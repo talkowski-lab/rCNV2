@@ -47,7 +47,7 @@ VOLUME ["/root/.config"]
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 4bb4c2be2d7364cf54dfe8dd4b547f27627967b6 && \
+    git checkout cae0b0a227542acfcc98bde642f17edf060d16a4 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)
