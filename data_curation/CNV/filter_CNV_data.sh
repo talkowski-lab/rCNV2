@@ -10,6 +10,10 @@
 
 # Commands executed to filter raw CNV data
 
+# Note: these commands are provided as a reference for what was executed on
+# the raw CNV data. In practice, these tasks were parallelized in FireCloud.
+# See filter_CNV_data.wdl for more details
+
 
 # Launch docker image
 docker run --rm -it talkowski/rcnv
@@ -48,6 +52,7 @@ while read cohort N; do
     --allcohorts all_raw_cnvs.bed.gz \
     --allcohorts_nsamp $allcohorts_nsamp \
     --gnomad refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
+    --gnomad-af-field POPMAX_AF \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     rare_cnv_curated/$cohort.rCNV.bed.gz
@@ -71,6 +76,7 @@ for cohort in PGC SSC; do
     --allcohorts all_raw_cnvs.bed.gz \
     --allcohorts_nsamp $allcohorts_nsamp \
     --gnomad refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
+    --gnomad-af-field POPMAX_AF \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     ultrarare_cnv_curated/$cohort.urCNV.bed.gz

@@ -44,6 +44,12 @@ RUN apt-get update -qqy && apt-get install -qqy \
     gcloud --version
 VOLUME ["/root/.config"]
 
+# Clone rCNV2 repo
+RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
+    cd /opt/rCNV2 && \
+    git checkout 4bb4c2be2d7364cf54dfe8dd4b547f27627967b6 && \
+    cd -
+
 # Developer utilities: add bash aliases, etc (for convenience)
 RUN echo 'alias l="ls -ltrha"' >> ~/.bashrc \
     && echo 'alias less="zless"' >> ~/.bashrc

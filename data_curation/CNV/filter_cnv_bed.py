@@ -65,7 +65,7 @@ def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
 
 
 # Read gnomAD sites VCF for frequency filtering
-def read_gnomad(vcfin, maxfreq):
+def read_gnomad(vcfin, maxfreq, af_field='AF'):
     """
     Reads a gnomAD-SV sites vcf and converts it to a BedTool
     """
@@ -80,11 +80,15 @@ def read_gnomad(vcfin, maxfreq):
             if record.info['SVTYPE'] not in 'DEL DUP MCNV'.split():
                 continue
 
-            af = record.info['AF']
-            if len(af) > 2:
-                af = sum(af)
+            if af_field in record.info.keys():
+                af = record.info[af_field]
             else:
-                af = af[0]
+                af = record.info['AF']
+            if isinstance(af, tuple):
+                if len(af) > 2:
+                    af = sum(af)
+                else:
+                    af = af[0]
             if af <= maxfreq:
                 continue
 
@@ -109,6 +113,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('inbed', help='Input BED (supports "stdin").')
     parser.add_argument('outbed', help='Output BED (supports "stdout").')
+    parser.add_argument('--chr', help='Restrict to a subset of chromosomes. ' +
+                        'Specify as comma-separated list.')
     parser.add_argument('--minsize', type=int, help='Minimum CNV size. ' +
                         '[50kb]', default=50000)
     parser.add_argument('--maxsize', type=int, help='Maximum CNV size. ' +
@@ -136,6 +142,9 @@ def main():
                         'is specified.')
     parser.add_argument('-g', '--gnomad', help='gnomAD-SV VCF to use for ' +
                         'frequency filtering.')
+    parser.add_argument('--gnomad-af-field', help='Entry in INFO field of ' + 
+                        'gnomAD-SV VCF to use as frequency. [AF]', default='AF',
+                        dest='af_field')
     parser.add_argument('-z', '--bgzip', dest='bgzip', action='store_true',
                         help='Compress output BED with bgzip.')
 
@@ -147,9 +156,19 @@ def main():
     else:
         cnvs = pybedtools.BedTool(args.inbed)
 
+    # Restrict to a subset of chromosomes, if specified
+    if args.chr is not None:
+        chroms = args.chr.split(',')
+    cnvs = cnvs.filter(lambda x: x.chrom in chroms)
+
     # Restrict to autosomes
     autosomes = [i for subl in ['{0} chr{1}'.format(c, c).split() for c in range(1, 23)] for i in subl]
-    cnvs = cnvs.filter(lambda x: x.chrom in autosomes).saveas()
+    cnvs = cnvs.filter(lambda x: x.chrom in autosomes)
+
+    # Loose restriction on CNV minimum size prior to self-intersect
+    # (It is impossible to attain target RO with CNVs smaller than 
+    #  args.recipoverlap * args.minsize)
+    cnvs = cnvs.filter(lambda x: x.stop - x.start >= (args.recipoverlap * args.minsize) ).saveas()
 
     # Restrict on self-intersection
     if args.nsamp is not None:
@@ -170,7 +189,7 @@ def main():
 
     # Restrict on gnomAD 
     if args.gnomad is not None:
-        gbed = read_gnomad(args.gnomad, args.maxfreq)
+        gbed = read_gnomad(args.gnomad, args.maxfreq, args.af_field)
         cnvs = freq_filter(cnvs, gbed, 0, maxFreq=args.maxfreq, 
                            ro=args.recipoverlap, dist=args.dist)
     
