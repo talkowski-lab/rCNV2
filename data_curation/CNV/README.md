@@ -32,10 +32,10 @@ We aggregated CNV data from multiple sources, listed below:
 | Cooper<sup>1</sup> | [Cooper _et al._, _Nat. Genet._ (2011)](https://www.nature.com/articles/ng.909) | [21841781](https://www.ncbi.nlm.nih.gov/pubmed/21841781) | Ill. 550k-610k (75%), Custom 1.2M (25%) | hg19 | DD | 0<sup>1</sup> | 8,329 |
 | SSC<sup>2</sup> | [Sanders _et at._, _Neuron_ (2015)](https://www.sciencedirect.com/science/article/pii/S0896627315007734?) | [26402605](https://www.ncbi.nlm.nih.gov/pubmed/26402605) | Omni 1Mv3 (46%), Omni 2.5 (41%), Omni 1Mv1 (13%) | hg18 | ASD | 2,795 | 0<sup>2</sup> |
 | UKBB | [Macé _et al._, _Nat. Comms._ (2017)](https://www.nature.com/articles/s41467-017-00556-x) | [28963451](https://www.ncbi.nlm.nih.gov/pubmed/28963451) | UKBB Affy Axiom (100%) | hg18 (?) | Mixed | 0<sup>3</sup> | 480,501<sup>3</sup> |
-| CHOP | - | - | Mixed Illumina SNP genotyping platforms | hg19 (?) | TBD | 287,901<sup>4</sup> | 0<sup>4</sup> |
-| GeneDX | - | - | TBD | hg18 & hg19 | Mixed | TBD | TBD |
-| TSAICG | [Huang _et al._, _Neuron_ (2017)](https://www.sciencedirect.com/science/article/pii/S0896627317305081) | [28641109](https://www.ncbi.nlm.nih.gov/pubmed/28641109) | OmniExpress (100%) | TBD | TS | 2,434 | 4,093 |
-| BCH | [Talkowski _et al._, _Cell_ (2012)](https://www.sciencedirect.com/science/article/pii/S0092867412004114) | [22521361](https://www.ncbi.nlm.nih.gov/pubmed/22521361) | TBD | TBD | TBD | TBD | TBD |  
+| CHOP | - | - | Mixed Illumina SNP genotyping platforms | hg19 | Mixed | 287,901<sup>4</sup> | 0<sup>4</sup> |
+| GDX | - | - | TBD? | hg18 & hg19 | Mixed | 9,959 | 0 |
+| TSAICG | [Huang _et al._, _Neuron_ (2017)](https://www.sciencedirect.com/science/article/pii/S0896627317305081) | [28641109](https://www.ncbi.nlm.nih.gov/pubmed/28641109) | OmniExpress (100%) | hg19 | TS | 2,434 | 4,093 |
+| BCH | [Talkowski _et al._, _Cell_ (2012)](https://www.sciencedirect.com/science/article/pii/S0092867412004114) | [22521361](https://www.ncbi.nlm.nih.gov/pubmed/22521361) | TBD? | hg18 | Mixed | 3,591 | 0 |  
 
 #### Notes on raw CNV data   
 1. Only retained control samples from Cooper _et al._. All cases from Cooper _et al._ also appear in Coe _et al._.  
@@ -51,7 +51,7 @@ Some datasets required manual curation prior to inclusion. Where necessary, thes
 
  * **SSC**: CNVs were filtered on pCNV ≤ 10<sup>-9</sup>, per recommendation of the authors.  
  * **UKBB**: CNVs were filtered on quality score ≥ 20.  
- * **CHOP**: CNVs were filtered on quality score ≥ 20 and CNV size ≥ 25kb while requiring at least 10 SNPs per CNV. After filtering, samples with >100 calls were excluded as outliers (which corresponded to the \~95th percentile).    
+ * **CHOP**: CNVs were filtered on quality score ≥ 20 and CNV size ≥ 25kb while requiring at least 10 SNPs per CNV. After CNV filtering, samples with `LRR_SD` < 0.35 or >100 calls were excluded as outliers, as well as samples genotyped on arrays with < 175k SNP probes.    
 
 ### Raw CNV callset properties  
 
@@ -64,23 +64,35 @@ The properties of each callset are listed below after initial data processing st
 | Cooper | 0 | 0 | - | - |  - | 8,329 | 432,478 | 1.8 kb | 8.04:1 | 51.9 |
 | SSC | 2,795 | 30,867 | 21.0 kb | 3.09:1 | 11.0 | 0 | 0 | - | - | - |
 | UKBB | 0 | 0 | - | - | - | 480,501 | 1,595,472 | 64.7 kb | 9.73:1 | 3.3 |
-| CHOP | 274,816 | 3,442,538 | 62.1 kb | 1.14:1 | 12.5 | 0 | 0 | - | - | - |
-| GeneDX | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| TSAICG | 2,434 | TBD | TBD | TBD | TBD | 4,093 | TBD | TBD | TBD | TBD |
-| BCH | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| CHOP | 209,514 | 3,241,044 | 61.1 kb | 1.05:1 | 15.5 | 0 | 0 | - | - | - |
+| GDX | 9,959 | 20,789 | 196.3 kb | 1:1.76 | 2.1 | 0 | 0 | - | - | - |
+| TSAICG | 2,434 | 3,541 | 91.1 kb | 1.01:1 | 1.5 | 4,093 | 5,834 | 91.3 kb | 1:1.08 | 1.4 |
+| BCH | 3,591 | 5,211 | 206.4 kb | 1:1.27 | 1.5 | 0 | 0 | - | - | - |
 
 ### Raw data access  
 
-All raw CNV data is stored in a protected Google Cloud bucket, here:  
+All raw CNV data files and their tabix indexes are stored in a protected Google Cloud bucket, here:  
 ```
 $ gsutil ls gs://rcnv_project/raw_data/cnv/
 
+gs://rcnv_project/raw_data/cnv/BCH.raw.bed.gz
+gs://rcnv_project/raw_data/cnv/BCH.raw.bed.gz.tbi
 gs://rcnv_project/raw_data/cnv/CHOP.raw.bed.gz
+gs://rcnv_project/raw_data/cnv/CHOP.raw.bed.gz.tbi
 gs://rcnv_project/raw_data/cnv/Coe.raw.bed.gz
+gs://rcnv_project/raw_data/cnv/Coe.raw.bed.gz.tbi
 gs://rcnv_project/raw_data/cnv/Cooper.raw.bed.gz
+gs://rcnv_project/raw_data/cnv/Cooper.raw.bed.gz.tbi
+gs://rcnv_project/raw_data/cnv/GDX.raw.bed.gz
+gs://rcnv_project/raw_data/cnv/GDX.raw.bed.gz.tbi
 gs://rcnv_project/raw_data/cnv/PGC.raw.bed.gz
+gs://rcnv_project/raw_data/cnv/PGC.raw.bed.gz.tbi
 gs://rcnv_project/raw_data/cnv/SSC.raw.bed.gz
+gs://rcnv_project/raw_data/cnv/SSC.raw.bed.gz.tbi
+gs://rcnv_project/raw_data/cnv/TSAICG.raw.bed.gz
+gs://rcnv_project/raw_data/cnv/TSAICG.raw.bed.gz.tbi
 gs://rcnv_project/raw_data/cnv/UKBB.raw.bed.gz
+gs://rcnv_project/raw_data/cnv/UKBB.raw.bed.gz.tbi
 ```
 
 Note that permissions must be granted per user prior to data access.  
@@ -92,7 +104,7 @@ All raw CNV data was subjected to the same set of global filters:
 2. Does not have substantial overlap<sup>1</sup> a common (`POPMAX AF`>1%) CNV from WGS resolution in gnomAD-SV<sup>2</sup> ([Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
 3. Does not have substantial overlap<sup>1</sup> with other CNVs in at least 1% of all samples within the same dataset
 4. Does not have substantial overlap<sup>1</sup> with other CNVs in at least 1% of all samples across all datasets
-5. CNV size ≥ 50kb and ≤ 10Mb
+5. CNV size ≥ 100kb and ≤ 10Mb
 6. Not substantially covered<sup>3</sup> by somatically hypermutable sites (described in [Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
 7. Not substantially covered<sup>3</sup> by segmental duplications and/or simple repeats  
 8. Not substantially covered<sup>3</sup> by N-masked regions of the hg19 reference genome assembly  
@@ -114,7 +126,7 @@ After the filtering steps described above, the datasets were as follows:
 | SSC | TBD | TBD | TBD | TBD | TBD | 0 | 0 | - | - | - |
 | UKBB | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | CHOP | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| GeneDX | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| GDX | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | TSAICG | 2,434 | TBD | TBD | TBD | TBD | 4,093 | TBD | TBD | TBD | TBD |
 | BCH | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 
@@ -140,6 +152,6 @@ After the filtering steps described above, the datasets were as follows:
 | SSC | TBD | TBD | TBD | TBD | TBD | 0 | 0 | - | - | - |
 | UKBB | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | CHOP | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| GeneDX | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| GDX | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | TSAICG | 2,434 | TBD | TBD | TBD | TBD | 4,093 | TBD | TBD | TBD | TBD |
 | BCH | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |

@@ -39,7 +39,7 @@ allcohorts_nsamp=$( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt \
 mkdir rare_cnv_curated/
 while read cohort N; do
   /opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
-    --minsize 50000 \
+    --minsize 100000 \
     --maxsize 10000000 \
     --nsamp $N \
     --maxfreq 0.01 \
@@ -63,7 +63,7 @@ done < <( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f1-2 )
 mkdir ultrarare_cnv_curated/
 for cohort in PGC SSC; do
   /opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
-    --minsize 50000 \
+    --minsize 100000 \
     --maxsize 10000000 \
     --nsamp $N \
     --maxfreq 0.0001 \
