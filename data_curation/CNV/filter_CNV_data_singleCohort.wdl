@@ -141,7 +141,7 @@ task filter_cnvs_singleChrom {
     docker: "talkowski/rcnv@sha256:9a0fdbe591550955bfb9b9139eb2e53764bfeef3e36217ef84b1d1628a44ad16"
     preemptible: 1
     memory: "4 GB"
-    disks: "local-disk 15 SSD"
+    disks: "local-disk 30 SSD"
   }
 
   output {

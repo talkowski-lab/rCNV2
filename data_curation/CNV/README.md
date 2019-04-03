@@ -28,8 +28,8 @@ We aggregated CNV data from multiple sources, listed below:
 | Dataset | Citation | PMID | Platform(s) | Build | Phenos | N Cases | N Ctrls |
 | --- | :--- | :--- | :--- | :--- | :--- | ---: | ---: |
 | PGC | [Marshall _et al._, _Nat. Genet._ (2017)](https://www.nature.com/articles/ng.3725) | [27869829](https://www.ncbi.nlm.nih.gov/pubmed/27869829) | Affy 6.0 (37%), Omni Express (31%), Omni Express Plus (12%), Other (20%) | hg18 | SCZ | 21,094 | 20,277 |
-| Coe | [Coe _et al._, _Nat. Genet._ (2014)](https://www.nature.com/articles/ng.3092) | [25217958](https://www.ncbi.nlm.nih.gov/pubmed/25217958) | Cases: SignatureChip OS v2.0 (58%), SignatureChip OS v1.0 (34%), Other (8%); Controls: Affy 6.0 (100%) | hg19 | DD | 29,083 | 11,256 |
 | Cooper<sup>1</sup> | [Cooper _et al._, _Nat. Genet._ (2011)](https://www.nature.com/articles/ng.909) | [21841781](https://www.ncbi.nlm.nih.gov/pubmed/21841781) | Ill. 550k-610k (75%), Custom 1.2M (25%) | hg19 | DD | 0<sup>1</sup> | 8,329 |
+| Coe | [Coe _et al._, _Nat. Genet._ (2014)](https://www.nature.com/articles/ng.3092) | [25217958](https://www.ncbi.nlm.nih.gov/pubmed/25217958) | Cases: SignatureChip OS v2.0 (58%), SignatureChip OS v1.0 (34%), Other (8%); Controls: Affy 6.0 (100%) | hg19 | DD | 29,083 | 11,256 |
 | SSC<sup>2</sup> | [Sanders _et at._, _Neuron_ (2015)](https://www.sciencedirect.com/science/article/pii/S0896627315007734?) | [26402605](https://www.ncbi.nlm.nih.gov/pubmed/26402605) | Omni 1Mv3 (46%), Omni 2.5 (41%), Omni 1Mv1 (13%) | hg18 | ASD | 2,795 | 0<sup>2</sup> |
 | UKBB | [Macé _et al._, _Nat. Comms._ (2017)](https://www.nature.com/articles/s41467-017-00556-x) | [28963451](https://www.ncbi.nlm.nih.gov/pubmed/28963451) | UKBB Affy Axiom (100%) | hg18 (?) | Mixed | 0<sup>3</sup> | 480,501<sup>3</sup> |
 | CHOP | - | - | Mixed Illumina SNP genotyping platforms | hg19 | Mixed | 287,901<sup>4</sup> | 0<sup>4</sup> |
@@ -55,19 +55,21 @@ Some datasets required manual curation prior to inclusion. Where necessary, thes
 
 ### Raw CNV callset properties  
 
-The properties of each callset are listed below after initial data processing steps but prior to further filtering:  
+The properties of each callset are listed below after initial data processing steps but prior to further filtering.  
 
-| Dataset | N Cases | Case CNVs | Case Median Size | Case DEL:DUP | CNVs /Case | N Ctrls | Ctrl CNVs | Ctrl Median Size | Ctrl DEL:DUP | CNVs /Ctrl | 
+| Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP | 
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| PGC | 21,094 | 42,096 | 79.7 kb | 1:1.04 | 2.0 | 20,277 | 40,464 | 78.2 kb | 1:1.03 | 2.0 |
-| Coe | 29,083 | 28,782 | 188.4 kb | 1:1.11 | 1.0 | 11,256 | 273,331 | 53.4 kb | 1.23:1 | 24.3 |
-| Cooper | 0 | 0 | - | - |  - | 8,329 | 432,478 | 1.8 kb | 8.04:1 | 51.9 |
-| SSC | 2,795 | 30,867 | 21.0 kb | 3.09:1 | 11.0 | 0 | 0 | - | - | - |
-| UKBB | 0 | 0 | - | - | - | 480,501 | 1,595,472 | 64.7 kb | 9.73:1 | 3.3 |
-| CHOP | 209,514 | 3,241,044 | 61.1 kb | 1.05:1 | 15.5 | 0 | 0 | - | - | - |
-| GDX | 9,959 | 20,789 | 196.3 kb | 1:1.76 | 2.1 | 0 | 0 | - | - | - |
-| TSAICG | 2,434 | 3,541 | 91.1 kb | 1.01:1 | 1.5 | 4,093 | 5,834 | 91.3 kb | 1:1.08 | 1.4 |
-| BCH | 3,591 | 5,211 | 206.4 kb | 1:1.27 | 1.5 | 0 | 0 | - | - | - |
+| PGC | 21,094 | 42,096 | 2.00 | 79.7 kb | 1:1.04 | 20,277 | 40,464 | 2.00 | 78.2 kb | 1:1.03 |
+| Cooper | 0 | 0 | - | - | - | 8,329 | 432,478 | 51.92 | 1.9 kb | 8.04:1 |
+| Coe | 29,083 | 28,782 | 0.99 | 188.4 kb | 1:1.11 | 11,256 | 273,331 | 24.28 | 53.4 kb | 1.24:1 |
+| SSC | 2,795 | 30,867 | 11.04 | 21.0 kb | 3.09:1 | 0 | 0 | - | - | - |
+| UKBB | 0 | 0 | - | - | - | 480,501 | 1,595,472 | 3.32 | 64.7 kb | 9.74:1 |
+| CHOP | 209,514 | 3,241,044 | 15.47 | 61.1 kb | 1.05:1 | 0 | 0 | - | - | - |
+| GDX | 9,959 | 20,789 | 2.09 | 196.3 kb | 1:1.76 | 0 | 0 | - | - | - |
+| TSAICG | 2,434 | 3,541 | 1.45 | 91.1 kb | 1.01:1 | 4,093 | 5,834 | 1.43 | 91.3 kb | 1:1.08 |
+| BCH | 3,591 | 5,211 | 1.45 | 206.4 kb | 1:1.27 | 0 | 0 | - | - | - |
+
+The information for this table was collected using `collect_cohort_stats.sh`.  
 
 ### Raw data access  
 
@@ -100,16 +102,16 @@ Note that permissions must be granted per user prior to data access.
 ## Curation Steps: Rare CNVs  
 
 All raw CNV data was subjected to the same set of global filters:  
-1. Restricted to autosomes
-2. Does not have substantial overlap<sup>1</sup> with a common (`POPMAX AF`>1%) CNV from WGS resolution in gnomAD-SV<sup>2</sup> ([Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
-3. Does not have substantial overlap<sup>1</sup> with a common (`AF`>1%) CNV from WGS resolution in the 1000 Genomes Project, Phase III ([Sudmant _et al._, _Nature_ (2015)](https://www.nature.com/articles/nature15394))  
-4. Does not have substantial overlap<sup>1</sup> with a common (`AF`>1%) CNV from WGS resolution in the NIH Center for Common Disease Genetics SV callset ([Abel _et al._, _bioRxiv_ (2018)](https://www.biorxiv.org/content/10.1101/508515v1))  
-5. Does not have substantial overlap<sup>1</sup> with other CNVs in at least 1% of all samples within the same dataset
-6. Does not have substantial overlap<sup>1</sup> with other CNVs in at least 1% of all samples in any of the other array CNV datasets (compared pairwise, one at a time)
-7. CNV size ≥ 100kb and ≤ 10Mb
-8. Not substantially covered<sup>3</sup> by somatically hypermutable sites (described in [Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
-9. Not substantially covered<sup>3</sup> by segmental duplications and/or simple repeats  
-10. Not substantially covered<sup>3</sup> by N-masked regions of the hg19 reference genome assembly  
+ * Restricted to autosomes
+ * Does not have substantial overlap<sup>1</sup> with a common (`POPMAX AF`>1%) CNV from WGS resolution in gnomAD-SV<sup>2</sup> ([Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
+ * Does not have substantial overlap<sup>1</sup> with a common (`AF`>1%) CNV from WGS resolution in the 1000 Genomes Project, Phase III ([Sudmant _et al._, _Nature_ (2015)](https://www.nature.com/articles/nature15394))  
+ * Does not have substantial overlap<sup>1</sup> with a common (`AF`>1%) CNV from WGS resolution in the NIH Center for Common Disease Genetics SV callset ([Abel _et al._, _bioRxiv_ (2018)](https://www.biorxiv.org/content/10.1101/508515v1))  
+ * Does not have substantial overlap<sup>1</sup> with other CNVs in at least 1% of all samples within the same dataset
+ * Does not have substantial overlap<sup>1</sup> with other CNVs in at least 1% of all samples in any of the other array CNV datasets (compared pairwise, one at a time)
+ * CNV size ≥ 100kb and ≤ 10Mb
+ * Not substantially covered<sup>3</sup> by somatically hypermutable sites (described in [Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
+ * Not substantially covered<sup>3</sup> by segmental duplications and/or simple repeats  
+ * Not substantially covered<sup>3</sup> by N-masked regions of the hg19 reference genome assembly  
 
 #### Notes on curation  
 1. "Substantial" overlap determined based on ≥50% reciprocal overlap using BEDTools ([Quinlan & Hall, _Bioinformatics_ (2010)](https://www.ncbi.nlm.nih.gov/pubmed/20110278)). For overlap-based comparisons, both breakpoints were required to be within ±50kb, and CNV type (DEL vs. DUP) was required to match.  
@@ -118,45 +120,49 @@ All raw CNV data was subjected to the same set of global filters:
 
 ### Rare CNV callset properties
 
-After the filtering steps described above, the datasets were as follows:
+The properties of each rare CNV callset are listed below after the above filtering steps.  
 
-| Dataset | N Cases | Case CNVs | Case Median Size | Case DEL:DUP | CNVs /Case | N Ctrls | Ctrl CNVs | Ctrl Median Size | Ctrl DEL:DUP | CNVs /Ctrl | 
+| Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP | 
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| PGC | 21,094 | TBD | TBD | TBD | TBD | 20,277 | TBD | TBD | TBD | TBD |
-| Coe | 29,083 | TBD | TBD | TBD | TBD | 11,256 | TBD | TBD | TBD | TBD |
-| Cooper | 0 | 0 | - | - |  - | 8,329 | TBD | TBD | TBD | TBD |
-| SSC | TBD | TBD | TBD | TBD | TBD | 0 | 0 | - | - | - |
-| UKBB | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| CHOP | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| GDX | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| TSAICG | 2,434 | TBD | TBD | TBD | TBD | 4,093 | TBD | TBD | TBD | TBD |
-| BCH | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| PGC | 21,094 | 14,090 | 0.67 | 188.3 kb | 1:1.33 | 20,277 | 12,914 | 0.64 | 183.6 kb | 1:1.29 |
+| Cooper | 0 | 0 | - | - | - | 8,329 | 4,367 | 0.52 | 172.4 kb | 1.37:1 |
+| Coe | 29,083 | 18,684 | 0.64 | 262.7 kb | 1:1.19 | 11,256 | 10,140 | 0.90 | 183.4 kb | 1:1.69 |
+| SSC | 2,795 | 2,088 | 0.75 | 191.3 kb | 1:1.12 | 0 | 0 | - | - | - |
+| UKBB | 0 | 0 | - | - | - | 480,501 | 0 | - | - | - |
+| CHOP | 209,514 | 0 | - | - | - | 0 | 0 | - | - | - |
+| GDX | 9,959 | 9,861 | 0.99 | 256.1 kb | 1:1.35 | 0 | 0 | - | - | - |
+| TSAICG | 2,434 | 1,525 | 0.63 | 193.0 kb | 1:1.33 | 4,093 | 2,535 | 0.62 | 183.3 kb | 1:1.35 |
+| BCH | 3,591 | 2,833 | 0.79 | 324.4 kb | 1:1.43 | 0 | 0 | - | - | - |
 
+The information for this table was collected using `collect_cohort_stats.sh`.  
 
 ## Curation Steps: Ultra-rare CNVs  
 
 In parallel to the creation of the rare CNV dataset (described above), a dataset of ultra-rare CNVs was also generated.
 
 These ultra-rare CNVs were subjected to the same set of filters as above, with the following modifications:  
-2. Does not have substantial overlap<sup>1</sup> with **a non-ultra-rare (`POPMAX AF`>0.01%) CNV** from WGS resolution in gnomAD-SV<sup>2</sup> ([Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
-3. Does not have substantial overlap<sup>1</sup> with **a non-ultra-rare (`AF`>0.01%) CNV** from WGS resolution in the 1000 Genomes Project, Phase III ([Sudmant _et al._, _Nature_ (2015)](https://www.nature.com/articles/nature15394))  
-4. Does not have substantial overlap<sup>1</sup> with **a non-ultra-rare (`AF`>0.01%) CNV** from WGS resolution in the NIH Center for Common Disease Genetics SV callset ([Abel _et al._, _bioRxiv_ (2018)](https://www.biorxiv.org/content/10.1101/508515v1))  
-5. Does not have substantial overlap<sup>1</sup> with other CNVs in **at least 0.01% of all samples** within the same dataset
-6. Does not have substantial overlap<sup>1</sup> with other CNVs in **at least 0.01% of all samples** in any of the other array CNV datasets (compared pairwise, one at a time)
+ * Does not have substantial overlap with **a non-ultra-rare (`POPMAX AF`>0.01%) CNV** from WGS resolution in gnomAD-SV ([Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
+ * Does not have substantial overlap with **a non-ultra-rare (`AF`>0.01%) CNV** from WGS resolution in the 1000 Genomes Project, Phase III ([Sudmant _et al._, _Nature_ (2015)](https://www.nature.com/articles/nature15394))  
+ * Does not have substantial overlap with **a non-ultra-rare (`AF`>0.01%) CNV** from WGS resolution in the NIH Center for Common Disease Genetics SV callset ([Abel _et al._, _bioRxiv_ (2018)](https://www.biorxiv.org/content/10.1101/508515v1))  
+ * Does not have substantial overlap with other CNVs in **at least 0.01% of all samples** within the same dataset
+ * Does not have substantial overlap with other CNVs in **at least 0.01% of all samples** in any of the other array CNV datasets (compared pairwise, one at a time)
 
 
 ### Ultra-rare CNV callset properties
 
-After the filtering steps described above, the datasets were as follows:
+The properties of each ultra-rare CNV callset are listed below after the above filtering steps.  
 
-| Dataset | N Cases | Case CNVs | Case Median Size | Case DEL:DUP | CNVs /Case | N Ctrls | Ctrl CNVs | Ctrl Median Size | Ctrl DEL:DUP | CNVs /Ctrl | 
+| Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP | 
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| PGC | 21,094 | TBD | TBD | TBD | TBD | 20,277 | TBD | TBD | TBD | TBD |
-| Coe | 29,083 | TBD | TBD | TBD | TBD | 11,256 | TBD | TBD | TBD | TBD |
-| Cooper | 0 | 0 | - | - |  - | 8,329 | TBD | TBD | TBD | TBD |
-| SSC | TBD | TBD | TBD | TBD | TBD | 0 | 0 | - | - | - |
-| UKBB | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| CHOP | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| GDX | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| TSAICG | 2,434 | TBD | TBD | TBD | TBD | 4,093 | TBD | TBD | TBD | TBD |
-| BCH | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| PGC | 21,094 | 5,631 | 0.27 | 248.3 kb | 1:1.66 | 20,277 | 4,890 | 0.24 | 237.4 kb | 1:1.55 |
+| Cooper | 0 | 0 | - | - | - | 8,329 | 1,622 | 0.19 | 224.8 kb | 1.06:1 |
+| Coe | 29,083 | 9,119 | 0.31 | 367.1 kb | 1:1.19 | 11,256 | 3,218 | 0.29 | 239.6 kb | 1:1.80 |
+| SSC | 2,795 | 746 | 0.27 | 261.2 kb | 1:1.22 | 0 | 0 | - | - | - |
+| UKBB | 0 | 0 | - | - | - | 480,501 | 0 | - | - | - |
+| CHOP | 209,514 | 0 | - | - | - | 0 | 0 | - | - | - |
+| GDX | 9,959 | 5,244 | 0.53 | 359.2 kb | 1:1.26 | 0 | 0 | - | - | - |
+| TSAICG | 2,434 | 644 | 0.26 | 242.8 kb | 1:1.62 | 4,093 | 1,020 | 0.25 | 238.8 kb | 1:1.68 |
+| BCH | 3,591 | 1,736 | 0.48 | 390.4 kb | 1:1.43 | 0 | 0 | - | - | - |
+
+The information for this table was collected using `collect_cohort_stats.sh`.  
+

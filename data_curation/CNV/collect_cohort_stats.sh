@@ -23,37 +23,114 @@ mkdir ./cleaned_cnv/
 gsutil cp -r gs://rcnv_project/cleaned_data/cnv/* ./cleaned_cnv/
 
 
+# Add helper alias for formatting long integers
+alias addcom="sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta'"
+
+
+# Master function to collect CNV data
+collect_stats () {
+  infile=$1
+
+  while read cohort N_total N_case N_ctrl bed; do
+    for wrapper in 1; do
+      echo "$cohort"
+
+      if [ -s $bed ]; then
+        n_case_cnv=$( zcat $bed \
+                      | fgrep -v "#" | fgrep -v CTRL | wc -l )
+        n_ctrl_cnv=$( zcat $bed \
+                      | fgrep -v "#" | fgrep -w CTRL | wc -l )
+      else
+        n_case_cnv=0
+        n_ctrl_cnv=0
+      fi
+
+      # Case stats
+      echo "$N_case" | addcom
+      if [ $n_case_cnv -gt 0 ]; then
+        # Count of CNVs
+        echo "$n_case_cnv" | addcom
+        # Count per sample
+        echo "" | awk -v n_case=$N_case -v n_cnv=$n_case_cnv \
+                  '{ printf "%0.2f\n", n_cnv/n_case }'
+        # Median size
+        zcat $bed \
+        | fgrep -v "#" \
+        | fgrep -v CTRL \
+        | awk '{ print $3-$2 }' \
+        | sort -nk1,1 \
+        | median \
+        | awk '{ printf "%0.1f kb\n", $1/1000 }'
+        # DEL : DUP ratio
+        n_case_del=$( zcat $bed | fgrep -v "#" \
+                      | fgrep -v CTRL | fgrep -w DEL | wc -l )
+        n_case_dup=$( zcat $bed | fgrep -v "#" \
+                      | fgrep -v CTRL | fgrep -w DUP | wc -l )
+        if [ $n_case_del -ge $n_case_dup ]; then
+          echo "" | awk -v del=$n_case_del -v dup=$n_case_dup \
+                    '{ printf "%0.2f:1\n", del/dup }'
+        else
+          echo "" | awk -v del=$n_case_del -v dup=$n_case_dup \
+                    '{ printf "1:%0.2f\n", dup/del }'
+        fi
+      else
+        echo -e "0\t-\t-\t-"
+      fi
+
+      # Control stats
+      echo "$N_ctrl" | addcom
+      if [ $n_ctrl_cnv -gt 0 ]; then
+        # Count of CNVs
+        echo "$n_ctrl_cnv" | addcom
+        # Count per sample
+        echo "" | awk -v n_ctrl=$N_ctrl -v n_cnv=$n_ctrl_cnv \
+                  '{ printf "%0.2f\n", n_cnv/n_ctrl }'
+        # Median size
+        zcat $bed \
+        | fgrep -v "#" \
+        | fgrep -w CTRL \
+        | awk '{ print $3-$2 }' \
+        | sort -nk1,1 \
+        | median \
+        | awk '{ printf "%0.1f kb\n", $1/1000 }'
+        # DEL : DUP ratio
+        n_ctrl_del=$( zcat $bed | fgrep -v "#" \
+                      | fgrep -w CTRL | fgrep -w DEL | wc -l )
+        n_ctrl_dup=$( zcat $bed | fgrep -v "#" \
+                      | fgrep -w CTRL | fgrep -w DUP | wc -l )
+        if [ $n_ctrl_del -ge $n_ctrl_dup ]; then
+          echo "" | awk -v del=$n_ctrl_del -v dup=$n_ctrl_dup \
+                    '{ printf "%0.2f:1\n", del/dup }'
+        else
+          echo "" | awk -v del=$n_ctrl_del -v dup=$n_ctrl_dup \
+                    '{ printf "1:%0.2f\n", dup/del }'
+        fi
+      else
+        echo -e "0\t-\t-\t-"
+      fi
+    done | paste -s
+  done < <( fgrep -v "#" $infile ) \
+  | sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' -e 's/\t/\ \|\ /g'
+}
+
+
 # Collect raw CNV data
-while read cohort N_total N_case N_ctrl; do
-  for wrapper in 1; do
-    echo "$cohort"
+awk -v OFS="\t" '{ print $0, "/raw_cnv/"$1".raw.bed.gz" }' \
+  /opt/rCNV2/refs/rCNV_sample_counts.txt \
+> raw_cnv.input.txt
+collect_stats raw_cnv.input.txt
 
-    echo "$N_case"
-    n_case_cnv=$( zcat raw_cnv/$cohort.raw.bed.gz \
-                  | fgrep -v "#" | fgrep -v CTRL | wc -l )
-    if [ -s raw_cnv/$cohort.raw.bed.gz ] && [ $n_case_cnv -gt 0 ]; then
-      echo "$n_case_cnv"
-      zcat raw_cnv/$cohort.raw.bed.gz \
-      | fgrep -v "#" \
-      | awk '{ print $3-$2 }' \
-      | sort -nk1,1 \
-      | median
-      n_case_del=$( zcat raw_cnv/$cohort.raw.bed.gz | fgrep -v "#" \
-                    | fgrep -v CTRL | fgrep -w DEL | wc -l )
-      n_case_dup=$( zcat raw_cnv/$cohort.raw.bed.gz | fgrep -v "#" \
-                    | fgrep -v CTRL | fgrep -w DUP | wc -l )
 
-    else
-      echo -e "0\t-\t-\t-"
-    fi
+# Collect filtered rare CNV data
+awk -v OFS="\t" '{ print $0, "/cleaned_cnv/"$1".rCNV.bed.gz" }' \
+  /opt/rCNV2/refs/rCNV_sample_counts.txt \
+> rare_cnv.input.txt
+collect_stats rare_cnv.input.txt
 
-    # echo "$N_ctrl"
-    # n_ctrl_cnv=$( zcat raw_cnv/$cohort.raw.bed.gz \
-    #               | fgrep -v "#" | fgrep -w CTRL | wc -l )
-    # if [ -s raw_cnv/$cohort.raw.bed.gz ] && [ $n_ctrl_cnv -gt 0 ]; then
-    #   echo YES
-    # else
-    #   echo -e "0\t-\t-\t-"
-    # fi
-  done | paste -s
-done < <( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt )
+
+# Collect filtered ultra-rare CNV data
+awk -v OFS="\t" '{ print $0, "/cleaned_cnv/"$1".uCNV.bed.gz" }' \
+  /opt/rCNV2/refs/rCNV_sample_counts.txt \
+> ultrarare_cnv.input.txt
+collect_stats ultrarare_cnv.input.txt
+
