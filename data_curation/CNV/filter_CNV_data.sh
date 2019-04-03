@@ -25,14 +25,26 @@ gsutil cp -r gs://rcnv_project/raw_data/cnv ./
 gsutil cp -r gs://rcnv_project/refs ./
 
 
-# Make master BED file of all raw CNV data
-zcat cnv/*bed.gz \
-| fgrep -v "#" \
-| sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
-| bgzip -c \
-> all_raw_cnvs.bed.gz
-allcohorts_nsamp=$( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt \
-                    | awk '{ sum+=$2 }END{ print sum }' )
+# # Make master BED file of all raw CNV data
+# zcat cnv/*bed.gz \
+# | fgrep -v "#" \
+# | sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
+# | bgzip -c \
+# > all_raw_cnvs.bed.gz
+# allcohorts_nsamp=$( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt \
+#                     | awk '{ sum+=$2 }END{ print sum }' )
+
+# Make master list of all raw CNV data per cohort
+while read cohort N; do
+  if [ -s cnv/$cohort.raw.bed.gz ]; then
+    echo "$cohort"
+    echo "$N"
+    echo "cnv/$cohort.raw.bed.gz"
+  fi \
+  | paste -s
+done < <( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f1-2 ) \
+| sort -nk2,2 \
+> raw_CNVs.per_cohort.txt
 
 
 # Filter each cohort for rare CNV callset
@@ -49,10 +61,11 @@ while read cohort N; do
     --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
     --blacklist refs/GRCh37.Nmask.bed.gz \
     --xcov 0.3 \
-    --allcohorts all_raw_cnvs.bed.gz \
-    --allcohorts_nsamp $allcohorts_nsamp \
-    --gnomad refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
-    --gnomad-af-field POPMAX_AF \
+    --cohorts-list raw_CNVs.per_cohort.txt \
+    --vcf refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
+    --vcf refs/1000Genomes_phase3.sites.vcf.gz \
+    --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
+    --vcf-af-field POPMAX_AF \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     rare_cnv_curated/$cohort.rCNV.bed.gz
@@ -73,10 +86,11 @@ for cohort in PGC SSC; do
     --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
     --blacklist refs/GRCh37.Nmask.bed.gz \
     --xcov 0.3 \
-    --allcohorts all_raw_cnvs.bed.gz \
-    --allcohorts_nsamp $allcohorts_nsamp \
-    --gnomad refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
-    --gnomad-af-field POPMAX_AF \
+    --cohorts-list raw_CNVs.per_cohort.txt \
+    --vcf refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
+    --vcf refs/1000Genomes_phase3.sites.vcf.gz \
+    --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
+    --vcf-af-field POPMAX_AF \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     ultrarare_cnv_curated/$cohort.urCNV.bed.gz

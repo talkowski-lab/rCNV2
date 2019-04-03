@@ -17,6 +17,7 @@ import pybedtools
 import pysam
 from math import ceil
 import subprocess
+import csv
 
 
 # Generic BED vs BED frequency filtering function
@@ -34,7 +35,7 @@ def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
 
     # Throw out CNV type mismatches
     def _cnv_match(feature):
-        if str(feature[4]) == str(feature[10]) or str(feature[10]) == 'MCNV':
+        if str(feature[4]) == str(feature[10]) or str(feature[10]) in 'MCNV CNV'.split():
             return feature
     xbed = xbed.filter(_cnv_match)
 
@@ -64,10 +65,10 @@ def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
     return cnvsA.filter(_remove_fails, hits, cutoff).saveas()
 
 
-# Read gnomAD sites VCF for frequency filtering
-def read_gnomad(vcfin, maxfreq, af_field='AF'):
+# Read sites VCF for frequency filtering
+def read_vcf(vcfin, maxfreq, af_field='AF'):
     """
-    Reads a gnomAD-SV sites vcf and converts it to a BedTool
+    Reads a SV sites vcf and converts it to a BedTool
     """
     vcf = pysam.VariantFile(vcfin)
     header = vcf.header
@@ -77,7 +78,11 @@ def read_gnomad(vcfin, maxfreq, af_field='AF'):
 
         for record in vcf:
 
-            if record.info['SVTYPE'] not in 'DEL DUP MCNV'.split():
+            if record.info['SVTYPE'] not in 'DEL DUP MCNV CNV'.split():
+                continue
+
+            if record.filter.keys() != ['PASS'] \
+            and record.filter.keys() != ['MULTIALLELIC']:
                 continue
 
             if af_field in record.info.keys():
@@ -85,15 +90,16 @@ def read_gnomad(vcfin, maxfreq, af_field='AF'):
             else:
                 af = record.info['AF']
             if isinstance(af, tuple):
-                if len(af) > 2:
-                    af = sum(af)
+                if len(af) > 1:
+                    af = sum([f for a, f in zip(list(record.alts), list(af)) if a != '<CN=2>'])
                 else:
                     af = af[0]
             if af <= maxfreq:
                 continue
 
             flist = [str(record.chrom), str(record.pos), str(record.stop), 
-                     str(record.id), str(record.info['SVTYPE']), 'CTRL']
+                     str(record.id), str(record.info['SVTYPE']).split('_')[0],
+                     'CTRL']
 
             fstr = ' '.join(flist) + '\n'
 
@@ -135,16 +141,20 @@ def main():
     parser.add_argument('--xcov', type=float, help='Maximum coverage ' + 
                         'by any blacklist before excluding a CNV. [0.3]',
                         default=0.3)
+    parser.add_argument('--cohorts-list', help='list of all cohorts to be used ' + 
+                        'for freq filtering. Will compare each cohort to input ' + 
+                        'bed, one at a time. Requires three tab delimited ' +
+                        'columns: name, sample size, and path to BED.')
     parser.add_argument('--allcohorts', help='BED file of all unfiltered ' + 
                         'CNVs across all cohorts, to be used for freq filtering.')
     parser.add_argument('--allcohorts_nsamp', type=int, help='Number of samples ' +
                         'combined across all cohorts. Only used if --allcohorts ' +
                         'is specified.')
-    parser.add_argument('-g', '--gnomad', help='gnomAD-SV VCF to use for ' +
-                        'frequency filtering.')
-    parser.add_argument('--gnomad-af-field', help='Entry in INFO field of ' + 
-                        'gnomAD-SV VCF to use as frequency. [AF]', default='AF',
-                        dest='af_field')
+    parser.add_argument('-v', '--vcf', action='append', help='SV VCF to use for ' + 
+                        'frequency filtering. May be specified multiple times.')
+    parser.add_argument('--vcf-af-field', help='Entry in INFO field of SV VCF(s) ' + 
+                        'to use as frequency. Will default to AF if entry not ' +
+                        'found.[AF]', default='AF', dest='af_field')
     parser.add_argument('-z', '--bgzip', dest='bgzip', action='store_true',
                         help='Compress output BED with bgzip.')
 
@@ -187,18 +197,28 @@ def main():
     # Restrict on size
     cnvs = cnvs.filter(lambda x: len(x) >= args.minsize and len(x) <= args.maxsize).saveas()
 
-    # Restrict on gnomAD 
-    if args.gnomad is not None:
-        gbed = read_gnomad(args.gnomad, args.maxfreq, args.af_field)
-        cnvs = freq_filter(cnvs, gbed, 0, maxFreq=args.maxfreq, 
-                           ro=args.recipoverlap, dist=args.dist)
-    
+    # Restrict on VCFs 
+    if args.vcf is not None:
+        for vcfpath in args.vcf:
+            vbed = read_vcf(vcfpath, args.maxfreq, args.af_field)
+            cnvs = freq_filter(cnvs, vbed, 0, maxFreq=args.maxfreq, 
+                               ro=args.recipoverlap, dist=args.dist).saveas()
+
+    # Restrict on frequency filtering vs other cohorts
+    if args.cohorts_list is not None:
+        with open(args.cohorts_list) as fin:
+            clist = csv.reader(fin, delimiter='\t')
+            for name, N, bcnv_path in clist:
+                cnvs = freq_filter(cnvs, bcnv_path, int(N),
+                           maxFreq=args.maxfreq, ro=args.recipoverlap, 
+                           dist=args.dist).saveas()
+
     # Restrict on global intersection
     if args.allcohorts is not None \
     and args.allcohorts_nsamp is not None:
         cnvs = freq_filter(cnvs, args.allcohorts, args.allcohorts_nsamp,
                            maxFreq=args.maxfreq, ro=args.recipoverlap, 
-                           dist=args.dist)
+                           dist=args.dist).saveas()
 
     # Write filtered CNVs out to file
     outheader = '#chr\tstart\tend\tname\tcnv\tpheno'

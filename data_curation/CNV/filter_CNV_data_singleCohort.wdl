@@ -29,8 +29,7 @@ workflow filter_cnvs_singleCohort {
         contig=contig[0],
         rCNV_bucket=rCNV_bucket,
         max_freq="0.01",
-        CNV_suffix="rCNV",
-        output_bucket="${rCNV_bucket}/cleaned_data/cnv"
+        CNV_suffix="rCNV"
     }
     call filter_cnvs_singleChrom as filter_ultrarare {
       input:
@@ -40,8 +39,7 @@ workflow filter_cnvs_singleCohort {
         contig=contig[0],
         rCNV_bucket=rCNV_bucket,
         max_freq="0.0001",
-        CNV_suffix="uCNV",
-        output_bucket="${rCNV_bucket}/cleaned_data/cnv"
+        CNV_suffix="uCNV"
     }
   }
 
@@ -49,12 +47,14 @@ workflow filter_cnvs_singleCohort {
   call merge_beds as merge_rare {
     input:
       beds=filter_rare.filtered_cnvs,
-      prefix="${cohort}.rCNV"
+      prefix="${cohort}.rCNV",
+        output_bucket="${rCNV_bucket}/cleaned_data/cnv"
   }
   call merge_beds as merge_ultrarare {
     input:
       beds=filter_ultrarare.filtered_cnvs,
-      prefix="${cohort}.uCNV"
+      prefix="${cohort}.uCNV",
+        output_bucket="${rCNV_bucket}/cleaned_data/cnv"
   }
 
   output {
@@ -83,7 +83,7 @@ task filter_cnvs_singleChrom {
 
     # Make master BED file of all raw CNV data
     # Restrict to >= 50kb to reduce size of file
-    # Note: it's impossible to get >50% RO with a <50kb call given minimum size of 50kb
+    # Note: it's impossible to get >50% RO with a <50kb call given minimum size of 100kb
     for bed in cnv/*bed.gz; do
       tabix "$bed" ${contig} \
       | awk -v FS="\t" -v OFS="\t" '{ if ($3-$2>=50000) print $0 }'
@@ -117,7 +117,7 @@ task filter_cnvs_singleChrom {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:248a73d54fb07a505a2ef96cfdc02117c5b35dae7414062098b5a6716cc93830"
+    docker: "talkowski/rcnv@sha256:1734a1608a7076f1002bba8df058e2f49375e1a20317c3f37f6a6bdabd03b6c2"
     preemptible: 1
     memory: "8 GB"
     disks: "local-disk 30 SSD"
@@ -150,7 +150,7 @@ task merge_beds {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:248a73d54fb07a505a2ef96cfdc02117c5b35dae7414062098b5a6716cc93830"
+    docker: "talkowski/rcnv@sha256:1734a1608a7076f1002bba8df058e2f49375e1a20317c3f37f6a6bdabd03b6c2"
     preemptible: 1
   }
 

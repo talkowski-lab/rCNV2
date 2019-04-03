@@ -101,13 +101,15 @@ Note that permissions must be granted per user prior to data access.
 
 All raw CNV data was subjected to the same set of global filters:  
 1. Restricted to autosomes
-2. Does not have substantial overlap<sup>1</sup> a common (`POPMAX AF`>1%) CNV from WGS resolution in gnomAD-SV<sup>2</sup> ([Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
-3. Does not have substantial overlap<sup>1</sup> with other CNVs in at least 1% of all samples within the same dataset
-4. Does not have substantial overlap<sup>1</sup> with other CNVs in at least 1% of all samples across all datasets
-5. CNV size ≥ 100kb and ≤ 10Mb
-6. Not substantially covered<sup>3</sup> by somatically hypermutable sites (described in [Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
-7. Not substantially covered<sup>3</sup> by segmental duplications and/or simple repeats  
-8. Not substantially covered<sup>3</sup> by N-masked regions of the hg19 reference genome assembly  
+2. Does not have substantial overlap<sup>1</sup> with a common (`POPMAX AF`>1%) CNV from WGS resolution in gnomAD-SV<sup>2</sup> ([Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
+3. Does not have substantial overlap<sup>1</sup> with a common (`AF`>1%) CNV from WGS resolution in the 1000 Genomes Project, Phase III ([Sudmant _et al._, _Nature_ (2015)](https://www.nature.com/articles/nature15394))  
+4. Does not have substantial overlap<sup>1</sup> with a common (`AF`>1%) CNV from WGS resolution in the NIH Center for Common Disease Genetics SV callset ([Abel _et al._, _bioRxiv_ (2018)](https://www.biorxiv.org/content/10.1101/508515v1))  
+5. Does not have substantial overlap<sup>1</sup> with other CNVs in at least 1% of all samples within the same dataset
+6. Does not have substantial overlap<sup>1</sup> with other CNVs in at least 1% of all samples in any of the other array CNV datasets (compared pairwise, one at a time)
+7. CNV size ≥ 100kb and ≤ 10Mb
+8. Not substantially covered<sup>3</sup> by somatically hypermutable sites (described in [Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
+9. Not substantially covered<sup>3</sup> by segmental duplications and/or simple repeats  
+10. Not substantially covered<sup>3</sup> by N-masked regions of the hg19 reference genome assembly  
 
 #### Notes on curation  
 1. "Substantial" overlap determined based on ≥50% reciprocal overlap using BEDTools ([Quinlan & Hall, _Bioinformatics_ (2010)](https://www.ncbi.nlm.nih.gov/pubmed/20110278)). For overlap-based comparisons, both breakpoints were required to be within ±50kb, and CNV type (DEL vs. DUP) was required to match.  
@@ -136,9 +138,12 @@ After the filtering steps described above, the datasets were as follows:
 In parallel to the creation of the rare CNV dataset (described above), a dataset of ultra-rare CNVs was also generated.
 
 These ultra-rare CNVs were subjected to the same set of filters as above, with the following modifications:  
-2. Does not have substantial overlap **an ultra-rare (`POPMAX AF`>0.01%) CNV** from WGS resolution in gnomAD-SV ([Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
-3. Does not have substantial overlap with other CNVs in **at least 0.01%** of all samples within the same dataset (to a minimum of one sample)  
-4. Does not have substantial overlap with other CNVs in **at least 0.01%** of all samples across all datasets (to a minimum of one sample)  
+2. Does not have substantial overlap<sup>1</sup> with **a non-ultra-rare (`POPMAX AF`>0.01%) CNV** from WGS resolution in gnomAD-SV<sup>2</sup> ([Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
+3. Does not have substantial overlap<sup>1</sup> with **a non-ultra-rare (`AF`>0.01%) CNV** from WGS resolution in the 1000 Genomes Project, Phase III ([Sudmant _et al._, _Nature_ (2015)](https://www.nature.com/articles/nature15394))  
+4. Does not have substantial overlap<sup>1</sup> with **a non-ultra-rare (`AF`>0.01%) CNV** from WGS resolution in the NIH Center for Common Disease Genetics SV callset ([Abel _et al._, _bioRxiv_ (2018)](https://www.biorxiv.org/content/10.1101/508515v1))  
+5. Does not have substantial overlap<sup>1</sup> with other CNVs in **at least 0.01% of all samples** within the same dataset
+6. Does not have substantial overlap<sup>1</sup> with other CNVs in **at least 0.01% of all samples** in any of the other array CNV datasets (compared pairwise, one at a time)
+
 
 ### Ultra-rare CNV callset properties
 
