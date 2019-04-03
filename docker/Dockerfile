@@ -47,13 +47,14 @@ VOLUME ["/root/.config"]
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 4f6743a5aac117475ca0ef8728a26b049532d845 && \
+    git checkout 779ccb89ec99ea916ed10bfecd57305fd1a4a369 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)
-RUN echo 'alias l="ls -ltrha"' >> ~/.bashrc \
-    && echo 'alias less="zless"' >> ~/.bashrc \
-    && echo 'alias median="/opt/rCNV2/utils/median.py" >> ~/.bash_aliases'
+RUN echo "source ~/.bash_aliases" >> ~/.bashrc \
+    && echo 'alias l="ls -ltrha"' >> ~/.bash_aliases \
+    && echo 'alias less="zless"' >> ~/.bash_aliases \
+    && echo 'alias median="/opt/rCNV2/utils/median.py"' >> ~/.bash_aliases
 
 # Launch bash
 CMD ["/bin/bash"]

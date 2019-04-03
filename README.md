@@ -14,6 +14,7 @@ _Note: most subdirectories have their own documentation, which outlines specific
 | --- | :--- |
 | [`data_curation/`](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/) | Code for filtering & curation of CNV and annotation data |
 | [`docker/`](https://github.com/talkowski-lab/rCNV2/tree/master/docker/) | Dockerfile to build rCNV Docker image |
+| [`refs/`](https://github.com/talkowski-lab/rCNV2/tree/master/refs/) | Small reference files |
 | [`utils/`](https://github.com/talkowski-lab/rCNV2/tree/master/utils/) | Miscellaneous small utilities and scripts |
 
 
