@@ -142,6 +142,7 @@ task filter_cnvs_singleChrom {
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 30 SSD"
+    bootDiskSizeGb: "30"
   }
 
   output {
