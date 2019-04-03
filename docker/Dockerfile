@@ -16,6 +16,7 @@ RUN conda update -n base conda
 RUN conda create --name=rcnv python=3.7
 RUN conda install -n rcnv -y -c bioconda numpy scipy pandas scikit-learn
 RUN conda install -n rcnv -y -c bioconda pysam bzip2 pybedtools
+RUN conda install -n rcnv -y -c bioconda click
 ENV CONDA_DEFAULT_ENV rcnv
 RUN echo "source activate rcnv" >> ~/.bashrc
 ENV PATH /opt/conda/envs/rcnv/bin:$PATH
@@ -44,10 +45,18 @@ RUN apt-get update -qqy && apt-get install -qqy \
     gcloud --version
 VOLUME ["/root/.config"]
 
+# Install Athena toolkit
+RUN git clone https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/athena /opt/athena \
+    && cd /opt/athena \
+    && git checkout 4298eca8e181904d8fb3812ccf6918adcf6e4d6f \
+    && cd -
+RUN cd /opt/athena \
+    && pip install -e .
+
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 3e640a97d3d89ce61b70aaa2010ab84b97d36c80 && \
+    git checkout 54a5a2be733dd463cbebeffb7ab721814ad6aada && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)

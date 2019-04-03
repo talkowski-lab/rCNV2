@@ -21,16 +21,11 @@ import csv
 
 
 # Generic BED vs BED frequency filtering function
-def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000, minsize=50000):
+def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
     """
     Compare two sets of CNVs, and retain those in set A that have fewer than
     a maximum specified number of hits in set B
     """
-
-    # Filter both sets of CNVs to min of floor( ro * minsize ), since it's 
-    # impossible to get ro% overlap for CNVs below this value
-    cnvsA = cnvsA.filter(lambda x: x.stop - x.start >= (ro * minsize) ).saveas()
-    cnvsB = cnvsB.filter(lambda x: x.stop - x.start >= (ro * minsize) ).saveas()
 
     # Intersect
     xbed = cnvsA.intersect(cnvsB, wa=True, wb=True, f=ro, r=True)
@@ -188,8 +183,7 @@ def main():
     # Restrict on self-intersection
     if args.nsamp is not None:
         cnvs = freq_filter(cnvs, cnvs, args.nsamp, maxFreq=args.maxfreq, 
-                           ro=args.recipoverlap, dist=args.dist, 
-                           minsize=args.minsize)
+                           ro=args.recipoverlap, dist=args.dist)
 
     # Restrict on blacklist coverage
     if args.blacklist is not None:
@@ -208,26 +202,23 @@ def main():
         for vcfpath in args.vcf:
             vbed = read_vcf(vcfpath, args.maxfreq, args.af_field)
             cnvs = freq_filter(cnvs, vbed, 0, maxFreq=args.maxfreq, 
-                               ro=args.recipoverlap, dist=args.dist,
-                               minsize=args.minsize).saveas()
+                               ro=args.recipoverlap, dist=args.dist).saveas()
 
     # Restrict on frequency filtering vs other cohorts
     if args.cohorts_list is not None:
         with open(args.cohorts_list) as fin:
             clist = csv.reader(fin, delimiter='\t')
             for name, N, bcnv_path in clist:
-                bcnvs = pybedtools.BedTool(bcnv_path)
-                cnvs = freq_filter(cnvs, bcnvs, int(N),
+                cnvs = freq_filter(cnvs, bcnv_path, int(N),
                            maxFreq=args.maxfreq, ro=args.recipoverlap, 
-                           dist=args.dist, minsize=args.minsize).saveas()
+                           dist=args.dist).saveas()
 
     # Restrict on global intersection
     if args.allcohorts is not None \
     and args.allcohorts_nsamp is not None:
-        allcohorts_bed = pybedtools.BedTool(args.allcohorts)
-        cnvs = freq_filter(cnvs, allcohorts_bed, args.allcohorts_nsamp,
+        cnvs = freq_filter(cnvs, args.allcohorts, args.allcohorts_nsamp,
                            maxFreq=args.maxfreq, ro=args.recipoverlap, 
-                           dist=args.dist, minsize=args.minsize).saveas()
+                           dist=args.dist).saveas()
 
     # Write filtered CNVs out to file
     outheader = '#chr\tstart\tend\tname\tcnv\tpheno'
