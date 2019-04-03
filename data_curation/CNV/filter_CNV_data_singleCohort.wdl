@@ -81,18 +81,38 @@ task filter_cnvs_singleChrom {
     gsutil cp -r ${rCNV_bucket}/raw_data/cnv ./
     gsutil cp -r ${rCNV_bucket}/refs ./
 
-    # Make master BED file of all raw CNV data
+    # # Make master BED file of all raw CNV data
+    # # Restrict to >= 50kb to reduce size of file
+    # # Note: it's impossible to get >50% RO with a <50kb call given minimum size of 100kb
+    # for bed in cnv/*bed.gz; do
+    #   tabix "$bed" ${contig} \
+    #   | awk -v FS="\t" -v OFS="\t" '{ if ($3-$2>=50000) print $0 }'
+    # done \
+    # | sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
+    # | bgzip -c \
+    # > all_raw_cnvs.bed.gz
+    # allcohorts_nsamp=$( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt \
+    #                     | awk '{ sum+=$2 }END{ print sum }' )
+
+
+    # Make BED files for each cohort to be used during filtering
     # Restrict to >= 50kb to reduce size of file
     # Note: it's impossible to get >50% RO with a <50kb call given minimum size of 100kb
-    for bed in cnv/*bed.gz; do
-      tabix "$bed" ${contig} \
-      | awk -v FS="\t" -v OFS="\t" '{ if ($3-$2>=50000) print $0 }'
-    done \
-    | sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
-    | bgzip -c \
-    > all_raw_cnvs.bed.gz
-    allcohorts_nsamp=$( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt \
-                        | awk '{ sum+=$2 }END{ print sum }' )
+    while read cohort N; do
+      if [ -s cnv/$cohort.raw.bed.gz ]; then
+        tabix cnv/$cohort.raw.bed.gz ${contig} \
+        | awk -v FS="\t" -v OFS="\t" '{ if ($3-$2>=50000) print $0 }' \
+        | bgzip -c \
+        > $cohort.filtered.bed.gz
+        echo "$cohort"
+        echo "$N"
+        echo "$cohort.filtered.bed.gz"
+      fi \
+      | paste -s
+    done < <( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f1-2 ) \
+    | sort -nk2,2 \
+    > raw_CNVs.per_cohort.txt
+
 
     # Filter CNVs
     /opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
@@ -107,20 +127,21 @@ task filter_cnvs_singleChrom {
       --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
       --blacklist refs/GRCh37.Nmask.bed.gz \
       --xcov 0.3 \
-      --allcohorts all_raw_cnvs.bed.gz \
-      --allcohorts_nsamp $allcohorts_nsamp \
-      --gnomad refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
-      --gnomad-af-field POPMAX_AF \
+      --cohorts-list raw_CNVs.per_cohort.txt \
+      --vcf refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
+      --vcf refs/1000Genomes_phase3.sites.vcf.gz \
+      --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
+      --vcf-af-field POPMAX_AF \
       --bgzip \
       ${raw_CNVs} \
       ${cohort}.${contig}.${CNV_suffix}.bed.gz
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:1734a1608a7076f1002bba8df058e2f49375e1a20317c3f37f6a6bdabd03b6c2"
+    docker: "talkowski/rcnv@sha256:9a0fdbe591550955bfb9b9139eb2e53764bfeef3e36217ef84b1d1628a44ad16"
     preemptible: 1
-    memory: "8 GB"
-    disks: "local-disk 30 SSD"
+    memory: "4 GB"
+    disks: "local-disk 15 SSD"
   }
 
   output {
@@ -150,7 +171,7 @@ task merge_beds {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:1734a1608a7076f1002bba8df058e2f49375e1a20317c3f37f6a6bdabd03b6c2"
+    docker: "talkowski/rcnv@sha256:9a0fdbe591550955bfb9b9139eb2e53764bfeef3e36217ef84b1d1628a44ad16"
     preemptible: 1
   }
 
