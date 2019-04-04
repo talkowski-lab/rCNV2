@@ -19,5 +19,17 @@ $ docker run --rm -it talkowski/rcnv
 
 (rcnv) root@hash:/# athena --help
 
- 
+Usage: athena [OPTIONS] COMMAND [ARGS]...
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  annotate    Annotate bins
+  count-sv    Intersect SV and bins
+  decomp      Decompose bin annotations
+  make-bins   Create sequential bins
+  query       Mutation rate lookup
+  vcf-filter  Filter an input VCF
+  vcf-stats   Get SV size & spacing 
 ```

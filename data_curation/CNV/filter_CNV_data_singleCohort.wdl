@@ -114,6 +114,16 @@ task filter_cnvs_singleChrom {
     > raw_CNVs.per_cohort.txt
 
 
+    # Reassign location of TMPDIR to local disk, rather than boot disk
+    # pybedtools can use a _ton_ of /tmp space when processing large BED files
+    mkdir pbt_tmp
+    mkdir pbt_tmp/tmp
+    chmod 777 pbt_tmp/tmp
+    ln -s pbt_tmp/tmp /tmp
+    export TEMP=pbt_tmp/tmp
+    export TMPDIR=pbt_tmp/tmp
+
+
     # Filter CNVs
     /opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
       --chr ${contig} \
@@ -140,9 +150,9 @@ task filter_cnvs_singleChrom {
   runtime {
     docker: "talkowski/rcnv@sha256:9a0fdbe591550955bfb9b9139eb2e53764bfeef3e36217ef84b1d1628a44ad16"
     preemptible: 1
-    memory: "4 GB"
-    disks: "local-disk 30 SSD"
-    bootDiskSizeGb: "30"
+    memory: "8 GB"
+    disks: "local-disk 250 SSD"
+    bootDiskSizeGb: "20"
   }
 
   output {
