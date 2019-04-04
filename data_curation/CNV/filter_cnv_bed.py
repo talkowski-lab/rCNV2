@@ -27,6 +27,9 @@ def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
     a maximum specified number of hits in set B
     """
 
+    # Save a local copy of cnvsA so generator doesn't exhaust itself
+    cnvsA = cnvsA.saveas()
+
     # Intersect
     xbed = cnvsA.intersect(cnvsB, wa=True, wb=True, f=ro, r=True)
     
@@ -62,7 +65,7 @@ def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
         or hits[fname] <= cutoff:
             return feature
 
-    return cnvsA.filter(_remove_fails, hits, cutoff).saveas()
+    return cnvsA.filter(_remove_fails, hits, cutoff)
 
 
 # Read sites VCF for frequency filtering
@@ -175,15 +178,13 @@ def main():
     autosomes = [i for subl in ['{0} chr{1}'.format(c, c).split() for c in range(1, 23)] for i in subl]
     cnvs = cnvs.filter(lambda x: x.chrom in autosomes)
 
-    # Loose restriction on CNV minimum size prior to self-intersect
-    # (It is impossible to attain target RO with CNVs smaller than 
-    #  args.recipoverlap * args.minsize)
-    cnvs = cnvs.filter(lambda x: x.stop - x.start >= (args.recipoverlap * args.minsize) ).saveas()
+    # # Loose restriction on CNV minimum size prior to self-intersect
+    # # (It is impossible to attain target RO with CNVs smaller than 
+    # #  args.recipoverlap * args.minsize)
+    # cnvs = cnvs.filter(lambda x: x.stop - x.start >= (args.recipoverlap * args.minsize) )
 
-    # Restrict on self-intersection
-    if args.nsamp is not None:
-        cnvs = freq_filter(cnvs, cnvs, args.nsamp, maxFreq=args.maxfreq, 
-                           ro=args.recipoverlap, dist=args.dist)
+    # Restrict on size
+    cnvs = cnvs.filter(lambda x: len(x) >= args.minsize and len(x) <= args.maxsize)
 
     # Restrict on blacklist coverage
     if args.blacklist is not None:
@@ -194,31 +195,33 @@ def main():
             bl = pybedtools.BedTool(blpath)
             cnvs = cnvs.coverage(bl).filter(_bl_filter, args.xcov).cut(range(0, 6))
 
-    # Restrict on size
-    cnvs = cnvs.filter(lambda x: len(x) >= args.minsize and len(x) <= args.maxsize).saveas()
-
     # Restrict on VCFs 
     if args.vcf is not None:
         for vcfpath in args.vcf:
             vbed = read_vcf(vcfpath, args.maxfreq, args.af_field)
             cnvs = freq_filter(cnvs, vbed, 0, maxFreq=args.maxfreq, 
-                               ro=args.recipoverlap, dist=args.dist).saveas()
+                               ro=args.recipoverlap, dist=args.dist)
 
-    # Restrict on frequency filtering vs other cohorts
+    # # Restrict on self-intersection
+    # if args.nsamp is not None:
+    #     cnvs = freq_filter(cnvs, cnvs, args.nsamp, maxFreq=args.maxfreq, 
+    #                        ro=args.recipoverlap, dist=args.dist)
+
+    # Restrict on frequency filtering vs each cohort, one at a time
     if args.cohorts_list is not None:
         with open(args.cohorts_list) as fin:
             clist = csv.reader(fin, delimiter='\t')
             for name, N, bcnv_path in clist:
                 cnvs = freq_filter(cnvs, bcnv_path, int(N),
                            maxFreq=args.maxfreq, ro=args.recipoverlap, 
-                           dist=args.dist).saveas()
+                           dist=args.dist)
 
     # Restrict on global intersection
     if args.allcohorts is not None \
     and args.allcohorts_nsamp is not None:
         cnvs = freq_filter(cnvs, args.allcohorts, args.allcohorts_nsamp,
                            maxFreq=args.maxfreq, ro=args.recipoverlap, 
-                           dist=args.dist).saveas()
+                           dist=args.dist)
 
     # Write filtered CNVs out to file
     outheader = '#chr\tstart\tend\tname\tcnv\tpheno'
