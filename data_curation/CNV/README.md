@@ -50,8 +50,8 @@ All CNV data native to hg18 was lifted over to hg19 coordinate space using UCSC 
 Some datasets required manual curation prior to inclusion. Where necessary, these steps are enumerated below:  
 
  * **SSC**: CNVs were filtered on pCNV ≤ 10<sup>-9</sup>, per recommendation of the authors.  
- * **UKBB**: CNVs were filtered on quality score ≥ 20.  
- * **CHOP**: CNVs were filtered on quality score ≥ 20 and CNV size ≥ 25kb while requiring at least 10 SNPs per CNV. After CNV filtering, samples with `LRR_SD` < 0.35 or >100 calls were excluded as outliers, as well as samples genotyped on arrays with < 175k SNP probes.    
+ * **UKBB**: CNVs were filtered on quality score ≥ 25 and CNV size ≥ 25kb.  
+ * **CHOP**: CNVs were filtered on quality score ≥ 30 and CNV size ≥ 25kb while requiring at least 10 SNPs per CNV. After CNV filtering, samples with `LRR_SD` < 0.25 or >30 calls were excluded as outliers, as well as samples genotyped on arrays with < 175k SNP probes.    
 
 ### Raw CNV callset properties  
 
@@ -64,7 +64,7 @@ The properties of each callset are listed below after initial data processing st
 | Coe | 29,083 | 28,782 | 0.99 | 188.4 kb | 1:1.11 | 11,256 | 273,331 | 24.28 | 53.4 kb | 1.24:1 |
 | SSC | 2,795 | 30,867 | 11.04 | 21.0 kb | 3.09:1 | 0 | 0 | - | - | - |
 | UKBB | 0 | 0 | - | - | - | 480,501 | 1,595,472 | 3.32 | 64.7 kb | 9.74:1 |
-| CHOP | 209,514 | 3,241,044 | 15.47 | 61.1 kb | 1.05:1 | 0 | 0 | - | - | - |
+| CHOP | 183,866 | 3,241,044 | 15.47 | 61.1 kb | 1.05:1 | 0 | 0 | - | - | - |
 | GDX | 9,959 | 20,789 | 2.09 | 196.3 kb | 1:1.76 | 0 | 0 | - | - | - |
 | TSAICG | 2,434 | 3,541 | 1.45 | 91.1 kb | 1.01:1 | 4,093 | 5,834 | 1.43 | 91.3 kb | 1:1.08 |
 | BCH | 3,591 | 5,211 | 1.45 | 206.4 kb | 1:1.27 | 0 | 0 | - | - | - |
@@ -129,7 +129,7 @@ The properties of each rare CNV callset are listed below after the above filteri
 | Coe | 29,083 | 18,684 | 0.64 | 262.7 kb | 1:1.19 | 11,256 | 10,140 | 0.90 | 183.4 kb | 1:1.69 |
 | SSC | 2,795 | 2,088 | 0.75 | 191.3 kb | 1:1.12 | 0 | 0 | - | - | - |
 | UKBB | 0 | 0 | - | - | - | 480,501 | 432,000 | 0.90 | 196.6 kb | 4.62:1 |
-| CHOP | 209,514 | 382,528 | 1.83 | 167.7 kb | 1.03:1 | 0 | 0 | - | - | - |
+| CHOP | 183,866 | 382,528 | 1.83 | 167.7 kb | 1.03:1 | 0 | 0 | - | - | - |
 | GDX | 9,959 | 9,861 | 0.99 | 256.1 kb | 1:1.35 | 0 | 0 | - | - | - |
 | TSAICG | 2,434 | 1,525 | 0.63 | 193.0 kb | 1:1.33 | 4,093 | 2,535 | 0.62 | 183.3 kb | 1:1.35 |
 | BCH | 3,591 | 2,833 | 0.79 | 324.4 kb | 1:1.43 | 0 | 0 | - | - | - |
@@ -158,7 +158,7 @@ The properties of each ultra-rare CNV callset are listed below after the above f
 | Coe | 29,083 | 9,119 | 0.31 | 367.1 kb | 1:1.19 | 11,256 | 3,218 | 0.29 | 239.6 kb | 1:1.80 |
 | SSC | 2,795 | 746 | 0.27 | 261.2 kb | 1:1.22 | 0 | 0 | - | - | - |
 | UKBB | 0 | 0 | - | - | - | 480,501 | 200,153 | 0.42 | 256.1 kb | 4.88:1 |
-| CHOP | 209,514 | 130,549 | 0.62 | 218.6 kb | 1:1.00 | 0 | 0 | - | - | - |
+| CHOP | 183,866 | 130,549 | 0.62 | 218.6 kb | 1:1.00 | 0 | 0 | - | - | - |
 | GDX | 9,959 | 5,244 | 0.53 | 359.2 kb | 1:1.26 | 0 | 0 | - | - | - |
 | TSAICG | 2,434 | 644 | 0.26 | 242.8 kb | 1:1.62 | 4,093 | 1,020 | 0.25 | 238.8 kb | 1:1.68 |
 | BCH | 3,591 | 1,736 | 0.48 | 390.4 kb | 1:1.43 | 0 | 0 | - | - | - |
