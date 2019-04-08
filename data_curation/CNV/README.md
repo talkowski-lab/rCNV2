@@ -51,7 +51,7 @@ Some datasets required manual curation prior to inclusion. Where necessary, thes
 
  * **SSC**: CNVs were filtered on pCNV ≤ 10<sup>-9</sup>, per recommendation of the authors.  
  * **UKBB**: CNVs were filtered on quality score ≥ 25 and CNV size ≥ 25kb.  
- * **CHOP**: CNVs were filtered on quality score ≥ 30 and CNV size ≥ 25kb while requiring at least 10 SNPs per CNV. After CNV filtering, samples with `LRR_SD` < 0.25 or >30 calls were excluded as outliers, as well as samples genotyped on arrays with < 175k SNP probes.    
+ * **CHOP**: CNVs were filtered on quality score ≥ 30 and CNV size ≥ 25kb while requiring at least 10 SNPs per CNV. After CNV filtering, samples with `LRR_SD` < 0.25, >30 CNV calls, or SNP call rate < 98% were excluded as outliers, as well as samples genotyped on arrays with < 175k SNP probes.    
 
 ### Raw CNV callset properties  
 
