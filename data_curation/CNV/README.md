@@ -20,6 +20,7 @@ Several abbreviations and acronyms are used below, as follows:
 | DD | Developmental Disorders |
 | ASD | Autism Spectrum Disorders |
 | TS | Tourette Syndrome |
+| CNCR | Cancer |  
 
 ### CNV data sources  
 
@@ -36,12 +37,14 @@ We aggregated CNV data from multiple sources, listed below:
 | GDX | - | - | TBD? | hg18 & hg19 | Mixed | 9,959 | 0 |
 | TSAICG | [Huang _et al._, _Neuron_ (2017)](https://www.sciencedirect.com/science/article/pii/S0896627317305081) | [28641109](https://www.ncbi.nlm.nih.gov/pubmed/28641109) | OmniExpress (100%) | hg19 | TS | 2,434 | 4,093 |
 | BCH | [Talkowski _et al._, _Cell_ (2012)](https://www.sciencedirect.com/science/article/pii/S0092867412004114) | [22521361](https://www.ncbi.nlm.nih.gov/pubmed/22521361) | TBD? | hg18 | Mixed | 3,591 | 0 |  
+| TCGA | [Zack _et al._, _Nat. Genet._ (2013)](https://www.nature.com/articles/ng.2760) | [24071852](https://www.ncbi.nlm.nih.gov/pubmed/24071852) | Affy 6.0 (100%) | hg19 | Cancer | 0<sup>5</sup> | 8,670<sup>5</sup> |  
 
 #### Notes on raw CNV data   
 1. Only retained control samples from Cooper _et al._. All cases from Cooper _et al._ also appear in Coe _et al._.  
 2. Only retained affected children from Sanders _et al._, since all controls were first-degree relatives of affected cases.  
 3. Currently unable to filter UKBB dataset by sample (no sample IDs provided). For now, assuming all samples are controls, which will \~mostly be true given our phenotypes of interest.  
 4. Currently unable to filter CHOP dataset by phenotype (no phenotype info provided). For now, assuming all samples are "cases", which will need to be revised. Also, note that the number of samples retained in the CHOP cohort decreased after filtering outlier samples (see below).  
+5. Only retained normal samples from tumor:normal pairs, and excluded any donors with known blood cancer.  
 
 ### Raw CNV data processing steps  
 
@@ -51,7 +54,8 @@ Some datasets required manual curation prior to inclusion. Where necessary, thes
 
  * **SSC**: CNVs were filtered on pCNV ≤ 10<sup>-9</sup>, per recommendation of the authors.  
  * **UKBB**: CNVs were filtered on quality score ≥ 25 and CNV size ≥ 25kb.  
- * **CHOP**: CNVs were filtered on quality score ≥ 30 and CNV size ≥ 25kb while requiring at least 10 SNPs per CNV. After CNV filtering, samples with `LRR_SD` < 0.25, >30 CNV calls, or SNP call rate < 98% were excluded as outliers, as well as samples genotyped on arrays with < 175k SNP probes.    
+ * **CHOP**: CNVs were filtered on quality score ≥ 30 and CNV size ≥ 25kb while requiring at least 10 SNPs per CNV. After CNV filtering, samples with `LRR_SD` < 0.25, >30 CNV calls, or SNP call rate < 98% were excluded as outliers, as well as samples genotyped on arrays with < 175k SNP probes.  
+ * **TCGA**: CNVs were filtered on ≥ 10 probes and ≥ 25kb. Deletions were required to have a mean log<sub>2</sub> intensity ≤ -1 and duplications were required to have a mean log<sub>2</sub> intensity of ≥ 0.5849625.  
 
 ### Raw CNV callset properties  
 
@@ -64,7 +68,7 @@ The properties of each callset are listed below after initial data processing st
 | Coe | 29,083 | 28,782 | 0.99 | 188.4 kb | 1:1.11 | 11,256 | 273,331 | 24.28 | 53.4 kb | 1.24:1 |
 | SSC | 2,795 | 30,867 | 11.04 | 21.0 kb | 3.09:1 | 0 | 0 | - | - | - |
 | UKBB | 0 | 0 | - | - | - | 480,501 | 873,454 | 1.82 | 101.6 kb | 6.50:1 |
-| CHOP | 183,866 | 1,629,599 | 8.86 | 74.3 kb | 1:1.08 | 0 | 0 | - | - | - |
+| CHOP | 182,440 | 1,621,189 | 8.89 | 74.3 kb | 1:1.08 | 0 | 0 | - | - | - |
 | GDX | 9,959 | 20,789 | 2.09 | 196.3 kb | 1:1.76 | 0 | 0 | - | - | - |
 | TSAICG | 2,434 | 3,541 | 1.45 | 91.1 kb | 1.01:1 | 4,093 | 5,834 | 1.43 | 91.3 kb | 1:1.08 |
 | BCH | 3,591 | 5,211 | 1.45 | 206.4 kb | 1:1.27 | 0 | 0 | - | - | - |
