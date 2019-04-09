@@ -53,7 +53,7 @@ VOLUME ["/root/.config"]
 # Install Athena toolkit
 RUN git clone https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/athena /opt/athena \
     && cd /opt/athena \
-    && git checkout 5c79b25912ffa29947e3e0c812e5b8e94a8f9134 \
+    && git checkout e52d303cd5156d8c497fb876bcdf471612f80153 \
     && cd -
 RUN cd /opt/athena \
     && pip install -e .
@@ -61,7 +61,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 639891fa6d4ddaf75b29b9f9b1da5ec8acd3f601 && \
+    git checkout ae39f256a3201b867be9a05d37aeb251e28eebe6 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)

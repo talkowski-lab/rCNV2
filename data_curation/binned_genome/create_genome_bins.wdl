@@ -88,6 +88,12 @@ task create_raw_bins {
       "$rCNV_bucket"/cleaned_data/binned_genome/
   >>>
 
+  runtime {
+    docker: "talkowski/rcnv@sha256:7690d64de0b07d7fef06ded7c6e589e831bf783ae7b5f790831fccfb8c8042bc"
+    preemptible: 1
+    disks: "local-disk 50 SSD"
+  }
+
   output {
     File bins = "GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz"
   }
@@ -141,6 +147,14 @@ task annotate_bins {
       GRCh37."$binsize"kb_bins_"$stepsize"kb_steps.annotated."${contig}".bed.gz
   >>>
 
+  runtime {
+    docker: "talkowski/rcnv@sha256:7690d64de0b07d7fef06ded7c6e589e831bf783ae7b5f790831fccfb8c8042bc"
+    preemptible: 1
+    memory: "4 GB"
+    disks: "local-disk 50 SSD"
+    bootDiskSizeGb: "20"
+  }
+
   output {
     File annotated_bins = "GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.${contig}.bed.gz"
   }
@@ -172,6 +186,11 @@ task cat_annotated_bins {
     gsutil cp GRCh37."$binsize"kb_bins_"$stepsize"kb_steps.annotated.bed.gz \
       "$rCNV_bucket"/cleaned_data/binned_genome/
   >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:7690d64de0b07d7fef06ded7c6e589e831bf783ae7b5f790831fccfb8c8042bc"
+    preemptible: 1
+  }
 
   output {
     File merged_bins = "GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz"
@@ -213,9 +232,14 @@ task decompose_annotations {
       GRCh37."$binsize"kb_bins_"$stepsize"kb_steps.annotated.eigen.bed.gz
   >>>
 
+  runtime {
+    docker: "talkowski/rcnv@sha256:7690d64de0b07d7fef06ded7c6e589e831bf783ae7b5f790831fccfb8c8042bc"
+    preemptible: 1
+    memory: "8 GB"
+  }
+
   output {
     File eigen_bins = "GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.eigen.bed.gz"
     File stats = "GRCh37.${binsize}kb_bins_${stepsize}kb_steps.eigenfeature_stats.txt"
   }
 }
-
