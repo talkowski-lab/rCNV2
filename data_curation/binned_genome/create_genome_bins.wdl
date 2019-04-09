@@ -71,21 +71,19 @@ task create_raw_bins {
     mkdir refs/
     gsutil cp -r gs://rcnv_project/refs/GRCh37.Nmask.bed.gz refs/
     gsutil cp -r gs://rcnv_project/refs/GRCh37.autosomes.genome refs/
-    gsutil cp -r gs://rcnv_project/refs/Affy_UKBB_axiom_probes.bed.gz* refs/
-    gsutil cp -r gs://rcnv_project/GRCh37_ref_build/* refs/
 
     # Create bins
     athena make-bins -z \
       -x refs/GRCh37.Nmask.bed.gz \
-      -s "$stepsize"000 \
-      --buffer "$binsize"000 \
+      -s ${stepsize}000 \
+      --buffer ${binsize}000 \
       refs/GRCh37.autosomes.genome \
-      "$binsize"000 \
-      GRCh37."$binsize"kb_bins_"$stepsize"kb_steps.raw.bed.gz
+      ${binsize}000 \
+      GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz
 
     # Move copy to master rCNV bucket
-    gsutil cp GRCh37."$binsize"kb_bins_"$stepsize"kb_steps.raw.bed.gz \
-      "$rCNV_bucket"/cleaned_data/binned_genome/
+    gsutil cp GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz \
+      ${rCNV_bucket}/cleaned_data/binned_genome/
   >>>
 
   runtime {
@@ -108,8 +106,14 @@ task annotate_bins {
   String contig
 
   command <<<
+    # Gather reference files
+    mkdir refs/
+    gsutil cp -r gs://rcnv_project/refs/Affy_UKBB_axiom_probes.bed.gz* refs/
+    gsutil cp -r gs://rcnv_project/GRCh37_ref_build/* refs/
+
+    # Annotate bins
     athena annotate-bins -z \
-      --chroms "${contig}" \
+      --chroms ${contig} \
       -t refs/Affy_UKBB_axiom_probes.bed.gz -a count -n ukbbAxiom_probes \
       -u decodeSexAveraged -a map-mean -n mean_recomb_rate \
       -u decodeSexAveraged -a map-max -n max_recomb_rate \
@@ -143,15 +147,15 @@ task annotate_bins {
       -u chainSelf:tName,tStart,tEnd,normScore -a map-max -n max_self_chain_score \
       --fasta refs/GRCh37.primary_assembly.fa \
       --ucsc-ref hg19 \
-      "${bins}" \
-      GRCh37."$binsize"kb_bins_"$stepsize"kb_steps.annotated."${contig}".bed.gz
+      ${bins} \
+      GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.${contig}.bed.gz
   >>>
 
   runtime {
     docker: "talkowski/rcnv@sha256:7690d64de0b07d7fef06ded7c6e589e831bf783ae7b5f790831fccfb8c8042bc"
     preemptible: 1
     memory: "4 GB"
-    disks: "local-disk 50 SSD"
+    disks: "local-disk 30 SSD"
     bootDiskSizeGb: "20"
   }
 
@@ -180,11 +184,11 @@ task cat_annotated_bins {
     | sort -Vk1,1 -k2,2n -k3,3n \
     | cat header.txt - \
     | bgzip -c \
-    > GRCh37."$binsize"kb_bins_"$stepsize"kb_steps.annotated.bed.gz
+    > GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz
 
     # Move copy to master rCNV bucket
-    gsutil cp GRCh37."$binsize"kb_bins_"$stepsize"kb_steps.annotated.bed.gz \
-      "$rCNV_bucket"/cleaned_data/binned_genome/
+    gsutil cp GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz \
+      ${rCNV_bucket}/cleaned_data/binned_genome/
   >>>
 
   runtime {
@@ -227,9 +231,9 @@ task decompose_annotations {
       --log-transform max_segdup_identity \
       --log-transform simple_repeats \
       --log-transform self_chain \
-      --stats GRCh37."$binsize"kb_bins_"$stepsize"kb_steps.eigenfeature_stats.txt \
-      "${bins}" \
-      GRCh37."$binsize"kb_bins_"$stepsize"kb_steps.annotated.eigen.bed.gz
+      --stats GRCh37.${binsize}kb_bins_${stepsize}kb_steps.eigenfeature_stats.txt \
+      ${bins} \
+      GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.eigen.bed.gz
   >>>
 
   runtime {
