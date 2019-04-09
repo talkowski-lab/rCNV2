@@ -14,8 +14,11 @@ RUN apt-get -qqy update \
 # Create python environment
 RUN conda update -n base conda
 RUN conda create --name=rcnv python=3.7
+RUN conda config --set ssl_verify no
 RUN conda install -n rcnv -y -c bioconda numpy scipy pandas scikit-learn
-RUN conda install -n rcnv -y -c bioconda pysam bzip2 pybedtools
+RUN conda install -n rcnv -y -c bioconda pysam
+RUN conda install -n rcnv -y -c bioconda pybedtools
+RUN conda install -n rcnv -y -c bioconda bzip2
 RUN conda install -n rcnv -y -c bioconda click
 RUN conda install -n rcnv -y -c bioconda mysqlclient
 RUN conda install -n rcnv -y -c bioconda pybigwig
@@ -50,7 +53,7 @@ VOLUME ["/root/.config"]
 # Install Athena toolkit
 RUN git clone https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/athena /opt/athena \
     && cd /opt/athena \
-    && git checkout 51b9bdd7f354997b493b5465f7f24c5374a27df7 \
+    && git checkout 5c79b25912ffa29947e3e0c812e5b8e94a8f9134 \
     && cd -
 RUN cd /opt/athena \
     && pip install -e .
@@ -58,7 +61,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout b984779a0d88db73046756a694b66e9b5d91f304 && \
+    git checkout 639891fa6d4ddaf75b29b9f9b1da5ec8acd3f601 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)
