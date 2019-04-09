@@ -18,7 +18,8 @@ docker run --rm -it talkowski/rcnv
 # Download necessary references (note: requires permissions)
 gcloud auth login
 mkdir refs/
-gsutil cp -r gs://rcnv_project/refs/GRCh37.Nmask.bed.gz refs/
+gsutil cp -r gs://rcnv_project/refs/GRCh37.Nmask.autosomes.bed.gz refs/
+gsutil cp -r gs://rcnv_project/refs/GRCh37.somatic_hypermutable_sites.bed.gz refs/
 gsutil cp -r gs://rcnv_project/refs/GRCh37.autosomes.genome refs/
 gsutil cp -r gs://rcnv_project/refs/Affy_UKBB_axiom_probes.bed.gz* refs/
 
@@ -39,7 +40,8 @@ stepsize=10
 
 # Create sliding windows
 athena make-bins -z \
-	-x refs/GRCh37.Nmask.bed.gz \
+	-x refs/GRCh37.Nmask.autosomes.bed.gz \
+  -x refs/GRCh37.somatic_hypermutable_sites.bed.gz \
   -s "$stepsize"000 \
 	--buffer "$binsize"000 \
 	refs/GRCh37.autosomes.genome \

@@ -69,12 +69,14 @@ task create_raw_bins {
   command <<<
     # Gather reference files
     mkdir refs/
-    gsutil cp -r gs://rcnv_project/refs/GRCh37.Nmask.bed.gz refs/
+    gsutil cp -r gs://rcnv_project/refs/GRCh37.Nmask.autosomes.bed.gz refs/
+    gsutil cp -r gs://rcnv_project/refs/GRCh37.somatic_hypermutable_sites.bed.gz refs/
     gsutil cp -r gs://rcnv_project/refs/GRCh37.autosomes.genome refs/
 
     # Create bins
     athena make-bins -z \
-      -x refs/GRCh37.Nmask.bed.gz \
+      -x refs/GRCh37.Nmask.autosomes.bed.gz \
+      -x refs/GRCh37.somatic_hypermutable_sites.bed.gz \
       -s ${stepsize}000 \
       --buffer ${binsize}000 \
       refs/GRCh37.autosomes.genome \
@@ -234,6 +236,10 @@ task decompose_annotations {
       --stats GRCh37.${binsize}kb_bins_${stepsize}kb_steps.eigenfeature_stats.txt \
       ${bins} \
       GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.eigen.bed.gz
+
+    # Move copy to master rCNV bucket
+    gsutil cp GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.eigen.bed.gz \
+      ${rCNV_bucket}/cleaned_data/binned_genome/
   >>>
 
   runtime {
