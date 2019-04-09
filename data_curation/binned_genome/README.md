@@ -34,31 +34,31 @@ We included the following annotations:
 | Mean 20mer uniqueness | UCSC | `wgEncodeDukeMapabilityUniqueness20bp` | `map-mean` | None |  
 | Mean 35mer uniqueness | UCSC | `wgEncodeDukeMapabilityUniqueness35bp` | `map-mean` | None |  
 | Common SNP density | UCSC | `snp151Common` | `count-unique` | None |  
-| Affy 6.0 probe density | UCSC | `snpArrayAffy6` | `count-unique` | `log(x+0.01_x)` |  
+| Affy 6.0 probe density | UCSC | `snpArrayAffy6` | `count-unique` | `log(x+0.01max_x)` |  
 | Affy 6.0 SV probe density | UCSC | `snpArrayAffy6SV` | `count-unique` | None |  
-| Affy 5.0 probe density | UCSC | `snpArrayAffy5` | `count-unique` | `log(x+0.01_x)` |  
-| Illumina Omni probe density | UCSC | `snpArrayIlluminaHumanOmni1_Quad` | `count-unique` | `log(x+0.01_x)` |  
-| Illumina 1M probe density | UCSC | `snpArrayIllumina1M` | `count-unique` | `log(x+0.01_x)` |  
-| Illumina 650 probe density | UCSC | `snpArrayIllumina650` | `count-unique` | `log(x+0.01_x)` |  
-| Illumina 550 probe density | UCSC | `snpArrayIllumina550` | `count-unique` | `log(x+0.01_x)` |  
+| Affy 5.0 probe density | UCSC | `snpArrayAffy5` | `count-unique` | `log(x+0.01max_x)` |  
+| Illumina Omni probe density | UCSC | `snpArrayIlluminaHumanOmni1_Quad` | `count-unique` | `log(x+0.01max_x)` |  
+| Illumina 1M probe density | UCSC | `snpArrayIllumina1M` | `count-unique` | `log(x+0.01max_x)` |  
+| Illumina 650 probe density | UCSC | `snpArrayIllumina650` | `count-unique` | `log(x+0.01max_x)` |  
+| Illumina 550 probe density | UCSC | `snpArrayIllumina550` | `count-unique` | `log(x+0.01max_x)` |  
 | Agilent 244k aCGH probe density | UCSC | `agilentCgh1x244k` | `count` | None |  
 | Agilent 180k aCGH probe density | UCSC | `agilentCgh4x180k` | `count` | None |  
 | Agilent 105k aCGH probe density | UCSC | `agilentCgh2x105k` | `count` | None |  
-| Affy UKBB Axiom probe density | [Thermo-Fisher](https://www.thermofisher.com/order/catalog/product/902502) | `Axiom_UKB_WCSG.na35.annot.csv` | `count` | `log(x+0.01_x)` |  
+| Affy UKBB Axiom probe density | [Thermo-Fisher](https://www.thermofisher.com/order/catalog/product/902502) | `Axiom_UKB_WCSG.na35.annot.csv` | `count` | `log(x+0.01max_x)` |  
 | RepeatMasker (all) | UCSC | `rmsk` | `coverage` | None |  
-| RepeatMasker (LINEs) | UCSC | `rmsk` | `coverage` | `log(x+0.01_x)` |  
-| RepeatMasker (SINEs) | UCSC | `rmsk` | `coverage` | `log(x+0.01_x)` |  
-| RepeatMasker (LTRs) | UCSC | `rmsk` | `coverage` | `log(x+0.01_x)` |  
-| RepeatMasker (DNA repeats) | UCSC | `rmsk` | `coverage` | `log(x+0.01_x)` |  
-| RepeatMasker (Simple repeats) | UCSC | `rmsk` | `coverage` | `log(x+0.01_x)` |  
-| RepeatMasker (Low-complexity repeats) | UCSC | `rmsk` | `coverage` | `log(x+0.01_x)` |  
+| RepeatMasker (LINEs) | UCSC | `rmsk` | `coverage` | `log(x+0.01max_x)` |  
+| RepeatMasker (SINEs) | UCSC | `rmsk` | `coverage` | `log(x+0.01max_x)` |  
+| RepeatMasker (LTRs) | UCSC | `rmsk` | `coverage` | `log(x+0.01max_x)` |  
+| RepeatMasker (DNA repeats) | UCSC | `rmsk` | `coverage` | `log(x+0.01max_x)` |  
+| RepeatMasker (Simple repeats) | UCSC | `rmsk` | `coverage` | `log(x+0.01max_x)` |  
+| RepeatMasker (Low-complexity repeats) | UCSC | `rmsk` | `coverage` | `log(x+0.01max_x)` |  
 | RepeatMasker (Satellites) | UCSC | `rmsk` | `coverage` | None |  
 | Nested repeats | UCSC | `nestedRepeats` | `coverage` | None |  
 | Microsatellites | UCSC | `microsat` | `coverage` | None |  
-| Segmental duplications | UCSC | `genomicSuperDups` | `coverage` | `log(x+0.01_x)` |  
-| Max seg. dup. identity | UCSC | `genomicSuperDups:fracMatch` | `map-max` | `log(x+0.01_x)` |  
-| Simple repeats | UCSC | `simpleRepeat` | `coverage` | `log(x+0.01_x)` |  
-| Self-chain | UCSC | `chainSelf` | `coverage` | `log(x+0.01_x)` |  
+| Segmental duplications | UCSC | `genomicSuperDups` | `coverage` | `log(x+0.01max_x)` |  
+| Max seg. dup. identity | UCSC | `genomicSuperDups:fracMatch` | `map-max` | `log(x+0.01max_x)` |  
+| Simple repeats | UCSC | `simpleRepeat` | `coverage` | `log(x+0.01max_x)` |  
+| Self-chain | UCSC | `chainSelf` | `coverage` | `log(x+0.01max_x)` |  
 | Max self-chain score | UCSC | `chainSelf:normScore` | `coverage` | None |  
 
 
