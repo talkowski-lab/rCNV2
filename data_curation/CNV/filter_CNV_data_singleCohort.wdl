@@ -135,7 +135,7 @@ task filter_cnvs_singleChrom {
       --dist 50000 \
       --blacklist refs/GRCh37.segDups_plus_simpleRepeats.bed.gz \
       --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
-      --blacklist refs/GRCh37.Nmask.bed.gz \
+      --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
       --xcov 0.3 \
       --cohorts-list raw_CNVs.per_cohort.txt \
       --vcf refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
@@ -148,7 +148,7 @@ task filter_cnvs_singleChrom {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:acbb1010e47e217bf6d1576b483220e8fa77840ef0d56337b50a28e54e9c9547"
+    docker: "talkowski/rcnv@sha256:d566dc85f0cdca47d93a0cf1cd412d10e6d48b3b5e0ce27f96fea9a6472ce88e"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 50 SSD"
@@ -182,7 +182,7 @@ task merge_beds {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:acbb1010e47e217bf6d1576b483220e8fa77840ef0d56337b50a28e54e9c9547"
+    docker: "talkowski/rcnv@sha256:d566dc85f0cdca47d93a0cf1cd412d10e6d48b3b5e0ce27f96fea9a6472ce88e"
     preemptible: 1
   }
 

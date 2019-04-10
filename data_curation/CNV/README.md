@@ -115,7 +115,7 @@ All raw CNV data was subjected to the same set of global filters:
  * Does not have substantial overlap<sup>1</sup> with a common (`AF`>1%) CNV from WGS resolution in the NIH Center for Common Disease Genetics SV callset ([Abel _et al._, _bioRxiv_ (2018)](https://www.biorxiv.org/content/10.1101/508515v1))  
  * Does not have substantial overlap<sup>1</sup> with other CNVs in at least 1% of all samples
  * Does not have substantial overlap<sup>1</sup> with other CNVs in at least 1% of all samples within the same dataset or in any of the other array CNV datasets (compared pairwise in serial)
- * Not substantially covered<sup>3</sup> by somatically hypermutable sites (described in [Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
+ * Not substantially covered<sup>3</sup> by somatically hypermutable sites (as applied in [Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
  * Not substantially covered<sup>3</sup> by segmental duplications and/or simple repeats  
  * Not substantially covered<sup>3</sup> by N-masked regions of the hg19 reference genome assembly  
 
@@ -171,6 +171,7 @@ The properties of each ultra-rare CNV callset are listed below after the above f
 | TSAICG | 2,434 | 648 | 0.27 | 241.5 kb | 1:1.56 | 4,093 | 1,025 | 0.25 | 235.4 kb | 1:1.62 |
 | BCH | 3,591 | 1,739 | 0.48 | 390.2 kb | 1:1.41 | 0 | 0 | - | - | - |
 | TCGA | 0 | 0 | - | - | - | 8,670 | 1,591 | 0.18 | 209.4 kb | 1:2.02 |
+
 
 The information for this table was collected using `collect_cohort_stats.sh`.  
 

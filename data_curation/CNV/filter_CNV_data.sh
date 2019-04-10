@@ -59,7 +59,7 @@ while read cohort N; do
     --dist 50000 \
     --blacklist refs/GRCh37.segDups_plus_simpleRepeats.bed.gz \
     --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
-    --blacklist refs/GRCh37.Nmask.bed.gz \
+    --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
     --xcov 0.3 \
     --cohorts-list raw_CNVs.per_cohort.txt \
     --vcf refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \

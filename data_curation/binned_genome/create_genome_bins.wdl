@@ -89,7 +89,7 @@ task create_raw_bins {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7690d64de0b07d7fef06ded7c6e589e831bf783ae7b5f790831fccfb8c8042bc"
+    docker: "talkowski/rcnv@sha256:d566dc85f0cdca47d93a0cf1cd412d10e6d48b3b5e0ce27f96fea9a6472ce88e"
     preemptible: 1
     disks: "local-disk 50 SSD"
   }
@@ -154,7 +154,7 @@ task annotate_bins {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7690d64de0b07d7fef06ded7c6e589e831bf783ae7b5f790831fccfb8c8042bc"
+    docker: "talkowski/rcnv@sha256:d566dc85f0cdca47d93a0cf1cd412d10e6d48b3b5e0ce27f96fea9a6472ce88e"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 30 SSD"
@@ -194,7 +194,7 @@ task cat_annotated_bins {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7690d64de0b07d7fef06ded7c6e589e831bf783ae7b5f790831fccfb8c8042bc"
+    docker: "talkowski/rcnv@sha256:d566dc85f0cdca47d93a0cf1cd412d10e6d48b3b5e0ce27f96fea9a6472ce88e"
     preemptible: 1
   }
 
@@ -243,7 +243,7 @@ task decompose_annotations {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7690d64de0b07d7fef06ded7c6e589e831bf783ae7b5f790831fccfb8c8042bc"
+    docker: "talkowski/rcnv@sha256:d566dc85f0cdca47d93a0cf1cd412d10e6d48b3b5e0ce27f96fea9a6472ce88e"
     preemptible: 1
     memory: "8 GB"
   }

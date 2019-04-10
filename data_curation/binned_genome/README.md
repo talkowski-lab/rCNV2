@@ -21,7 +21,9 @@ gs://rcnv_project/cleaned_data/binned_genome/GRCh37.100kb_bins_10kb_steps.annota
 
 ### Bin creation & annotation
 
-We created sliding windows at 100kb resolution and 10kb step size, and excluded any bins within ±100kb of any N-masked sequence.  
+We created sliding windows for all autosomes at 100kb resolution and 10kb step size, and excluded any bins within ±100kb of any N-masked sequence or known somatically hypermutable site (as applied in [Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674)).  
+
+After filtering, we retained a final set of 261,087 bins for analysis.  
 
 To control for technical and genomic covariates, we annotated all bins against a suite of features, then performed Eigendecomposition to control for the inherent correlation structure of most genomic annotation tracks.  
 
