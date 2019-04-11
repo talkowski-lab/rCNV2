@@ -65,11 +65,12 @@ while read cohort N; do
     --vcf refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
     --vcf refs/1000Genomes_phase3.sites.vcf.gz \
     --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-    --vcf-af-field POPMAX_AF \
+    --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     rare_cnv_curated/$cohort.rCNV.bed.gz
 done < <( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f1-2 )
+    
 
 
 # Filter each cohort for ultrarare CNV callset
@@ -90,7 +91,7 @@ for cohort in PGC SSC; do
     --vcf refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
     --vcf refs/1000Genomes_phase3.sites.vcf.gz \
     --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-    --vcf-af-field POPMAX_AF \
+    --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     ultrarare_cnv_curated/$cohort.urCNV.bed.gz

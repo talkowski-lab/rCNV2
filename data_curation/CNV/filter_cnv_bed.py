@@ -69,12 +69,16 @@ def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
 
 
 # Read sites VCF for frequency filtering
-def read_vcf(vcfin, maxfreq, af_field='AF'):
+def read_vcf(vcfin, maxfreq, af_fields='AF'):
     """
     Reads a SV sites vcf and converts it to a BedTool
     """
     vcf = pysam.VariantFile(vcfin)
     header = vcf.header
+
+    af_fields = af_fields.split(',')
+    if 'AF' not in af_fields:
+        af_fields.append('AF')
 
     def _filter_vcf(vcf, maxfreq):
         vcf_str = ''
@@ -88,16 +92,23 @@ def read_vcf(vcfin, maxfreq, af_field='AF'):
             and record.filter.keys() != ['MULTIALLELIC']:
                 continue
 
-            if af_field in record.info.keys():
-                af = record.info[af_field]
-            else:
-                af = record.info['AF']
-            if isinstance(af, tuple):
-                if len(af) > 1:
-                    af = sum([f for a, f in zip(list(record.alts), list(af)) if a != '<CN=2>'])
-                else:
-                    af = af[0]
-            if af <= maxfreq:
+            def _scrape_afs(record, af_fields):
+                afs = []
+                for field in af_fields:
+                    if field in record.info.keys():
+                        af = record.info[field]
+                    else:
+                        continue
+                    if isinstance(af, tuple):
+                        if len(af) > 1:
+                            af = sum([f for a, f in zip(list(record.alts), list(af)) if a != '<CN=2>'])
+                        else:
+                            af = af[0]
+                    afs.append(af)
+                return afs
+
+            max_af = max(_scrape_afs(record, af_fields))
+            if max_af <= maxfreq:
                 continue
 
             flist = [str(record.chrom), str(record.pos), str(record.stop), 
@@ -131,18 +142,20 @@ def main():
     parser.add_argument('-N', '--nsamp', type=int, help='Number of samples ' +
                         'represented in input BED.')
     parser.add_argument('--maxfreq', type=float, help='Maximum CNV ' + 
-                        'frequency. [0.01]', default=0.01)
+                        'frequency. [default: 0.01]', default=0.01)
     parser.add_argument('--recipoverlap', type=float, help='Reciprocal overlap ' + 
-                        'cutoff after which to consider two CNVs matching. [0.5]',
+                        'cutoff after which to consider two CNVs matching. ' +
+                        '[default: 0.5]',
                         default=0.5)
     parser.add_argument('--dist', type=int, help='Maximum distance permitted ' + 
-                        'between breakpoints to consider two CNVs matching. [50kb]',
+                        'between breakpoints to consider two CNVs matching. ' +
+                        '[default: 50kb]',
                         default=50000)
     parser.add_argument('-x', '--blacklist', action='append', help='BED file ' +
                         'containing regions to blacklist based on CNV coverage. ' +
                         'May be specified multiple times.')
     parser.add_argument('--xcov', type=float, help='Maximum coverage ' + 
-                        'by any blacklist before excluding a CNV. [0.3]',
+                        'by any blacklist before excluding a CNV. [default: 0.3]',
                         default=0.3)
     parser.add_argument('--cohorts-list', help='list of all cohorts to be used ' + 
                         'for freq filtering. Will compare each cohort to input ' + 
@@ -155,9 +168,11 @@ def main():
                         'is specified.')
     parser.add_argument('-v', '--vcf', action='append', help='SV VCF to use for ' + 
                         'frequency filtering. May be specified multiple times.')
-    parser.add_argument('--vcf-af-field', help='Entry in INFO field of SV VCF(s) ' + 
-                        'to use as frequency. Will default to AF if entry not ' +
-                        'found.[AF]', default='AF', dest='af_field')
+    parser.add_argument('--vcf-af-fields', help='Entry or entries in INFO field ' +
+                        'of SV VCF(s) to use as frequency. Separate multiple ' +
+                        'entries with commas. If multiple entries are specified, ' +
+                        'will take the max. Will default to AF if entry not found.',
+                         default='AF', dest='af_fields')
     parser.add_argument('-z', '--bgzip', dest='bgzip', action='store_true',
                         help='Compress output BED with bgzip.')
 
@@ -172,7 +187,7 @@ def main():
     # Restrict to a subset of chromosomes, if specified
     if args.chr is not None:
         chroms = args.chr.split(',')
-    cnvs = cnvs.filter(lambda x: x.chrom in chroms)
+        nvs = cnvs.filter(lambda x: x.chrom in chroms)
 
     # Restrict to autosomes
     autosomes = [i for subl in ['{0} chr{1}'.format(c, c).split() for c in range(1, 23)] for i in subl]
@@ -198,7 +213,7 @@ def main():
     # Restrict on VCFs 
     if args.vcf is not None:
         for vcfpath in args.vcf:
-            vbed = read_vcf(vcfpath, args.maxfreq, args.af_field)
+            vbed = read_vcf(vcfpath, args.maxfreq, args.af_fields)
             cnvs = freq_filter(cnvs, vbed, 0, maxFreq=args.maxfreq, 
                                ro=args.recipoverlap, dist=args.dist)
 
