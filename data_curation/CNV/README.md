@@ -142,6 +142,19 @@ The properties of each rare CNV callset are listed below after the above filteri
 | TCGA | 0 | 0 | - | - | - | 8,670 | 5,056 | 0.58 | 175.0 kb | 1:2.15 |
 
 
+| Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP | 
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| PGC | 21,094 | 304,954 | 14.46 | 190.7 kb | 1:1.37 | 20,277 | 279,830 | 13.80 | 184.9 kb | 1:1.33 |
+| Cooper | 0 | 0 | - | - | - | 8,329 | 96,538 | 11.59 | 172.1 kb | 1.31:1 |
+| Coe | 29,083 | 401,716 | 13.81 | 263.9 kb | 1:1.22 | 11,256 | 238,503 | 21.19 | 176.3 kb | 1:1.69 |
+| SSC | 2,795 | 45,304 | 16.21 | 191.4 kb | 1:1.17 | 0 | 0 | - | - | - |
+| UKBB | 0 | 0 | - | - | - | 480,501 | 317,526 | 0.66 | 207.0 kb | 3.36:1 |
+| CHOP | 182,440 | 4,598,637 | 25.21 | 178.8 kb | 1:1.55 | 0 | 0 | - | - | - |
+| GDX | 9,959 | 217,006 | 21.79 | 255.8 kb | 1:1.35 | 0 | 0 | - | - | - |
+| TSAICG | 2,434 | 33,110 | 13.60 | 194.8 kb | 1:1.37 | 4,093 | 55,198 | 13.49 | 184.6 kb | 1:1.38 |
+| BCH | 3,591 | 61,248 | 17.06 | 329.0 kb | 1:1.45 | 0 | 0 | - | - | - |
+| TCGA | 0 | 0 | - | - | - | 8,670 | 114,620 | 13.22 | 171.3 kb | 1:2.22 |
+
 The information for this table was collected using `collect_cohort_stats.sh`.  
 
 ## Curation Steps: Ultra-rare CNVs  

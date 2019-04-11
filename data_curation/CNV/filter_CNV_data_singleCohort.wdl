@@ -141,14 +141,14 @@ task filter_cnvs_singleChrom {
       --vcf refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
       --vcf refs/1000Genomes_phase3.sites.vcf.gz \
       --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-      --vcf-af-field POPMAX_AF \
+      --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
       --bgzip \
       ${raw_CNVs} \
       ${cohort}.${contig}.${CNV_suffix}.bed.gz
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:d566dc85f0cdca47d93a0cf1cd412d10e6d48b3b5e0ce27f96fea9a6472ce88e"
+    docker: "talkowski/rcnv@sha256:5ee04d7d83d347866383cb0563f708e5ad5676c4e1a74219856176a151137520"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 50 SSD"
@@ -182,7 +182,7 @@ task merge_beds {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:d566dc85f0cdca47d93a0cf1cd412d10e6d48b3b5e0ce27f96fea9a6472ce88e"
+    docker: "talkowski/rcnv@sha256:5ee04d7d83d347866383cb0563f708e5ad5676c4e1a74219856176a151137520"
     preemptible: 1
   }
 

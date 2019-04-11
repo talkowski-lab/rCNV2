@@ -184,14 +184,12 @@ def main():
     else:
         cnvs = pybedtools.BedTool(args.inbed)
 
-    # Restrict to a subset of chromosomes, if specified
-    if args.chr is not None:
+    # Restrict to a subset of chromosomes, or autosomes if not specified
+    if args.chr is None:
+        chroms = [i for subl in ['{0} chr{1}'.format(c, c).split() for c in range(1, 23)] for i in subl]
+    else:
         chroms = args.chr.split(',')
-        nvs = cnvs.filter(lambda x: x.chrom in chroms)
-
-    # Restrict to autosomes
-    autosomes = [i for subl in ['{0} chr{1}'.format(c, c).split() for c in range(1, 23)] for i in subl]
-    cnvs = cnvs.filter(lambda x: x.chrom in autosomes)
+    cnvs = cnvs.filter(lambda x: x.chrom in chroms)
 
     # # Loose restriction on CNV minimum size prior to self-intersect
     # # (It is impossible to attain target RO with CNVs smaller than 
