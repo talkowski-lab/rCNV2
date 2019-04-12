@@ -33,7 +33,7 @@ We aggregated CNV data from multiple sources, listed below:
 | Coe | [Coe _et al._, _Nat. Genet._ (2014)](https://www.nature.com/articles/ng.3092) | [25217958](https://www.ncbi.nlm.nih.gov/pubmed/25217958) | Cases: SignatureChip OS v2.0 (58%), SignatureChip OS v1.0 (34%), Other (8%); Controls: Affy 6.0 (100%) | hg19 | DD | 29,083 | 11,256 |
 | SSC<sup>2</sup> | [Sanders _et at._, _Neuron_ (2015)](https://www.sciencedirect.com/science/article/pii/S0896627315007734?) | [26402605](https://www.ncbi.nlm.nih.gov/pubmed/26402605) | Omni 1Mv3 (46%), Omni 2.5 (41%), Omni 1Mv1 (13%) | hg18 | ASD | 2,795 | 0<sup>2</sup> |
 | UKBB | [Macé _et al._, _Nat. Comms._ (2017)](https://www.nature.com/articles/s41467-017-00556-x) | [28963451](https://www.ncbi.nlm.nih.gov/pubmed/28963451) | UKBB Affy Axiom (100%) | hg18 (?) | Mixed | 0<sup>3</sup> | 480,501<sup>3</sup> |
-| CHOP | - | - | Mixed Illumina SNP genotyping platforms | hg19 | Mixed | 287,901<sup>4</sup> | 0<sup>4</sup> |
+| CHOP | - | - | Mixed Illumina SNP genotyping platforms | hg19 | Mixed | 170,761<sup>4</sup> | 30,404<sup>4</sup> |
 | GDX | - | - | TBD? | hg18 & hg19 | Mixed | 9,959 | 0 |
 | TSAICG | [Huang _et al._, _Neuron_ (2017)](https://www.sciencedirect.com/science/article/pii/S0896627317305081) | [28641109](https://www.ncbi.nlm.nih.gov/pubmed/28641109) | OmniExpress (100%) | hg19 | TS | 2,434 | 4,093 |
 | BCH | [Talkowski _et al._, _Cell_ (2012)](https://www.sciencedirect.com/science/article/pii/S0092867412004114) | [22521361](https://www.ncbi.nlm.nih.gov/pubmed/22521361) | TBD? | hg18 | Mixed | 3,591 | 0 |  
@@ -43,7 +43,7 @@ We aggregated CNV data from multiple sources, listed below:
 1. Only retained control samples from Cooper _et al._. All cases from Cooper _et al._ also appear in Coe _et al._.  
 2. Only retained affected children from Sanders _et al._, since all controls were first-degree relatives of affected cases.  
 3. Currently unable to filter UKBB dataset by sample (no sample IDs provided). For now, assuming all samples are controls, which will \~mostly be true given our phenotypes of interest.  
-4. Currently unable to filter CHOP dataset by phenotype (no phenotype info provided). For now, assuming all samples are "cases", which will need to be revised. Also, note that the number of samples retained in the CHOP cohort decreased after filtering outlier samples (see below).  
+4. Counts represent the number of samples retained after filtering outlier samples, described below.  
 5. Only retained normal samples from tumor:normal pairs, and excluded any donors with known blood cancer.  
 
 ### Raw CNV data processing steps  
@@ -68,7 +68,7 @@ The properties of each callset are listed below after initial data processing st
 | Coe | 29,083 | 28,782 | 0.99 | 188.4 kb | 1:1.11 | 11,256 | 273,331 | 24.28 | 53.4 kb | 1.24:1 |
 | SSC | 2,795 | 30,867 | 11.04 | 21.0 kb | 3.09:1 | 0 | 0 | - | - | - |
 | UKBB | 0 | 0 | - | - | - | 480,501 | 873,454 | 1.82 | 101.6 kb | 6.50:1 |
-| CHOP | 182,440 | 1,621,189 | 8.89 | 74.3 kb | 1:1.08 | 0 | 0 | - | - | - |
+| CHOP | 170,761 | 1,621,189 | 8.89 | 74.3 kb | 1:1.08 | 30,404 | 0 | - | - | - |
 | GDX | 9,959 | 20,789 | 2.09 | 196.3 kb | 1:1.76 | 0 | 0 | - | - | - |
 | TSAICG | 2,434 | 3,541 | 1.45 | 91.1 kb | 1.01:1 | 4,093 | 5,834 | 1.43 | 91.3 kb | 1:1.08 |
 | BCH | 3,591 | 5,211 | 1.45 | 206.4 kb | 1:1.27 | 0 | 0 | - | - | - |
@@ -135,7 +135,7 @@ The properties of each rare CNV callset are listed below after the above filteri
 | Coe | 29,083 | 18,256 | 0.63 | 263.9 kb | 1:1.22 | 11,256 | 9,960 | 0.88 | 183.8 kb | 1:1.78 |
 | SSC | 2,795 | 2,044 | 0.73 | 194.0 kb | 1:1.16 | 0 | 0 | - | - | - |
 | UKBB | 0 | 0 | - | - | - | 480,501 | 315,649 | 0.66 | 208.1 kb | 3.33:1 |
-| CHOP | 182,440 | 195,987 | 1.07 | 184.7 kb | 1:1.51 | 0 | 0 | - | - | - |
+| CHOP | 170,761 | 195,987 | 1.07 | 184.7 kb | 1:1.51 | 30,404 | 0 | - | - | - |
 | GDX | 9,959 | 9,820 | 0.99 | 257.5 kb | 1:1.36 | 0 | 0 | - | - | - |
 | TSAICG | 2,434 | 1,505 | 0.62 | 194.8 kb | 1:1.37 | 4,093 | 2,509 | 0.61 | 184.6 kb | 1:1.38 |
 | BCH | 3,591 | 2,784 | 0.78 | 329.0 kb | 1:1.45 | 0 | 0 | - | - | - |
@@ -166,7 +166,7 @@ The properties of each ultra-rare CNV callset are listed below after the above f
 | Coe | 29,083 | 9,181 | 0.32 | 363.0 kb | 1:1.17 | 11,256 | 3,276 | 0.29 | 237.8 kb | 1:1.72 |
 | SSC | 2,795 | 753 | 0.27 | 260.8 kb | 1:1.18 | 0 | 0 | - | - | - |
 | UKBB | 0 | 0 | - | - | - | 480,501 | 136,352 | 0.28 | 282.3 kb | 3.49:1 |
-| CHOP | 182,440 | 67,044 | 0.37 | 237.2 kb | 1:1.39 | 0 | 0 | - | - | - |
+| CHOP | 170,761 | 67,044 | 0.37 | 237.2 kb | 1:1.39 | 30,404 | 0 | - | - | - |
 | GDX | 9,959 | 5,271 | 0.53 | 357.0 kb | 1:1.24 | 0 | 0 | - | - | - |
 | TSAICG | 2,434 | 648 | 0.27 | 241.5 kb | 1:1.56 | 4,093 | 1,025 | 0.25 | 235.4 kb | 1:1.62 |
 | BCH | 3,591 | 1,739 | 0.48 | 390.2 kb | 1:1.41 | 0 | 0 | - | - | - |
