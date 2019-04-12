@@ -148,7 +148,7 @@ task filter_cnvs_singleChrom {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:5ee04d7d83d347866383cb0563f708e5ad5676c4e1a74219856176a151137520"
+    docker: "talkowski/rcnv@sha256:21c4b880ef578b3e177cdc617b026683f59efc37e49f95ac31d38ecc090f3439"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 50 SSD"
@@ -173,6 +173,7 @@ task merge_beds {
     zcat ${sep=" " beds} \
     | fgrep -v "#" \
     | sort -Vk1,1 -k2,2n -k3,3n \
+    | uniq \
     | cat header.txt - \
     | bgzip -c \
     > "${prefix}.bed.gz"
@@ -182,7 +183,7 @@ task merge_beds {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:5ee04d7d83d347866383cb0563f708e5ad5676c4e1a74219856176a151137520"
+    docker: "talkowski/rcnv@sha256:21c4b880ef578b3e177cdc617b026683f59efc37e49f95ac31d38ecc090f3439"
     preemptible: 1
   }
 
