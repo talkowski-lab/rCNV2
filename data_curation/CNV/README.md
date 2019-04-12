@@ -33,7 +33,7 @@ We aggregated CNV data from multiple sources, listed below:
 | Coe | [Coe _et al._, _Nat. Genet._ (2014)](https://www.nature.com/articles/ng.3092) | [25217958](https://www.ncbi.nlm.nih.gov/pubmed/25217958) | Cases: SignatureChip OS v2.0 (58%), SignatureChip OS v1.0 (34%), Other (8%); Controls: Affy 6.0 (100%) | hg19 | DD | 29,083 | 11,256 |
 | SSC<sup>2</sup> | [Sanders _et at._, _Neuron_ (2015)](https://www.sciencedirect.com/science/article/pii/S0896627315007734?) | [26402605](https://www.ncbi.nlm.nih.gov/pubmed/26402605) | Omni 1Mv3 (46%), Omni 2.5 (41%), Omni 1Mv1 (13%) | hg18 | ASD | 2,795 | 0<sup>2</sup> |
 | UKBB | [Macé _et al._, _Nat. Comms._ (2017)](https://www.nature.com/articles/s41467-017-00556-x) | [28963451](https://www.ncbi.nlm.nih.gov/pubmed/28963451) | UKBB Affy Axiom (100%) | hg18 (?) | Mixed | 0<sup>3</sup> | 480,501<sup>3</sup> |
-| CHOP | - | - | Mixed Illumina SNP genotyping platforms | hg19 | Mixed | 147,328<sup>4</sup> | 27,923<sup>4</sup> |
+| CHOP | - | - | Mixed Illumina SNP genotyping platforms | hg19 | Mixed | 148,503<sup>4</sup> | 27,989<sup>4</sup> |
 | GDX | - | - | TBD? | hg18 & hg19 | Mixed | 9,959 | 0 |
 | TSAICG | [Huang _et al._, _Neuron_ (2017)](https://www.sciencedirect.com/science/article/pii/S0896627317305081) | [28641109](https://www.ncbi.nlm.nih.gov/pubmed/28641109) | OmniExpress (100%) | hg19 | TS | 2,434 | 4,093 |
 | BCH | [Talkowski _et al._, _Cell_ (2012)](https://www.sciencedirect.com/science/article/pii/S0092867412004114) | [22521361](https://www.ncbi.nlm.nih.gov/pubmed/22521361) | TBD? | hg18 | Mixed | 3,591 | 0 |  
@@ -54,7 +54,7 @@ Some datasets required manual curation prior to inclusion. Where necessary, thes
 
  * **SSC**: CNVs were filtered on pCNV ≤ 10<sup>-9</sup>, per recommendation of the authors.  
  * **UKBB**: CNVs were filtered on quality score ≥ 25 and CNV size ≥ 25kb.  
- * **CHOP**: CNVs were filtered on quality score ≥ 35 and CNV size ≥ 25kb while requiring at least 10 SNPs per CNV. After CNV filtering, samples with `LRR_SD` < 0.25, >25 CNV calls, or SNP call rate < 98% were excluded as outliers, as well as samples genotyped on arrays with < 175k SNP probes.  
+ * **CHOP**: CNVs were filtered on quality score ≥ 40 and CNV size ≥ 25kb while requiring at least 10 SNPs per CNV. After CNV filtering, samples with `LRR_SD` < 0.25, >20 CNV calls, or SNP call rate < 98% were excluded as outliers, as well as samples genotyped on arrays with < 175k SNP probes.  
  * **TCGA**: CNVs were filtered on ≥ 10 probes and ≥ 25kb. Deletions were required to have a mean log<sub>2</sub> intensity ≤ -1 and duplications were required to have a mean log<sub>2</sub> intensity of ≥ 0.5849625.  
 
 ### Raw CNV callset properties  
@@ -68,7 +68,7 @@ The properties of each callset are listed below after initial data processing st
 | Coe | 29,083 | 28,782 | 0.99 | 188.4 kb | 1:1.11 | 11,256 | 273,331 | 24.28 | 53.4 kb | 1.24:1 |
 | SSC | 2,795 | 30,867 | 11.04 | 21.0 kb | 3.09:1 | 0 | 0 | - | - | - |
 | UKBB | 0 | 0 | - | - | - | 480,501 | 873,454 | 1.82 | 101.6 kb | 6.50:1 |
-| CHOP | 147,328 | 978,376 | 6.64 | 79.1 kb | 1:1.14 | 27,923 | 221,597 | 7.94 | 75.1 kb | 1.54:1 |
+| CHOP | 148,503 | 978,376 | 6.64 | 79.1 kb | 1:1.14 | 27,989 | 221,597 | 7.94 | 75.1 kb | 1.54:1 |
 | GDX | 9,959 | 20,789 | 2.09 | 196.3 kb | 1:1.76 | 0 | 0 | - | - | - |
 | TSAICG | 2,434 | 3,541 | 1.45 | 91.1 kb | 1.01:1 | 4,093 | 5,834 | 1.43 | 91.3 kb | 1:1.08 |
 | BCH | 3,591 | 5,211 | 1.45 | 206.4 kb | 1:1.27 | 0 | 0 | - | - | - |
@@ -131,15 +131,15 @@ The properties of each rare CNV callset are listed below after the above filteri
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP | 
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | PGC | 21,094 | 13,852 | 0.66 | 190.7 kb | 1:1.37 | 20,277 | 12,710 | 0.63 | 184.9 kb | 1:1.33 |
-| Cooper | 0 | 0 | - | - | - | 8,329 | 4,306 | 0.52 | 173.9 kb | 1.33:1 |
-| Coe | 29,083 | 18,256 | 0.63 | 263.9 kb | 1:1.22 | 11,256 | 9,960 | 0.88 | 183.8 kb | 1:1.78 |
-| SSC | 2,795 | 2,044 | 0.73 | 194.0 kb | 1:1.16 | 0 | 0 | - | - | - |
+| Cooper | 0 | 0 | - | - | - | 8,329 | 4,329 | 0.52 | 173.2 kb | 1.31:1 |
+| Coe | 29,083 | 18,258 | 0.63 | 263.9 kb | 1:1.22 | 11,256 | 10,022 | 0.89 | 184.0 kb | 1:1.79 |
+| SSC | 2,795 | 2,047 | 0.73 | 193.8 kb | 1:1.16 | 0 | 0 | - | - | - |
 | UKBB | 0 | 0 | - | - | - | 480,501 | 315,649 | 0.66 | 208.1 kb | 3.33:1 |
-| CHOP | 147,328 | 195,987 | 1.07 | 184.7 kb | 1:1.51 | 27,923 | 0 | - | - | - |
-| GDX | 9,959 | 9,820 | 0.99 | 257.5 kb | 1:1.36 | 0 | 0 | - | - | - |
+| CHOP | 148,503 | 131,678 | 0.89 | 188.9 kb | 1:1.59 | 27,989 | 24,518 | 0.88 | 182.4 kb | 1:1.18 |
+| GDX | 9,959 | 9,821 | 0.99 | 257.5 kb | 1:1.36 | 0 | 0 | - | - | - |
 | TSAICG | 2,434 | 1,505 | 0.62 | 194.8 kb | 1:1.37 | 4,093 | 2,509 | 0.61 | 184.6 kb | 1:1.38 |
 | BCH | 3,591 | 2,784 | 0.78 | 329.0 kb | 1:1.45 | 0 | 0 | - | - | - |
-| TCGA | 0 | 0 | - | - | - | 8,670 | 5,000 | 0.58 | 175.1 kb | 1:2.21 |
+| TCGA | 0 | 0 | - | - | - | 8,670 | 5,003 | 0.58 | 175.1 kb | 1:2.21 |
 
 
 The information for this table was collected using `collect_cohort_stats.sh`.  
@@ -161,16 +161,16 @@ The properties of each ultra-rare CNV callset are listed below after the above f
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP | 
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| PGC | 21,094 | 5,676 | 0.27 | 246.0 kb | 1:1.60 | 20,277 | 4,933 | 0.24 | 236.4 kb | 1:1.50 |
-| Cooper | 0 | 0 | - | - | - | 8,329 | 1,727 | 0.21 | 213.6 kb | 1.18:1 |
-| Coe | 29,083 | 9,181 | 0.32 | 363.0 kb | 1:1.17 | 11,256 | 3,276 | 0.29 | 237.8 kb | 1:1.72 |
-| SSC | 2,795 | 753 | 0.27 | 260.8 kb | 1:1.18 | 0 | 0 | - | - | - |
+| PGC | 21,094 | 5,696 | 0.27 | 246.0 kb | 1:1.60 | 20,277 | 4,955 | 0.24 | 236.1 kb | 1:1.50 |
+| Cooper | 0 | 0 | - | - | - | 8,329 | 1,739 | 0.21 | 212.6 kb | 1.19:1 |
+| Coe | 29,083 | 9,198 | 0.32 | 362.0 kb | 1:1.17 | 11,256 | 3,288 | 0.29 | 237.8 kb | 1:1.72 |
+| SSC | 2,795 | 755 | 0.27 | 260.3 kb | 1:1.18 | 0 | 0 | - | - | - |
 | UKBB | 0 | 0 | - | - | - | 480,501 | 136,352 | 0.28 | 282.3 kb | 3.49:1 |
-| CHOP | 147,328 | 67,044 | 0.37 | 237.2 kb | 1:1.39 | 27,923 | 0 | - | - | - |
-| GDX | 9,959 | 5,271 | 0.53 | 357.0 kb | 1:1.24 | 0 | 0 | - | - | - |
-| TSAICG | 2,434 | 648 | 0.27 | 241.5 kb | 1:1.56 | 4,093 | 1,025 | 0.25 | 235.4 kb | 1:1.62 |
-| BCH | 3,591 | 1,739 | 0.48 | 390.2 kb | 1:1.41 | 0 | 0 | - | - | - |
-| TCGA | 0 | 0 | - | - | - | 8,670 | 1,591 | 0.18 | 209.4 kb | 1:2.02 |
+| CHOP | 148,503 | 44,221 | 0.30 | 243.3 kb | 1:1.46 | 27,989 | 10,171 | 0.36 | 234.0 kb | 1:1.42 |
+| GDX | 9,959 | 5,281 | 0.53 | 356.6 kb | 1:1.24 | 0 | 0 | - | - | - |
+| TSAICG | 2,434 | 650 | 0.27 | 240.7 kb | 1:1.56 | 4,093 | 1,027 | 0.25 | 235.4 kb | 1:1.63 |
+| BCH | 3,591 | 1,740 | 0.48 | 390.1 kb | 1:1.41 | 0 | 0 | - | - | - |
+| TCGA | 0 | 0 | - | - | - | 8,670 | 1,601 | 0.18 | 209.1 kb | 1:2.04 |
 
 The information for this table was collected using `collect_cohort_stats.sh`.  
 
