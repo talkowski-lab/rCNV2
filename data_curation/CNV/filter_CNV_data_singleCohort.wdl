@@ -148,7 +148,7 @@ task filter_cnvs_singleChrom {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:8b7e03520df241c3b42e6202a20bbc763daa6e5ded2d0eba64503d45281a08fa"
+    docker: "talkowski/rcnv@sha256:5bc7c04ef1c3d69753ff8c8d3e4274259bc6e8da54bc96c264870ab6b5fdcfdb"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 50 SSD"
@@ -183,7 +183,7 @@ task merge_beds {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:8b7e03520df241c3b42e6202a20bbc763daa6e5ded2d0eba64503d45281a08fa"
+    docker: "talkowski/rcnv@sha256:5bc7c04ef1c3d69753ff8c8d3e4274259bc6e8da54bc96c264870ab6b5fdcfdb"
     preemptible: 1
   }
 
