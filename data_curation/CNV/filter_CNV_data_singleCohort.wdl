@@ -43,7 +43,7 @@ workflow filter_cnvs_singleCohort {
     }
   }
 
-  # Merge results across chromosomes
+  # Merge results across chromosomes, and split by phenotype
   call merge_beds as merge_rare {
     input:
       beds=filter_rare.filtered_cnvs,
@@ -60,8 +60,16 @@ workflow filter_cnvs_singleCohort {
   output {
     File rCNVs = merge_rare.merged_bed
     File rCNVs_idx = merge_rare.merged_bed_idx
+    File case_rCNVs = merge_rare.merged_case_bed
+    File case_rCNVs_idx = merge_rare.merged_case_bed_idx
+    File control_rCNVs = merge_rare.merged_control_bed
+    File control_rCNVs_idx = merge_rare.merged_control_bed_idx
     File uCNVs = merge_ultrarare.merged_bed
     File uCNVs_idx = merge_ultrarare.merged_bed_idx
+    File case_urCNVs = merge_ultrarare.merged_case_bed
+    File case_urCNVs_idx = merge_ultrarare.merged_case_bed_idx
+    File control_urCNVs = merge_ultrarare.merged_control_bed
+    File control_urCNVs_idx = merge_ultrarare.merged_control_bed_idx
   }
 }
 
@@ -168,8 +176,8 @@ task merge_beds {
   String output_bucket
 
   command <<<
-    tabix -f ${beds[0]}
-    tabix -H ${beds[0]} > header.txt
+    # Simple merge
+    echo -e "#chr\tstart\tend\tname\tcnv\tpheno" > header.txt
     zcat ${sep=" " beds} \
     | fgrep -v "#" \
     | sort -Vk1,1 -k2,2n -k3,3n \
@@ -178,8 +186,24 @@ task merge_beds {
     | bgzip -c \
     > "${prefix}.bed.gz"
     tabix -f "${prefix}.bed.gz"
-    gsutil cp "${prefix}.bed.gz" ${output_bucket}/
-    gsutil cp "${prefix}.bed.gz.tbi" ${output_bucket}/
+    # Split by case/control
+    zcat ${prefix}.bed.gz \
+    | fgrep -v "#" \
+    | fgrep -w CTRL \
+    | cat header.txt - \
+    | bgzip -c \
+    > "${prefix}.CTRL.bed.gz"
+    tabix -f "${prefix}.CTRL.bed.gz"
+    zcat ${prefix}.bed.gz \
+    | fgrep -v "#" \
+    | fgrep -wv CTRL \
+    | cat header.txt - \
+    | bgzip -c \
+    > "${prefix}.CASE.bed.gz"
+    tabix -f "${prefix}.CASE.bed.gz"
+    # Copy to google bucket
+    gsutil cp "${prefix}*bed.gz" ${output_bucket}/
+    gsutil cp "${prefix}*bed.gz.tbi" ${output_bucket}/
   >>>
 
   runtime {
@@ -190,5 +214,9 @@ task merge_beds {
   output {
    File merged_bed = "${prefix}.bed.gz"
    File merged_bed_idx = "${prefix}.bed.gz.tbi"
+   File merged_case_bed = "${prefix}.CASE.bed.gz"
+   File merged_case_bed_idx = "${prefix}.CASE.bed.gz.tbi"
+   File merged_control_bed = "${prefix}.CTRL.bed.gz"
+   File merged_control_bed_idx = "${prefix}.CTRL.bed.gz.tbi"
   }
 }

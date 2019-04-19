@@ -1,7 +1,5 @@
 # CNV Data Curation
 
-## CNV Data Curation  
-
 We aggregated existing microarray-based CNV calls from numerous sources. This process is described below.  
 
 All commands executed to filter the CNV data as descrbed below are contained in `filter_CNV_data.sh`.  
