@@ -58,6 +58,8 @@ def main():
     parser.add_argument('-f', '--fraction', help='Minimum fraction of window ' +
                         'covered by a CNV to count as overlapping. [default: 0.75]',
                         type=float, default=0.75)
+    parser.add_argument('-c', '--cnv', help='Type of CNV to include (DEL/DUP). ' +
+                        '[default: all]')
     parser.add_argument('-n', '--names', help='File listing names for each set ' +
                         'of CNVs to be appended to the header of the output file. ' +
                         'Order must match input bedlist. Otherwise, will be ' +
@@ -76,7 +78,10 @@ def main():
     header = get_bed_header(args.windows)
 
     for cnvs, setname in cnv_bed_table:
-        bins = bins.intersect(cnvs, f=args.fraction, wa=True, c=True)
+        cnvbt = pybedtools.BedTool(cnvs)
+        if args.cnv is not None:
+            import pdb; pdb.set_trace()
+        bins = bins.intersect(cnvbt, f=args.fraction, wa=True, c=True)
         header = '\t'.join([header, setname])
 
     if args.outbed is None \
