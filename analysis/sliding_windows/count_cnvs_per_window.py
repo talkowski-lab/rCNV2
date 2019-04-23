@@ -80,7 +80,7 @@ def main():
     for cnvs, setname in cnv_bed_table:
         cnvbt = pybedtools.BedTool(cnvs)
         if args.cnv is not None:
-            import pdb; pdb.set_trace()
+            cnvbt = cnvbt.filter(lambda x: args.cnv in x)
         bins = bins.intersect(cnvbt, f=args.fraction, wa=True, c=True)
         header = '\t'.join([header, setname])
 
