@@ -50,6 +50,11 @@ RUN apt-get update -qqy && apt-get install -qqy \
     gcloud --version
 VOLUME ["/root/.config"]
 
+# Install R and R packages
+RUN conda install -n rcnv -y r-base
+RUN Rscript -e "sapply(c('optparse'),\
+    function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
+
 # Install Athena toolkit
 RUN git clone https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/athena /opt/athena \
     && cd /opt/athena \
@@ -61,7 +66,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout dfec0a18a995fd86347fbfc983c3eb90bfda496b && \
+    git checkout a4d279f924ea4602884bed0c0e298b55b0da64fc && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)

@@ -39,6 +39,11 @@ done < <( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f1 ) \
 
 # Count CNVs in cases and controls per cohort, split by CNV type
 # Bins with no annotations
+/opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
+  -z \
+  -o GRCh37.100kb_bins_10kb_steps.raw.rCNV_counts.bed.gz \
+  rCNV_bed_paths.list \
+  windows/GRCh37.100kb_bins_10kb_steps.raw.bed.gz
 for CNV in DEL DUP; do
   /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
     -z \
@@ -48,6 +53,11 @@ for CNV in DEL DUP; do
     windows/GRCh37.100kb_bins_10kb_steps.raw.bed.gz
 done  
 # Bins with raw annotations
+/opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
+  -z \
+  -o GRCh37.100kb_bins_10kb_steps.annotated.rCNV_counts.bed.gz \
+  rCNV_bed_paths.list \
+  windows/GRCh37.100kb_bins_10kb_steps.annotated.bed.gz
 for CNV in DEL DUP; do
   /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
     -z \
@@ -57,6 +67,11 @@ for CNV in DEL DUP; do
     windows/GRCh37.100kb_bins_10kb_steps.annotated.bed.gz
 done  
 # Bins with eigenannotations
+/opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
+  -z \
+  -o GRCh37.100kb_bins_10kb_steps.annotated.eigen.rCNV_counts.${CNV}.bed.gz \
+  rCNV_bed_paths.list \
+  windows/GRCh37.100kb_bins_10kb_steps.annotated.eigen.bed.gz
 for CNV in DEL DUP; do
   /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
     -z \
