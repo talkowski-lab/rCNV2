@@ -1,6 +1,6 @@
 # Phenotype Data Curation
 
-We collapsed cohorts into sets of case:control cohort pairs matched on phenotype and technical CNV properties.  
+We collapsed cohorts into sets of case:control cohort pairs matched on phenotype and technical CNV properties. This process is described below.  
 
 ### Phenotype abbreviations  
 
@@ -15,6 +15,41 @@ Several abbreviations and acronyms are used below, as follows:
 | NPD | Other neuropsychiatric disorders |
 | SCZ | Schizophrenia |
 
+### Phenotype curation  
+
+We harmonized phenotype data across [all cohorts included in the overall CNV dataset](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/).  
+
+Given the variability of phenotypic detail available between different cohorts, we applied a standardized hierarchical phenotype consolidation scheme to each cohort.  
+
+### Phenotype hierarchy  
+
+The hierarchy of phenotypes considered is listed below. HPO numbers for each term are listed in brackets.  
+
+```
+Germline disease
+|
+|--Neurological defect
+|   |  
+|   |  
+|   |  
+|
+|--Non-neurological defect
+```  
+
+### Phenotype assignment per cohort  
+
+We processed each cohort as follows:
+
+#### CHOP  
+ * 
+
+--- 
+
+## Phenotype Case-Control Cohort Pairings  
+
+For each phenotype, we broke down available case and control cohorts into pairs for burden testing. 
+
+These case-control pairings are described below per phenotype.  
 
 ### ASD: Autism spectrum disorders  
 

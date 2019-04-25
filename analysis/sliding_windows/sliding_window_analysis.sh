@@ -81,3 +81,15 @@ for CNV in DEL DUP; do
     windows/GRCh37.100kb_bins_10kb_steps.annotated.eigen.bed.gz
 done  
 
+
+# Run burden tests - example
+/opt/rCNV2/analysis/sliding_windows/window_burden_test.R \
+  --bgzip \
+  --case-column Coe.rCNV.CASE \
+  --case-n 29083 \
+  --control-column UKBB.rCNV.CTRL \
+  --control-n 480501 \
+  GRCh37.100kb_bins_10kb_steps.raw.rCNV_counts.DEL.bed.gz \
+  GRCh37.100kb_bins_10kb_steps.DEL.test_stats.bed.gz
+
+
