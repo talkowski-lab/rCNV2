@@ -17,31 +17,27 @@ Several abbreviations and acronyms are used below, as follows:
 
 ### Phenotype curation  
 
-We harmonized phenotype data across [all cohorts included in the overall CNV dataset](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/).  
+Given the variability of phenotypic detail available between different cohorts, we applied a standardized hierarchical phenotype consolidation scheme uniformly across all samples.  
 
-Given the variability of phenotypic detail available between different cohorts, we applied a standardized hierarchical phenotype consolidation scheme to each cohort.  
+We used the [Human Phenotype Ontology (HPO)](https://hpo.jax.org/app/) to harmonize phenotype data across all [cohorts included in the overall CNV dataset](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/).  
+
+For each sample, we recursively matched all phenotype information available against HPO keywords, and assigned the corresponding HPO terms to each sample when a matche was found.  
+
+The code to perform this HPO conversion is contained in `convert_phenotypes_to_hpo.sh`.  
 
 ### Phenotype hierarchy  
+
+After assigning HPO terms to each sample, we next subgrouped samples based on concordant HPO terms into a reduced hierarchy of "phenotype groups" considered in this study.  
+
+After tabulating the number of samples matching each HPO code, we retained HPO codes with at least 1,000 samples. In some situations, we collapsed redundant HPO codes up the hierarchy.  
+
+This process yielded a hierarchical phenotype classification system with XX distinct HPO-based sample groupings, each which has ≥ 1,000 samples.  
 
 The hierarchy of phenotypes considered is listed below. HPO numbers for each term are listed in brackets.  
 
 ```
-Germline disease
-|
-|--Neurological defect
-|   |  
-|   |  
-|   |  
-|
-|--Non-neurological defect
+Updated hierarchy image will go here when ready
 ```  
-
-### Phenotype assignment per cohort  
-
-We processed each cohort as follows:
-
-#### CHOP  
- * 
 
 --- 
 

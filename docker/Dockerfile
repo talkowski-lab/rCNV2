@@ -15,6 +15,7 @@ RUN apt-get -qqy update \
 RUN conda update -n base conda
 RUN conda create --name=rcnv python=3.7
 RUN conda config --set ssl_verify no
+RUN conda install -n rcnv -y r-base
 RUN conda install -n rcnv -y -c bioconda numpy scipy pandas scikit-learn
 RUN conda install -n rcnv -y -c bioconda pysam
 RUN conda install -n rcnv -y -c bioconda pybedtools
@@ -22,10 +23,10 @@ RUN conda install -n rcnv -y -c bioconda bzip2
 RUN conda install -n rcnv -y -c bioconda click
 RUN conda install -n rcnv -y -c bioconda mysqlclient
 RUN conda install -n rcnv -y -c bioconda pybigwig
-RUN conda install -n rcnv -y obonet
 ENV CONDA_DEFAULT_ENV rcnv
 RUN echo "source activate rcnv" >> ~/.bashrc
 ENV PATH /opt/conda/envs/rcnv/bin:$PATH
+RUN pip install obonet
 
 # Install google cloud tools
 RUN pip install google-cloud-storage
@@ -51,8 +52,7 @@ RUN apt-get update -qqy && apt-get install -qqy \
     gcloud --version
 VOLUME ["/root/.config"]
 
-# Install R and R packages
-RUN conda install -n rcnv -y r-base
+# Install R packages
 RUN Rscript -e "sapply(c('optparse'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 
@@ -67,7 +67,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 2bcbebe62fe8997e7892120481675d94f944a697 && \
+    git checkout fb9aaa5187e3928b9f8f84c3b1153c13498c087b && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)
