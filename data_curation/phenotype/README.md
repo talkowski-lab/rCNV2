@@ -2,26 +2,13 @@
 
 We collapsed cohorts into sets of case:control cohort pairs matched on phenotype and technical CNV properties. This process is described below.  
 
-### Phenotype abbreviations  
-
-Several abbreviations and acronyms are used below, as follows:  
-
-| Abbreviation | Definition |
-| --- | :--- |
-| ASD | Autism Spectrum Disorders |
-| CHD | Congenital Heart Disease |  
-| CTRL | Control (Unaffected Sample) |
-| DD | Developmental Disorders |
-| NPD | Other neuropsychiatric disorders |
-| SCZ | Schizophrenia |
-
 ### Phenotype curation  
 
 Given the variability of phenotypic detail available between different cohorts, we applied a standardized hierarchical phenotype consolidation scheme uniformly across all samples.  
 
 We used the [Human Phenotype Ontology (HPO)](https://hpo.jax.org/app/) to harmonize phenotype data across all [cohorts included in the overall CNV dataset](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/).  
 
-For each sample, we recursively matched all phenotype information available against HPO keywords, and assigned the corresponding HPO terms to each sample when a matche was found.  
+For each sample, we recursively matched all phenotype information available against HPO keywords, and assigned the corresponding HPO terms to each sample when a match was found.  
 
 The code to perform this HPO conversion is contained in `convert_phenotypes_to_hpo.sh`.  
 
@@ -29,9 +16,15 @@ The code to perform this HPO conversion is contained in `convert_phenotypes_to_h
 
 After assigning HPO terms to each sample, we next subgrouped samples based on concordant HPO terms into a reduced hierarchy of "phenotype groups" considered in this study.  
 
-After tabulating the number of samples matching each HPO code, we retained HPO codes with at least 1,000 samples. In some situations, we collapsed redundant HPO codes up the hierarchy.  
+After tabulating the number of samples matching each HPO code, we retained all HPO terms with at least 1,000 samples. 
 
-This process yielded a hierarchical phenotype classification system with XX distinct HPO-based sample groupings, each which has ≥ 1,000 samples.  
+We next compared shared sample memberships between all pairs of related HPO terms:
+ * If fewer than 1,000 samples differed between a pair of HPO terms, we retained the more general (i.e., higher-level) term, and excluded the more specific (i.e., lower-level) term.
+ * If both terms were equally high-level, we retained the term with the larger sample size.
+
+This process yielded a hierarchical phenotype classification system with XX distinct HPO-based sample groupings, each which has ≥ 1,000 samples and differs from another phenotype group by at least 1,000 distinct samples.  
+
+The code to perform the phenotype group consolidation process described above is contained in `convert_phenotypes_to_hpo.sh`    
 
 The hierarchy of phenotypes considered is listed below. HPO numbers for each term are listed in brackets.  
 

@@ -20,71 +20,132 @@ gcloud auth login
 mkdir raw_phenos/
 gsutil cp -r gs://rcnv_project/raw_data/phenotypes/* raw_phenos/
 mkdir cleaned_phenos/
+mkdir cleaned_phenos/all/
+mkdir cleaned_phenos/filtered/
+
+
+# Download current version of HPO
+wget http://purl.obolibrary.org/obo/hp.obo
+
+
+# Make tsv of HPO obo file (for convenience)
+/opt/rCNV2/data_curation/phenotype/HPO_obo_to_tsv.py \
+  --obo hp.obo \
+  --outfile HPO_dict.tsv
+gzip -f HPO_dict.tsv
+gsutil cp HPO_dict.tsv.gz gs://rcnv_project/refs/
 
 
 # Convert BCH & GDX phenotypes
 /opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
-  --obo http://purl.obolibrary.org/obo/hp.obo \
+  --obo hp.obo \
   -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
   -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
-  --no-match-default "UNKNOWN" \
-  -o cleaned_phenos/BCH_GDX.cleaned_phenos.txt \
+  --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
+  -o cleaned_phenos/all/BCH_GDX.cleaned_phenos.txt \
   raw_phenos/BCH_GDX.raw_phenos.txt
+
 
 # Convert Coe phenotypes
 /opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
-  --obo http://purl.obolibrary.org/obo/hp.obo \
+  --obo hp.obo \
   -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
   -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
-  --no-match-default "UNKNOWN" \
-  -o cleaned_phenos/Coe.cleaned_phenos.txt \
+  --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
+  -o cleaned_phenos/all/Coe.cleaned_phenos.txt \
   raw_phenos/Coe.raw_phenos.txt
+
 
 # Convert SSC phenotypes
 /opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
-  --obo http://purl.obolibrary.org/obo/hp.obo \
+  --obo hp.obo \
   -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
   -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
-  --no-match-default "UNKNOWN" \
-  -o cleaned_phenos/SSC.cleaned_phenos.txt \
+  --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
+  -o cleaned_phenos/all/SSC.cleaned_phenos.txt \
   raw_phenos/SSC.raw_phenos.txt
 
-# Prep conversion table for cohorts with uniform phenotypes (CHOP, TSAICG, PGC)
-cut -f2 raw_phenos/CHOP.raw_phenos.txt \
-| sort \
-| uniq \
-| awk -v OFS="\t" '{ print $'
 
+# Convert CHOP phenotypes
 /opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
-  --obo http://purl.obolibrary.org/obo/hp.obo \
+  --obo hp.obo \
   -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
   -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
-  -e /opt/rCNV2/refs/hpo/eligible_hpo_terms.txt \
-  --no-match-default "UNKNOWN" \
-  -o cleaned_phenos/CHOP.cleaned_phenos.txt \
+  --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
+  -o cleaned_phenos/all/CHOP.cleaned_phenos.txt \
   raw_phenos/CHOP.raw_phenos.txt
 
 
-
-
-
-
-
-
-time /opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
-  --obo http://purl.obolibrary.org/obo/hp.obo \
+# Prep conversion table for cohorts with uniform phenotypes (TSAICG, PGC)
+cut -f2 raw_phenos/CHOP.raw_phenos.txt \
+| sort \
+| uniq \
+| awk -v OFS="\t" '{ print $1, $1 }' \
+> CHOP.raw_phenos.conversion_input.txt
+/opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
+  --obo hp.obo \
   -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
   -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
-  -e /opt/rCNV2/refs/hpo/eligible_hpo_terms.txt \
-  --no-match-default "UNKNOWN" \
-  -o test_phenotypes_reclassified.txt \
-  test_phenotypes.txt
+  --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
+  -o CHOP.raw_phenos.conversion_table.txt \
+  CHOP.raw_phenos.conversion_input.txt
 
-time /opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
-  --obo http://purl.obolibrary.org/obo/hp.obo \
-  -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
-  -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
-  --no-match-default "UNKNOWN" \
-  -o test_phenotypes_reclassified.txt \
-  test_phenotypes.txt
+
+# Make dummy phenotype files for TSAICG
+yes $( fgrep "tourette" CHOP.raw_phenos.conversion_table.txt | cut -f2 ) \
+| head -n $( fgrep TSAICG /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f3 ) \
+| awk -v OFS="\t" '{ print "TSAICG_CASE_"NR, $1 }' \
+> cleaned_phenos/all/TSAICG.cleaned_phenos.txt
+
+
+# Make dummy phenotype files for PGC
+yes $( fgrep "schizophrenia" CHOP.raw_phenos.conversion_table.txt | cut -f2 ) \
+| head -n $( fgrep PGC /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f3 ) \
+| awk -v OFS="\t" '{ print "PGC_CASE_"NR, $1 }' \
+> cleaned_phenos/all/PGC.cleaned_phenos.txt
+
+
+# Pool all phenotypes across cohorts
+while read cohort; do
+  if [ -e cleaned_phenos/all/${cohort}.cleaned_phenos.txt ]; then
+    if [ ${cohort} != "CHOP" ]; then
+      cat cleaned_phenos/all/${cohort}.cleaned_phenos.txt
+    else
+      fgrep -wf raw_phenos/CHOP.QC_pass_samples.list \
+        cleaned_phenos/all/${cohort}.cleaned_phenos.txt
+    fi
+  fi
+done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt ) \
+> all_phenos.merged.txt
+
+
+# Determine minimum HPO tree to use
+/opt/rCNV2/data_curation/phenotype/collapse_HPO_tree.py \
+  --ignore "HP:0000001" \
+  --obo hp.obo \
+  --raw-counts samples_per_HPO.txt \
+  --filter-log HPO_tree_filter.log \
+  --outfile phenotype_groups.HPO_metadata.txt \
+  all_phenos.merged.txt
+
+
+# Restrict all cohort phenotypes to terms in minimal HPO tree
+while read cohort; do
+  if [ -e cleaned_phenos/all/${cohort}.cleaned_phenos.txt ]; then
+    /opt/rCNV2/data_curation/phenotype/filter_HPO_per_sample.py \
+      -o cleaned_phenos/filtered/${cohort}.cleaned_phenos.txt \
+      cleaned_phenos/all/${cohort}.cleaned_phenos.txt \
+      phenotype_groups.HPO_metadata.txt
+  fi
+done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt )
+
+
+# Copy all final data to Google bucket (requires permissions)
+gsutil cp -r cleaned_phenos/* gs://rcnv_project/cleaned_data/phenotypes/
+gsutil cp samples_per_HPO.txt \
+  gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/
+gsutil cp HPO_tree_filter.log \
+  gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/
+gsutil cp phenotype_groups.HPO_metadata.txt \
+  gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/
 
