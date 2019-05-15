@@ -17,7 +17,7 @@ import argparse
 from sys import stdout
 
 
-locale.setlocale(locale.LC_ALL, 'en_us')
+locale.setlocale(locale.LC_ALL, 'en_US.utf8')
 
 
 def gather_counts(cohort_table, hpo_metadata, hpo_dir):
@@ -41,7 +41,7 @@ def gather_counts(cohort_table, hpo_metadata, hpo_dir):
                 continue
 
             if cohort not in counts.keys():
-                counts[cohort] = { 'HEALTHY_CONTROL' : ctrl_n }
+                counts[cohort] = { 'HEALTHY_CONTROL' : int(ctrl_n) }
 
             for pheno in phenos:
                 if pheno not in counts[cohort].keys():
@@ -62,12 +62,39 @@ def gather_counts(cohort_table, hpo_metadata, hpo_dir):
     return counts
 
 
+def gather_metacounts(counts, metalist):
+    """
+    Combine sample counts across individual cohorts within each metacohort
+    """
+
+    metacounts = {}
+
+    with open(metalist) as infile:
+        reader = csv.reader(infile, delimiter='\t')
+
+        for name, cohorts in reader:
+            if name.startswith('#'):
+                continue
+            else:
+                metacounts[name] = {}
+
+            for cohort in cohorts.split(';'):
+                if cohort in counts.keys():
+                    for pheno in counts[cohort].keys():
+                        if pheno not in metacounts[name].keys():
+                            metacounts[name][pheno] = int(counts[cohort][pheno])
+                        else:
+                            metacounts[name][pheno] += int(counts[cohort][pheno])
+
+    return metacounts
+
+
 def write_table_header(outfile, counts):
     """
     Write a HTML-formatted header to outfile
     """
 
-    column_names = ['HPO', 'description', '**Total**'] + list(counts.keys())
+    column_names = ['HPO', 'description', 'Total'] + list(counts.keys())
     outfile.write('| ' + ' | '.join(column_names) + ' |  \n')
 
     hr_line = [':---'] * 2 + ['---:'] * (len(counts.keys()) + 1)
@@ -91,10 +118,15 @@ def write_table(counts, hpo_metadata, outfile):
             if term.startswith('#'):
                 continue
 
-            total_n = str(locale.format("%d", total_n, grouping=True))
+            if term == 'HEALTHY_CONTROL':
+                total_n = 0
+                for cohort in counts.keys():
+                    total_n += counts[cohort]['HEALTHY_CONTROL']
+
+            total_n = str(locale.format_string("%d", int(total_n), grouping=True))
 
             counts_per = [counts[cohort][term] for cohort in counts.keys()]
-            counts_per = [locale.format("%d", k, grouping=True) for k in counts_per]
+            counts_per = [locale.format_string("%d", int(k), grouping=True) for k in counts_per]
             counts_per = [str(k) for k in counts_per]
 
             outvals = [term, descrip, total_n] + counts_per
@@ -115,6 +147,13 @@ def main():
     parser.add_argument('cohort_table', help='Table of cohorts and total samples.')
     parser.add_argument('hpo_dir', help='Path to directory with cleaned ' + \
                         'sample-level HPO assignments.')
+    parser.add_argument('--meta-cohorts', help='Path to tsv specifying ' + \
+                        'metacohorts to consider. Two columns: metacohort ID ' + \
+                        'and semicolon-separated cohorts to include. ' + \
+                        '[default: no metacohort output]', dest='metalist')
+    parser.add_argument('--meta-out', help='Path to output file for counts ' + \
+                        'summarized per metacohort. [default: no metacohort ' + \
+                        'output]', dest='meta_out')
     parser.add_argument('-o', '--outfile', help='Path to output file. ' +
                         '[default: stdout]')
     args = parser.parse_args()
@@ -136,6 +175,13 @@ def main():
 
     # Format output table & write to file
     write_table(counts, args.hpo_metadata, outfile)
+
+    # Format output table for metacohorts, if optioned
+    if args.metalist is not None \
+    and args.meta_out is not None:
+        metaoutfile = open(args.meta_out, 'w')
+        metacounts = gather_metacounts(counts, args.metalist)
+        write_table(metacounts, args.hpo_metadata, metaoutfile)
 
 
 if __name__ == '__main__':

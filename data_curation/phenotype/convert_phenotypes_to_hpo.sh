@@ -158,6 +158,9 @@ done
 
 # Get summary table of HPO counts per study
 /opt/rCNV2/data_curation/phenotype/gather_hpo_per_cohort_table.py \
+  --outfile HPOs_by_cohort.table.tsv \
+  --meta-cohorts /opt/rCNV2/refs/rCNV_metacohort_list.txt \
+  --meta-out HPOs_by_metacohort.table.tsv \
   phenotype_groups.HPO_metadata.txt \
   /opt/rCNV2/refs/rCNV_sample_counts.txt \
   cleaned_phenos/filtered/
