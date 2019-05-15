@@ -108,11 +108,9 @@ The code to generate this table is provided in `gather_hpo_per_cohort_table.py`.
 
 ## Case-control "metacohorts"  
 
-To further control for potential technical differences between cohorts, we broke down available case and control datasets into four matched groups for burden testing.  
+To further control for potential technical differences between cohorts, we broke down available case and control datasets into four matched groups for burden testing, dubbed **metacohorts**.  
 
-These metacohorts represent the base unit on which all burden testing was performed.  
-
-These case-control pairings (dubbed **metacohorts**) are described below.  
+These metacohorts represent the base unit on which all burden testing was performed, and are described below: 
 
 | Metacohort ID | Case Source(s) | Number of Cases | Control Sources(s) | Number of Controls |  
 | :--- | :--- | ---: | :--- | ---: |  
