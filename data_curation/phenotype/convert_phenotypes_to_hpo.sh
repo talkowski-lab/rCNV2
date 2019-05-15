@@ -15,6 +15,10 @@
 docker run --rm -it talkowski/rcnv
 
 
+# Add helper alias for formatting long integers
+alias addcom="sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta'"
+
+
 # Copy all raw phenotype data from the project Google Bucket (note: requires permissions)
 gcloud auth login
 mkdir raw_phenos/
@@ -36,34 +40,16 @@ gzip -f HPO_dict.tsv
 gsutil cp HPO_dict.tsv.gz gs://rcnv_project/refs/
 
 
-# Convert BCH & GDX phenotypes
-/opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
-  --obo hp.obo \
-  -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
-  -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
-  --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
-  -o cleaned_phenos/all/BCH_GDX.cleaned_phenos.txt \
-  raw_phenos/BCH_GDX.raw_phenos.txt
-
-
-# Convert Coe phenotypes
-/opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
-  --obo hp.obo \
-  -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
-  -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
-  --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
-  -o cleaned_phenos/all/Coe.cleaned_phenos.txt \
-  raw_phenos/Coe.raw_phenos.txt
-
-
-# Convert SSC phenotypes
-/opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
-  --obo hp.obo \
-  -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
-  -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
-  --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
-  -o cleaned_phenos/all/SSC.cleaned_phenos.txt \
-  raw_phenos/SSC.raw_phenos.txt
+# Convert BCH, GDX, Coe, and SSC phenotypes
+for cohort in BCH, GDX, Coe, SSC; do
+  /opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
+    --obo hp.obo \
+    -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
+    -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
+    --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
+    -o cleaned_phenos/all/${cohort}.cleaned_phenos.txt \
+    raw_phenos/${cohort}.raw_phenos.txt
+done
 
 
 # Convert CHOP phenotypes
@@ -72,8 +58,11 @@ gsutil cp HPO_dict.tsv.gz gs://rcnv_project/refs/
   -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
   -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
   --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
-  -o cleaned_phenos/all/CHOP.cleaned_phenos.txt \
+  -o cleaned_phenos/all/CHOP.cleaned_phenos.preQC.txt \
   raw_phenos/CHOP.raw_phenos.txt
+cut -f1 raw_phenos/CHOP.QC_pass_samples.list \
+| fgrep -wf - cleaned_phenos/all/CHOP.cleaned_phenos.preQC.txt \
+> cleaned_phenos/all/CHOP.cleaned_phenos.txt
 
 
 # Prep conversion table for cohorts with uniform phenotypes (TSAICG, PGC)
@@ -138,6 +127,10 @@ while read cohort; do
       phenotype_groups.HPO_metadata.txt
   fi
 done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt )
+/opt/rCNV2/data_curation/phenotype/filter_HPO_per_sample.py \
+  -o cleaned_phenos/filtered/CHOP.cleaned_phenos.preQC.txt \
+  cleaned_phenos/all/CHOP.cleaned_phenos.preQC.txt \
+  phenotype_groups.HPO_metadata.txt
 
 
 # Copy all final data to Google bucket (requires permissions)
@@ -148,4 +141,24 @@ gsutil cp HPO_tree_filter.log \
   gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/
 gsutil cp phenotype_groups.HPO_metadata.txt \
   gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/
+
+
+# Print HTML table of HPO metadata for README
+for wrapper in 1; do
+  echo -e "| HPO Term | Description | Samples | HPO Tier | Parent Terms | Child Terms |  "
+  echo -e "| :--- | :--- | ---: | ---: | :--- | :--- |  "
+  paste \
+    <( fgrep -v "#" phenotype_groups.HPO_metadata.txt | cut -f1-2 ) \
+    <( fgrep -v "#" phenotype_groups.HPO_metadata.txt | cut -f3 | addcom ) \
+    <( fgrep -v "#" phenotype_groups.HPO_metadata.txt | cut -f4- ) \
+  | sed -e 's/\t/\ \|\ /g' -e 's/^/\|\ /g' -e 's/$/\ \|\ \ /g' -e 's/\;/,\ /g' \
+  | fgrep -v "HEALTHY_CONTROL"
+done
+
+
+# Get summary table of HPO counts per study
+/opt/rCNV2/data_curation/phenotype/gather_hpo_per_cohort_table.py \
+  phenotype_groups.HPO_metadata.txt \
+  /opt/rCNV2/refs/rCNV_sample_counts.txt \
+  cleaned_phenos/filtered/
 

@@ -28,6 +28,13 @@ RUN echo "source activate rcnv" >> ~/.bashrc
 ENV PATH /opt/conda/envs/rcnv/bin:$PATH
 RUN pip install obonet
 
+# Install locales
+RUN apt-get -qqy update \
+    && apt-get -qqy install --fix-missing locales
+ENV LC_ALL "en_US.UTF-8"
+ENV LC_CTYPE "en_US.UTF-8"
+RUN dpkg-reconfigure locales
+
 # Install google cloud tools
 RUN pip install google-cloud-storage
 
@@ -67,7 +74,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 4e410d52ad09c5b798d81c26dd04fab0199599f4 && \
+    git checkout 9d125cbc67f9c242e622d4b49150e0d8267eb086 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)

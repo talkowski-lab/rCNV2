@@ -264,13 +264,20 @@ def write_final_hpo_list(hpo_counts, hpo_g, outfile):
                 children.append('NA')
             
         else:
-            tiers.append('NA')
-            descrips.append('NA')
-            parents.append('NA')
+            if term == 'HEALTHY_CONTROL':
+                tiers.append(1)
+                descrips.append('Unaffected control sample')
+                parents.append('NA')
+            else:
+                tiers.append(2)
+                descrips.append('NA')
+                parents.append('HP:0000118')
             children.append('NA')
 
     # Determine sort order
-    order = range(0, len(terms))
+    idx_counts = [(i, v) for i, (k, v) in enumerate(hpo_counts.items())]
+    order = [i for i, v in sorted(idx_counts, reverse=True, key=lambda x: x[1])]
+    # order = range(0, len(terms))
 
     # Write header to file
     header = '#HPO_term\tdescription\tsamples\tHPO_tier' + \
