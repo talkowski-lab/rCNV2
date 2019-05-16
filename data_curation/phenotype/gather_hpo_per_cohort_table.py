@@ -89,25 +89,28 @@ def gather_metacounts(counts, metalist):
     return metacounts
 
 
-def write_table_header(outfile, counts):
+def write_table_header(outfile, counts, html=False):
     """
-    Write a HTML-formatted header to outfile
+    Write a formatted header to outfile
     """
 
     column_names = ['HPO', 'description', 'Total'] + list(counts.keys())
-    outfile.write('| ' + ' | '.join(column_names) + ' |  \n')
 
-    hr_line = [':---'] * 2 + ['---:'] * (len(counts.keys()) + 1)
-    outfile.write('| ' + ' | '.join(hr_line) + ' |  \n')
+    if html:
+        outfile.write('| ' + ' | '.join(column_names) + ' |  \n')
+        hr_line = [':---'] * 2 + ['---:'] * (len(counts.keys()) + 1)
+        outfile.write('| ' + ' | '.join(hr_line) + ' |  \n')
+    else:
+        outfile.write("#" + '\t'.join(column_names) + '\n')
 
 
-def write_table(counts, hpo_metadata, outfile):
+def write_table(counts, hpo_metadata, outfile, html=False):
     """
     Master function to process input data and write summary table
     """
 
     # Write header to outfile
-    write_table_header(outfile, counts)
+    write_table_header(outfile, counts, html)
 
     # Add one row per phenotype
     with open(hpo_metadata) as infile:
@@ -123,15 +126,22 @@ def write_table(counts, hpo_metadata, outfile):
                 for cohort in counts.keys():
                     total_n += counts[cohort]['HEALTHY_CONTROL']
 
-            total_n = str(locale.format_string("%d", int(total_n), grouping=True))
+            if html:
+                total_n = str(locale.format_string("%d", int(total_n), grouping=True))
+            else:
+                total_n = str(total_n)
 
             counts_per = [counts[cohort][term] for cohort in counts.keys()]
-            counts_per = [locale.format_string("%d", int(k), grouping=True) for k in counts_per]
+            if html:
+                counts_per = [locale.format_string("%d", int(k), grouping=True) for k in counts_per]
             counts_per = [str(k) for k in counts_per]
 
             outvals = [term, descrip, total_n] + counts_per
 
-            outfile.write('| ' + ' | '.join(outvals) + ' |  \n')
+            if html:
+                outfile.write('| ' + ' | '.join(outvals) + ' |  \n')
+            else:
+                outfile.write('\t'.join(outvals) + '\n')
 
 
 def main():
@@ -156,6 +166,8 @@ def main():
                         'output]', dest='meta_out')
     parser.add_argument('-o', '--outfile', help='Path to output file. ' +
                         '[default: stdout]')
+    parser.add_argument('--html', action='store_true', help='Output tables in ' + \
+                        ' HTML format. [default: flat tsv output]')
     args = parser.parse_args()
 
     # Clean hpo directory specification
@@ -174,14 +186,14 @@ def main():
         outfile = open(args.outfile, 'w')
 
     # Format output table & write to file
-    write_table(counts, args.hpo_metadata, outfile)
+    write_table(counts, args.hpo_metadata, outfile, args.html)
 
     # Format output table for metacohorts, if optioned
     if args.metalist is not None \
     and args.meta_out is not None:
         metaoutfile = open(args.meta_out, 'w')
         metacounts = gather_metacounts(counts, args.metalist)
-        write_table(metacounts, args.hpo_metadata, metaoutfile)
+        write_table(metacounts, args.hpo_metadata, metaoutfile, args.html)
 
 
 if __name__ == '__main__':
