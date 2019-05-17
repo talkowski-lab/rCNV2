@@ -18,7 +18,13 @@ RUN conda config --set ssl_verify no
 RUN conda install -n rcnv -y r-base
 RUN conda install -n rcnv -y -c bioconda numpy scipy pandas scikit-learn
 RUN conda install -n rcnv -y -c bioconda pysam
-RUN conda install -n rcnv -y -c bioconda pybedtools
+# RUN cd /opt/ && \
+#     wget https://github.com/arq5x/bedtools2/releases/download/v2.27.1/bedtools-2.27.1.tar.gz && \
+#     tar -xzvf bedtools-2.27.1.tar.gz \
+#     && cd bedtools2 \
+#     && make
+# ENV PATH="/opt/bedtools2/bin:${PATH}"
+RUN conda install -n rcnv -y -c bioconda pybedtools bedtools=2.27.1
 RUN conda install -n rcnv -y -c bioconda bzip2
 RUN conda install -n rcnv -y -c bioconda click
 RUN conda install -n rcnv -y -c bioconda mysqlclient
@@ -71,7 +77,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 51745cb34c5eef762cfa2a0c999cffd1ed8ec440 && \
+    git checkout c18767ca50a8eb44ed81eeefa1e138537a662255 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)

@@ -15,6 +15,7 @@
 # See filter_CNV_data.wdl for more details
 
 
+
 # Launch docker image
 docker run --rm -it talkowski/rcnv
 
@@ -23,6 +24,22 @@ docker run --rm -it talkowski/rcnv
 gcloud auth login
 gsutil cp -r gs://rcnv_project/raw_data/cnv ./
 gsutil cp -r gs://rcnv_project/refs ./
+
+
+
+# Sanity check raw CNV data (to ensure proper formatting)
+# Check headers
+for bed in cnv/*raw.bed.gz; do
+  echo $bed
+  zcat $bed | head -n1
+  echo -e "\n\n"
+done
+# Check HPO code formatting
+for bed in cnv/*raw.bed.gz; do
+  echo $bed
+  zcat $bed | fgrep -v "#" | cut -f6 | sed 's/\;/\n/g' | sort | uniq -c
+  echo -e "\n\n"
+done
 
 
 # # Make master BED file of all raw CNV data
@@ -96,4 +113,27 @@ for cohort in PGC SSC; do
     cnv/$cohort.raw.bed.gz \
     ultrarare_cnv_curated/$cohort.urCNV.bed.gz
 done
+
+
+# Debugging code chunk: chr22 rCNVs for BCH cohort
+/opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
+  --chr 22 \
+  --minsize 100000 \
+  --maxsize 10000000 \
+  --nsamp 3591 \
+  --maxfreq 0.01 \
+  --recipoverlap 0.5 \
+  --dist 50000 \
+  --blacklist refs/GRCh37.segDups_plus_simpleRepeats.bed.gz \
+  --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+  --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
+  --xcov 0.3 \
+  --cohorts-list raw_CNVs.per_cohort.txt \
+  --vcf refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
+  --vcf refs/1000Genomes_phase3.sites.vcf.gz \
+  --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
+  --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
+  --bgzip \
+  cnv/BCH.raw.bed.gz \
+  rare_cnv_curated/BCH.rCNV.bed.gz
 
