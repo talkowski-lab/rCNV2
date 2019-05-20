@@ -31,41 +31,48 @@ def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
     cnvsA = cnvsA.saveas()
 
     # Intersect
-    xbed = cnvsA.intersect(cnvsB, wa=True, wb=True, f=ro, r=True)
-    
-    # Throw out self-hits
-    xbed = xbed.filter(lambda x: str(x[3]) != str(x[9]))
+    xbed = cnvsA.intersect(cnvsB, wa=True, wb=True, f=ro, r=True).saveas()
 
-    # Throw out CNV type mismatches
-    def _cnv_match(feature):
-        if str(feature[4]) == str(feature[10]) or str(feature[10]) in 'MCNV CNV'.split():
-            return feature
-    xbed = xbed.filter(_cnv_match)
+    # Only perform filtering if more than one intersection was found
+    if len(xbed) == 0:
 
-    # Apply breakpoint distance requirement
-    def _bp_dist(feature, dist):
-        if abs(int(feature[1]) - int(feature[7])) <= dist \
-        and abs(int(feature[2]) - int(feature[8])) <= dist:
-            return feature[0:6]
-    xbed = xbed.filter(_bp_dist, dist)
+        return cnvsA
 
-    # Get dictionary of hits per ID
-    hits = {}
-    for feature in xbed:
-        fname = str(feature[3])
-        if fname not in hits.keys():
-            hits[fname] = 0
-        hits[fname] += 1
+    else:
+        
+        # Throw out self-hits
+        xbed = xbed.filter(lambda x: str(x[3]) != str(x[9]))
 
-    # Get list of CNVs to keep based on freq in xbed
-    cutoff = ceil(maxFreq * nsamp)
-    def _remove_fails(feature, hits, cutoff):
-        fname = str(feature[3])
-        if fname not in hits.keys() \
-        or hits[fname] <= cutoff:
-            return feature
+        # Throw out CNV type mismatches
+        def _cnv_match(feature):
+            if str(feature[4]) == str(feature[10]) or str(feature[10]) in 'MCNV CNV'.split():
+                return feature
+        xbed = xbed.filter(_cnv_match)
 
-    return cnvsA.filter(_remove_fails, hits, cutoff)
+        # Apply breakpoint distance requirement
+        def _bp_dist(feature, dist):
+            if abs(int(feature[1]) - int(feature[7])) <= dist \
+            and abs(int(feature[2]) - int(feature[8])) <= dist:
+                return feature[0:6]
+        xbed = xbed.filter(_bp_dist, dist)
+
+        # Get dictionary of hits per ID
+        hits = {}
+        for feature in xbed:
+            fname = str(feature[3])
+            if fname not in hits.keys():
+                hits[fname] = 0
+            hits[fname] += 1
+
+        # Get list of CNVs to keep based on freq in xbed
+        cutoff = ceil(maxFreq * nsamp)
+        def _remove_fails(feature, hits, cutoff):
+            fname = str(feature[3])
+            if fname not in hits.keys() \
+            or hits[fname] <= cutoff:
+                return feature
+
+        return cnvsA.filter(_remove_fails, hits, cutoff)
 
 
 # Read sites VCF for frequency filtering

@@ -156,7 +156,7 @@ task filter_cnvs_singleChrom {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:feb2e31751c4dbf8c3d9b274a5949b4546010a0509493084f9f7b3c931801ec2"
+    docker: "talkowski/rcnv@sha256:745e7ad66ae7218035cec2c23488a521b11f313989f8312e85ca1429b38c5903"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 50 SSD"
@@ -189,14 +189,14 @@ task merge_beds {
     # Split by case/control
     zcat ${prefix}.bed.gz \
     | fgrep -v "#" \
-    | fgrep -w CTRL \
+    | fgrep -w HEALTHY_CONTROL \
     | cat header.txt - \
     | bgzip -c \
     > "${prefix}.CTRL.bed.gz"
     tabix -f "${prefix}.CTRL.bed.gz"
     zcat ${prefix}.bed.gz \
     | fgrep -v "#" \
-    | fgrep -wv CTRL \
+    | fgrep -wv HEALTHY_CONTROL \
     | cat header.txt - \
     | bgzip -c \
     > "${prefix}.CASE.bed.gz"
@@ -207,7 +207,7 @@ task merge_beds {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:feb2e31751c4dbf8c3d9b274a5949b4546010a0509493084f9f7b3c931801ec2"
+    docker: "talkowski/rcnv@sha256:745e7ad66ae7218035cec2c23488a521b11f313989f8312e85ca1429b38c5903"
     preemptible: 1
   }
 

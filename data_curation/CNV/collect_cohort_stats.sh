@@ -37,9 +37,9 @@ collect_stats () {
 
       if [ -s $bed ]; then
         n_case_cnv=$( zcat $bed \
-                      | fgrep -v "#" | fgrep -v CTRL | wc -l )
+                      | fgrep -v "#" | fgrep -v HEALTHY_CONTROL | wc -l )
         n_ctrl_cnv=$( zcat $bed \
-                      | fgrep -v "#" | fgrep -w CTRL | wc -l )
+                      | fgrep -v "#" | fgrep -w HEALTHY_CONTROL | wc -l )
       else
         n_case_cnv=0
         n_ctrl_cnv=0
@@ -56,16 +56,16 @@ collect_stats () {
         # Median size
         zcat $bed \
         | fgrep -v "#" \
-        | fgrep -v CTRL \
+        | fgrep -v HEALTHY_CONTROL \
         | awk '{ print $3-$2 }' \
         | sort -nk1,1 \
         | median \
         | awk '{ printf "%0.1f kb\n", $1/1000 }'
         # DEL : DUP ratio
         n_case_del=$( zcat $bed | fgrep -v "#" \
-                      | fgrep -v CTRL | fgrep -w DEL | wc -l )
+                      | fgrep -v HEALTHY_CONTROL | fgrep -w DEL | wc -l )
         n_case_dup=$( zcat $bed | fgrep -v "#" \
-                      | fgrep -v CTRL | fgrep -w DUP | wc -l )
+                      | fgrep -v HEALTHY_CONTROL | fgrep -w DUP | wc -l )
         if [ $n_case_del -ge $n_case_dup ]; then
           echo "" | awk -v del=$n_case_del -v dup=$n_case_dup \
                     '{ printf "%0.2f:1\n", del/dup }'
@@ -88,16 +88,16 @@ collect_stats () {
         # Median size
         zcat $bed \
         | fgrep -v "#" \
-        | fgrep -w CTRL \
+        | fgrep -w HEALTHY_CONTROL \
         | awk '{ print $3-$2 }' \
         | sort -nk1,1 \
         | median \
         | awk '{ printf "%0.1f kb\n", $1/1000 }'
         # DEL : DUP ratio
         n_ctrl_del=$( zcat $bed | fgrep -v "#" \
-                      | fgrep -w CTRL | fgrep -w DEL | wc -l )
+                      | fgrep -w HEALTHY_CONTROL | fgrep -w DEL | wc -l )
         n_ctrl_dup=$( zcat $bed | fgrep -v "#" \
-                      | fgrep -w CTRL | fgrep -w DUP | wc -l )
+                      | fgrep -w HEALTHY_CONTROL | fgrep -w DUP | wc -l )
         if [ $n_ctrl_del -ge $n_ctrl_dup ]; then
           echo "" | awk -v del=$n_ctrl_del -v dup=$n_ctrl_dup \
                     '{ printf "%0.2f:1\n", del/dup }'
