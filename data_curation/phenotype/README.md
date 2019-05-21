@@ -110,7 +110,9 @@ The code to generate this table is provided in `gather_hpo_per_cohort_table.py`.
 
 To control for potential technical differences between cohorts, we combined CNV data from multiple cohorts into four matched groups for burden testing, dubbed **metacohorts**.  
 
-These metacohorts represent the basic unit on which all burden testing was performed, and are described below: 
+These metacohorts represent the basic unit on which all burden testing was performed, and are described in the table below.  
+
+For completeness, we also performed identical analyses on a pooled dataset of all samples, dubbed the **megacohort**.  
 
 | Metacohort ID | Case Source(s) | Number of Cases | Control Sources(s) | Number of Controls |  
 | :--- | :--- | ---: | :--- | ---: |  
@@ -118,40 +120,41 @@ These metacohorts represent the basic unit on which all burden testing was perfo
 | `meta2` | PGC, SSC, TSAICG | 26,323 | TCGA, PGC, TSAICG | 33,040 |  
 | `meta3` | CHOP | 154,140 | CHOP | 28,070 |  
 | `meta4` | UKBB | 0 (TBD) | UKBB | 480,501 |  
+| `mega` | Coe, BCH, GDX, PGC, SSC, TSAICG, CHOP, UKBB | 223,116 | Coe, Cooper, TCGA, PGC, TSAICG, CHOP, UKBB | 561,196 |  
 
 The count of samples for each phenotype group per metacohort is listed below:  
 
-| HPO | description | Total | meta1 | meta2 | meta3 | meta4 |  
-| :--- | :--- | ---: | ---: | ---: | ---: | ---: |  
-| HP:0000118 | Phenotypic abnormality | 223,116 | 42,653 | 26,323 | 154,140 | 0 |  
-| HP:0000707 | Abnormality of the nervous system | 116,783 | 36,054 | 26,323 | 54,406 | 0 |  
-| HP:0012638 | Abnormality of nervous system physiology | 91,067 | 35,796 | 26,323 | 28,948 | 0 |  
-| HP:0000708 | Behavioral abnormality | 54,041 | 3,788 | 23,889 | 26,364 | 0 |  
-| UNKNOWN | NA | 49,137 | 5,264 | 0 | 43,873 | 0 |  
-| HP:0012759 | Neurodevelopmental abnormality | 36,378 | 34,893 | 814 | 671 | 0 |  
-| HP:0012758 | Neurodevelopmental delay | 34,633 | 34,633 | 0 | 0 | 0 |  
-| HP:0002715 | Abnormality of the immune system | 32,932 | 89 | 0 | 32,843 | 0 |  
-| HP:0012639 | Abnormality of nervous system morphology | 26,277 | 1,341 | 0 | 24,936 | 0 |  
-| HP:0007367 | Atrophy/Degeneration affecting the central nervous system | 24,257 | 10 | 0 | 24,247 | 0 |  
-| HEALTHY_CONTROL | Unaffected control sample | 561,196 | 19,585 | 33,040 | 28,070 | 480,501 |  
-| HP:0001626 | Abnormality of the cardiovascular system | 22,372 | 1,369 | 0 | 21,003 | 0 |  
-| HP:0100753 | Schizophrenia | 22,301 | 7 | 21,094 | 1,200 | 0 |  
-| HP:0000729 | Autistic behavior | 16,926 | 3,060 | 2,795 | 11,071 | 0 |  
-| HP:0100022 | Abnormality of movement | 15,553 | 725 | 2,434 | 12,394 | 0 |  
-| HP:0002597 | Abnormality of the vasculature | 15,073 | 125 | 0 | 14,948 | 0 |  
-| HP:0000752 | Hyperactivity | 12,941 | 582 | 0 | 12,359 | 0 |  
-| HP:0000736 | Short attention span | 12,908 | 549 | 0 | 12,359 | 0 |  
-| HP:0000152 | Abnormality of head or neck | 7,045 | 7,045 | 0 | 0 | 0 |  
-| HP:0001627 | Abnormal heart morphology | 6,751 | 696 | 0 | 6,055 | 0 |  
-| HP:0001250 | Seizures | 4,965 | 2,885 | 318 | 1,762 | 0 |  
-| HP:0001507 | Growth abnormality | 3,262 | 2,505 | 0 | 757 | 0 |  
-| HP:0004305 | Involuntary movements | 2,538 | 69 | 2,434 | 35 | 0 |  
-| HP:0031466 | Impairment in personality functioning | 2,171 | 441 | 0 | 1,730 | 0 |  
-| HP:0001249 | Intellectual disability | 2,072 | 587 | 814 | 671 | 0 |  
-| HP:0000924 | Abnormality of the skeletal system | 1,986 | 1,986 | 0 | 0 | 0 |  
-| HP:0012443 | Abnormality of brain morphology | 1,950 | 1,261 | 0 | 689 | 0 |  
-| HP:0002197 | Generalized-onset seizure | 1,781 | 1,781 | 0 | 0 | 0 |  
-| HP:0025031 | Abnormality of the digestive system | 1,588 | 330 | 0 | 1,258 | 0 |  
-| HP:0003011 | Abnormality of the musculature | 1,376 | 1,376 | 0 | 0 | 0 |  
-| HP:0001510 | Growth delay | 1,035 | 1,035 | 0 | 0 | 0 |  
+| HPO | description | Total | meta1 | meta2 | meta3 | meta4 | mega |  
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |  
+| HP:0000118 | Phenotypic abnormality | 223,116 | 42,653 | 26,323 | 154,140 | 0 | 223,116 |  
+| HP:0000707 | Abnormality of the nervous system | 116,783 | 36,054 | 26,323 | 54,406 | 0 | 116,783 |  
+| HP:0012638 | Abnormality of nervous system physiology | 91,067 | 35,796 | 26,323 | 28,948 | 0 | 91,067 |  
+| HP:0000708 | Behavioral abnormality | 54,041 | 3,788 | 23,889 | 26,364 | 0 | 54,041 |  
+| UNKNOWN | NA | 49,137 | 5,264 | 0 | 43,873 | 0 | 49,137 |  
+| HP:0012759 | Neurodevelopmental abnormality | 36,378 | 34,893 | 814 | 671 | 0 | 36,378 |  
+| HP:0012758 | Neurodevelopmental delay | 34,633 | 34,633 | 0 | 0 | 0 | 34,633 |  
+| HP:0002715 | Abnormality of the immune system | 32,932 | 89 | 0 | 32,843 | 0 | 32,932 |  
+| HP:0012639 | Abnormality of nervous system morphology | 26,277 | 1,341 | 0 | 24,936 | 0 | 26,277 |  
+| HP:0007367 | Atrophy/Degeneration affecting the central nervous system | 24,257 | 10 | 0 | 24,247 | 0 | 24,257 |  
+| HEALTHY_CONTROL | Unaffected control sample | 1,122,392 | 19,585 | 33,040 | 28,070 | 480,501 | 561,196 |  
+| HP:0001626 | Abnormality of the cardiovascular system | 22,372 | 1,369 | 0 | 21,003 | 0 | 22,372 |  
+| HP:0100753 | Schizophrenia | 22,301 | 7 | 21,094 | 1,200 | 0 | 22,301 |  
+| HP:0000729 | Autistic behavior | 16,926 | 3,060 | 2,795 | 11,071 | 0 | 16,926 |  
+| HP:0100022 | Abnormality of movement | 15,553 | 725 | 2,434 | 12,394 | 0 | 15,553 |  
+| HP:0002597 | Abnormality of the vasculature | 15,073 | 125 | 0 | 14,948 | 0 | 15,073 |  
+| HP:0000752 | Hyperactivity | 12,941 | 582 | 0 | 12,359 | 0 | 12,941 |  
+| HP:0000736 | Short attention span | 12,908 | 549 | 0 | 12,359 | 0 | 12,908 |  
+| HP:0000152 | Abnormality of head or neck | 7,045 | 7,045 | 0 | 0 | 0 | 7,045 |  
+| HP:0001627 | Abnormal heart morphology | 6,751 | 696 | 0 | 6,055 | 0 | 6,751 |  
+| HP:0001250 | Seizures | 4,965 | 2,885 | 318 | 1,762 | 0 | 4,965 |  
+| HP:0001507 | Growth abnormality | 3,262 | 2,505 | 0 | 757 | 0 | 3,262 |  
+| HP:0004305 | Involuntary movements | 2,538 | 69 | 2,434 | 35 | 0 | 2,538 |  
+| HP:0031466 | Impairment in personality functioning | 2,171 | 441 | 0 | 1,730 | 0 | 2,171 |  
+| HP:0001249 | Intellectual disability | 2,072 | 587 | 814 | 671 | 0 | 2,072 |  
+| HP:0000924 | Abnormality of the skeletal system | 1,986 | 1,986 | 0 | 0 | 0 | 1,986 |  
+| HP:0012443 | Abnormality of brain morphology | 1,950 | 1,261 | 0 | 689 | 0 | 1,950 |  
+| HP:0002197 | Generalized-onset seizure | 1,781 | 1,781 | 0 | 0 | 0 | 1,781 |  
+| HP:0025031 | Abnormality of the digestive system | 1,588 | 330 | 0 | 1,258 | 0 | 1,588 |  
+| HP:0003011 | Abnormality of the musculature | 1,376 | 1,376 | 0 | 0 | 0 | 1,376 |  
+| HP:0001510 | Growth delay | 1,035 | 1,035 | 0 | 0 | 0 | 1,035 |  
 

@@ -156,7 +156,7 @@ task filter_cnvs_singleChrom {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e0b624ba24e7e0326708e859a2e9e694e9c3ed0ec91e64002f826bd279c77d8b"
+    docker: "talkowski/rcnv@sha256:462c3ab0e47c33d75010ca6f8cf0ae79d9292fc7faad21768a38757955ad60e6"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 50 SSD"
@@ -186,37 +186,37 @@ task merge_beds {
     | bgzip -c \
     > "${prefix}.bed.gz"
     tabix -f "${prefix}.bed.gz"
-    # Split by case/control
-    zcat ${prefix}.bed.gz \
-    | fgrep -v "#" \
-    | fgrep -w HEALTHY_CONTROL \
-    | cat header.txt - \
-    | bgzip -c \
-    > "${prefix}.CTRL.bed.gz"
-    tabix -f "${prefix}.CTRL.bed.gz"
-    zcat ${prefix}.bed.gz \
-    | fgrep -v "#" \
-    | fgrep -wv HEALTHY_CONTROL \
-    | cat header.txt - \
-    | bgzip -c \
-    > "${prefix}.CASE.bed.gz"
-    tabix -f "${prefix}.CASE.bed.gz"
+    # # Split by case/control
+    # zcat ${prefix}.bed.gz \
+    # | fgrep -v "#" \
+    # | fgrep -w HEALTHY_CONTROL \
+    # | cat header.txt - \
+    # | bgzip -c \
+    # > "${prefix}.CTRL.bed.gz"
+    # tabix -f "${prefix}.CTRL.bed.gz"
+    # zcat ${prefix}.bed.gz \
+    # | fgrep -v "#" \
+    # | fgrep -wv HEALTHY_CONTROL \
+    # | cat header.txt - \
+    # | bgzip -c \
+    # > "${prefix}.CASE.bed.gz"
+    # tabix -f "${prefix}.CASE.bed.gz"
     # Copy to google bucket
     gsutil cp "${prefix}*bed.gz" ${output_bucket}/
     gsutil cp "${prefix}*bed.gz.tbi" ${output_bucket}/
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e0b624ba24e7e0326708e859a2e9e694e9c3ed0ec91e64002f826bd279c77d8b"
+    docker: "talkowski/rcnv@sha256:462c3ab0e47c33d75010ca6f8cf0ae79d9292fc7faad21768a38757955ad60e6"
     preemptible: 1
   }
 
   output {
    File merged_bed = "${prefix}.bed.gz"
    File merged_bed_idx = "${prefix}.bed.gz.tbi"
-   File merged_case_bed = "${prefix}.CASE.bed.gz"
-   File merged_case_bed_idx = "${prefix}.CASE.bed.gz.tbi"
-   File merged_control_bed = "${prefix}.CTRL.bed.gz"
-   File merged_control_bed_idx = "${prefix}.CTRL.bed.gz.tbi"
+   # File merged_case_bed = "${prefix}.CASE.bed.gz"
+   # File merged_case_bed_idx = "${prefix}.CASE.bed.gz.tbi"
+   # File merged_control_bed = "${prefix}.CTRL.bed.gz"
+   # File merged_control_bed_idx = "${prefix}.CTRL.bed.gz.tbi"
   }
 }

@@ -16,12 +16,14 @@ workflow filter_CNV_data {
   Array[String] cohorts
   Array[Int] sample_sizes
   Array[File] raw_CNVs
+  File metacohort_list
   File contiglist
   String rCNV_bucket
 
+  Array[Array[String]] metacohorts = read_tsv(metacohort_list)
   Array[Int] cohort_idxs = range(length(cohorts))
 
-  # Scatter over cohorts
+  # Scatter over cohorts and filter CNVs
   scatter ( i in cohort_idxs ) {
     # Call subworkflow to perform CNV filtering for a single cohort
     call filter_single.filter_cnvs_singleCohort as filter_cohort {
@@ -34,49 +36,31 @@ workflow filter_CNV_data {
     }
   }
 
-  # Make master CASE and CTRL subsets
-  call combine_subsets as combine_case_rCNVs {
-    input:
-      beds=filter_cohort.case_rCNVs,
-      bed_idxs=filter_cohort.case_rCNVs_idx,
-      output_bucket="${rCNV_bucket}/cleaned_data/cnv",
-      prefix="ALL.rCNV.CASE"
-  }
-  call combine_subsets as combine_control_rCNVs {
-    input:
-      beds=filter_cohort.control_rCNVs,
-      bed_idxs=filter_cohort.control_rCNVs_idx,
-      output_bucket="${rCNV_bucket}/cleaned_data/cnv",
-      prefix="ALL.rCNV.CTRL"
-  }
-  call combine_subsets as combine_case_urCNVs {
-    input:
-      beds=filter_cohort.case_urCNVs,
-      bed_idxs=filter_cohort.case_urCNVs_idx,
-      output_bucket="${rCNV_bucket}/cleaned_data/cnv",
-      prefix="ALL.urCNV.CASE"
-  }
-  call combine_subsets as combine_control_urCNVs {
-    input:
-      beds=filter_cohort.control_urCNVs,
-      bed_idxs=filter_cohort.control_urCNVs_idx,
-      output_bucket="${rCNV_bucket}/cleaned_data/cnv",
-      prefix="ALL.urCNV.CTRL"
+  # Scatter over metacohorts and combine filtered CNVs
+  scatter ( metacohort in metacohorts ) {
+    call combine_subsets as combine_meta_rCNVs {
+      input:
+        beds=filter_cohort.rCNVs,
+        bed_idxs=filter_cohort.rCNVs_idx,
+        cohorts=metacohort[1]
+        output_bucket="${rCNV_bucket}/cleaned_data/cnv",
+        prefix="${metacohort[0]}.rCNV"
+    }
+    call combine_subsets as combine_meta_urCNVs {
+      input:
+        beds=filter_cohort.urCNVs,
+        bed_idxs=filter_cohort.urCNVs_idx,
+        cohorts=metacohort[1]
+        output_bucket="${rCNV_bucket}/cleaned_data/cnv",
+        prefix="${metacohort[0]}.urCNV"
+    }
   }
 
   output {
     Array[File] rCNVs = filter_cohort.rCNVs
     Array[File] rCNVs_idx = filter_cohort.rCNVs_idx
-    File case_rCNVs = combine_case_rCNVs.combined_bed
-    File case_rCNVs_idx = combine_case_rCNVs.combined_bed_idx
-    File control_rCNVs = combine_control_rCNVs.combined_bed
-    File control_rCNVs_idx = combine_control_rCNVs.combined_bed_idx
     Array[File] uCNVs = filter_cohort.uCNVs
     Array[File] uCNVs_idx = filter_cohort.uCNVs_idx
-    File case_urCNVs = combine_case_urCNVs.combined_bed
-    File case_urCNVs_idx = combine_case_urCNVs.combined_bed_idx
-    File control_urCNVs = combine_control_urCNVs.combined_bed
-    File control_urCNVs_idx = combine_control_urCNVs.combined_bed_idx
   }
 }
 
@@ -85,12 +69,18 @@ workflow filter_CNV_data {
 task combine_subsets {
   Array[File] beds
   Array[File] bed_idxs
+  String cohorts
   String output_bucket
   String prefix
 
+  bedlist = write_tsv(beds)
+  idxlist = write_tsv(bed_idxs)
+
   command <<<
+    sed 's/;/\n/g' ${cohorts} > cohorts.list
     tabix -H ${beds[0]} > header.txt
-    zcat ${sep=" " beds} \
+    fgrep -f cohorts.list ${bedlist} \
+    | xargs -I {} zcat {} \
     | fgrep -v "#" \
     | sort -Vk1,1 -k2,2n -k3,3n -k4,4V -k5,5V -k6,6V \
     | cat header.txt - \
@@ -103,7 +93,7 @@ task combine_subsets {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e0b624ba24e7e0326708e859a2e9e694e9c3ed0ec91e64002f826bd279c77d8b"
+    docker: "talkowski/rcnv@sha256:462c3ab0e47c33d75010ca6f8cf0ae79d9292fc7faad21768a38757955ad60e6"
     preemptible: 1
   }
 

@@ -1,5 +1,0 @@
-#meta_ID	cohorts
-meta1	Coe;Cooper;BCH;GDX
-meta2	PGC;SSC;TSAICG;TCGA
-meta3	CHOP
-meta4	UKBB

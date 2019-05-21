@@ -157,9 +157,10 @@ done
 
 
 # Get summary table of HPO counts per cohort & metacohort
+gsutil cp gs://rcnv_project/analysis/analysis_refs/rCNV_metacohort_list.txt ./
 /opt/rCNV2/data_curation/phenotype/gather_hpo_per_cohort_table.py \
   --outfile HPOs_by_cohort.table.tsv \
-  --meta-cohorts /opt/rCNV2/refs/rCNV_metacohort_list.txt \
+  --meta-cohorts rCNV_metacohort_list.txt \
   --meta-out HPOs_by_metacohort.table.tsv \
   phenotype_groups.HPO_metadata.txt \
   /opt/rCNV2/refs/rCNV_sample_counts.txt \
@@ -176,7 +177,7 @@ gsutil cp HPOs_by_metacohort.table.tsv \
 # Print HTML tables of HPO counts per cohort & metacohort
 /opt/rCNV2/data_curation/phenotype/gather_hpo_per_cohort_table.py \
   --outfile HPOs_by_cohort.table.html.tsv \
-  --meta-cohorts /opt/rCNV2/refs/rCNV_metacohort_list.txt \
+  --meta-cohorts rCNV_metacohort_list.txt \
   --meta-out HPOs_by_metacohort.table.html.tsv \
   --html \
   phenotype_groups.HPO_metadata.txt \
