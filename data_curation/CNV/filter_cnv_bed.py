@@ -31,7 +31,29 @@ def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
     cnvsA = cnvsA.saveas()
 
     # Intersect
-    xbed = cnvsA.intersect(cnvsB, wa=True, wb=True, f=ro, r=True).saveas()
+    xbed = cnvsA.intersect(cnvsB, wa=True, wb=True, f=ro, r=True)
+        
+    # Throw out self-hits
+    def _no_self(feature):
+        if len(feature) >= 10:
+            if str(feature[3]) != str(feature[9]):
+                return feature
+    xbed = xbed.filter(_no_self)
+
+    # Throw out CNV type mismatches
+    def _cnv_match(feature):
+        if len(feature) >= 11:
+            if str(feature[4]) == str(feature[10]) or str(feature[10]) in 'MCNV CNV'.split():
+                return feature
+    xbed = xbed.filter(_cnv_match)
+
+    # Apply breakpoint distance requirement
+    def _bp_dist(feature, dist):
+        if len(feature) >= 9:
+            if abs(int(feature[1]) - int(feature[7])) <= dist \
+            and abs(int(feature[2]) - int(feature[8])) <= dist:
+                return feature[0:6]
+    xbed = xbed.filter(_bp_dist, dist).saveas()
 
     # Only perform filtering if more than one intersection was found
     if len(xbed) == 0:
@@ -39,22 +61,6 @@ def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
         return cnvsA
 
     else:
-        
-        # Throw out self-hits
-        xbed = xbed.filter(lambda x: str(x[3]) != str(x[9]))
-
-        # Throw out CNV type mismatches
-        def _cnv_match(feature):
-            if str(feature[4]) == str(feature[10]) or str(feature[10]) in 'MCNV CNV'.split():
-                return feature
-        xbed = xbed.filter(_cnv_match)
-
-        # Apply breakpoint distance requirement
-        def _bp_dist(feature, dist):
-            if abs(int(feature[1]) - int(feature[7])) <= dist \
-            and abs(int(feature[2]) - int(feature[8])) <= dist:
-                return feature[0:6]
-        xbed = xbed.filter(_bp_dist, dist)
 
         # Get dictionary of hits per ID
         hits = {}
