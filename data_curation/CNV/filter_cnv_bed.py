@@ -53,7 +53,7 @@ def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
             if abs(int(feature[1]) - int(feature[7])) <= dist \
             and abs(int(feature[2]) - int(feature[8])) <= dist:
                 return feature[0:6]
-    xbed = xbed.filter(_bp_dist, dist).saveas()
+    xbed = xbed.filter(_bp_dist, dist)
 
     # Only perform filtering if more than one intersection was found
     if len(xbed) == 0:

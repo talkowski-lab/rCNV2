@@ -9,7 +9,7 @@
 # Filter raw CNV data to rare and ultra-rare subsets
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:filter_cnvs_singleCohort/versions/37/plain-WDL/descriptor" as filter_single
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:filter_cnvs_singleCohort/versions/40/plain-WDL/descriptor" as filter_single
 
 
 workflow filter_CNV_data {
@@ -42,17 +42,17 @@ workflow filter_CNV_data {
       input:
         beds=filter_cohort.rCNVs,
         bed_idxs=filter_cohort.rCNVs_idx,
-        cohorts=metacohort[1]
+        cohorts=metacohort[1],
         output_bucket="${rCNV_bucket}/cleaned_data/cnv",
         prefix="${metacohort[0]}.rCNV"
     }
-    call combine_subsets as combine_meta_urCNVs {
+    call combine_subsets as combine_meta_uCNVs {
       input:
-        beds=filter_cohort.urCNVs,
-        bed_idxs=filter_cohort.urCNVs_idx,
-        cohorts=metacohort[1]
+        beds=filter_cohort.uCNVs,
+        bed_idxs=filter_cohort.uCNVs_idx,
+        cohorts=metacohort[1],
         output_bucket="${rCNV_bucket}/cleaned_data/cnv",
-        prefix="${metacohort[0]}.urCNV"
+        prefix="${metacohort[0]}.uCNV"
     }
   }
 
@@ -73,8 +73,8 @@ task combine_subsets {
   String output_bucket
   String prefix
 
-  bedlist = write_tsv(beds)
-  idxlist = write_tsv(bed_idxs)
+  File bedlist = write_tsv(beds)
+  File idxlist = write_tsv(bed_idxs)
 
   command <<<
     sed 's/;/\n/g' ${cohorts} > cohorts.list
@@ -93,7 +93,7 @@ task combine_subsets {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:462c3ab0e47c33d75010ca6f8cf0ae79d9292fc7faad21768a38757955ad60e6"
+    docker: "talkowski/rcnv@sha256:38dbd5d1910ddfe5733b7455135d62adf77fd2ad1ef3bd8058188ce6b4209ac1"
     preemptible: 1
   }
 

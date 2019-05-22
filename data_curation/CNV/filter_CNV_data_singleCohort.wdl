@@ -43,7 +43,7 @@ workflow filter_cnvs_singleCohort {
     }
   }
 
-  # Merge results across chromosomes, and split by phenotype
+  # Merge results across chromosomes
   call merge_beds as merge_rare {
     input:
       beds=filter_rare.filtered_cnvs,
@@ -60,16 +60,16 @@ workflow filter_cnvs_singleCohort {
   output {
     File rCNVs = merge_rare.merged_bed
     File rCNVs_idx = merge_rare.merged_bed_idx
-    File case_rCNVs = merge_rare.merged_case_bed
-    File case_rCNVs_idx = merge_rare.merged_case_bed_idx
-    File control_rCNVs = merge_rare.merged_control_bed
-    File control_rCNVs_idx = merge_rare.merged_control_bed_idx
+    # File case_rCNVs = merge_rare.merged_case_bed
+    # File case_rCNVs_idx = merge_rare.merged_case_bed_idx
+    # File control_rCNVs = merge_rare.merged_control_bed
+    # File control_rCNVs_idx = merge_rare.merged_control_bed_idx
     File uCNVs = merge_ultrarare.merged_bed
     File uCNVs_idx = merge_ultrarare.merged_bed_idx
-    File case_urCNVs = merge_ultrarare.merged_case_bed
-    File case_urCNVs_idx = merge_ultrarare.merged_case_bed_idx
-    File control_urCNVs = merge_ultrarare.merged_control_bed
-    File control_urCNVs_idx = merge_ultrarare.merged_control_bed_idx
+    # File case_uCNVs = merge_ultrarare.merged_case_bed
+    # File case_uCNVs_idx = merge_ultrarare.merged_case_bed_idx
+    # File control_uCNVs = merge_ultrarare.merged_control_bed
+    # File control_uCNVs_idx = merge_ultrarare.merged_control_bed_idx
   }
 }
 
@@ -156,11 +156,11 @@ task filter_cnvs_singleChrom {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:462c3ab0e47c33d75010ca6f8cf0ae79d9292fc7faad21768a38757955ad60e6"
+    docker: "talkowski/rcnv@sha256:38dbd5d1910ddfe5733b7455135d62adf77fd2ad1ef3bd8058188ce6b4209ac1"
     preemptible: 1
     memory: "4 GB"
-    disks: "local-disk 50 SSD"
-    bootDiskSizeGb: "30"
+    disks: "local-disk 200 SSD"
+    bootDiskSizeGb: "20"
   }
 
   output {
@@ -207,7 +207,7 @@ task merge_beds {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:462c3ab0e47c33d75010ca6f8cf0ae79d9292fc7faad21768a38757955ad60e6"
+    docker: "talkowski/rcnv@sha256:38dbd5d1910ddfe5733b7455135d62adf77fd2ad1ef3bd8058188ce6b4209ac1"
     preemptible: 1
   }
 
