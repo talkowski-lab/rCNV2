@@ -32,9 +32,9 @@ We aggregated CNV data from multiple sources, listed below:
 | SSC<sup>2</sup> | [Sanders _et at._, _Neuron_ (2015)](https://www.sciencedirect.com/science/article/pii/S0896627315007734?) | [26402605](https://www.ncbi.nlm.nih.gov/pubmed/26402605) | Omni 1Mv3 (46%), Omni 2.5 (41%), Omni 1Mv1 (13%) | hg18 | ASD | 2,795 | 0<sup>2</sup> |
 | UKBB | [Macé _et al._, _Nat. Comms._ (2017)](https://www.nature.com/articles/s41467-017-00556-x) | [28963451](https://www.ncbi.nlm.nih.gov/pubmed/28963451) | UKBB Affy Axiom (100%) | hg18 (?) | Mixed | 0<sup>3</sup> | 480,501<sup>3</sup> |
 | CHOP | - | - | Mixed Illumina SNP genotyping platforms | hg19 | Mixed | 150,231<sup>4</sup> | 28,070<sup>4</sup> |
-| GDX | - | - | TBD? | hg18 & hg19 | Mixed | 9,959 | 0 |
+| GDX | - | - | aCGH (?) | hg18 & hg19 | Mixed | 9,959 | 0 |
 | TSAICG | [Huang _et al._, _Neuron_ (2017)](https://www.sciencedirect.com/science/article/pii/S0896627317305081) | [28641109](https://www.ncbi.nlm.nih.gov/pubmed/28641109) | OmniExpress (100%) | hg19 | TS | 2,434 | 4,093 |
-| BCH | [Talkowski _et al._, _Cell_ (2012)](https://www.sciencedirect.com/science/article/pii/S0092867412004114) | [22521361](https://www.ncbi.nlm.nih.gov/pubmed/22521361) | TBD? | hg18 | Mixed | 3,591 | 0 |  
+| BCH | [Talkowski _et al._, _Cell_ (2012)](https://www.sciencedirect.com/science/article/pii/S0092867412004114) | [22521361](https://www.ncbi.nlm.nih.gov/pubmed/22521361) | aCGH (?) | hg18 | Mixed | 3,591 | 0 |  
 | TCGA | [Zack _et al._, _Nat. Genet._ (2013)](https://www.nature.com/articles/ng.2760) | [24071852](https://www.ncbi.nlm.nih.gov/pubmed/24071852) | Affy 6.0 (100%) | hg19 | Cancer | 0<sup>5</sup> | 8,670<sup>5</sup> |  
 
 #### Notes on raw CNV data   
@@ -128,16 +128,16 @@ The properties of each rare CNV callset are listed below after the above filteri
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP | 
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| PGC | 21,094 | 13,852 | 0.66 | 190.7 kb | 1:1.37 | 20,277 | 12,710 | 0.63 | 184.9 kb | 1:1.33 |
-| Cooper | 0 | 0 | - | - | - | 8,329 | 4,336 | 0.52 | 173.2 kb | 1.32:1 |
-| Coe | 29,083 | 18,258 | 0.63 | 263.9 kb | 1:1.22 | 11,256 | 10,157 | 0.90 | 185.1 kb | 1:1.81 |
-| SSC | 2,795 | 2,054 | 0.73 | 191.9 kb | 1:1.17 | 0 | 0 | - | - | - |
-| UKBB | 0 | 315,652 | inf | 208.1 kb | 3.33:1 | 480,501 | 0 | - | - | - |
-| CHOP | 150,231 | 113,149 | 0.75 | 198.6 kb | 1:1.50 | 28,070 | 17,848 | 0.64 | 188.0 kb | 1:1.14 |
-| GDX | 9,959 | 9,821 | 0.99 | 257.5 kb | 1:1.36 | 0 | 0 | - | - | - |
-| TSAICG | 2,434 | 1,505 | 0.62 | 194.8 kb | 1:1.37 | 4,093 | 2,509 | 0.61 | 184.6 kb | 1:1.38 |
-| BCH | 3,591 | 2,784 | 0.78 | 329.0 kb | 1:1.45 | 0 | 0 | - | - | - |
-| TCGA | 0 | 0 | - | - | - | 8,670 | 5,021 | 0.58 | 175.0 kb | 1:2.22 |
+| PGC | 21,094 | 14,206 | 0.67 | 187.3 kb | 1:1.32 | 20,277 | 13,029 | 0.64 | 182.2 kb | 1:1.28 |
+| Cooper | 0 | 0 | - | - | - | 8,329 | 6,719 | 0.81 | 154.6 kb | 1.62:1 |
+| Coe | 29,083 | 19,224 | 0.66 | 255.8 kb | 1:1.22 | 11,256 | 24,551 | 2.18 | 151.4 kb | 1:2.35 |
+| SSC | 2,795 | 3,394 | 1.21 | 165.3 kb | 1.27:1 | 0 | 0 | - | - | - |
+| UKBB | 0 | 0 | - | - | - | 480,501 | 379,076 | 0.79 | 200.6 kb | 3.06:1 |
+| CHOP | 150,231 | 156,467 | 1.04 | 164.1 kb | 1:1.09 | 28,070 | 27,562 | 0.98 | 151.4 kb | 1.39:1 |
+| GDX | 9,959 | 10,132 | 1.02 | 249.9 kb | 1:1.36 | 0 | 0 | - | - | - |
+| TSAICG | 2,434 | 1,526 | 0.63 | 192.7 kb | 1:1.33 | 4,093 | 2,540 | 0.62 | 182.9 kb | 1:1.35 |
+| BCH | 3,591 | 2,869 | 0.80 | 321.2 kb | 1:1.45 | 0 | 0 | - | - | - |
+| TCGA | 0 | 0 | - | - | - | 8,670 | 12,458 | 1.44 | 151.4 kb | 1:1.87 |
 
 
 The information for this table was collected using `collect_cohort_stats.sh`.  

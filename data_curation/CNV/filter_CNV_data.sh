@@ -92,7 +92,7 @@ done < <( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f1-2 )
 
 # Filter each cohort for ultrarare CNV callset
 mkdir ultrarare_cnv_curated/
-for cohort in PGC SSC; do
+while read cohort N; do
   /opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
     --minsize 100000 \
     --maxsize 10000000 \
@@ -112,10 +112,11 @@ for cohort in PGC SSC; do
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     ultrarare_cnv_curated/$cohort.urCNV.bed.gz
-done
+done < <( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f1-2 )
 
 
 # Debugging code chunk: chr22 rCNVs for BCH cohort
+mkdir debug
 /opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
   --chr 22 \
   --minsize 100000 \
@@ -135,5 +136,66 @@ done
   --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
   --bgzip \
   cnv/BCH.raw.bed.gz \
-  rare_cnv_curated/BCH.rCNV.bed.gz
+  debug/BCH.rCNV.bed.gz
+# /opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
+#   --chr 22 \
+#   --minsize 100000 \
+#   --maxsize 10000000 \
+#   --nsamp 3591 \
+#   --maxfreq 0.01 \
+#   --recipoverlap 0.5 \
+#   --dist 50000 \
+#   --blacklist refs/GRCh37.segDups_plus_simpleRepeats.bed.gz \
+#   --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+#   --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
+#   --xcov 0.3 \
+#   --cohorts-list <( fgrep BCH raw_CNVs.per_cohort.txt ) \
+#   --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
+#   --bgzip \
+#   cnv/BCH.raw.bed.gz \
+#   debug/BCH.rCNV.bed.gz
+
+/opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
+  --chr 22 \
+  --minsize 100000 \
+  --maxsize 10000000 \
+  --nsamp 3591 \
+  --maxfreq 0.0001 \
+  --recipoverlap 0.5 \
+  --dist 50000 \
+  --blacklist refs/GRCh37.segDups_plus_simpleRepeats.bed.gz \
+  --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+  --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
+  --xcov 0.3 \
+  --cohorts-list raw_CNVs.per_cohort.txt \
+  --vcf refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
+  --vcf refs/1000Genomes_phase3.sites.vcf.gz \
+  --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
+  --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
+  --bgzip \
+  cnv/BCH.raw.bed.gz \
+  debug/BCH.uCNV.bed.gz
+
+
+# Debugging code chunk: chr22 rCNVs for PGC cohort
+/opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
+  --chr 22 \
+  --minsize 100000 \
+  --maxsize 10000000 \
+  --nsamp 41371 \
+  --maxfreq 0.01 \
+  --recipoverlap 0.5 \
+  --dist 50000 \
+  --blacklist refs/GRCh37.segDups_plus_simpleRepeats.bed.gz \
+  --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+  --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
+  --xcov 0.3 \
+  --cohorts-list raw_CNVs.per_cohort.txt \
+  --vcf refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
+  --vcf refs/1000Genomes_phase3.sites.vcf.gz \
+  --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
+  --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
+  --bgzip \
+  cnv/PGC.raw.bed.gz \
+  rare_cnv_curated/PGC.rCNV.bed.gz
 

@@ -9,7 +9,7 @@
 # Filter raw CNV data to rare and ultra-rare subsets
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:filter_cnvs_singleCohort/versions/40/plain-WDL/descriptor" as filter_single
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:filter_cnvs_singleCohort/versions/41/plain-WDL/descriptor" as filter_single
 
 
 workflow filter_CNV_data {
@@ -77,7 +77,7 @@ task combine_subsets {
   File idxlist = write_tsv(bed_idxs)
 
   command <<<
-    sed 's/;/\n/g' ${cohorts} > cohorts.list
+    echo "${cohorts}" | sed 's/;/\n/g' > cohorts.list
     tabix -H ${beds[0]} > header.txt
     fgrep -f cohorts.list ${bedlist} \
     | xargs -I {} zcat {} \
@@ -93,7 +93,7 @@ task combine_subsets {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:38dbd5d1910ddfe5733b7455135d62adf77fd2ad1ef3bd8058188ce6b4209ac1"
+    docker: "talkowski/rcnv@sha256:18e93b2069a0b0ac6be3d370a794e74ecaf61ca22f68df4d29659edac431ed07"
     preemptible: 1
   }
 

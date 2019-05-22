@@ -32,53 +32,46 @@ def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
 
     # Intersect
     xbed = cnvsA.intersect(cnvsB, wa=True, wb=True, f=ro, r=True)
-        
+
     # Throw out self-hits
     def _no_self(feature):
-        if len(feature) >= 10:
+        if len(feature.fields) >= 10:
             if str(feature[3]) != str(feature[9]):
                 return feature
     xbed = xbed.filter(_no_self)
 
     # Throw out CNV type mismatches
     def _cnv_match(feature):
-        if len(feature) >= 11:
+        if len(feature.fields) >= 11:
             if str(feature[4]) == str(feature[10]) or str(feature[10]) in 'MCNV CNV'.split():
                 return feature
     xbed = xbed.filter(_cnv_match)
 
     # Apply breakpoint distance requirement
     def _bp_dist(feature, dist):
-        if len(feature) >= 9:
+        if len(feature.fields) >= 9:
             if abs(int(feature[1]) - int(feature[7])) <= dist \
             and abs(int(feature[2]) - int(feature[8])) <= dist:
                 return feature[0:6]
     xbed = xbed.filter(_bp_dist, dist)
 
-    # Only perform filtering if more than one intersection was found
-    if len(xbed) == 0:
-
-        return cnvsA
-
-    else:
-
-        # Get dictionary of hits per ID
-        hits = {}
-        for feature in xbed:
+    # Get dictionary of hits per ID
+    hits = {}
+    for feature in xbed:
+        if len(feature) >= 4:
             fname = str(feature[3])
             if fname not in hits.keys():
                 hits[fname] = 0
             hits[fname] += 1
 
-        # Get list of CNVs to keep based on freq in xbed
-        cutoff = ceil(maxFreq * nsamp)
-        def _remove_fails(feature, hits, cutoff):
-            fname = str(feature[3])
-            if fname not in hits.keys() \
-            or hits[fname] <= cutoff:
-                return feature
+    # Get list of CNVs to keep based on freq in xbed
+    cutoff = ceil(maxFreq * nsamp)
+    def _remove_fails(feature, hits, cutoff):
+        fname = str(feature[3])
+        if hits.get(fname, 0) <= cutoff:
+            return feature
 
-        return cnvsA.filter(_remove_fails, hits, cutoff)
+    return cnvsA.filter(_remove_fails, hits, cutoff)
 
 
 # Read sites VCF for frequency filtering
@@ -126,7 +119,7 @@ def read_vcf(vcfin, maxfreq, af_fields='AF'):
 
             flist = [str(record.chrom), str(record.pos), str(record.stop), 
                      str(record.id), str(record.info['SVTYPE']).split('_')[0],
-                     'CTRL']
+                     'HEALTHY_CONTROL']
 
             fstr = ' '.join(flist) + '\n'
 
