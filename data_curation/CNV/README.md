@@ -6,34 +6,20 @@ All commands executed to filter the CNV data as descrbed below are contained in 
 
 In practice, the commands in `filter_CNV_data.sh` were parallelized in [FireCloud/Terra](https://portal.firecloud.org) with `filter_CNV_data.wdl`.  
 
-### Glossary & abbreviations  
-
-Several abbreviations and acronyms are used below, as follows:  
-
-| Abbreviation | Definition |
-| --- | :--- |
-| CNV | Copy Number Variant |
-| CTRL | Control (Unaffected Sample) |
-| SCZ | Schizophrenia |
-| DD | Developmental Disorders |
-| ASD | Autism Spectrum Disorders |
-| TS | Tourette Syndrome |
-| CNCR | Cancer |  
-
 ### CNV data sources  
 
 We aggregated CNV data from multiple sources, listed below:  
 
 | Dataset | Citation | PMID | Platform(s) | Build | Phenos | N Cases | N Ctrls |
 | --- | :--- | :--- | :--- | :--- | :--- | ---: | ---: |
-| PGC | [Marshall _et al._, _Nat. Genet._ (2017)](https://www.nature.com/articles/ng.3725) | [27869829](https://www.ncbi.nlm.nih.gov/pubmed/27869829) | Affy 6.0 (37%), Omni Express (31%), Omni Express Plus (12%), Other (20%) | hg18 | SCZ | 21,094 | 20,277 |
-| Cooper<sup>1</sup> | [Cooper _et al._, _Nat. Genet._ (2011)](https://www.nature.com/articles/ng.909) | [21841781](https://www.ncbi.nlm.nih.gov/pubmed/21841781) | Ill. 550k-610k (75%), Custom 1.2M (25%) | hg19 | DD | 0<sup>1</sup> | 8,329 |
-| Coe | [Coe _et al._, _Nat. Genet._ (2014)](https://www.nature.com/articles/ng.3092) | [25217958](https://www.ncbi.nlm.nih.gov/pubmed/25217958) | Cases: SignatureChip OS v2.0 (58%), SignatureChip OS v1.0 (34%), Other (8%); Controls: Affy 6.0 (100%) | hg19 | DD | 29,083 | 11,256 |
-| SSC<sup>2</sup> | [Sanders _et at._, _Neuron_ (2015)](https://www.sciencedirect.com/science/article/pii/S0896627315007734?) | [26402605](https://www.ncbi.nlm.nih.gov/pubmed/26402605) | Omni 1Mv3 (46%), Omni 2.5 (41%), Omni 1Mv1 (13%) | hg18 | ASD | 2,795 | 0<sup>2</sup> |
+| PGC | [Marshall _et al._, _Nat. Genet._ (2017)](https://www.nature.com/articles/ng.3725) | [27869829](https://www.ncbi.nlm.nih.gov/pubmed/27869829) | Affy 6.0 (37%), Omni Express (31%), Omni Express Plus (12%), Other (20%) | hg18 | Schizophrenia | 21,094 | 20,277 |
+| Cooper<sup>1</sup> | [Cooper _et al._, _Nat. Genet._ (2011)](https://www.nature.com/articles/ng.909) | [21841781](https://www.ncbi.nlm.nih.gov/pubmed/21841781) | Ill. 550k-610k (75%), Custom 1.2M (25%) | hg19 | Developmental disorders | 0<sup>1</sup> | 8,329 |
+| Coe | [Coe _et al._, _Nat. Genet._ (2014)](https://www.nature.com/articles/ng.3092) | [25217958](https://www.ncbi.nlm.nih.gov/pubmed/25217958) | Cases: SignatureChip OS v2.0 (58%), SignatureChip OS v1.0 (34%), Other (8%); Controls: Affy 6.0 (100%) | hg19 | Developmental disorders | 29,083 | 11,256 |
+| SSC<sup>2</sup> | [Sanders _et at._, _Neuron_ (2015)](https://www.sciencedirect.com/science/article/pii/S0896627315007734?) | [26402605](https://www.ncbi.nlm.nih.gov/pubmed/26402605) | Omni 1Mv3 (46%), Omni 2.5 (41%), Omni 1Mv1 (13%) | hg18 | Autism | 2,795 | 0<sup>2</sup> |
 | UKBB | [Macé _et al._, _Nat. Comms._ (2017)](https://www.nature.com/articles/s41467-017-00556-x) | [28963451](https://www.ncbi.nlm.nih.gov/pubmed/28963451) | UKBB Affy Axiom (100%) | hg18 (?) | Mixed | 0<sup>3</sup> | 480,501<sup>3</sup> |
 | CHOP | - | - | Mixed Illumina SNP genotyping platforms | hg19 | Mixed | 150,231<sup>4</sup> | 28,070<sup>4</sup> |
 | GDX | - | - | aCGH (?) | hg18 & hg19 | Mixed | 9,959 | 0 |
-| TSAICG | [Huang _et al._, _Neuron_ (2017)](https://www.sciencedirect.com/science/article/pii/S0896627317305081) | [28641109](https://www.ncbi.nlm.nih.gov/pubmed/28641109) | OmniExpress (100%) | hg19 | TS | 2,434 | 4,093 |
+| TSAICG | [Huang _et al._, _Neuron_ (2017)](https://www.sciencedirect.com/science/article/pii/S0896627317305081) | [28641109](https://www.ncbi.nlm.nih.gov/pubmed/28641109) | OmniExpress (100%) | hg19 | Tourette Syndrome | 2,434 | 4,093 |
 | BCH | [Talkowski _et al._, _Cell_ (2012)](https://www.sciencedirect.com/science/article/pii/S0092867412004114) | [22521361](https://www.ncbi.nlm.nih.gov/pubmed/22521361) | aCGH (?) | hg18 | Mixed | 3,591 | 0 |  
 | TCGA | [Zack _et al._, _Nat. Genet._ (2013)](https://www.nature.com/articles/ng.2760) | [24071852](https://www.ncbi.nlm.nih.gov/pubmed/24071852) | Affy 6.0 (100%) | hg19 | Cancer | 0<sup>5</sup> | 8,670<sup>5</sup> |  
 
@@ -95,6 +81,8 @@ gs://rcnv_project/raw_data/cnv/PGC.raw.bed.gz
 gs://rcnv_project/raw_data/cnv/PGC.raw.bed.gz.tbi
 gs://rcnv_project/raw_data/cnv/SSC.raw.bed.gz
 gs://rcnv_project/raw_data/cnv/SSC.raw.bed.gz.tbi
+gs://rcnv_project/raw_data/cnv/TCGA.raw.bed.gz
+gs://rcnv_project/raw_data/cnv/TCGA.raw.bed.gz.tbi
 gs://rcnv_project/raw_data/cnv/TSAICG.raw.bed.gz
 gs://rcnv_project/raw_data/cnv/TSAICG.raw.bed.gz.tbi
 gs://rcnv_project/raw_data/cnv/UKBB.raw.bed.gz
@@ -128,16 +116,16 @@ The properties of each rare CNV callset are listed below after the above filteri
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP | 
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| PGC | 21,094 | 14,206 | 0.67 | 187.3 kb | 1:1.32 | 20,277 | 13,029 | 0.64 | 182.2 kb | 1:1.28 |
-| Cooper | 0 | 0 | - | - | - | 8,329 | 6,719 | 0.81 | 154.6 kb | 1.62:1 |
-| Coe | 29,083 | 19,224 | 0.66 | 255.8 kb | 1:1.22 | 11,256 | 24,551 | 2.18 | 151.4 kb | 1:2.35 |
-| SSC | 2,795 | 3,394 | 1.21 | 165.3 kb | 1.27:1 | 0 | 0 | - | - | - |
-| UKBB | 0 | 0 | - | - | - | 480,501 | 379,076 | 0.79 | 200.6 kb | 3.06:1 |
-| CHOP | 150,231 | 156,467 | 1.04 | 164.1 kb | 1:1.09 | 28,070 | 27,562 | 0.98 | 151.4 kb | 1.39:1 |
-| GDX | 9,959 | 10,132 | 1.02 | 249.9 kb | 1:1.36 | 0 | 0 | - | - | - |
-| TSAICG | 2,434 | 1,526 | 0.63 | 192.7 kb | 1:1.33 | 4,093 | 2,540 | 0.62 | 182.9 kb | 1:1.35 |
-| BCH | 3,591 | 2,869 | 0.80 | 321.2 kb | 1:1.45 | 0 | 0 | - | - | - |
-| TCGA | 0 | 0 | - | - | - | 8,670 | 12,458 | 1.44 | 151.4 kb | 1:1.87 |
+| PGC | 21,094 | 13,852 | 0.66 | 190.7 kb | 1:1.37 | 20,277 | 12,710 | 0.63 | 184.9 kb | 1:1.33 |
+| Cooper | 0 | 0 | - | - | - | 8,329 | 4,336 | 0.52 | 173.2 kb | 1.32:1 |
+| Coe | 29,083 | 18,258 | 0.63 | 263.9 kb | 1:1.22 | 11,256 | 10,157 | 0.90 | 185.1 kb | 1:1.81 |
+| SSC | 2,795 | 2,054 | 0.73 | 191.9 kb | 1:1.17 | 0 | 0 | - | - | - |
+| UKBB | 0 | 0 | - | - | - | 480,501 | 315,652 | 0.66 | 208.1 kb | 3.33:1 |
+| CHOP | 150,231 | 113,149 | 0.75 | 198.6 kb | 1:1.50 | 28,070 | 17,848 | 0.64 | 188.0 kb | 1:1.14 |
+| GDX | 9,959 | 9,821 | 0.99 | 257.5 kb | 1:1.36 | 0 | 0 | - | - | - |
+| TSAICG | 2,434 | 1,505 | 0.62 | 194.8 kb | 1:1.37 | 4,093 | 2,509 | 0.61 | 184.6 kb | 1:1.38 |
+| BCH | 3,591 | 2,784 | 0.78 | 329.0 kb | 1:1.45 | 0 | 0 | - | - | - |
+| TCGA | 0 | 0 | - | - | - | 8,670 | 5,021 | 0.58 | 175.0 kb | 1:2.22 |
 
 
 The information for this table was collected using `collect_cohort_stats.sh`.  
@@ -163,7 +151,7 @@ The properties of each ultra-rare CNV callset are listed below after the above f
 | Cooper | 0 | 0 | - | - | - | 8,329 | 1,756 | 0.21 | 211.3 kb | 1.20:1 |
 | Coe | 29,083 | 9,214 | 0.32 | 361.5 kb | 1:1.17 | 11,256 | 3,320 | 0.29 | 237.7 kb | 1:1.73 |
 | SSC | 2,795 | 755 | 0.27 | 260.8 kb | 1:1.19 | 0 | 0 | - | - | - |
-| UKBB | 0 | 136,736 | inf | 281.5 kb | 3.49:1 | 480,501 | 0 | - | - | - |
+| UKBB | 0 | 0 | - | - | - | 480,501 | 136,736 | 0.28 | 281.5 kb | 3.49:1 |
 | CHOP | 150,231 | 42,052 | 0.28 | 254.7 kb | 1:1.49 | 28,070 | 7,528 | 0.27 | 237.3 kb | 1:1.48 |
 | GDX | 9,959 | 5,293 | 0.53 | 355.7 kb | 1:1.24 | 0 | 0 | - | - | - |
 | TSAICG | 2,434 | 654 | 0.27 | 240.7 kb | 1:1.56 | 4,093 | 1,030 | 0.25 | 235.4 kb | 1:1.63 |
@@ -172,3 +160,33 @@ The properties of each ultra-rare CNV callset are listed below after the above f
 
 The information for this table was collected using `collect_cohort_stats.sh`.  
 
+---  
+
+## Meta-cohort CNV callset properties  
+
+As described on the [phenotype filtering documentation](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/), groups of individual cohorts were created for purposes of case:control CNV burden testing.  
+
+The construction of these cohorts are described elsewhere, but the properties of their combined CNV callsets are listed below.  
+
+### Rare CNVs  
+
+| Metacohort | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP | 
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| meta1 | 42,653 | 30,863 | 0.72 | 265.4 kb | 1:1.28 | 19,585 | 14,493 | 0.74 | 181.9 kb | 1:1.38 |
+| meta2 | 26,323 | 17,411 | 0.66 | 191.4 kb | 1:1.34 | 33,040 | 20,240 | 0.61 | 183.1 kb | 1:1.51 |
+| meta3 | 154,140 | 113,149 | 0.73 | 198.6 kb | 1:1.50 | 28,070 | 17,848 | 0.64 | 188.0 kb | 1:1.14 |
+| meta4 | 0 | 0 | - | - | - | 480,501 | 315,652 | 0.66 | 208.1 kb | 3.33:1 |
+| mega | 223,116 | 161,423 | 0.72 | 207.7 kb | 1:1.44 | 561,196 | 368,233 | 0.66 | 204.9 kb | 2.58:1 |
+
+
+### Ultra-rare CNVs  
+
+| Metacohort | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP | 
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| meta1 | 42,653 | 16,250 | 0.38 | 361.5 kb | 1:1.21 | 19,585 | 5,076 | 0.26 | 228.0 kb | 1:1.33 |
+| meta2 | 26,323 | 7,132 | 0.27 | 246.4 kb | 1:1.55 | 33,040 | 7,619 | 0.23 | 228.4 kb | 1:1.61 |
+| meta3 | 154,140 | 42,052 | 0.27 | 254.7 kb | 1:1.49 | 28,070 | 7,528 | 0.27 | 237.3 kb | 1:1.48 |
+| meta4 | 0 | 0 | - | - | - | 480,501 | 136,736 | 0.28 | 281.5 kb | 3.49:1 |
+| mega | 223,116 | 65,434 | 0.29 | 273.2 kb | 1:1.42 | 561,196 | 156,959 | 0.28 | 275.0 kb | 2.69:1 |
+
+The information for these tables was collected using `collect_cohort_stats.sh`.  

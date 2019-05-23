@@ -167,10 +167,32 @@ gsutil cp gs://rcnv_project/analysis/analysis_refs/rCNV_metacohort_list.txt ./
   cleaned_phenos/filtered/
 
 
+# Get simplified table of metacohort combined case & control counts
+echo -e "#metacohort\tsamples\tCASE\tCTRL" \
+> rCNV_metacohort_sample_counts.txt
+while read name cohorts; do
+  col=$( head -n1 HPOs_by_metacohort.table.tsv \
+         | sed 's/\t/\n/g' \
+         | awk -v name=${name} '{ if ($1==name) print NR }' )
+  ncase=$( fgrep -wv HEALTHY_CONTROL HPOs_by_metacohort.table.tsv \
+           | fgrep -v "#" \
+           | awk -v FS="\t" -v col=${col} '{ print $col }' \
+           | sort -nrk1,1 \
+           | head -n1 )
+  nctrl=$( fgrep -w HEALTHY_CONTROL HPOs_by_metacohort.table.tsv \
+           | awk -v FS="\t" -v col=${col} '{ print $col }' )
+  ntotal=$(( ${ncase} + ${nctrl} ))
+  echo -e "${name}\t${ntotal}\t${ncase}\t${nctrl}"
+done < rCNV_metacohort_list.txt \
+>> rCNV_metacohort_sample_counts.txt
+
+
 # Copy sample counts per HPO term per cohort to Google bucket (requires permissions)
 gsutil cp HPOs_by_cohort.table.tsv \
   gs://rcnv_project/analysis/analysis_refs/
 gsutil cp HPOs_by_metacohort.table.tsv \
+  gs://rcnv_project/analysis/analysis_refs/
+gsutil cp rCNV_metacohort_sample_counts.txt \
   gs://rcnv_project/analysis/analysis_refs/
 
 

@@ -21,6 +21,7 @@ mkdir ./raw_cnv
 gsutil cp -r gs://rcnv_project/raw_data/cnv/* ./raw_cnv/
 mkdir ./cleaned_cnv/
 gsutil cp -r gs://rcnv_project/cleaned_data/cnv/* ./cleaned_cnv/
+gsutil cp gs://rcnv_project/analysis/analysis_refs/rCNV_metacohort_sample_counts.txt ./
 
 
 # Add helper alias for formatting long integers
@@ -117,6 +118,7 @@ collect_stats () {
 # Collect raw CNV data
 awk -v OFS="\t" '{ print $0, "/raw_cnv/"$1".raw.bed.gz" }' \
   /opt/rCNV2/refs/rCNV_sample_counts.txt \
+| fgrep -v "#" \
 > raw_cnv.input.txt
 collect_stats raw_cnv.input.txt
 
@@ -124,6 +126,7 @@ collect_stats raw_cnv.input.txt
 # Collect filtered rare CNV data
 awk -v OFS="\t" '{ print $0, "/cleaned_cnv/"$1".rCNV.bed.gz" }' \
   /opt/rCNV2/refs/rCNV_sample_counts.txt \
+| fgrep -v "#" \
 > rare_cnv.input.txt
 collect_stats rare_cnv.input.txt
 
@@ -131,6 +134,23 @@ collect_stats rare_cnv.input.txt
 # Collect filtered ultra-rare CNV data
 awk -v OFS="\t" '{ print $0, "/cleaned_cnv/"$1".uCNV.bed.gz" }' \
   /opt/rCNV2/refs/rCNV_sample_counts.txt \
+| fgrep -v "#" \
 > ultrarare_cnv.input.txt
 collect_stats ultrarare_cnv.input.txt
+
+
+# Collect filtered rare CNV data per metacohort
+awk -v OFS="\t" '{ print $0, "/cleaned_cnv/"$1".rCNV.bed.gz" }' \
+  rCNV_metacohort_sample_counts.txt \
+| fgrep -v "#" \
+> rare_cnv.metacohorts.input.txt
+collect_stats rare_cnv.metacohorts.input.txt
+
+# Collect filtered ultra-rare CNV data per metacohort
+awk -v OFS="\t" '{ print $0, "/cleaned_cnv/"$1".uCNV.bed.gz" }' \
+  rCNV_metacohort_sample_counts.txt \
+| fgrep -v "#" \
+> ultrarare_cnv.metacohorts.input.txt
+collect_stats ultrarare_cnv.metacohorts.input.txt
+
 
