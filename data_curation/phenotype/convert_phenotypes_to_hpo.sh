@@ -118,6 +118,14 @@ done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt ) \
   all_phenos.merged.txt
 
 
+# Make simple file mapping HPO codes to directory prefixes (no colons)
+paste <( cut -f1 phenotype_groups.HPO_metadata.txt | sed 's/\://g' ) \
+      <( cut -f1 phenotype_groups.HPO_metadata.txt ) \
+| fgrep -v "#" \
+| fgrep -v "HEALTHY_CONTROL" \
+> test_phenotypes.list
+
+
 # Restrict all cohort phenotypes to terms in minimal HPO tree
 while read cohort; do
   if [ -e cleaned_phenos/all/${cohort}.cleaned_phenos.txt ]; then
@@ -141,6 +149,8 @@ gsutil cp HPO_tree_filter.log \
   gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/
 gsutil cp phenotype_groups.HPO_metadata.txt \
   gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/
+gsutil cp test_phenotypes.list \
+  gs://rcnv_project/analysis/analysis_refs/
 
 
 # Print HTML table of HPO metadata for README

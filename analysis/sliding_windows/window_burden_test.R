@@ -11,8 +11,23 @@
 # Perform a Fisher's exact test for rare CNV burden for sliding windows
 
 
-# Process an input bed file
-import.bed <- function(bed.in, case.col.name, n.case, ctrl.col.name, n.ctrl){
+options(scipen=1000, stringsAsFactors=F)
+
+
+# Extract sample counts from table
+get.sample.counts <- function(pheno.table.in, cohort.name, case.hpo, control.hpo){
+  ptab <- read.table(pheno.table.in, header=T, sep="\t", comment.char="")
+  case.n <- ptab[which(ptab[,1] == case.hpo),
+                 which(colnames(ptab) == cohort.name)]
+  control.n <- ptab[which(ptab[,1] == control.hpo),
+                 which(colnames(ptab) == cohort.name)]
+  return(list("case.n"=as.numeric(case.n),
+              "control.n"=as.numeric(control.n)))
+}
+
+
+# Process an input bed file of CNVs
+import.bed <- function(bed.in, case.col.name, case.n, control.col.name, control.n){
   bed <- read.table(bed.in, sep="\t", header=T, comment.char="")
   
   case.col.idx <- grep(case.col.name, colnames(bed), fixed=T)
@@ -21,16 +36,18 @@ import.bed <- function(bed.in, case.col.name, n.case, ctrl.col.name, n.ctrl){
                "in BED header", sep=""))
   }
   
-  ctrl.col.idx <- grep(ctrl.col.name, colnames(bed), fixed=T)
-  if(length(ctrl.col.idx) == 0){
-    stop(paste("--control-column \"",ctrl.col.idx,"\" cannot be found ",
+  control.col.idx <- grep(control.col.name, colnames(bed), fixed=T)
+  if(length(control.col.idx) == 0){
+    stop(paste("--control-column \"",control.col.idx,"\" cannot be found ",
                "in BED header", sep=""))
   }
   
-  bed <- bed[,c(1:3, case.col.idx, ctrl.col.idx)]
-  colnames(bed) <- c("chr", "start", "end", "case.CNV", "ctrl.CNV")
-  bed$case.ref <- n.case - bed$case.CNV
-  bed$ctrl.ref <- n.ctrl - bed$ctrl.CNV
+  bed <- bed[,c(1:3, case.col.idx, control.col.idx)]
+  colnames(bed) <- c("chr", "start", "end", "case.CNV", "control.CNV")
+  bed$case.ref <- case.n - bed$case.CNV
+  bed$control.ref <- control.n - bed$control.CNV
+  bed$case.CNV.freq <- bed$case.CNV / case.n
+  bed$control.CNV.freq <- bed$control.CNV / control.n
   
   return(bed)
 }
@@ -39,15 +56,15 @@ import.bed <- function(bed.in, case.col.name, n.case, ctrl.col.name, n.ctrl){
 # Fisher's exact test for a single vector of CNV counts
 burden.test.single <- function(counts){
   case.cnv <- as.integer(counts[1])
-  ctrl.cnv <- as.integer(counts[2])
+  control.cnv <- as.integer(counts[2])
   case.ref <- as.integer(counts[3])
-  ctrl.ref <- as.integer(counts[4])
+  control.ref <- as.integer(counts[4])
   
-  if(case.cnv == 0 & ctrl.cnv == 0){
+  if(case.cnv == 0 & control.cnv == 0){
     p <- 1
     or <- c(NA,NA,NA)
   }else{
-    cnv.mat <- matrix(c(ctrl.ref, case.ref, ctrl.cnv, case.cnv),
+    cnv.mat <- matrix(c(control.ref, case.ref, control.cnv, case.cnv),
                       byrow=T, nrow=2)
     
     p <- fisher.test(cnv.mat, alternative="greater")$p.value
@@ -61,13 +78,38 @@ burden.test.single <- function(counts){
 }
 
 
-# Fisher's exact test of case:control CNV burden per bin
-burden.test <- function(bed){
-  f.res <- t(apply(bed[ ,-c(1:3)], 1, burden.test.single))
+# Compute Fisher's exact test lookup table
+build.fisher.lookup.table <- function(bed){
+  counts.df <- unique(bed[,4:7])
+  counts.df <- counts.df[with(counts.df, order(control.CNV, case.CNV)),]
   
-  fisher.bed <- cbind(bed[ ,1:3], f.res)
-  colnames(fisher.bed) <- c("chr", "start", "end",
-                            "p", "OR", "OR.lower", "OR.upper")
+  f.stats <- t(apply(counts.df, 1, burden.test.single))
+  
+  f.table <- cbind(counts.df, f.stats)
+  return(f.table)
+}
+
+
+# Fisher's exact test of case:control CNV burden per bin
+burden.test <- function(bed, precision){
+  f.table <- build.fisher.lookup.table(bed)
+  
+  f.res <- merge(bed, f.table, sort=F, all.x=T, all.y=F)
+  f.res <- f.res[with(f.res, order(chr, start)),]
+  
+  fisher.bed <- data.frame("chr" = f.res$chr,
+                           "start" = f.res$start, 
+                           "end" = f.res$end,
+                           "case_alt" = f.res$case.CNV,
+                           "case_ref" = f.res$case.ref,
+                           "case_freq" = round(f.res$case.CNV.freq, precision),
+                           "control_alt" = f.res$control.CNV, 
+                           "control_ref" = f.res$control.ref,
+                           "control_freq" = round(f.res$control.CNV.freq, precision),
+                           "fisher_phred_p" = round(-log10(f.res$p), precision),
+                           "fisher_OR" = round(f.res$OR, precision), 
+                           "fisher_OR_lower" = round(f.res$OR.lower, precision), 
+                           "fisher_OR_upper" = round(f.res$OR.upper, precision))
   return(fisher.bed)
 }
 
@@ -79,17 +121,26 @@ require(optparse,quietly=T)
 
 # List of command-line options
 option_list <- list(
-  make_option(c("--case-column"), type="character", default=NULL,
+  make_option(c("--pheno-table"), type="character", default=NULL,
+              help="table with counts of samples per HPO term per cohort [default %default]",
+              metavar="file"),
+  make_option(c("--cohort-name"), type="character", default=NULL,
+              help="name of cohort [default %default]",
+              metavar="string"),
+  make_option(c("--case-hpo"), type="character", default=NULL,
+              help="HPO term to use for case samples [default %default]",
+              metavar="string"),
+  make_option(c("--control-hpo"), type="character", default='HEALTHY_CONTROL',
+              help="HPO term to use for control samples [default %default]",
+              metavar="string"),
+  make_option(c("--case-column"), type="character", default='case_cnvs',
               help="name of column to use for case CNV counts [default %default]",
-              metavar="character"),
-  make_option(c("--case-n"), type="integer", default=NULL,
-              help="total case cohort sample size [default %default]",
-              metavar="integer"),
-  make_option(c("--control-column"), type="character", default=NULL,
+              metavar="string"),
+  make_option(c("--control-column"), type="character", default='control_cnvs',
               help="name of column to use for control CNV counts [default %default]",
-              metavar="character"),
-  make_option(c("--control-n"), type="integer", default=NULL,
-              help="total control cohort sample size [default %default]",
+              metavar="string"),
+  make_option(c("--precision"), type="integer", default=6,
+              help="level of precision for floats [default %default]",
               metavar="integer"),
   make_option(c("-z", "--bgzip"), action="store_true", default=FALSE,
               help="bgzip output BED file [default %default]")
@@ -105,35 +156,42 @@ opts <- args$options
 if(length(args$args) != 2){
   stop("Incorrect number of required positional arguments\n")
 }
-if(is.null(opts$`case-column`)){
-  stop("Must specify --case-column\n")
+if(is.null(opts$`pheno-table`)){
+  stop("Must provide --pheno-table\n")
 }
-if(is.null(opts$`control-column`)){
-  stop("Must specify --control-column\n")
+if(is.null(opts$`cohort-name`)){
+  stop("Must specify --cohort-name\n")
 }
-if(is.null(opts$`case-n`)){
-  stop("Must specify --case-n\n")
-}
-if(is.null(opts$`control-n`)){
-  stop("Must specify --control-n\n")
+if(is.null(opts$`case-hpo`)){
+  stop("Must specify --case-hpo\n")
 }
 
 # Writes args & opts to vars
 bed.in <- args$args[1]
 outfile <- args$args[2]
+pheno.table.in <- opts$`pheno-table`
+cohort.name <- opts$`cohort-name`
+case.hpo <- opts$`case-hpo`
+control.hpo <- opts$`control-hpo`
 case.col.name <- opts$`case-column`
-ctrl.col.name <- opts$`control-column`
-n.case <- opts$`case-n`
-n.ctrl <- opts$`control-n`
+control.col.name <- opts$`control-column`
+precision <- opts$precision
+
+# Extract sample counts
+sample.counts <- get.sample.counts(pheno.table.in, cohort.name, case.hpo, control.hpo)
 
 # Process input BED
-bed <- import.bed(bed.in, case.col.name, n.case, ctrl.col.name, n.ctrl)
+bed <- import.bed(bed.in, case.col.name, sample.counts$case.n,
+                  control.col.name, sample.counts$control.n)
 
 # Run burden tests
-fisher.bed <- burden.test(bed)
+fisher.bed <- burden.test(bed, precision)
   
 # Format output
 colnames(fisher.bed)[1] <- "#chr"
+if(length(grep(".gz", outfile, fixed=T)) > 0){
+  outfile <- tools::file_path_sans_ext(outfile)
+}
 write.table(fisher.bed, outfile, sep="\t", col.names=T, row.names=F, quote=F)
 if(opts$bgzip == TRUE){
   system(paste("bgzip -f", outfile),wait=T)

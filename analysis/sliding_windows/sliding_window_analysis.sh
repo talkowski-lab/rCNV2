@@ -22,64 +22,46 @@ mkdir cleaned_cnv/
 gsutil cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
 mkdir windows/
 gsutil cp -r gs://rcnv_project/cleaned_data/binned_genome/* windows/
+mkdir refs/
+gsutil cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
 
-# Gather list of CNV datasets to intersect
-while read cohort; do
-  for pheno in CASE CTRL; do
-    if [ -e cleaned_cnv/$cohort.rCNV.$pheno.bed.gz ] && \
-       [ $( zcat cleaned_cnv/$cohort.rCNV.$pheno.bed.gz \
-            | fgrep -v "#" | wc -l ) -gt 0 ]; then
-      echo -e "./cleaned_cnv/$cohort.rCNV.$pheno.bed.gz"
-    fi
-  done
-done < <( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f1 ) \
-> rCNV_bed_paths.list
+# Test/dev parameters (neurodevelopmental abnormality)
+hpo="HP:0012759"
+prefix="HP0012759"
+meta="meta1"
+freq_code="rCNV"
+metacohort_list="refs/rCNV_metacohort_list.txt"
+binned_genome="windows/GRCh37.100kb_bins_10kb_steps.raw.bed.gz"
 
 
-# Count CNVs in cases and controls per cohort, split by CNV type
-# Bins with no annotations
-/opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
-  -z \
-  -o GRCh37.100kb_bins_10kb_steps.raw.rCNV_counts.bed.gz \
-  rCNV_bed_paths.list \
-  windows/GRCh37.100kb_bins_10kb_steps.raw.bed.gz
-for CNV in DEL DUP; do
-  /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
-    -z \
-    --cnv ${CNV} \
-    -o GRCh37.100kb_bins_10kb_steps.raw.rCNV_counts.${CNV}.bed.gz \
-    rCNV_bed_paths.list \
-    windows/GRCh37.100kb_bins_10kb_steps.raw.bed.gz
-done  
-# Bins with raw annotations
-/opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
-  -z \
-  -o GRCh37.100kb_bins_10kb_steps.annotated.rCNV_counts.bed.gz \
-  rCNV_bed_paths.list \
-  windows/GRCh37.100kb_bins_10kb_steps.annotated.bed.gz
-for CNV in DEL DUP; do
-  /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
-    -z \
-    --cnv ${CNV} \
-    -o GRCh37.100kb_bins_10kb_steps.annotated.rCNV_counts.${CNV}.bed.gz \
-    rCNV_bed_paths.list \
-    windows/GRCh37.100kb_bins_10kb_steps.annotated.bed.gz
-done  
-# Bins with eigenannotations
-/opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
-  -z \
-  -o GRCh37.100kb_bins_10kb_steps.annotated.eigen.rCNV_counts.${CNV}.bed.gz \
-  rCNV_bed_paths.list \
-  windows/GRCh37.100kb_bins_10kb_steps.annotated.eigen.bed.gz
-for CNV in DEL DUP; do
-  /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
-    -z \
-    --cnv ${CNV} \
-    -o GRCh37.100kb_bins_10kb_steps.annotated.eigen.rCNV_counts.${CNV}.bed.gz \
-    rCNV_bed_paths.list \
-    windows/GRCh37.100kb_bins_10kb_steps.annotated.eigen.bed.gz
-done  
+# Count CNVs in cases and controls per phenotype, split by metacohort and CNV type
+# Iterate over phenotypes
+while read prefix hpo; do
+  # Iterate over metacohorts
+  while read meta cohorts; do
+    cnv_bed="cleaned_cnv/$meta.$freq_code.bed.gz"
+    # Iterate over CNV types
+    for CNV in CNV DEL DUP; do
+      # Count CNVs
+      /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
+        -t $CNV \
+        --hpo ${hpo} \
+        -z \
+        -o "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
+        ${cnv_bed} \
+        ${binned_genome}
+      # Perform burden test
+      /opt/rCNV2/analysis/sliding_windows/window_burden_test.R \
+      --pheno-table refs/HPOs_by_metacohort.table.tsv \
+      --cohort-name $meta \
+      --case-hpo ${hpo} \
+      --bgzip \
+      "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
+      "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+    done
+  done < ${metacohort_list}
+done < refs/test_phenotypes.list
 
 
 # Run burden tests - example
