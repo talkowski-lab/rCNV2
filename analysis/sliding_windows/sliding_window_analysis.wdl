@@ -42,6 +42,7 @@ task burden_test {
   String hpo
   File metacohort_list
   String freq_code
+  File binned_genome
   String rCNV_bucket
   String prefix
 
@@ -60,7 +61,7 @@ task burden_test {
           --hpo ${hpo} \
           -z \
           -o "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
-          ${cnv_bed} \
+          $cnv_bed \
           ${binned_genome}
         # Perform burden test
         /opt/rCNV2/analysis/sliding_windows/window_burden_test.R \
@@ -81,6 +82,8 @@ task burden_test {
   runtime {
     docker: "talkowski/rcnv@sha256:26ca8f4b57f8c074bc08c42fab76dd7d157bebf041ff233efa7b6a5de438da9c"
     preemptible: 1
+    memory: "4 GB"
+    bootDiskSizeGb: "20"
   }
 
   output {
