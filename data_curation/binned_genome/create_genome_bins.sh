@@ -34,7 +34,7 @@ gsutil cp -r gs://rcnv_project/GRCh37_ref_build/* refs/
 
 
 # Set desired bin size & step size resolution (in kb)
-binsize=100
+binsize=200
 stepsize=10
 
 

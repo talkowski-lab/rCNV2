@@ -28,8 +28,9 @@ mkdir cleaned_phenos/all/
 mkdir cleaned_phenos/filtered/
 
 
-# Download current version of HPO
+# Download current version of HPO and ICD10
 wget http://purl.obolibrary.org/obo/hp.obo
+gsutil cp gs://rcnv_project/refs/UKBB_ICD10_manifest.tsv ./
 
 
 # Make tsv of HPO obo file (for convenience)
@@ -92,6 +93,36 @@ yes $( fgrep "schizophrenia" CHOP.raw_phenos.conversion_table.txt | cut -f2 ) \
 | head -n $( fgrep PGC /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f3 ) \
 | awk -v OFS="\t" '{ print "PGC_CASE_"NR, $1 }' \
 > cleaned_phenos/all/PGC.cleaned_phenos.txt
+
+
+# Convert UKBB ICD-10 codes to indications
+/opt/rCNV2/data_curation/phenotype/icd10_to_indication.py \
+  --default HEALTHY_CONTROL \
+  --report-fails \
+  --outfile raw_phenos/UKBB.raw_phenos.txt \
+  UKBB_ICD10_manifest.tsv \
+  raw_phenos/UKBB.sample_IDs_w_ICD10.txt
+
+
+# Convert UKBB phenotypes
+# Note: for UKBB, given the different phenotype encoding, assume any sample
+# that does not match an HPO term is a healthy control -- not an unknown
+# affected sample, since we assume most samples in UKBB are from the general
+# population and thus are largely healthy
+/opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
+  --obo hp.obo \
+  -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
+  -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
+  --no-match-default "HEALTHY_CONTROL_UNKNOWN" \
+  -o cleaned_phenos/all/UKBB.cleaned_phenos.preQC.txt \
+  raw_phenos/UKBB.raw_phenos.txt
+/opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
+  --obo hp.obo \
+  -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
+  -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
+  --no-match-default "HEALTHY_CONTROL_UNKNOWN" \
+  -o test_out.txt \
+  test_input.txt
 
 
 # Pool all phenotypes across cohorts
