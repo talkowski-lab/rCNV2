@@ -95,6 +95,15 @@ yes $( fgrep "schizophrenia" CHOP.raw_phenos.conversion_table.txt | cut -f2 ) \
 > cleaned_phenos/all/PGC.cleaned_phenos.txt
 
 
+# Tabulate UKBB ICD-10 dictionary of all terms with at least 48 samples for manual review
+# 48 samples = 1:1000 phenotype incidence in UKBB
+/opt/rCNV2/data_curation/phenotype/tabulate_ukbb_icd10_dictionary.py \
+  --minsamp 48 \
+  --outfile UKBB_ICD10_wSampleCounts.for_review.txt \
+  UKBB_ICD10_manifest.tsv \
+  raw_phenos/UKBB.sample_IDs_w_ICD10.txt
+
+
 # Convert UKBB ICD-10 codes to indications
 /opt/rCNV2/data_curation/phenotype/icd10_to_indication.py \
   --default HEALTHY_CONTROL \

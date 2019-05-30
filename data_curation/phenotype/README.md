@@ -18,9 +18,11 @@ The code to perform this HPO conversion is contained in `convert_phenotypes_to_h
 
 For the UK BioBank dataset, all phenotypes were encoded in [ICD-10 format](https://www.cms.gov/medicare/coding/icd10/) according to [the UK BioBank-sanctioned version of ICD-10](https://biobank.ctsu.ox.ac.uk/crystal/coding.cgi?id=19&nl=1).  
 
-Thus, phenotypes for each sample were first converted from ICD-10 to plain-text indications with `icd10_to_indication.py`.  
+Given the scope of analyses in this study, we reduced the 19,153 unique ICD-10 codes to a smaller subset relevant to this study. This was accomplished through a mix of automated filtering (`prune_ukbb_icd10_dictionary.py`) down to ICD-10 codes with an incidence of at least 0.1%, followed by manual review.  
 
-Once converted to plain-text indications, UK BioBank samples were subjected to HPO conversion as described above.  
+Afterwards, phenotypes for each sample were converted from ICD-10 to plain-text indications with `icd10_to_indication.py`.  
+
+Once converted to plain-text indications, UK BioBank samples were subjected to indication-to-HPO conversion as described above.  
 
 ### Phenotype hierarchy  
 
