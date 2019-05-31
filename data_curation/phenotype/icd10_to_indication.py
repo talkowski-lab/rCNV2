@@ -17,16 +17,32 @@ import argparse
 from sys import stdout
 
 
-def read_icd_list(infile):
+def get_children(G, node_id):
     """
-    Read a list of ICD-10 codes into a list
+    Return all generations of children for a node
+    """
+
+    children = list(set([node for node in nx.dfs_preorder_nodes(G, node_id)]))
+
+    return children
+
+
+def read_icd_list(infile, G, conv, children=True):
+    """
+    Read a list of ICD-10 codes, and gather all children
     """
 
     with open(infile) as f:
-        terms = f.readlines
-        terms = [x.strip() for x in terms]
+        terms = f.readlines()
+        terms = [x.rstrip() for x in terms]
 
-    return terms
+    children = [get_children(G, conv[t]) for t in terms]
+    children = [item for sublist in children for item in sublist]
+    children = [G.nodes[t]['icd'] for t in children]
+
+    allterms = list(set(terms + children))
+
+    return allterms
 
 
 def make_icd_graph(icd_10_map):
@@ -85,12 +101,14 @@ def read_icd_indication_dict(icd10map):
 
         for icd, descrip, node_idx, parent_idx, selectable in reader:
 
-            if icd == 'coding' \
-            or icd.startswith('Chapter'):
+            if icd == 'coding':
                 continue
 
             # Clean description
-            descrip = descrip.upper().split(' ', 1)[1]
+            if descrip.startswith('Chapter'):
+                descrip = descrip.upper().split(' ', 2)[2]
+            else:
+                descrip = descrip.upper().split(' ', 1)[1]
             descrip = sub('[^A-Za-z0-9\ ]+', '', descrip)
             descrip = ' '.join([w for w in descrip.split(' ') if w not in junk_words])
             for word in split_words:
@@ -109,46 +127,72 @@ def read_icd_indication_dict(icd10map):
     return icd_dict
 
 
-# def process_samples(samples, icd_dict, outfile, default='NA', report=False):
-#     """
-#     Iterate over a file of sample + ICD-10 pairs and convert to indications
-#     """
+def get_parents(G, node_id):
+    """
+    Return all generations of parents for a node
+    """
 
-#     skip_keywords = ['FAMILY_HISTORY_OF']
+    parents = list(set(nx.ancestors(G, node_id)))
 
-#     with open(samples) as infile:
+    return parents
 
-#         reader = csv.reader(infile, delimiter='\t')
 
-#         for sample, icds in reader:
+def process_samples(samples, icd_indic_dict, G, icd_node_dict, 
+                    whitelist, blacklist, nclist, blacklist_samps,
+                    outfile, blacklisted_samps_outfile, 
+                    default='NA', report=False):
+    """
+    Iterate over a file of sample + ICD-10 pairs and convert to indications,
+    while applying various whitelists and blacklists
+    """
 
-#             # Parse ICD-10 codes
-#             if icds == '':
-#                 pheno = default
-#             else:
-#                 icds = icds.split(';')
-#                 pheno = ''
-#                 for icd in icds:
+    with open(samples) as infile:
 
-#                     descrip = icd_dict.get(icd, None)
+        reader = csv.reader(infile, delimiter='\t')
 
-#                     if icd is None:
-#                         if report:
-#                             err = 'Failed to find match for {0} for sample {1}'
-#                             print(err.format(icd, sample))
-#                     else:
-#                         if any(keyword in descrip for keyword in skip_keywords):
-#                             continue
-#                         else:
-#                             if pheno == '':
-#                                 pheno = descrip
-#                             else:
-#                                 pheno = ';'.join([pheno, icd_dict.get(icd, '')])
+        for sample, icds in reader:
 
-#             if pheno == '':
-#                 pheno = default
+            # Parse ICD-10 codes
+            if icds == '':
+                icds = []
+            else:
+                icds = icds.split(';')
 
-#             outfile.write('{0}\t{1}\n'.format(sample, pheno))
+            # Get all parent terms corresponding to original ICD-10 codes
+            parents = [get_parents(G, icd_node_dict[i]) for i in icds]
+            parents = [item for sublist in parents for item in sublist]
+            parents = [G.nodes[t].get('icd', None) for t in parents]
+            parents = [t for t in parents if t is not None]
+
+            allterms = list(set(icds + parents))
+
+            # Check for any overlap with sample-level blacklist terms
+            # If any hits are found, immediately stop processing sample
+            # and record that sample on sample-level blacklist outfile
+            sbl_hits = list(set(allterms).intersection(set(blacklist_samps)))
+            if len(sbl_hits) > 0:
+                reason = 'Matched sample blacklist terms: {0}'
+                outline = '{0}\t{1}\n'
+                outline = outline.format(sample, 
+                                         reason.format(', '.join(sbl_hits)))
+                blacklisted_samps_outfile.write(outline)
+                continue
+
+            # Restrict to terms on term whitelist
+            allterms = [t for t in allterms if t in whitelist]
+
+            # Erase terms that are on term blacklist
+            allterms = [t for t in allterms if t not in blacklist]
+
+            # Convert all remaining terms into indications
+            if len(allterms) > 0:
+                allphenos = [icd_indic_dict.get(t, None) for t in allterms]
+                allphenos = [p for p in allphenos if p is not None]
+                pheno = ';'.join(allphenos)
+            else:
+                pheno = default
+
+            outfile.write('{0}\t{1}\n'.format(sample, pheno))
 
 
 def main():
@@ -192,8 +236,8 @@ def main():
                         '[default: icd10_sample_blacklist.txt]', metavar='file',
                         default='icd10_sample_blacklist.txt')
     parser.add_argument('-d', '--default', help='String to use if no ICD-10 codes ' +
-                        'match. [default: HEALTHY_CONTROL]', 
-                        default='HEALTHY_CONTROL', metavar='string')
+                        'match. [default: healthy]', default='healthy', 
+                        metavar='string')
     parser.add_argument('--report-fails', action='store_true', 
                         help='Print warnings for each failed ICD-10 mapping. ' +
                         '[default: silent]')
@@ -201,35 +245,36 @@ def main():
                         '[default: stdout]', metavar='file')
     args = parser.parse_args()
 
-    # Read whitelist terms
-    if args.whitelist_terms is not None:
-        whitelist = read_icd_list(args.whitelist_terms)
-    else:
-        whitelist = list(icd_indic_dict.keys())
-
-    # Read blacklist terms
-    if args.blacklist_terms is not None:
-        blacklist = read_icd_list(args.blacklist_terms)
-    else:
-        blacklist = []
-
-    # Read non-control terms
-    if args.not_control_terms is not None:
-        nclist = read_icd_list(args.not_control_terms)
-    else:
-        nclist = []
-
-    # Read sample blacklist terms
-    if args.blacklist_samples is not None:
-        blacklist_samps = read_icd_list(args.blacklist_samples)
-    else:
-        blacklist_sampes = []
+    # Read ICD-10 indication dictionary
+    icd_indic_dict = read_icd_indication_dict(args.icd_10_map)
 
     # Read ICD-10 graph
     icd_g, icd_node_dict = make_icd_graph(args.icd_10_map)
 
-    # Read ICD-10 indication dictionary
-    icd_indic_dict = read_icd_indication_dict(args.icd_10_map)
+    # Build whitelist terms (+ children)
+    if args.whitelist_terms is not None:
+        whitelist = read_icd_list(args.whitelist_terms, icd_g, icd_node_dict)
+    else:
+        whitelist = list(icd_indic_dict.keys())
+
+    # Build blacklist terms (+ children)
+    if args.blacklist_terms is not None:
+        blacklist = read_icd_list(args.blacklist_terms, icd_g, icd_node_dict)
+    else:
+        blacklist = []
+
+    # Build non-control terms (+ children)
+    if args.not_control_terms is not None:
+        nclist = read_icd_list(args.not_control_terms, icd_g, icd_node_dict)
+    else:
+        nclist = []
+
+    # Build sample blacklist terms (+ children)
+    if args.blacklist_samples is not None:
+        blacklist_samps = read_icd_list(args.blacklist_samples, 
+                                        icd_g, icd_node_dict)
+    else:
+        blacklist_samps = []
 
     # Open connection to outfiles
     if args.outfile is None:
@@ -237,10 +282,13 @@ def main():
     else:
         outfile = open(args.outfile, 'w')
     blacklisted_samps_outfile = open(args.blacklisted_samples_outfile, 'w')
+    blacklisted_samps_outfile.write('#sample\treason\n')
 
-    # # Process sample + ICD-10 pairings
-    # process_samples(args.samples, icd_dict, outfile, args.default,
-    #                 args.report_fails)
+    # Process sample + ICD-10 pairings
+    process_samples(args.samples, icd_indic_dict, icd_g, icd_node_dict, 
+                    whitelist, blacklist, nclist, blacklist_samps, 
+                    outfile, blacklisted_samps_outfile, 
+                    args.default, args.report_fails)
     
 
 if __name__ == '__main__':

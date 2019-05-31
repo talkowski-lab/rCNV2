@@ -65,7 +65,7 @@ def get_superterms(term, hpo_g):
     Get all HPO terms upstream of a query term
     """
 
-    if hpo_g.has_node(term):
+    if hpo_g.nodes.get(term, None) is not None:
         superterms = networkx.descendants(hpo_g, term)
         superterms = [s for s in superterms if s is not None]
     else:
@@ -113,18 +113,20 @@ def make_hpo_lookup_table(hpo_g, supp_terms=None, break_table=None,
         with open(supp_terms) as supp:
             reader = csv.reader(supp, delimiter='\t')
 
-            for key, term in reader:
+            for key, terms in reader:
                 key = clean_pheno(key)
+                terms = list(set(terms.split(';')))
 
                 if key not in hpo_dict.keys():
-                    hpo_dict[key] = [term]
+                    hpo_dict[key] = terms
                 else:
-                    if term not in hpo_dict[key]:
-                        hpo_dict[key].append(term)
+                    hpo_dict[key] = hpo_dict[key] + terms
 
-                for sterm in get_superterms(term, hpo_g):
-                    if sterm not in hpo_dict[key]:
-                        hpo_dict[key].append(sterm)
+                for term in terms:
+                    for sterm in get_superterms(term, hpo_g):
+                        if sterm not in hpo_dict[key]:
+                            hpo_dict[key].append(sterm)
+
 
     # Restrict terms to those appearing in eligibility list, if optioned
     # Remove entries that don't apply to any of the designated eligible terms

@@ -12,13 +12,17 @@ We used the [Human Phenotype Ontology (HPO)](https://hpo.jax.org/app/) to harmon
 
 For each sample, we recursively matched all phenotype information available against HPO keywords, and assigned the corresponding HPO terms to each sample when a match was found.  
 
+We abided by all HPO phenotype definitions with a single exception: we matched all congenital anomalies to `HP:0001197 [Abnormality of prenatal development or birth]`, despite the description for that term excluding fetal structural anomalies. We made this exception because congenital anomalies were a phenotype of particular interest in this study, and there was no clear corresponding existing HPO code for these phenotypes.
+
 The code to perform this HPO conversion is contained in `convert_phenotypes_to_hpo.sh`.  
 
 #### A note on ICD-10 to HPO conversion  
 
 For the UK BioBank dataset, all phenotypes were encoded in [ICD-10 format](https://www.cms.gov/medicare/coding/icd10/) according to [the UK BioBank-sanctioned version of ICD-10](https://biobank.ctsu.ox.ac.uk/crystal/coding.cgi?id=19&nl=1).  
 
-Given the scope of analyses in this study, we reduced the 19,153 unique ICD-10 codes to a smaller subset relevant to this study. This was accomplished through a mix of automated filtering (`prune_ukbb_icd10_dictionary.py`) down to ICD-10 codes with an incidence of at least 0.1%, followed by manual review.  
+Given the scope of analyses in this study, we reduced the 19,153 unique ICD-10 codes to a smaller subset relevant to this study. This was accomplished through:
+1. Automated filtering (`prune_ukbb_icd10_dictionary.py`) to isolate ICD-10 codes with a cohort prevalance of at least 0.01% but no greater than 5%
+2. Manual review by a physician to further identify terms unlikely to have a strong genetic component (e.g., infectious .  
 
 Afterwards, phenotypes for each sample were converted from ICD-10 to plain-text indications with `icd10_to_indication.py`.  
 

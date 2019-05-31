@@ -1,0 +1,20 @@
+Block C00-C14
+Block C15-C26
+Block C30-C39
+Block C40-C41
+Block C43-C44
+Block C45-C49
+Block C50-C50
+Block C51-C58
+Block C60-C63
+Block C64-C68
+Block C69-C72
+Block C73-C75
+Block C76-C80
+Block C81-C96
+Block D00-D09
+Block D37-D48
+D46
+D750
+D752
+Block Q90-Q99
