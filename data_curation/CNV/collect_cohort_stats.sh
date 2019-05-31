@@ -32,6 +32,10 @@ alias addcom="sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta'"
 collect_stats () {
   infile=$1
 
+  # Print header
+  echo "| Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  "
+  echo "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
+
   while read cohort N_total N_case N_ctrl bed; do
     for wrapper in 1; do
       echo "$cohort"

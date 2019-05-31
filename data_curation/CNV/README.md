@@ -44,14 +44,14 @@ Some datasets required manual curation prior to inclusion. Where necessary, thes
 
 The properties of each callset are listed below after initial data processing steps but prior to further filtering.  
 
-| Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP | 
+| Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | PGC | 21,094 | 42,096 | 2.00 | 79.7 kb | 1:1.04 | 20,277 | 40,464 | 2.00 | 78.2 kb | 1:1.03 |
 | Cooper | 0 | 0 | - | - | - | 8,329 | 432,478 | 51.92 | 1.9 kb | 8.04:1 |
 | Coe | 29,083 | 28,782 | 0.99 | 188.4 kb | 1:1.11 | 11,256 | 273,331 | 24.28 | 53.4 kb | 1.24:1 |
 | SSC | 2,795 | 30,867 | 11.04 | 21.0 kb | 3.09:1 | 0 | 0 | - | - | - |
-| UKBB | 0 | 0 | - | - | - | 480,501 | 873,454 | 1.82 | 101.6 kb | 6.50:1 |
-| CHOP | 150,231 | 692,357 | 4.61 | 89.0 kb | 1:1.05 | 28,070 | 114,881 | 4.09 | 86.8 kb | 1.71:1 |
+| UKBB | 55,471 | 87,538 | 1.58 | 117.4 kb | 4.72:1 | 385,922 | 601,226 | 1.56 | 115.9 kb | 4.80:1 |
+| CHOP | 153,870 | 690,521 | 4.49 | 89.0 kb | 1:1.05 | 24,161 | 114,881 | 4.75 | 86.8 kb | 1.71:1 |
 | GDX | 9,959 | 20,789 | 2.09 | 196.3 kb | 1:1.76 | 0 | 0 | - | - | - |
 | TSAICG | 2,434 | 3,541 | 1.45 | 91.1 kb | 1.01:1 | 4,093 | 5,834 | 1.43 | 91.3 kb | 1:1.08 |
 | BCH | 3,591 | 5,211 | 1.45 | 206.4 kb | 1:1.27 | 0 | 0 | - | - | - |

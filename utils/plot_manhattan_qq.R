@@ -232,30 +232,81 @@ qq <- function (stats, cutoff=NULL, highlights=NULL,
 }
 
 
+################
+###RSCRIPT BLOCK
+################
+require(optparse,quietly=T)
+# List of command-line options
+option_list <- list(
+  make_option(c("--p-col-name"), type="character", default="P",
+              help="column name corresponding to P-values [default %default]",
+              metavar="string"),
+  make_option(c("--p-is-phred"), type="logical", default=F, action="store_true",
+              help="supplied P-values are Phred-scaled (-log10[P]) [default %default]"),
+  make_option(c("--cutoff"), type="numeric", default=10^-8, 
+              help="P-value of significance threshold [default %default]",
+              metavar="numeric"),
+  make_option(c("--highlight"), type="character", default=NULL, 
+              help="BED file of coordinates to highlight [default %default]",
+              metavar="BED"),
+  make_option(c("--highlight-name"), type="character", default="Highlighted regions", 
+              help="name for highlighted regions in legend [default %default]",
+              metavar="string")
+)
 
-# Dev parameters:
-stats.in <- "~/scratch/NDD_burden_tmp/meta1.HP0012759.rCNV.DEL.sliding_window.stats.bed.gz"
-p.col.name <- "fisher_phred_p"
-p.is.phred <- T
-cutoff <- 10^-5
-out.prefix <- "~/scratch/meta1.NDD.test"
-highlight.in <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz"
-highlight.name <- "Positive Controls"
+# Get command-line arguments & options
+args <- parse_args(OptionParser(usage="%prog stats out_prefix",
+                                option_list=option_list),
+                   positional_arguments=TRUE)
+opts <- args$options
+
+print(args)
+
+# Checks for appropriate positional arguments
+if(length(args$args) != 2){
+  stop("Incorrect number of required positional arguments\n")
+}
+
+# Writes args & opts to vars
+stats.in <- args$args[1]
+out.prefix <- args$args[2]
+p.col.name <- opts$`p-col-name`
+p.is.phred <- opts$`p-is-phred`
+cutoff <- opts$cutoff
+highlight.in <- opts$highlight
+highlight.name <- opts$`highlight-name`
 
 
+# # Dev parameters:
+# stats.in <- "~/scratch/NDD_burden_tmp/meta1.HP0012759.rCNV.DEL.sliding_window.stats.bed.gz"
+# p.col.name <- "fisher_phred_p"
+# p.is.phred <- T
+# cutoff <- 10^-5
+# out.prefix <- "~/scratch/meta1.NDD.test"
+# highlight.in <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz"
+# highlight.name <- "Positive Controls"
+
+# Load data
 stats <- read.stats(stats.in, p.col.name, p.is.phred)
 
-highlights <- read.highlight.bed(highlight.in)
+if(!is.null(highlight.in)){
+  highlights <- read.highlight.bed(highlight.in)
+}else{
+  highlights <- data.frame("chr"=c(),
+                           "start"=c(),
+                           "end"=c())
+}
 
+# Generate plots
 png(paste(out.prefix, "manhattan.png", sep="."),
     height=1000, width=1800, res=400)
-manhattan(stats, cutoff, highlights,
+manhattan(stats, cutoff, highlights=highlights,
           highlight.name=highlight.name)
 dev.off()
 
 png(paste(out.prefix, "qq.png", sep="."),
     height=1000, width=1000, res=400)
-qq(stats, cutoff, highlights,
+qq(stats, cutoff, highlights=highlights,
    highlight.name=highlight.name,
    legend=F)
 dev.off()
@@ -263,9 +314,10 @@ dev.off()
 png(paste(out.prefix, "manhattan_with_qq.png", sep="."),
     height=1000, width=2800, res=400)
 layout(matrix(c(1,2), nrow=1), widths=c(18, 10))
-manhattan(stats, cutoff, highlights,
+manhattan(stats, cutoff, highlights=highlights,
           highlight.name=highlight.name)
-qq(stats, cutoff, highlights,
+qq(stats, cutoff, highlights=highlights,
    highlight.name=highlight.name,
    legend=F)
 dev.off()
+
