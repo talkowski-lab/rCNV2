@@ -104,6 +104,33 @@ def write_table_header(outfile, counts, html=False):
         outfile.write("#" + '\t'.join(column_names) + '\n')
 
 
+def metacohort_abundance_filter(counts, metacounts, min_samples, min_metas):
+    """
+    Prune counts and metacounts based on minimum sample abundance
+    """
+
+    metacohorts = list(metacounts.keys())
+    metacohorts = [m for m in metacohorts if m not in 'mega total'.split()]
+    hpos = list(metacounts[metacohorts[0]].keys())
+
+    passing_hpos = {}
+    for hpo in hpos:
+        passing_hpos[hpo] = len([m for m in metacohorts if metacounts[m][hpo] >= min_samples])
+    keep_hpos = [m for m, k in passing_hpos.items() if k >= min_metas]
+
+    for cohort in counts.keys():
+        for pheno in hpos:
+            if pheno not in keep_hpos:
+                counts[cohort].pop(pheno)
+
+    for meta in metacounts.keys():
+        for pheno in hpos:
+            if pheno not in keep_hpos:
+                metacounts[meta].pop(pheno)
+
+    return counts, metacounts
+
+
 def write_table(counts, hpo_metadata, outfile, html=False):
     """
     Master function to process input data and write summary table
@@ -121,10 +148,14 @@ def write_table(counts, hpo_metadata, outfile, html=False):
             if term.startswith('#'):
                 continue
 
+            if term not in counts[list(counts.keys())[0]].keys():
+                continue
+
             if term == 'HEALTHY_CONTROL':
                 total_n = 0
                 for cohort in counts.keys():
-                    total_n += counts[cohort]['HEALTHY_CONTROL']
+                    if cohort != 'mega':
+                        total_n += counts[cohort]['HEALTHY_CONTROL']
 
             if html:
                 total_n = str(locale.format_string("%d", int(total_n), grouping=True))
@@ -155,18 +186,24 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('hpo_metadata', help='Table of HPO metadata.')
     parser.add_argument('cohort_table', help='Table of cohorts and total samples.')
-    parser.add_argument('hpo_dir', help='Path to directory with cleaned ' + \
+    parser.add_argument('hpo_dir', help='Path to directory with cleaned ' + 
                         'sample-level HPO assignments.')
-    parser.add_argument('--meta-cohorts', help='Path to tsv specifying ' + \
-                        'metacohorts to consider. Two columns: metacohort ID ' + \
-                        'and semicolon-separated cohorts to include. ' + \
+    parser.add_argument('--meta-cohorts', help='Path to tsv specifying ' + 
+                        'metacohorts to consider. Two columns: metacohort ID ' + 
+                        'and semicolon-separated cohorts to include. ' + 
                         '[default: no metacohort output]', dest='metalist')
-    parser.add_argument('--meta-out', help='Path to output file for counts ' + \
-                        'summarized per metacohort. [default: no metacohort ' + \
+    parser.add_argument('--meta-out', help='Path to output file for counts ' + 
+                        'summarized per metacohort. [default: no metacohort ' + 
                         'output]', dest='meta_out')
+    parser.add_argument('--min-per-metacohort', type=int, default=100,
+                        help='Minimum number of samples required per metacohort ' +
+                        'for at least --min-metacohort total metacohorts. [default 100]')
+    parser.add_argument('--min-metacohorts', type=int, default=1,
+                        help='Minimum number of metacohorts required to have ' +
+                        'at least --min-per-metacohort samples each. [default 1]')
     parser.add_argument('-o', '--outfile', help='Path to output file. ' +
                         '[default: stdout]')
-    parser.add_argument('--html', action='store_true', help='Output tables in ' + \
+    parser.add_argument('--html', action='store_true', help='Output tables in ' + 
                         ' HTML format. [default: flat tsv output]')
     args = parser.parse_args()
 
@@ -185,16 +222,22 @@ def main():
     else:
         outfile = open(args.outfile, 'w')
 
-    # Format output table & write to file
-    write_table(counts, args.hpo_metadata, outfile, args.html)
-
     # Format output table for metacohorts, if optioned
     if args.metalist is not None \
     and args.meta_out is not None:
         metaoutfile = open(args.meta_out, 'w')
         metacounts = gather_metacounts(counts, args.metalist)
-        write_table(metacounts, args.hpo_metadata, metaoutfile, args.html)
 
+        # Filter HPO terms based on minimum metacohort abundance, if optioned
+        counts, metacounts = metacohort_abundance_filter(counts, metacounts,
+                                                         args.min_per_metacohort,
+                                                         args.min_metacohorts)
+
+    # Format output tables & write to file
+    write_table(counts, args.hpo_metadata, outfile, args.html)
+    if args.metalist is not None \
+    and args.meta_out is not None:
+        write_table(metacounts, args.hpo_metadata, metaoutfile, args.html)
 
 if __name__ == '__main__':
     main()

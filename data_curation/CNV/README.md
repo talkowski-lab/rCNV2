@@ -16,19 +16,18 @@ We aggregated CNV data from multiple sources, listed below:
 | Cooper<sup>1</sup> | [Cooper _et al._, _Nat. Genet._ (2011)](https://www.nature.com/articles/ng.909) | [21841781](https://www.ncbi.nlm.nih.gov/pubmed/21841781) | Ill. 550k-610k (75%), Custom 1.2M (25%) | hg19 | Developmental disorders | 0<sup>1</sup> | 8,329 |
 | Coe | [Coe _et al._, _Nat. Genet._ (2014)](https://www.nature.com/articles/ng.3092) | [25217958](https://www.ncbi.nlm.nih.gov/pubmed/25217958) | Cases: SignatureChip OS v2.0 (58%), SignatureChip OS v1.0 (34%), Other (8%); Controls: Affy 6.0 (100%) | hg19 | Developmental disorders | 29,083 | 11,256 |
 | SSC<sup>2</sup> | [Sanders _et at._, _Neuron_ (2015)](https://www.sciencedirect.com/science/article/pii/S0896627315007734?) | [26402605](https://www.ncbi.nlm.nih.gov/pubmed/26402605) | Omni 1Mv3 (46%), Omni 2.5 (41%), Omni 1Mv1 (13%) | hg18 | Autism | 2,795 | 0<sup>2</sup> |
-| UKBB | [Macé _et al._, _Nat. Comms._ (2017)](https://www.nature.com/articles/s41467-017-00556-x) | [28963451](https://www.ncbi.nlm.nih.gov/pubmed/28963451) | UKBB Affy Axiom (100%) | hg18 (?) | Mixed | 0<sup>3</sup> | 480,501<sup>3</sup> |
-| CHOP | - | - | Mixed Illumina SNP genotyping platforms | hg19 | Mixed | 154,140<sup>4</sup> | 28,070<sup>4</sup> |
+| UKBB | [Macé _et al._, _Nat. Comms._ (2017)](https://www.nature.com/articles/s41467-017-00556-x) | [28963451](https://www.ncbi.nlm.nih.gov/pubmed/28963451) | UKBB Affy Axiom (100%) | hg19 | Mixed | 55,471<sup>3</sup> | 385,922<sup>3</sup> |
+| CHOP | - | - | Mixed Illumina SNP genotyping platforms | hg19 | Mixed | 153,870<sup>3</sup> | 24,161<sup>3</sup> |
 | GDX | - | - | aCGH (?) | hg18 & hg19 | Mixed | 9,959 | 0 |
 | TSAICG | [Huang _et al._, _Neuron_ (2017)](https://www.sciencedirect.com/science/article/pii/S0896627317305081) | [28641109](https://www.ncbi.nlm.nih.gov/pubmed/28641109) | OmniExpress (100%) | hg19 | Tourette Syndrome | 2,434 | 4,093 |
 | BCH | [Talkowski _et al._, _Cell_ (2012)](https://www.sciencedirect.com/science/article/pii/S0092867412004114) | [22521361](https://www.ncbi.nlm.nih.gov/pubmed/22521361) | aCGH (?) | hg18 | Mixed | 3,591 | 0 |  
-| TCGA | [Zack _et al._, _Nat. Genet._ (2013)](https://www.nature.com/articles/ng.2760) | [24071852](https://www.ncbi.nlm.nih.gov/pubmed/24071852) | Affy 6.0 (100%) | hg19 | Cancer | 0<sup>5</sup> | 8,670<sup>5</sup> |  
+| TCGA | [Zack _et al._, _Nat. Genet._ (2013)](https://www.nature.com/articles/ng.2760) | [24071852](https://www.ncbi.nlm.nih.gov/pubmed/24071852) | Affy 6.0 (100%) | hg19 | Cancer | 0<sup>4</sup> | 8,670<sup>4</sup> |  
 
 #### Notes on raw CNV data   
 1. Only retained control samples from Cooper _et al._. All cases from Cooper _et al._ also appear in Coe _et al._.  
 2. Only retained affected children from Sanders _et al._, since all controls were first-degree relatives of affected cases.  
-3. Currently unable to filter UKBB dataset by sample (no sample IDs provided). For now, assuming all samples are controls, which will \~mostly be true given our phenotypes of interest.  
-4. Counts represent the number of samples retained after filtering outlier samples, described below.  
-5. Only retained normal samples from tumor:normal pairs, and excluded any donors with known blood cancer.  
+3. Counts represent the number of samples retained after filtering outlier samples, described below.  
+4. Only retained normal samples from tumor:normal pairs, and excluded any donors with known blood cancer.  
 
 ### Raw CNV data processing steps  
 
@@ -37,8 +36,8 @@ All CNV data native to hg18 was lifted over to hg19 coordinate space using UCSC 
 Some datasets required manual curation prior to inclusion. Where necessary, these steps are enumerated below:  
 
  * **SSC**: CNVs were filtered on pCNV ≤ 10<sup>-9</sup>, per recommendation of the authors.  
- * **UKBB**: CNVs were filtered on quality score ≥ 30 and CNV size ≥ 25kb. After CNV filtering, samples with >8 CNV calls were excluded as outliers as well as any samples with known cancers.  
- * **CHOP**: CNVs were filtered on quality score ≥ 40 and CNV size ≥ 25kb while requiring at least 10 SNPs per CNV. After CNV filtering, samples with `LRR_SD` < 0.25, >20 CNV calls, or SNP call rate < 98% were excluded as outliers, as well as samples genotyped on arrays with < 175k SNP probes or samples labeled as cancer patients.  
+ * **UKBB**: CNVs were filtered on quality score ≥ 25 and CNV size ≥ 25kb. After CNV filtering, samples with >7 CNV calls were excluded as outliers as well as any samples with known malignant cancers or chromosomal disorders (e.g., Down's Syndrome or sex chromosome aneuploidies).  
+ * **CHOP**: CNVs were filtered on quality score ≥ 40 and CNV size ≥ 25kb while requiring at least 10 SNPs per CNV. After CNV filtering, samples with `LRR_SD` < 0.25, >20 CNV calls, or SNP call rate < 98% were excluded as outliers, as well as samples genotyped on arrays with < 175k SNP probes or samples labeled as cancer or Down's Syndrome patients.  
  * **TCGA**: CNVs were filtered on ≥ 10 probes and ≥ 25kb. Deletions were required to have a mean log<sub>2</sub> intensity ≤ -1 and duplications were required to have a mean log<sub>2</sub> intensity of ≥ 0.5849625.  
 
 ### Raw CNV callset properties  
@@ -162,13 +161,26 @@ The information for this table was collected using `collect_cohort_stats.sh`.
 
 ---  
 
-## Meta-cohort CNV callset properties  
+## Case-control "metacohorts"  
 
-As described on the [phenotype filtering documentation](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/), groups of individual cohorts were created for purposes of case:control CNV burden testing.  
+To control for potential technical differences between cohorts, we combined CNV data from multiple cohorts into four matched groups for burden testing, dubbed **metacohorts**.  
 
-The construction of these cohorts are described elsewhere, but the properties of their combined CNV callsets are listed below.  
+Individual cohorts were assigned to metacohorts on the basis of similarity in CNV counts across the genome, which matched expectations based on platforms and processing pipelines for each callset.  
 
-### Rare CNVs  
+These metacohorts represent the basic unit on which all burden testing was performed, and are described in the table below.  
+
+For completeness, we also performed identical analyses on a pooled dataset of all samples, dubbed the **megacohort**.  
+
+| Metacohort ID | Case Source(s) | Number of Cases | Control Sources(s) | Number of Controls |  
+| :--- | :--- | ---: | :--- | ---: |  
+| `meta1` | Coe, BCH, GDX | 42,653 | Coe, Cooper | 19,585 |  
+| `meta2` | PGC, SSC, TSAICG | 26,323 | TCGA, PGC, TSAICG | 33,040 |  
+| `meta3` | CHOP | 153,870 | CHOP | 24,161 |  
+| `meta4` | UKBB | 55,471 | UKBB | 385,922 |  
+| `mega` | Coe, BCH, GDX, PGC, SSC, TSAICG, CHOP, UKBB | 278,317 | Coe, Cooper, TCGA, PGC, TSAICG, CHOP, UKBB | 462,708 |  
+
+
+### Metacohort rare CNV callset properties  
 
 | Metacohort | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP | 
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -179,7 +191,7 @@ The construction of these cohorts are described elsewhere, but the properties of
 | mega | 223,116 | 161,423 | 0.72 | 207.7 kb | 1:1.44 | 561,196 | 368,233 | 0.66 | 204.9 kb | 2.58:1 |
 
 
-### Ultra-rare CNVs  
+### Metacohort ultra-rare CNV callset properties  
 
 | Metacohort | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP | 
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |

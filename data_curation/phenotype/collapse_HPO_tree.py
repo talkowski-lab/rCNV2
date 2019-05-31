@@ -71,21 +71,62 @@ def prune_small_terms(hpo_counts, min_samples):
     return filtered_counts
 
 
-def get_related_terms(hpo_counts, hpo_g):
+def calc_term_overlap(termsA, termsB):
+    """
+    Calculate the reciprocal overlap between two lists of HPO terms
+    """
+
+    nA = len(termsA)
+    nB = len(termsB)
+
+    if nA == 0 or nB == 0:
+        ro = 0
+    else:
+        nOvr = len(set(termsA).intersection(set(termsB)))
+        oA = nOvr / nA
+        oB = nOvr / nB
+        ro = min([oA, oB])
+
+    return ro
+
+
+def get_related_terms(hpo_counts, hpo_g, min_sib_frac=0.5):
     """
     Define pairs of related terms to be evaluated
     """
 
     related_terms = []
 
-    for term, count in hpo_counts.items():
+    parents_d = {}
 
+    siblings_d = {}
+
+    # Get all parents
+    for term, count in hpo_counts.items():
         if term in hpo_g.nodes():
             parents = networkx.descendants(hpo_g, term)
             parents = [t for t in parents if t in hpo_counts.keys()]
+            parents_d[term] = parents
+
+    # Get all siblings (based on reciprocal sharing of at least X% of parent terms)
+    for term, count in hpo_counts.items():
+        if term in hpo_g.nodes():
+            parents = parents_d[term]
+            siblings = []
+            for termB, parentsB in parents_d.items():
+                if termB != term:
+                    if calc_term_overlap(parents, parentsB) >= min_sib_frac:
+                        siblings.append(termB)
+            siblings_d[term] = siblings
+
+    # Get all children and filter nodes
+    for term, count in hpo_counts.items():
+        if term in hpo_g.nodes():
+            parents = parents_d[term]
+            siblings = siblings_d[term]
             children = networkx.ancestors(hpo_g, term)
             children = [t for t in children if t in hpo_counts.keys()]
-            relatives = list(set(parents + children))
+            relatives = list(set(parents + children + siblings))
 
             for rel in relatives:
                 if (term, rel) not in related_terms \
@@ -170,6 +211,21 @@ def prune_related_terms(hpo_counts, related_terms, pairwise_counts, hpo_g,
 
     for termA, termB in related_terms:
 
+        if termA in terms_to_prune:
+            if filter_log is not None:
+                msg = 'Skipping candidate pair "{0}" ({1}) & "{2}" ({3}): ' + \
+                      '{1} has already been pruned.\n'
+                f_log.write(msg.format(hpo_g.nodes(data=True)[termA]['name'], termA, 
+                                       hpo_g.nodes(data=True)[termB]['name'], termB))
+            continue
+        if termB in terms_to_prune:
+            if filter_log is not None:
+                msg = 'Skipping candidate pair "{0}" ({1}) & "{2}" ({3}): ' + \
+                      '{3} has already been pruned.\n'
+                f_log.write(msg.format(hpo_g.nodes(data=True)[termA]['name'], termA, 
+                                       hpo_g.nodes(data=True)[termB]['name'], termB))
+            continue
+
         countA = hpo_counts.get(termA, 0)
         countB = hpo_counts.get(termB, 0)
 
@@ -208,7 +264,7 @@ def prune_related_terms(hpo_counts, related_terms, pairwise_counts, hpo_g,
                                     hpo_g.nodes(data=True)[termA]['name'],
                                     hpo_g.nodes(data=True)[termB]['name'],
                                     'both terms are same order, but {2} has ' + \
-                                    'more samples than {3}')
+                                    'at least as many samples as {3}')
             else:
                 terms_to_prune.append(termA)
                 if filter_log is not None:

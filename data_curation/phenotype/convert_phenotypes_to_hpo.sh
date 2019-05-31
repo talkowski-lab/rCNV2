@@ -26,6 +26,7 @@ gsutil cp -r gs://rcnv_project/raw_data/phenotypes/* raw_phenos/
 mkdir cleaned_phenos/
 mkdir cleaned_phenos/all/
 mkdir cleaned_phenos/filtered/
+mkdir cleaned_phenos/filtered/
 
 
 # Download current version of HPO and ICD10
@@ -61,8 +62,8 @@ done
   --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
   -o cleaned_phenos/all/CHOP.cleaned_phenos.preQC.txt \
   raw_phenos/CHOP.raw_phenos.txt
-cut -f1 raw_phenos/CHOP.QC_pass_samples.list \
-| fgrep -wf - cleaned_phenos/all/CHOP.cleaned_phenos.preQC.txt \
+fgrep -wf raw_phenos/CHOP.QC_pass_samples.list \
+  cleaned_phenos/all/CHOP.cleaned_phenos.preQC.txt \
 > cleaned_phenos/all/CHOP.cleaned_phenos.txt
 
 
@@ -117,9 +118,9 @@ yes $( fgrep "schizophrenia" CHOP.raw_phenos.conversion_table.txt | cut -f2 ) \
   raw_phenos/UKBB.sample_IDs_w_ICD10.txt
 
 
-# Copy list of UKBB samples with phenotype QC failures to Google bucket (note: requires permissions)
+# Copy UKBB sample IDs that failed phenotype QC to Google bucket (note: requires permissions)
 gsutil cp UKBB.phenotype_blacklisted_samples.txt \
-  gs://rcnv_project/
+  gs://rcnv_project/raw_data/phenotypes/
 
 
 # Convert UKBB indications
@@ -130,16 +131,19 @@ gsutil cp UKBB.phenotype_blacklisted_samples.txt \
   --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
   -o cleaned_phenos/all/UKBB.cleaned_phenos.preQC.txt \
   raw_phenos/UKBB.raw_phenos.txt
+fgrep -wf raw_phenos/UKBB.QC_pass_samples.list \
+  cleaned_phenos/all/UKBB.cleaned_phenos.preQC.txt \
+> cleaned_phenos/all/UKBB.cleaned_phenos.txt
 
 
 # Pool all phenotypes across cohorts
 while read cohort; do
   if [ -e cleaned_phenos/all/${cohort}.cleaned_phenos.txt ]; then
-    if [ ${cohort} != "CHOP" ]; then
-      cat cleaned_phenos/all/${cohort}.cleaned_phenos.txt
-    else
-      fgrep -wf raw_phenos/CHOP.QC_pass_samples.list \
+    if [ ${cohort} == "CHOP" ] || [ ${cohort} == "UKBB" ]; then
+      fgrep -wf raw_phenos/${cohort}.QC_pass_samples.list \
         cleaned_phenos/all/${cohort}.cleaned_phenos.txt
+    else
+      cat cleaned_phenos/all/${cohort}.cleaned_phenos.txt
     fi
   fi
 done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt ) \
@@ -149,19 +153,15 @@ done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt ) \
 # Determine minimum HPO tree to use
 /opt/rCNV2/data_curation/phenotype/collapse_HPO_tree.py \
   --ignore "HP:0000001" \
+  --ignore "HP:0031797" \
+  --ignore "HP:0011008" \
   --obo hp.obo \
   --raw-counts samples_per_HPO.txt \
   --filter-log HPO_tree_filter.log \
-  --outfile phenotype_groups.HPO_metadata.txt \
+  --min-samples 1000 \
+  --min-diff 2000 \
+  --outfile phenotype_groups.HPO_metadata.filtered.txt \
   all_phenos.merged.txt
-
-
-# Make simple file mapping HPO codes to directory prefixes (no colons)
-paste <( cut -f1 phenotype_groups.HPO_metadata.txt | sed 's/\://g' ) \
-      <( cut -f1 phenotype_groups.HPO_metadata.txt ) \
-| fgrep -v "#" \
-| fgrep -v "HEALTHY_CONTROL" \
-> test_phenotypes.list
 
 
 # Restrict all cohort phenotypes to terms in minimal HPO tree
@@ -170,25 +170,58 @@ while read cohort; do
     /opt/rCNV2/data_curation/phenotype/filter_HPO_per_sample.py \
       -o cleaned_phenos/filtered/${cohort}.cleaned_phenos.txt \
       cleaned_phenos/all/${cohort}.cleaned_phenos.txt \
-      phenotype_groups.HPO_metadata.txt
+      phenotype_groups.HPO_metadata.filtered.txt
   fi
 done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt )
-/opt/rCNV2/data_curation/phenotype/filter_HPO_per_sample.py \
-  -o cleaned_phenos/filtered/CHOP.cleaned_phenos.preQC.txt \
-  cleaned_phenos/all/CHOP.cleaned_phenos.preQC.txt \
-  phenotype_groups.HPO_metadata.txt
+for cohort in UKBB CHOP; do
+  /opt/rCNV2/data_curation/phenotype/filter_HPO_per_sample.py \
+    -o cleaned_phenos/filtered/${cohort}.cleaned_phenos.preQC.txt \
+    cleaned_phenos/all/${cohort}.cleaned_phenos.preQC.txt \
+    phenotype_groups.HPO_metadata.filtered.txt
+done
 
 
-# Copy all final data to Google bucket (requires permissions)
-gsutil cp -r cleaned_phenos/* gs://rcnv_project/cleaned_data/phenotypes/
-gsutil cp samples_per_HPO.txt \
-  gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/
-gsutil cp HPO_tree_filter.log \
-  gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/
-gsutil cp phenotype_groups.HPO_metadata.txt \
-  gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/
-gsutil cp test_phenotypes.list \
-  gs://rcnv_project/analysis/analysis_refs/
+# Get summary table of HPO counts per cohort & metacohort
+# Only keep HPO terms with at least 500 cases from two or more metacohorts
+gsutil cp gs://rcnv_project/analysis/analysis_refs/rCNV_metacohort_list.txt ./
+/opt/rCNV2/data_curation/phenotype/gather_hpo_per_cohort_table.py \
+  --outfile HPOs_by_cohort.table.tsv \
+  --meta-cohorts rCNV_metacohort_list.txt \
+  --meta-out HPOs_by_metacohort.table.tsv \
+  --min-metacohorts 2 \
+  --min-per-metacohort 500 \
+  phenotype_groups.HPO_metadata.filtered.txt \
+  /opt/rCNV2/refs/rCNV_sample_counts.txt \
+  cleaned_phenos/filtered/
+
+
+# Clean up output from original HPO tree consolidation to reflect metacohort filtering
+fgrep -v "#" HPOs_by_cohort.table.tsv \
+| cut -f1 \
+| sort -Vk1,1 \
+> final_HPOs.txt
+while read hpo; do
+  awk -v hpo=${hpo} '{ if ($1==hpo) print $0 }' \
+  phenotype_groups.HPO_metadata.filtered.txt
+done < final_HPOs.txt \
+> phenotype_groups.HPO_metadata.tmp
+while IFS=$'\t' read hpo descrip n tier oparents ochildren; do
+  parents=$( echo "${oparents}" | sed -e 's/;/\n/g' \
+             | fgrep -wf final_HPOs.txt | paste -s -d\; )
+  if [ -z ${parents} ] || [ ${parents} == "" ]; then
+    parents="NA"
+  fi
+  children=$( echo "${ochildren}" | sed -e 's/;/\n/g' \
+             | fgrep -wf final_HPOs.txt | paste -s -d\; )
+  if [ -z ${children} ] || [ ${children} == "" ]; then
+    children="NA"
+  fi
+  echo -e "${hpo}\t${descrip}\t${n}\t${tier}\t${parents}\t${children}"
+done < phenotype_groups.HPO_metadata.tmp \
+| sort -t$'\t' -nrk3,3 \
+| cat <( grep -e '^#' phenotype_groups.HPO_metadata.filtered.txt ) - \
+> phenotype_groups.HPO_metadata.txt
+rm phenotype_groups.HPO_metadata.tmp
 
 
 # Print HTML table of HPO metadata for README
@@ -199,20 +232,45 @@ for wrapper in 1; do
     <( fgrep -v "#" phenotype_groups.HPO_metadata.txt | cut -f1-2 ) \
     <( fgrep -v "#" phenotype_groups.HPO_metadata.txt | cut -f3 | addcom ) \
     <( fgrep -v "#" phenotype_groups.HPO_metadata.txt | cut -f4- ) \
-  | sed -e 's/\t/\ \|\ /g' -e 's/^/\|\ /g' -e 's/$/\ \|\ \ /g' -e 's/\;/,\ /g' \
-  | fgrep -v "HEALTHY_CONTROL"
+  | sed -e 's/\t/\ \|\ /g' -e 's/^/\|\ /g' -e 's/$/\ \|\ \ /g' -e 's/\;/,\ /g' 
 done
 
 
-# Get summary table of HPO counts per cohort & metacohort
-gsutil cp gs://rcnv_project/analysis/analysis_refs/rCNV_metacohort_list.txt ./
-/opt/rCNV2/data_curation/phenotype/gather_hpo_per_cohort_table.py \
-  --outfile HPOs_by_cohort.table.tsv \
-  --meta-cohorts rCNV_metacohort_list.txt \
-  --meta-out HPOs_by_metacohort.table.tsv \
-  phenotype_groups.HPO_metadata.txt \
-  /opt/rCNV2/refs/rCNV_sample_counts.txt \
-  cleaned_phenos/filtered/
+# Make simple file mapping HPO codes to directory prefixes (no colons)
+paste <( cut -f1 phenotype_groups.HPO_metadata.txt | sed 's/\://g' ) \
+      <( cut -f1 phenotype_groups.HPO_metadata.txt ) \
+| fgrep -v "#" \
+| fgrep -v "HEALTHY_CONTROL" \
+> test_phenotypes.list
+
+
+# Restrict all cohort phenotypes to final analysis terms
+while read cohort; do
+  if [ -e cleaned_phenos/all/${cohort}.cleaned_phenos.txt ]; then
+    /opt/rCNV2/data_curation/phenotype/filter_HPO_per_sample.py \
+      -o cleaned_phenos/filtered/${cohort}.cleaned_phenos.txt \
+      cleaned_phenos/all/${cohort}.cleaned_phenos.txt \
+      phenotype_groups.HPO_metadata.txt
+  fi
+done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt )
+for cohort in UKBB CHOP; do
+  /opt/rCNV2/data_curation/phenotype/filter_HPO_per_sample.py \
+    -o cleaned_phenos/filtered/${cohort}.cleaned_phenos.preQC.txt \
+    cleaned_phenos/all/${cohort}.cleaned_phenos.preQC.txt \
+    phenotype_groups.HPO_metadata.txt
+done
+
+
+# Copy all final data to Google bucket (requires permissions)
+gsutil -m cp -r cleaned_phenos/* gs://rcnv_project/cleaned_data/phenotypes/
+gsutil cp samples_per_HPO.txt \
+  gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/
+gsutil cp HPO_tree_filter.log \
+  gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/
+gsutil cp phenotype_groups.HPO_metadata.txt \
+  gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/
+gsutil cp test_phenotypes.list \
+  gs://rcnv_project/analysis/analysis_refs/
 
 
 # Get simplified table of metacohort combined case & control counts
