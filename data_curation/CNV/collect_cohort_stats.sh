@@ -18,9 +18,9 @@ docker run --rm -it talkowski/rcnv
 # Copy all raw and filtered CNV data from Google Bucket (note: requires permissions)
 gcloud auth login
 mkdir ./raw_cnv
-gsutil cp -r gs://rcnv_project/raw_data/cnv/* ./raw_cnv/
+gsutil -m cp -r gs://rcnv_project/raw_data/cnv/* ./raw_cnv/
 mkdir ./cleaned_cnv/
-gsutil cp -r gs://rcnv_project/cleaned_data/cnv/* ./cleaned_cnv/
+gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* ./cleaned_cnv/
 gsutil cp gs://rcnv_project/analysis/analysis_refs/rCNV_metacohort_sample_counts.txt ./
 
 

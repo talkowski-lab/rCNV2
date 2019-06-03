@@ -25,7 +25,7 @@ mkdir raw_phenos/
 gsutil cp -r gs://rcnv_project/raw_data/phenotypes/* raw_phenos/
 mkdir cleaned_phenos/
 mkdir cleaned_phenos/all/
-mkdir cleaned_phenos/filtered/
+mkdir cleaned_phenos/intermediate/
 mkdir cleaned_phenos/filtered/
 
 
@@ -160,7 +160,7 @@ done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt ) \
   --filter-log HPO_tree_filter.log \
   --min-samples 1000 \
   --min-diff 2000 \
-  --outfile phenotype_groups.HPO_metadata.filtered.txt \
+  --outfile phenotype_groups.HPO_metadata.intermediate.txt \
   all_phenos.merged.txt
 
 
@@ -168,16 +168,16 @@ done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt ) \
 while read cohort; do
   if [ -e cleaned_phenos/all/${cohort}.cleaned_phenos.txt ]; then
     /opt/rCNV2/data_curation/phenotype/filter_HPO_per_sample.py \
-      -o cleaned_phenos/filtered/${cohort}.cleaned_phenos.txt \
+      -o cleaned_phenos/intermediate/${cohort}.cleaned_phenos.txt \
       cleaned_phenos/all/${cohort}.cleaned_phenos.txt \
-      phenotype_groups.HPO_metadata.filtered.txt
+      phenotype_groups.HPO_metadata.intermediate.txt
   fi
 done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt )
 for cohort in UKBB CHOP; do
   /opt/rCNV2/data_curation/phenotype/filter_HPO_per_sample.py \
-    -o cleaned_phenos/filtered/${cohort}.cleaned_phenos.preQC.txt \
+    -o cleaned_phenos/intermediate/${cohort}.cleaned_phenos.preQC.txt \
     cleaned_phenos/all/${cohort}.cleaned_phenos.preQC.txt \
-    phenotype_groups.HPO_metadata.filtered.txt
+    phenotype_groups.HPO_metadata.intermediate.txt
 done
 
 
@@ -190,9 +190,9 @@ gsutil cp gs://rcnv_project/analysis/analysis_refs/rCNV_metacohort_list.txt ./
   --meta-out HPOs_by_metacohort.table.tsv \
   --min-metacohorts 2 \
   --min-per-metacohort 500 \
-  phenotype_groups.HPO_metadata.filtered.txt \
+  phenotype_groups.HPO_metadata.intermediate.txt \
   /opt/rCNV2/refs/rCNV_sample_counts.txt \
-  cleaned_phenos/filtered/
+  cleaned_phenos/intermediate/
 
 
 # Clean up output from original HPO tree consolidation to reflect metacohort filtering
@@ -202,7 +202,7 @@ fgrep -v "#" HPOs_by_cohort.table.tsv \
 > final_HPOs.txt
 while read hpo; do
   awk -v hpo=${hpo} '{ if ($1==hpo) print $0 }' \
-  phenotype_groups.HPO_metadata.filtered.txt
+  phenotype_groups.HPO_metadata.intermediate.txt
 done < final_HPOs.txt \
 > phenotype_groups.HPO_metadata.tmp
 while IFS=$'\t' read hpo descrip n tier oparents ochildren; do
@@ -219,7 +219,7 @@ while IFS=$'\t' read hpo descrip n tier oparents ochildren; do
   echo -e "${hpo}\t${descrip}\t${n}\t${tier}\t${parents}\t${children}"
 done < phenotype_groups.HPO_metadata.tmp \
 | sort -t$'\t' -nrk3,3 \
-| cat <( grep -e '^#' phenotype_groups.HPO_metadata.filtered.txt ) - \
+| cat <( grep -e '^#' phenotype_groups.HPO_metadata.intermediate.txt ) - \
 > phenotype_groups.HPO_metadata.txt
 rm phenotype_groups.HPO_metadata.tmp
 

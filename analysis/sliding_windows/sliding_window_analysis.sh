@@ -33,6 +33,7 @@ meta="meta1"
 freq_code="rCNV"
 metacohort_list="refs/rCNV_metacohort_list.txt"
 binned_genome="windows/GRCh37.100kb_bins_10kb_steps.raw.bed.gz"
+p_cutoff=0.00001
 
 
 # Count CNVs in cases and controls per phenotype, split by metacohort and CNV type
@@ -43,6 +44,19 @@ while read prefix hpo; do
     cnv_bed="cleaned_cnv/$meta.$freq_code.bed.gz"
     # Iterate over CNV types
     for CNV in CNV DEL DUP; do
+      # Set CNV-specific parameters
+      case "$CNV" in
+        DEL)
+          highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz
+          ;;
+        DUP)
+          highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz
+          ;;
+        *)
+          highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.bed.gz
+          ;;
+      esac
+
       # Count CNVs
       /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
         -t $CNV \
@@ -51,15 +65,29 @@ while read prefix hpo; do
         -o "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
         ${cnv_bed} \
         ${binned_genome}
+
       # Perform burden test
       /opt/rCNV2/analysis/sliding_windows/window_burden_test.R \
-      --pheno-table refs/HPOs_by_metacohort.table.tsv \
-      --cohort-name $meta \
-      --case-hpo ${hpo} \
-      --bgzip \
-      "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
-      "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+        --pheno-table refs/HPOs_by_metacohort.table.tsv \
+        --cohort-name $meta \
+        --case-hpo ${hpo} \
+        --bgzip \
+        "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
+        "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+
+      # Generate Manhattan & QQ plots
+      /opt/rCNV2/utils/plot_manhattan_qq.R \
+        --p-col-name "fisher_phred_p" \
+        --p-is-phred \
+        --cutoff ${p_cutoff} \
+        --highlight-bed "$highlight_bed" \
+        --highlight-name "Known GDs (Owen 2018)" \
+        "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz" \
+        "$meta.${prefix}.${freq_code}.$CNV.sliding_window"
     done
+
+    # TODO: Generate Miami & QQ plots
+
   done < ${metacohort_list}
 done < refs/test_phenotypes.list
 

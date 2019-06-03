@@ -15,6 +15,7 @@ workflow sliding_window_analysis {
   File metacohort_sample_table
   File binned_genome
   Float bin_overlap
+  Float p_cutoff
   String rCNV_bucket
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
@@ -30,21 +31,22 @@ workflow sliding_window_analysis {
         freq_code="rCNV",
         binned_genome=binned_genome,
         bin_overlap=bin_overlap,
+        p_cutoff=p_cutoff,
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
     }
-    # Run uCNV assocation tests per phenotype
-    call burden_test as uCNV_burden_test {
-      input:
-        hpo=pheno[1],
-        metacohort_list=metacohort_list,
-        metacohort_sample_table=metacohort_sample_table,
-        freq_code="uCNV",
-        binned_genome=binned_genome,
-        bin_overlap=bin_overlap,
-        rCNV_bucket=rCNV_bucket,
-        prefix=pheno[0]
-    }
+    # # Run uCNV assocation tests per phenotype
+    # call burden_test as uCNV_burden_test {
+    #   input:
+    #     hpo=pheno[1],
+    #     metacohort_list=metacohort_list,
+    #     metacohort_sample_table=metacohort_sample_table,
+    #     freq_code="uCNV",
+    #     binned_genome=binned_genome,
+    #     bin_overlap=bin_overlap,
+    #     rCNV_bucket=rCNV_bucket,
+    #     prefix=pheno[0]
+    # }
   }
 }
 
@@ -57,6 +59,7 @@ task burden_test {
   String freq_code
   File binned_genome
   Float bin_overlap
+  Float p_cutoff
   String rCNV_bucket
   String prefix
 
@@ -69,6 +72,19 @@ task burden_test {
       cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
       # Iterate over CNV types
       for CNV in CNV DEL DUP; do
+        # Set CNV-specific parameters
+        case "$CNV" in
+          DEL)
+            highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz
+            ;;
+          DUP)
+            highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz
+            ;;
+          *)
+            highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.bed.gz
+            ;;
+        esac
+
         # Count CNVs
         /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
           --fraction ${bin_overlap} \
@@ -78,6 +94,7 @@ task burden_test {
           -o "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
           $cnv_bed \
           ${binned_genome}
+
         # Perform burden test
         /opt/rCNV2/analysis/sliding_windows/window_burden_test.R \
         --pheno-table ${metacohort_sample_table} \
@@ -87,7 +104,20 @@ task burden_test {
         "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
         "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
         tabix -f "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+
+        # Generate Manhattan & QQ plots
+        /opt/rCNV2/utils/plot_manhattan_qq.R \
+          --p-col-name "fisher_phred_p" \
+          --p-is-phred \
+          --cutoff ${p_cutoff} \
+          --highlight-bed "$highlight_bed" \
+          --highlight-name "Known GDs (Owen 2018)" \
+          "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz" \
+          "$meta.${prefix}.${freq_code}.$CNV.sliding_window"
       done
+
+      # TODO: Generate Miami & QQ plots
+
     done < ${metacohort_list}
     # Copy results to output bucket
     gsutil cp *.sliding_window.stats.bed.gz* \
