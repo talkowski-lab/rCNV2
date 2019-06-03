@@ -16,7 +16,7 @@ We aggregated CNV data from multiple sources, listed below:
 | Cooper<sup>1</sup> | [Cooper _et al._, _Nat. Genet._ (2011)](https://www.nature.com/articles/ng.909) | [21841781](https://www.ncbi.nlm.nih.gov/pubmed/21841781) | Ill. 550k-610k (75%), Custom 1.2M (25%) | hg19 | Developmental disorders | 0<sup>1</sup> | 8,329 |
 | Coe | [Coe _et al._, _Nat. Genet._ (2014)](https://www.nature.com/articles/ng.3092) | [25217958](https://www.ncbi.nlm.nih.gov/pubmed/25217958) | Cases: SignatureChip OS v2.0 (58%), SignatureChip OS v1.0 (34%), Other (8%); Controls: Affy 6.0 (100%) | hg19 | Developmental disorders | 29,083 | 11,256 |
 | SSC<sup>2</sup> | [Sanders _et at._, _Neuron_ (2015)](https://www.sciencedirect.com/science/article/pii/S0896627315007734?) | [26402605](https://www.ncbi.nlm.nih.gov/pubmed/26402605) | Omni 1Mv3 (46%), Omni 2.5 (41%), Omni 1Mv1 (13%) | hg18 | Autism | 2,795 | 0<sup>2</sup> |
-| UKBB | [Macé _et al._, _Nat. Comms._ (2017)](https://www.nature.com/articles/s41467-017-00556-x) | [28963451](https://www.ncbi.nlm.nih.gov/pubmed/28963451) | UKBB Affy Axiom (100%) | hg19 | Mixed | 55,471<sup>3</sup> | 385,922<sup>3</sup> |
+| UKBB | [Macé _et al._, _Nat. Comms._ (2017)](https://www.nature.com/articles/s41467-017-00556-x) | [28963451](https://www.ncbi.nlm.nih.gov/pubmed/28963451) | UKBB Affy Axiom (100%) | hg19 | Mixed | 54,071<sup>3</sup> | 375,800<sup>3</sup> |
 | CHOP | - | - | Mixed Illumina SNP genotyping platforms | hg19 | Mixed | 153,870<sup>3</sup> | 24,161<sup>3</sup> |
 | GDX | - | - | aCGH (?) | hg18 & hg19 | Mixed | 9,959 | 0 |
 | TSAICG | [Huang _et al._, _Neuron_ (2017)](https://www.sciencedirect.com/science/article/pii/S0896627317305081) | [28641109](https://www.ncbi.nlm.nih.gov/pubmed/28641109) | OmniExpress (100%) | hg19 | Tourette Syndrome | 2,434 | 4,093 |
@@ -36,7 +36,7 @@ All CNV data native to hg18 was lifted over to hg19 coordinate space using UCSC 
 Some datasets required manual curation prior to inclusion. Where necessary, these steps are enumerated below:  
 
  * **SSC**: CNVs were filtered on pCNV ≤ 10<sup>-9</sup>, per recommendation of the authors.  
- * **UKBB**: CNVs were filtered on quality score ≥ 25 and CNV size ≥ 25kb. After CNV filtering, samples with >7 CNV calls were excluded as outliers as well as any samples with known malignant cancers or chromosomal disorders (e.g., Down's Syndrome or sex chromosome aneuploidies).  
+ * **UKBB**: CNVs were filtered on quality score ≥ 17 and CNV size ≥ 25kb. After CNV filtering, samples with >10 CNV calls were excluded as outliers as well as any samples with known malignant cancers or chromosomal disorders (e.g., Down's Syndrome or sex chromosome aneuploidies).  
  * **CHOP**: CNVs were filtered on quality score ≥ 40 and CNV size ≥ 25kb while requiring at least 10 SNPs per CNV. After CNV filtering, samples with `LRR_SD` < 0.25, >20 CNV calls, or SNP call rate < 98% were excluded as outliers, as well as samples genotyped on arrays with < 175k SNP probes or samples labeled as cancer or Down's Syndrome patients.  
  * **TCGA**: CNVs were filtered on ≥ 10 probes and ≥ 25kb. Deletions were required to have a mean log<sub>2</sub> intensity ≤ -1 and duplications were required to have a mean log<sub>2</sub> intensity of ≥ 0.5849625.  
 
@@ -113,18 +113,18 @@ All raw CNV data was subjected to the same set of global filters:
 
 The properties of each rare CNV callset are listed below after the above filtering steps.  
 
-| Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP | 
+| Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | PGC | 21,094 | 13,852 | 0.66 | 190.7 kb | 1:1.37 | 20,277 | 12,710 | 0.63 | 184.9 kb | 1:1.33 |
-| Cooper | 0 | 0 | - | - | - | 8,329 | 4,336 | 0.52 | 173.2 kb | 1.32:1 |
-| Coe | 29,083 | 18,258 | 0.63 | 263.9 kb | 1:1.22 | 11,256 | 10,157 | 0.90 | 185.1 kb | 1:1.81 |
-| SSC | 2,795 | 2,054 | 0.73 | 191.9 kb | 1:1.17 | 0 | 0 | - | - | - |
-| UKBB | 0 | 0 | - | - | - | 480,501 | 315,652 | 0.66 | 208.1 kb | 3.33:1 |
-| CHOP | 150,231 | 113,149 | 0.75 | 198.6 kb | 1:1.50 | 28,070 | 17,848 | 0.64 | 188.0 kb | 1:1.14 |
-| GDX | 9,959 | 9,821 | 0.99 | 257.5 kb | 1:1.36 | 0 | 0 | - | - | - |
+| Cooper | 0 | 0 | - | - | - | 8,329 | 4,318 | 0.52 | 173.2 kb | 1.32:1 |
+| Coe | 29,083 | 18,259 | 0.63 | 263.9 kb | 1:1.22 | 11,256 | 10,154 | 0.90 | 184.9 kb | 1:1.81 |
+| SSC | 2,795 | 2,053 | 0.73 | 192.3 kb | 1:1.17 | 0 | 0 | - | - | - |
+| UKBB | 55,471 | 21,877 | 0.39 | 205.4 kb | 2.21:1 | 385,922 | 148,875 | 0.39 | 201.6 kb | 2.27:1 |
+| CHOP | 153,870 | 112,655 | 0.73 | 199.0 kb | 1:1.50 | 24,161 | 17,796 | 0.74 | 188.2 kb | 1:1.14 |
+| GDX | 9,959 | 9,820 | 0.99 | 257.5 kb | 1:1.36 | 0 | 0 | - | - | - |
 | TSAICG | 2,434 | 1,505 | 0.62 | 194.8 kb | 1:1.37 | 4,093 | 2,509 | 0.61 | 184.6 kb | 1:1.38 |
 | BCH | 3,591 | 2,784 | 0.78 | 329.0 kb | 1:1.45 | 0 | 0 | - | - | - |
-| TCGA | 0 | 0 | - | - | - | 8,670 | 5,021 | 0.58 | 175.0 kb | 1:2.22 |
+| TCGA | 0 | 0 | - | - | - | 8,670 | 5,019 | 0.58 | 175.0 kb | 1:2.22 |
 
 
 The information for this table was collected using `collect_cohort_stats.sh`.  
@@ -144,18 +144,18 @@ These ultra-rare CNVs were subjected to the same set of filters as above, with t
 
 The properties of each ultra-rare CNV callset are listed below after the above filtering steps.  
 
-| Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP | 
+| Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| PGC | 21,094 | 5,723 | 0.27 | 245.0 kb | 1:1.60 | 20,277 | 4,980 | 0.25 | 235.7 kb | 1:1.50 |
-| Cooper | 0 | 0 | - | - | - | 8,329 | 1,756 | 0.21 | 211.3 kb | 1.20:1 |
-| Coe | 29,083 | 9,214 | 0.32 | 361.5 kb | 1:1.17 | 11,256 | 3,320 | 0.29 | 237.7 kb | 1:1.73 |
-| SSC | 2,795 | 755 | 0.27 | 260.8 kb | 1:1.19 | 0 | 0 | - | - | - |
-| UKBB | 0 | 0 | - | - | - | 480,501 | 136,736 | 0.28 | 281.5 kb | 3.49:1 |
-| CHOP | 150,231 | 42,052 | 0.28 | 254.7 kb | 1:1.49 | 28,070 | 7,528 | 0.27 | 237.3 kb | 1:1.48 |
-| GDX | 9,959 | 5,293 | 0.53 | 355.7 kb | 1:1.24 | 0 | 0 | - | - | - |
-| TSAICG | 2,434 | 654 | 0.27 | 240.7 kb | 1:1.56 | 4,093 | 1,030 | 0.25 | 235.4 kb | 1:1.63 |
-| BCH | 3,591 | 1,743 | 0.49 | 389.9 kb | 1:1.41 | 0 | 0 | - | - | - |
-| TCGA | 0 | 0 | - | - | - | 8,670 | 1,609 | 0.19 | 207.5 kb | 1:2.04 |
+| PGC | 21,094 | 5,705 | 0.27 | 244.8 kb | 1:1.62 | 20,277 | 4,983 | 0.25 | 234.4 kb | 1:1.50 |
+| Cooper | 0 | 0 | - | - | - | 8,329 | 1,778 | 0.21 | 210.3 kb | 1.22:1 |
+| Coe | 29,083 | 9,216 | 0.32 | 361.3 kb | 1:1.16 | 11,256 | 3,304 | 0.29 | 237.5 kb | 1:1.76 |
+| SSC | 2,795 | 747 | 0.27 | 259.7 kb | 1:1.21 | 0 | 0 | - | - | - |
+| UKBB | 55,471 | 9,881 | 0.18 | 276.9 kb | 1.98:1 | 385,922 | 66,879 | 0.17 | 272.6 kb | 2.02:1 |
+| CHOP | 153,870 | 42,041 | 0.27 | 253.5 kb | 1:1.47 | 24,161 | 7,520 | 0.31 | 237.4 kb | 1:1.48 |
+| GDX | 9,959 | 5,304 | 0.53 | 354.5 kb | 1:1.23 | 0 | 0 | - | - | - |
+| TSAICG | 2,434 | 658 | 0.27 | 240.3 kb | 1:1.54 | 4,093 | 1,023 | 0.25 | 238.1 kb | 1:1.66 |
+| BCH | 3,591 | 1,750 | 0.49 | 388.5 kb | 1:1.40 | 0 | 0 | - | - | - |
+| TCGA | 0 | 0 | - | - | - | 8,670 | 1,610 | 0.19 | 207.4 kb | 1:2.03 |
 
 The information for this table was collected using `collect_cohort_stats.sh`.  
 
@@ -182,23 +182,22 @@ For completeness, we also performed identical analyses on a pooled dataset of al
 
 ### Metacohort rare CNV callset properties  
 
-| Metacohort | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP | 
+| Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| meta1 | 42,653 | 30,863 | 0.72 | 265.4 kb | 1:1.28 | 19,585 | 14,493 | 0.74 | 181.9 kb | 1:1.38 |
-| meta2 | 26,323 | 17,411 | 0.66 | 191.4 kb | 1:1.34 | 33,040 | 20,240 | 0.61 | 183.1 kb | 1:1.51 |
-| meta3 | 154,140 | 113,149 | 0.73 | 198.6 kb | 1:1.50 | 28,070 | 17,848 | 0.64 | 188.0 kb | 1:1.14 |
-| meta4 | 0 | 0 | - | - | - | 480,501 | 315,652 | 0.66 | 208.1 kb | 3.33:1 |
-| mega | 223,116 | 161,423 | 0.72 | 207.7 kb | 1:1.44 | 561,196 | 368,233 | 0.66 | 204.9 kb | 2.58:1 |
-
+| meta1 | 42,653 | 30,863 | 0.72 | 265.4 kb | 1:1.28 | 19,585 | 14,472 | 0.74 | 182.0 kb | 1:1.38 |
+| meta2 | 26,323 | 17,410 | 0.66 | 191.4 kb | 1:1.34 | 33,040 | 20,238 | 0.61 | 183.2 kb | 1:1.51 |
+| meta3 | 153,870 | 112,655 | 0.73 | 199.0 kb | 1:1.50 | 24,161 | 17,796 | 0.74 | 188.2 kb | 1:1.14 |
+| meta4 | 55,471 | 21,877 | 0.39 | 205.4 kb | 2.21:1 | 385,922 | 148,875 | 0.39 | 201.6 kb | 2.27:1 |
+| mega | 278,317 | 182,805 | 0.66 | 207.7 kb | 1:1.26 | 462,708 | 201,381 | 0.44 | 197.2 kb | 1.66:1 |
 
 ### Metacohort ultra-rare CNV callset properties  
 
-| Metacohort | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP | 
+| Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| meta1 | 42,653 | 16,250 | 0.38 | 361.5 kb | 1:1.21 | 19,585 | 5,076 | 0.26 | 228.0 kb | 1:1.33 |
-| meta2 | 26,323 | 7,132 | 0.27 | 246.4 kb | 1:1.55 | 33,040 | 7,619 | 0.23 | 228.4 kb | 1:1.61 |
-| meta3 | 154,140 | 42,052 | 0.27 | 254.7 kb | 1:1.49 | 28,070 | 7,528 | 0.27 | 237.3 kb | 1:1.48 |
-| meta4 | 0 | 0 | - | - | - | 480,501 | 136,736 | 0.28 | 281.5 kb | 3.49:1 |
-| mega | 223,116 | 65,434 | 0.29 | 273.2 kb | 1:1.42 | 561,196 | 156,959 | 0.28 | 275.0 kb | 2.69:1 |
+| meta1 | 42,653 | 16,270 | 0.38 | 360.4 kb | 1:1.21 | 19,585 | 5,082 | 0.26 | 227.0 kb | 1:1.33 |
+| meta2 | 26,323 | 7,110 | 0.27 | 246.1 kb | 1:1.56 | 33,040 | 7,616 | 0.23 | 227.9 kb | 1:1.62 |
+| meta3 | 153,870 | 42,041 | 0.27 | 253.5 kb | 1:1.47 | 24,161 | 7,520 | 0.31 | 237.4 kb | 1:1.48 |
+| meta4 | 55,471 | 9,881 | 0.18 | 276.9 kb | 1.98:1 | 385,922 | 66,879 | 0.17 | 272.6 kb | 2.02:1 |
+| mega | 278,317 | 75,302 | 0.27 | 272.9 kb | 1:1.23 | 462,708 | 87,097 | 0.19 | 263.0 kb | 1.54:1 |
 
 The information for these tables was collected using `collect_cohort_stats.sh`.  
