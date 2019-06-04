@@ -59,8 +59,9 @@ manhattan <- function (df, cutoff=1e-08, highlights=NULL,
                        highlight.name="Highlighted Loci",
                        mark.highlights=FALSE,
                        lab.prefix=NULL,
-                       ymax=NULL, reflection=F){
-  colors <- c("gray15", "gray65")
+                       ymax=NULL, reflection=F,
+                       label.cex=1){
+  colors <- c("gray15", "gray70")
   
   contigs <- unique(df[, 1])
   contigs <- contigs[which(!(is.na(contigs)))]
@@ -146,7 +147,7 @@ manhattan <- function (df, cutoff=1e-08, highlights=NULL,
     df.plot$color[hits] <- highlight.color
   }
   
-  abline(h=log.cutoff, col="red")
+  abline(h=log.cutoff, col="#D01C8B", lty=2)
   
   points(df.plot[, 2], df.plot[, 5], 
          cex=0.2, pch=19, 
@@ -183,7 +184,7 @@ manhattan <- function (df, cutoff=1e-08, highlights=NULL,
          col.axis=indexes$bg[k])
   })
   if(x.title == T){
-    mtext(x.ax, text="Chromosome", line=0.95)
+    mtext(x.ax, text="Chromosome", line=0.95, cex=label.cex)
   }
   
   if(reflection == T){
@@ -195,9 +196,11 @@ manhattan <- function (df, cutoff=1e-08, highlights=NULL,
   axis(2, at=y.at, tick=F, line=-0.5, labels=abs(y.at), 
        cex.axis=0.75, las=2)
   if(!is.null(lab.prefix)){
-    mtext(2, text=bquote(-log[10](italic(p)) ~ .(lab.prefix)), line=1.5)
+    mtext(2, text=bquote(-log[10](italic(p)) ~ .(lab.prefix)), 
+          line=1.5, cex=label.cex)
   }else{
-    mtext(2, text=bquote(-log[10](italic(p))), line=1.5)
+    mtext(2, text=bquote(-log[10](italic(p))), 
+          line=1.5, cex=label.cex)
   }
 }
 
@@ -207,7 +210,8 @@ qq <- function (stats, cutoff=NULL, highlights=NULL,
                 highlight.color="#4EE69A",
                 highlight.name="Positive Controls",
                 print.stats=T, legend=T,
-                ymax=NULL, reflection=F){
+                ymax=NULL, reflection=F,
+                label.cex=1){
   
   # Dummy function to plot N/A QQ for analyses with no cases
   empty.qq <- function(){
@@ -215,9 +219,11 @@ qq <- function (stats, cutoff=NULL, highlights=NULL,
     plot(x=0:1, y=0:1, type="n", xaxt="n", yaxt="n", 
          xlab="", ylab="", xaxs="i", yaxs="i")
     axis(1, at=axTicks(1), labels=NA, tck=-0.02)
-    mtext(1, text=expression(Expected ~ ~-log[10](italic(p))), line=1.2)
+    mtext(1, text=expression(Expected ~ ~-log[10](italic(p))), 
+          line=1.2, cex=label.cex)
     axis(2, at=axTicks(2), labels=NA, tck=-0.02)
-    mtext(2, text=expression(Observed ~ ~-log[10](italic(p))), line=1.5)
+    mtext(2, text=expression(Observed ~ ~-log[10](italic(p))), 
+          line=1.5, cex=label.cex)
     text(x=0.5,y=0.5,labels="N/A")
   }
   
@@ -284,7 +290,6 @@ qq <- function (stats, cutoff=NULL, highlights=NULL,
     }
     
     expected <- -log10(expected)
-    lambda.ypos <- c(0.9, 0.825, 0.75)
     
     if(reflection == F){
       p <- -log10(p)
@@ -292,6 +297,7 @@ qq <- function (stats, cutoff=NULL, highlights=NULL,
       ab.end <- 1
       x.ax <- 1
       mars <- c(2.1, 3.1, 0.5, 1)
+      lambda.ypos <- c(0.9, 0.825, 0.75)
       x.title <- T
     }else{
       p <- log10(p)
@@ -300,6 +306,7 @@ qq <- function (stats, cutoff=NULL, highlights=NULL,
       ymax <- -ymax
       x.ax <- 3
       mars <- c(0.5, 3.1, 0.6, 1)
+      lambda.ypos <- rev(c(0.9, 0.825, 0.75))
       x.title <- F
     }
     
@@ -309,7 +316,7 @@ qq <- function (stats, cutoff=NULL, highlights=NULL,
          xlim=c(0, 1.1 * max(expected)), ylim=range(c(0, 1.1 * ymax)))
     polygon(x=conf.int[, 1], y=conf.int[, 2], col="gray90", border=NA)
     abline(0, ab.end, col="gray50")
-    abline(h=log.cutoff, col="red")
+    abline(h=log.cutoff, col="#D01C8B", lty=2)
     
     if (print.stats == T){
       xpos.adjust <- 0.025
@@ -356,7 +363,8 @@ qq <- function (stats, cutoff=NULL, highlights=NULL,
     axis(x.ax, at=axTicks(1), labels=NA, tck=0)
     axis(x.ax, at=axTicks(1), tick=F, line=-1.1, cex.axis=0.75, labels=abs(axTicks(1)))
     if(x.title == T){
-      mtext(x.ax, text=expression(Expected ~ ~-log[10](italic(p))), line=1.15)
+      mtext(x.ax, text=expression(Expected ~ ~-log[10](italic(p))), 
+            line=1.15, cex=label.cex)
     }
     
     if(reflection == T){
@@ -366,7 +374,22 @@ qq <- function (stats, cutoff=NULL, highlights=NULL,
     }
     axis(2, at=y.at, labels=NA, tck=-0.02)
     axis(2, at=y.at, cex.axis=0.75, tick=F, line=-0.6, las=2, labels=abs(y.at))
-    mtext(2, text=expression(Observed ~ ~-log[10](italic(p))), line=1.5)
+    mtext(2, text=expression(Observed ~ ~-log[10](italic(p))), 
+          line=1.5, cex=label.cex)
+  }
+}
+
+
+# Generate title panel for composite plots
+title.panel <- function(title){
+  par(mar=c(0.1, 3.1, 0.1, 1), bty="n")
+  plot(0:1, 0:1, xlab="", xaxt="n", ylab="", yaxt="n", type="n")
+  subs <- unlist(strsplit(title, split="\n", fixed=T))
+  main <- subs[1]
+  text(x=0.5, y=1, pos=1, labels=main, font=2)
+  if(length(subs) > 1){
+    sub.cats <- paste(subs[-1], collapse="\n")
+    text(x=0.5, y=0.5, pos=1, labels=sub.cats, cex=0.85, xpd=T)
   }
 }
 
@@ -404,6 +427,9 @@ option_list <- list(
               metavar="string"),
   make_option(c("--label-prefix-2"), type="character", default=NULL, 
               help="prefix to append to labels for second plot (--miami only) [default %default]",
+              metavar="string"),
+  make_option(c("--title"), type="character", default=NULL, 
+              help="title for composite Manhattan/Miami & QQ plot [default %default]",
               metavar="string")
 )
 
@@ -432,6 +458,7 @@ highlight2.in <- opts$`highlight-bed-2`
 highlight2.name <- opts$`highlight-name-2`
 lab.prefix <- opts$`label-prefix`
 lab2.prefix <- opts$`label-prefix-2`
+title <- gsub("\\n", "\n", opts$title, fixed=T)
 
 # Checks for appropriate positional arguments, depending on mode
 if(miami == F){
@@ -478,7 +505,7 @@ if(miami == F){
             lab.prefix=lab.prefix,
             ymax=-log10(global.p.min))
   dev.off()
-  
+
   # Generate QQ plot
   qq.png.out <- paste(out.prefix, "qq.png", sep=".")
   cat(paste("Printing QQ plot to", qq.png.out, "\n"))
@@ -494,9 +521,17 @@ if(miami == F){
   combo.png.out <- paste(out.prefix, "manhattan_with_qq.png", sep=".")
   cat(paste("Printing combined Manhattan & QQ plots to", 
             combo.png.out, "\n"))
-  png(combo.png.out,
-      height=1000, width=2800, res=400)
-  layout(matrix(c(1,2), nrow=1), widths=c(18, 10))
+  if(is.null(title)){
+    png(combo.png.out,
+        height=1000, width=2800, res=400)
+    layout(matrix(c(1,2), nrow=1), widths=c(18, 10))
+  }else{
+    png(combo.png.out,
+        height=1200, width=2800, res=400)
+    layout(matrix(c(1,1,2,3), nrow=2, byrow=T), 
+           heights=c(2, 10), widths=c(18, 10))
+    title.panel(title)
+  }
   manhattan(stats, cutoff, highlights=highlights,
             highlight.name=highlight.name,
             lab.prefix=lab.prefix,
@@ -516,8 +551,8 @@ if(miami == F){
   miami.png.out <- paste(out.prefix, "miami.png", sep=".")
   cat(paste("Printing Miami plot to", miami.png.out, "\n"))
   png(miami.png.out,
-      height=1880, width=1800, res=400)
-  layout(matrix(1:2, nrow=2), heights=c(0.94, 1))
+      height=1600, width=1800, res=400)
+  layout(matrix(1:2, nrow=2), heights=c(1, 0.88))
   manhattan(stats, cutoff, highlights=highlights,
             highlight.name=highlight.name,
             lab.prefix=lab.prefix,
@@ -533,26 +568,40 @@ if(miami == F){
   combo.png.out <- paste(out.prefix, "miami_with_qq.png", sep=".")
   cat(paste("Printing combined Miami & QQ plots to", 
             combo.png.out, "\n"))
-  png(combo.png.out,
-      height=1880, width=2800, res=400)
-  layout(matrix(1:4, nrow=2, byrow=T), widths=c(18, 10))
+  if(is.null(title)){
+    png(combo.png.out,
+        height=1600, width=2600, res=400)
+    layout(matrix(1:4, nrow=2, byrow=T), 
+           heights=c(1, 0.88), widths=c(18, 8))
+  }else{
+    png(combo.png.out,
+        height=0.8*1800, width=0.8*2600, res=400)
+    layout(matrix(c(1, 1, 2:5), nrow=3, byrow=T), 
+           heights=c(0.235, 1, 0.94), widths=c(18, 8))
+    title.panel(title)
+  }
+  label.cex <- 0.75
   manhattan(stats, cutoff, highlights=highlights,
             highlight.name=highlight.name,
             lab.prefix=lab.prefix,
-            ymax=-log10(global.p.min))
+            ymax=-log10(global.p.min),
+            label.cex=label.cex)
   qq(stats, cutoff, highlights=highlights,
      highlight.name=highlight.name,
      legend=F,
-     ymax=-log10(global.p.min))
+     ymax=-log10(global.p.min),
+     label.cex=0.9*label.cex)
   manhattan(stats2, cutoff, highlights=highlights2,
             highlight.name=highlight2.name,
             lab.prefix=lab2.prefix,
             ymax=-log10(global.p.min),
-            reflection=T)
+            reflection=T,
+            label.cex=label.cex)
   qq(stats2, cutoff, highlights=highlights2,
      highlight.name=highlight2.name,
      legend=F,
      ymax=-log10(global.p.min),
-     reflection=T)
+     reflection=T,
+     label.cex=0.9*label.cex)
 }
 

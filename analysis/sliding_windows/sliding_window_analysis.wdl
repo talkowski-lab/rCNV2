@@ -67,10 +67,25 @@ task burden_test {
     # Copy CNV data
     mkdir cleaned_cnv/
     gsutil cp ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
-    
+
     # Iterate over metacohorts
     while read meta cohorts; do
-      cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
+
+      # Set metacohort parameters
+      cnv_bed="cleaned_cnv/$meta.$freq_code.bed.gz"
+      descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+                 | awk -v FS="\t" '{ print $2 }' )
+      meta_idx=$( head -n1 "${metacohort_sample_table}" \
+                  | sed 's/\t/\n/g' \
+                  | awk -v meta="$meta" '{ if ($1==meta) print NR }' )
+      ncase=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+               | awk -v FS="\t" -v meta_idx="$meta_idx" '{ print $meta_idx }' \
+               | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+      nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
+               | awk -v FS="\t" -v meta_idx="$meta_idx" '{ print $meta_idx }' \
+               | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+      title="$descrip (${hpo})\n$ncase cases vs $nctrl controls in '${meta}' cohort"
+
       # Iterate over CNV types
       for CNV in CNV DEL DUP; do
         # Set CNV-specific parameters
@@ -113,6 +128,7 @@ task burden_test {
           --cutoff ${p_cutoff} \
           --highlight-bed "$highlight_bed" \
           --highlight-name "Known GDs (Owen 2018)" \
+          --title "$title" \
           "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz" \
           "$meta.${prefix}.${freq_code}.$CNV.sliding_window"
       done
@@ -129,6 +145,7 @@ task burden_test {
         --highlight-bed-2 /opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz \
         --highlight-name-2 "Known DEL GDs (Owen 2018)" \
         --label-prefix-2 "DEL" \
+        --title "$title" \
         "$meta.${prefix}.${freq_code}.DUP.sliding_window.stats.bed.gz" \
         "$meta.${prefix}.${freq_code}.DEL.sliding_window.stats.bed.gz" \
         "$meta.${prefix}.${freq_code}.sliding_window"
@@ -142,7 +159,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:944213dc05c529e8af2fdbebc31355997e4a99981e354b5a9b5a5332657cbbd6"
+    docker: "talkowski/rcnv@sha256:c2b45b470f6b897269be2aa5bb82bf90d3f3aa626bfa702c038b19e2568afe26"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
