@@ -67,6 +67,7 @@ task burden_test {
     # Copy CNV data
     mkdir cleaned_cnv/
     gsutil cp ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
+    
     # Iterate over metacohorts
     while read meta cohorts; do
       cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
@@ -116,24 +117,41 @@ task burden_test {
           "$meta.${prefix}.${freq_code}.$CNV.sliding_window"
       done
 
-      # TODO: Generate Miami & QQ plots
-
+      # Generate Miami & QQ plots
+      /opt/rCNV2/utils/plot_manhattan_qq.R \
+        --miami \
+        --p-col-name "fisher_phred_p" \
+        --p-is-phred \
+        --cutoff ${p_cutoff} \
+        --highlight-bed /opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz \
+        --highlight-name "Known DUP GDs (Owen 2018)" \
+        --label-prefix "DUP" \
+        --highlight-bed-2 /opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz \
+        --highlight-name-2 "Known DEL GDs (Owen 2018)" \
+        --label-prefix-2 "DEL" \
+        "$meta.${prefix}.${freq_code}.DUP.sliding_window.stats.bed.gz" \
+        "$meta.${prefix}.${freq_code}.DEL.sliding_window.stats.bed.gz" \
+        "$meta.${prefix}.${freq_code}.sliding_window"
     done < ${metacohort_list}
+
     # Copy results to output bucket
     gsutil cp *.sliding_window.stats.bed.gz* \
-      "${rCNV_bucket}/analysis/sliding_window/${prefix}/${freq_code}/stats/"
+      "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/"
+    gsutil cp *.sliding_window.*.png \
+      "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/plots/"
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7eaef60761656838bbafbe5cc0359d4ed865dbfc62602d59d43b0325bdc8ad2f"
+    docker: "talkowski/rcnv@sha256:944213dc05c529e8af2fdbebc31355997e4a99981e354b5a9b5a5332657cbbd6"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
   }
 
   output {
-    Array[File] stats_beds = glob("*.sliding_window.stats.bed.gz")
-    Array[File] stats_bed_idxs = glob("*.sliding_window.stats.bed.gz.tbi")
+    # Array[File] stats_beds = glob("*.sliding_window.stats.bed.gz")
+    # Array[File] stats_bed_idxs = glob("*.sliding_window.stats.bed.gz.tbi")
+    # Array[File] plots = glob("*.sliding_window.*.png")
   }
 }
 

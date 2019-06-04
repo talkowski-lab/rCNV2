@@ -57,7 +57,9 @@ RUN apt-get update -qqy && apt-get install -qqy \
 VOLUME ["/root/.config"]
 
 # Install R packages
-RUN Rscript -e "sapply(c('optparse'),\
+RUN apt-get -qqy update \
+    && apt-get -qqy install --fix-missing libxrender1 libcairo2-dev libxt-dev
+RUN Rscript -e "sapply(c('optparse','Cairo'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 
 # Install Athena toolkit
@@ -71,7 +73,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 617325fe7181ee2ff0651b62ebc234e69d2904f5 && \
+    git checkout 855ecbb76eefd66ac316ee3178a75558ae1513ea && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)
