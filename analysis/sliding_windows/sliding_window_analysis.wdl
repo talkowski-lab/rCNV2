@@ -66,13 +66,13 @@ task burden_test {
   command <<<
     # Copy CNV data
     mkdir cleaned_cnv/
-    gsutil cp ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
+    gsutil cp -m ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
 
     # Iterate over metacohorts
     while read meta cohorts; do
 
       # Set metacohort parameters
-      cnv_bed="cleaned_cnv/$meta.$freq_code.bed.gz"
+      cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
       descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
                  | awk -v FS="\t" '{ print $2 }' )
       meta_idx=$( head -n1 "${metacohort_sample_table}" \
@@ -84,7 +84,7 @@ task burden_test {
       nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
                | awk -v FS="\t" -v meta_idx="$meta_idx" '{ print $meta_idx }' \
                | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
-      title="$descrip (${hpo})\n$ncase cases vs $nctrl controls in '${meta}' cohort"
+      title="$descrip (${hpo})\n$ncase cases vs $nctrl controls in '$meta' cohort"
 
       # Iterate over CNV types
       for CNV in CNV DEL DUP; do
@@ -152,14 +152,14 @@ task burden_test {
     done < ${metacohort_list}
 
     # Copy results to output bucket
-    gsutil cp *.sliding_window.stats.bed.gz* \
+    gsutil -m cp *.sliding_window.stats.bed.gz* \
       "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/"
-    gsutil cp *.sliding_window.*.png \
+    gsutil -m cp *.sliding_window.*.png \
       "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/plots/"
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:c2b45b470f6b897269be2aa5bb82bf90d3f3aa626bfa702c038b19e2568afe26"
+    docker: "talkowski/rcnv@sha256:ec9fbb493defb27b17c2ef3e3781d2a3b2849bfaf4f073a88b8c496239fb30ab"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

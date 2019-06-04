@@ -69,9 +69,9 @@ task create_raw_bins {
   command <<<
     # Gather reference files
     mkdir refs/
-    gsutil cp -r gs://rcnv_project/refs/GRCh37.Nmask.autosomes.bed.gz refs/
-    gsutil cp -r gs://rcnv_project/refs/GRCh37.somatic_hypermutable_sites.bed.gz refs/
-    gsutil cp -r gs://rcnv_project/refs/GRCh37.autosomes.genome refs/
+    gsutil -m cp -r gs://rcnv_project/refs/GRCh37.Nmask.autosomes.bed.gz refs/
+    gsutil -m cp -r gs://rcnv_project/refs/GRCh37.somatic_hypermutable_sites.bed.gz refs/
+    gsutil -m cp -r gs://rcnv_project/refs/GRCh37.autosomes.genome refs/
 
     # Create bins
     athena make-bins -z \
@@ -110,8 +110,8 @@ task annotate_bins {
   command <<<
     # Gather reference files
     mkdir refs/
-    gsutil cp -r gs://rcnv_project/refs/Affy_UKBB_axiom_probes.bed.gz* refs/
-    gsutil cp -r gs://rcnv_project/GRCh37_ref_build/* refs/
+    gsutil -m cp -r gs://rcnv_project/refs/Affy_UKBB_axiom_probes.bed.gz* refs/
+    gsutil -m cp -r gs://rcnv_project/GRCh37_ref_build/* refs/
 
     # Annotate bins
     athena annotate-bins -z \

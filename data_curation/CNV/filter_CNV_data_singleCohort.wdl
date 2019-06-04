@@ -86,8 +86,8 @@ task filter_cnvs_singleChrom {
 
   command <<<
     # Copy all raw CNV data
-    gsutil cp -r ${rCNV_bucket}/raw_data/cnv ./
-    gsutil cp -r ${rCNV_bucket}/refs ./
+    gsutil -m cp -r ${rCNV_bucket}/raw_data/cnv ./
+    gsutil -m cp -r ${rCNV_bucket}/refs ./
 
     # # Make master BED file of all raw CNV data
     # # Restrict to >= 50kb to reduce size of file
@@ -202,8 +202,8 @@ task merge_beds {
     # > "${prefix}.CASE.bed.gz"
     # tabix -f "${prefix}.CASE.bed.gz"
     # Copy to google bucket
-    gsutil cp "${prefix}*bed.gz" ${output_bucket}/
-    gsutil cp "${prefix}*bed.gz.tbi" ${output_bucket}/
+    gsutil -m cp "${prefix}*bed.gz" ${output_bucket}/
+    gsutil -m cp "${prefix}*bed.gz.tbi" ${output_bucket}/
   >>>
 
   runtime {
