@@ -146,7 +146,7 @@ task filter_cnvs_singleChrom {
       --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
       --xcov 0.3 \
       --cohorts-list raw_CNVs.per_cohort.txt \
-      --vcf refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
+      --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
       --vcf refs/1000Genomes_phase3.sites.vcf.gz \
       --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
       --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
@@ -156,7 +156,8 @@ task filter_cnvs_singleChrom {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:70f27fed60883c249b131b19c372e2f849d12b607a17110fd8ba772c659350b3"
+    #TODO: update docker
+    # docker: "talkowski/rcnv@sha256:70f27fed60883c249b131b19c372e2f849d12b607a17110fd8ba772c659350b3"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 200 SSD"

@@ -96,6 +96,7 @@ while read prefix hpo; do
         --cutoff ${p_cutoff} \
         --highlight-bed "$highlight_bed" \
         --highlight-name "Known GDs (Owen 2018)" \
+        --label-prefix "$CNV" \
         --title "$title" \
         "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz" \
         "$meta.${prefix}.${freq_code}.$CNV.sliding_window"
@@ -124,14 +125,4 @@ while read prefix hpo; do
 done < refs/test_phenotypes.list
 
 
-# Run burden tests - example
-/opt/rCNV2/analysis/sliding_windows/window_burden_test.R \
-  --bgzip \
-  --case-column Coe.rCNV.CASE \
-  --case-n 29083 \
-  --control-column UKBB.rCNV.CTRL \
-  --control-n 480501 \
-  GRCh37.100kb_bins_10kb_steps.raw.rCNV_counts.DEL.bed.gz \
-  GRCh37.100kb_bins_10kb_steps.DEL.test_stats.bed.gz
-
-
+# Perform meta-analysis 

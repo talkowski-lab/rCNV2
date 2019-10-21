@@ -22,6 +22,7 @@ We aggregated CNV data from multiple sources, listed below:
 | TSAICG | [Huang _et al._, _Neuron_ (2017)](https://www.sciencedirect.com/science/article/pii/S0896627317305081) | [28641109](https://www.ncbi.nlm.nih.gov/pubmed/28641109) | OmniExpress (100%) | hg19 | Tourette Syndrome | 2,434 | 4,093 |
 | BCH | [Talkowski _et al._, _Cell_ (2012)](https://www.sciencedirect.com/science/article/pii/S0092867412004114) | [22521361](https://www.ncbi.nlm.nih.gov/pubmed/22521361) | aCGH (?) | hg18 | Mixed | 3,591 | 0 |  
 | TCGA | [Zack _et al._, _Nat. Genet._ (2013)](https://www.nature.com/articles/ng.2760) | [24071852](https://www.ncbi.nlm.nih.gov/pubmed/24071852) | Affy 6.0 (100%) | hg19 | Cancer | 0<sup>4</sup> | 8,670<sup>4</sup> |  
+| Epi25k | [Niestroj _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/10.1101/651299v1) | - | Illumina GSA-MD v1.0 | hg19 | Epilepsy | 12,758 | 8,478 |  
 
 #### Notes on raw CNV data   
 1. Only retained control samples from Cooper _et al._. All cases from Cooper _et al._ also appear in Coe _et al._.  
@@ -106,7 +107,7 @@ All raw CNV data was subjected to the same set of global filters:
 
 #### Notes on curation  
 1. "Substantial" overlap determined based on ≥50% reciprocal overlap using BEDTools ([Quinlan & Hall, _Bioinformatics_ (2010)](https://www.ncbi.nlm.nih.gov/pubmed/20110278)). For overlap-based comparisons, both breakpoints were required to be within ±50kb, and CNV type (DEL vs. DUP) was required to match.  
-2. The version of gnomAD-SV used for this analysis included 12,549 samples as reported in [the gnomAD-SV preprint](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674), and not the smaller release subset of 10,738 genomes [available from the gnomAD website](https://gnomad.broadinstitute.org/downloads/)
+2. The version of gnomAD-SV used for this analysis (gnomAD-SV v2.1, non-neuro) included 8,342 samples without known neuropsychiatric disorders as available from the gnomAD website](https://gnomad.broadinstitute.org/downloads/) and described in [Collins*, Brand*, et al.](https://www.biorxiv.org/content/10.1101/578674v1)  
 3. "Substantial" coverage determined based on ≥30% coverage per BEDTools coverage ([Quinlan & Hall, _Bioinformatics_ (2010)](https://www.ncbi.nlm.nih.gov/pubmed/20110278)).
 
 ### Rare CNV callset properties
@@ -134,7 +135,7 @@ The information for this table was collected using `collect_cohort_stats.sh`.
 In parallel to the creation of the rare CNV dataset (described above), a dataset of ultra-rare CNVs was also generated.
 
 These ultra-rare CNVs were subjected to the same set of filters as above, with the following modifications:  
- * Does not have substantial overlap with **a non-ultra-rare (`AF`>0.01%) CNV** in any population from WGS resolution in gnomAD-SV ([Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
+ * Does not have substantial overlap with **a non-ultra-rare (`AF`>0.01%) CNV** in any population from WGS resolution in gnomAD-SV (v2.1, non-neuro; see above) ([Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
  * Does not have substantial overlap with **a non-ultra-rare (`AF`>0.01%) CNV** in any population from WGS resolution in the 1000 Genomes Project, Phase III ([Sudmant _et al._, _Nature_ (2015)](https://www.nature.com/articles/nature15394))  
  * Does not have substantial overlap with **a non-ultra-rare (`AF`>0.01%) CNV** from WGS resolution in the NIH Center for Common Disease Genetics SV callset ([Abel _et al._, _bioRxiv_ (2018)](https://www.biorxiv.org/content/10.1101/508515v1))  
  * Does not have substantial overlap with other CNVs in **at least 0.01% of all samples** within the same dataset or in any of the other array CNV datasets (compared pairwise in serial)

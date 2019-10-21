@@ -79,7 +79,7 @@ while read cohort N; do
     --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
     --xcov 0.3 \
     --cohorts-list raw_CNVs.per_cohort.txt \
-    --vcf refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
+    --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
     --vcf refs/1000Genomes_phase3.sites.vcf.gz \
     --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
     --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
@@ -105,7 +105,7 @@ while read cohort N; do
     --blacklist refs/GRCh37.Nmask.bed.gz \
     --xcov 0.3 \
     --cohorts-list raw_CNVs.per_cohort.txt \
-    --vcf refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
+    --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
     --vcf refs/1000Genomes_phase3.sites.vcf.gz \
     --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
     --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
@@ -130,7 +130,7 @@ mkdir debug
   --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
   --xcov 0.3 \
   --cohorts-list raw_CNVs.per_cohort.txt \
-  --vcf refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
+  --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
   --vcf refs/1000Genomes_phase3.sites.vcf.gz \
   --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
   --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
@@ -168,7 +168,7 @@ mkdir debug
   --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
   --xcov 0.3 \
   --cohorts-list raw_CNVs.per_cohort.txt \
-  --vcf refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
+  --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
   --vcf refs/1000Genomes_phase3.sites.vcf.gz \
   --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
   --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
@@ -191,7 +191,7 @@ mkdir debug
   --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
   --xcov 0.3 \
   --cohorts-list raw_CNVs.per_cohort.txt \
-  --vcf refs/gnomAD_v2_SV_MASTER.sites.vcf.gz \
+  --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
   --vcf refs/1000Genomes_phase3.sites.vcf.gz \
   --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
   --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
