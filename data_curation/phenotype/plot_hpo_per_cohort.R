@@ -59,7 +59,7 @@ counts <- read.table(tsv.in, comment.char="", header=T, sep="\t")
 counts$label <- paste(counts[, 1], " (", counts$description, ")", sep="")
 
 # Plot data
-pdf(plot.out, height=6, width=9)
+jpeg(plot.out, res=300, height=6*300, width=9*300)
 layout(matrix(1:3, nrow=1), widths=c(3, 2, 2))
 par(bty="n", mar=c(0.25, 0.25, 2.5, 0.25))
 plot.labels(counts$label)

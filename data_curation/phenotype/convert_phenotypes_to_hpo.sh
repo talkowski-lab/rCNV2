@@ -256,7 +256,10 @@ done
 # Barplot of samples per metacohort per HPO
 /opt/rCNV2/data_curation/phenotype/plot_hpo_per_cohort.R \
   HPOs_by_metacohort.table.tsv \
-  HPOs_by_metacohort.barplot.pdf
+  HPOs_by_metacohort.barplot.jpg
+gsutil cp HPOs_by_metacohort.barplot.jpg \
+  gs://rcnv_project/public/
+gsutil acl ch -u AllUsers:R gs://rcnv_project/public/HPOs_by_metacohort.barplot.jpg
 
 
 # Make simple file mapping HPO codes to directory prefixes (no colons)
@@ -294,8 +297,6 @@ gsutil cp phenotype_groups.HPO_metadata.txt \
   gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/
 gsutil cp test_phenotypes.list \
   gs://rcnv_project/analysis/analysis_refs/
-gsutil cp HPOs_by_metacohort.barplot.pdf \
-  gs://rcnv_project/public/
 
 
 # Get simplified table of metacohort combined case & control counts
