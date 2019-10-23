@@ -253,6 +253,12 @@ for wrapper in 1; do
 done
 
 
+# Barplot of samples per metacohort per HPO
+/opt/rCNV2/data_curation/phenotype/plot_hpo_per_cohort.R \
+  HPOs_by_metacohort.table.tsv \
+  HPOs_by_metacohort.barplot.pdf
+
+
 # Make simple file mapping HPO codes to directory prefixes (no colons)
 paste <( cut -f1 phenotype_groups.HPO_metadata.txt | sed 's/\://g' ) \
       <( cut -f1 phenotype_groups.HPO_metadata.txt ) \
@@ -288,6 +294,8 @@ gsutil cp phenotype_groups.HPO_metadata.txt \
   gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/
 gsutil cp test_phenotypes.list \
   gs://rcnv_project/analysis/analysis_refs/
+gsutil cp HPOs_by_metacohort.barplot.pdf \
+  gs://rcnv_project/public/
 
 
 # Get simplified table of metacohort combined case & control counts
