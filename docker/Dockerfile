@@ -36,7 +36,7 @@ RUN apt-get -qqy update \
 RUN pip install google-cloud-storage
 
 # Lifted from https://github.com/GoogleCloudPlatform/cloud-sdk-docker/blob/master/debian_slim/Dockerfile
-ENV CLOUD_SDK_VERSION=240.0.0
+ENV CLOUD_SDK_VERSION=267.0.0
 ARG INSTALL_COMPONENTS
 RUN apt-get update -qqy && apt-get install -qqy \
         curl \
@@ -58,14 +58,15 @@ VOLUME ["/root/.config"]
 
 # Install R packages
 RUN apt-get -qqy update \
-    && apt-get -qqy install --fix-missing libxrender1 libcairo2-dev libxt-dev
-RUN Rscript -e "sapply(c('optparse','Cairo'),\
+    && apt-get -qqy install libxrender1 libcairo2-dev libxt-dev libx11-dev
+RUN apt-get -qqy upgrade
+RUN Rscript -e "sapply(c('optparse'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 
 # Install Athena toolkit
 RUN git clone https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/athena /opt/athena \
     && cd /opt/athena \
-    && git checkout b501708dee8949b62233ac067e45ff2858fc19e6 \
+    && git checkout 3019915655a68fd1020bca2111058eb108a816cd \
     && cd -
 RUN cd /opt/athena \
     && pip install -e .
@@ -73,7 +74,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 158a86f369513f9ee316b20f6e6e87c05dd7ea64 && \
+    git checkout 8e91bb3e9da88f70cd2ae62f60f5863baa56f8c5 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)

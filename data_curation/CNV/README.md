@@ -22,13 +22,16 @@ We aggregated CNV data from multiple sources, listed below:
 | TSAICG | [Huang _et al._, _Neuron_ (2017)](https://www.sciencedirect.com/science/article/pii/S0896627317305081) | [28641109](https://www.ncbi.nlm.nih.gov/pubmed/28641109) | OmniExpress (100%) | hg19 | Tourette Syndrome | 2,434 | 4,093 |
 | BCH | [Talkowski _et al._, _Cell_ (2012)](https://www.sciencedirect.com/science/article/pii/S0092867412004114) | [22521361](https://www.ncbi.nlm.nih.gov/pubmed/22521361) | aCGH (?) | hg18 | Mixed | 3,591 | 0 |  
 | TCGA | [Zack _et al._, _Nat. Genet._ (2013)](https://www.nature.com/articles/ng.2760) | [24071852](https://www.ncbi.nlm.nih.gov/pubmed/24071852) | Affy 6.0 (100%) | hg19 | Cancer | 0<sup>4</sup> | 8,670<sup>4</sup> |  
-| Epi25k | [Niestroj _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/10.1101/651299v1) | - | Illumina GSA-MD v1.0 | hg19 | Epilepsy | 12,758 | 8,478 |  
+| Epi25k | [Niestroj _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/10.1101/651299v1) | - | Illumina GSA-MD v1.0 (100%) | hg19 | Epilepsy | 12,758<sup>3</sup> | 8,478<sup>3</sup> |  
+| SickKids | [Zarrei _et al._, _NPJ Genomic Medicine_ (2019)](https://www.nature.com/articles/s41525-019-0098-3) | [31602316](https://www.ncbi.nlm.nih.gov/pubmed/31602316) | Affy 6.0 (100%) | hg19 | NDDs | 2,691 | 0<sup>2</sup> |  
+| IU<sup>5</sup> | - | - | CMA? | hg19? | Mixed | 1,577 | 0 |  
 
 #### Notes on raw CNV data   
 1. Only retained control samples from Cooper _et al._. All cases from Cooper _et al._ also appear in Coe _et al._.  
-2. Only retained affected children from Sanders _et al._, since all controls were first-degree relatives of affected cases.  
-3. Counts represent the number of samples retained after filtering outlier samples, described below.  
+2. Only retained affected children from Sanders _et al._ and Zarrei _et al._, since all controls were first-degree relatives of affected cases.  
+3. Counts represent the number of samples retained after filtering outliers, described below.  
 4. Only retained normal samples from tumor:normal pairs, and excluded any donors with known blood cancer.  
+5. Excluded samples from Indiana University cohort derived from buccal swab DNA, samples with known aneuploidies or large runs of homozygosity, and samples with no phenotypic indication specified.  
 
 ### Raw CNV data processing steps  
 
@@ -40,6 +43,7 @@ Some datasets required manual curation prior to inclusion. Where necessary, thes
  * **UKBB**: CNVs were filtered on quality score ≥ 17 and CNV size ≥ 25kb. After CNV filtering, samples with >10 CNV calls were excluded as outliers as well as any samples with known malignant cancers or chromosomal disorders (e.g., Down's Syndrome or sex chromosome aneuploidies).  
  * **CHOP**: CNVs were filtered on quality score ≥ 40 and CNV size ≥ 25kb while requiring at least 10 SNPs per CNV. After CNV filtering, samples with `LRR_SD` < 0.25, >20 CNV calls, or SNP call rate < 98% were excluded as outliers, as well as samples genotyped on arrays with < 175k SNP probes or samples labeled as cancer or Down's Syndrome patients.  
  * **TCGA**: CNVs were filtered on ≥ 10 probes and ≥ 25kb. Deletions were required to have a mean log<sub>2</sub> intensity ≤ -1 and duplications were required to have a mean log<sub>2</sub> intensity of ≥ 0.5849625.  
+ * **Epi25k**: CNVs were filtered on ≥ 10 probes and ≥ 20kb. After CNV filtering, samples with >25 CNV calls were excluded as outliers.  
 
 ### Raw CNV callset properties  
 

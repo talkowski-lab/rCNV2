@@ -42,8 +42,8 @@ gzip -f HPO_dict.tsv
 gsutil cp HPO_dict.tsv.gz gs://rcnv_project/refs/
 
 
-# Convert BCH, GDX, Coe, and SSC phenotypes
-for cohort in BCH GDX Coe SSC; do
+# Convert BCH, GDX, Coe, SSC, SickKids, and IU phenotypes
+for cohort in BCH GDX Coe SSC Epi25k SickKids IU; do
   /opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
     --obo hp.obo \
     -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
@@ -52,6 +52,22 @@ for cohort in BCH GDX Coe SSC; do
     -o cleaned_phenos/all/${cohort}.cleaned_phenos.txt \
     raw_phenos/${cohort}.raw_phenos.txt
 done
+
+
+# Convert Epi25k case/control phenotypes
+fgrep -wv HEALTHY_CONTROL raw_phenos/Epi25k.raw_phenos.txt \
+| /opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
+    --obo hp.obo \
+    -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
+    -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
+    --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
+    -o cleaned_phenos/all/Epi25k.cleaned_phenos.preQC.txt \
+    /dev/stdin
+fgrep -w HEALTHY_CONTROL raw_phenos/Epi25k.raw_phenos.preQC.txt \
+>> cleaned_phenos/all/Epi25k.cleaned_phenos.preQC.txt
+fgrep -wf raw_phenos/Epi25k.QC_pass_samples.list \
+  cleaned_phenos/all/Epi25k.cleaned_phenos.preQC.txt \
+> cleaned_phenos/all/Epi25k.cleaned_phenos.txt
 
 
 # Convert CHOP phenotypes
@@ -153,6 +169,7 @@ done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt ) \
 # Determine minimum HPO tree to use
 /opt/rCNV2/data_curation/phenotype/collapse_HPO_tree.py \
   --ignore "HP:0000001" \
+  --ignore "HP:0031796" \
   --ignore "HP:0031797" \
   --ignore "HP:0011008" \
   --obo hp.obo \
@@ -173,7 +190,7 @@ while read cohort; do
       phenotype_groups.HPO_metadata.intermediate.txt
   fi
 done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt )
-for cohort in UKBB CHOP; do
+for cohort in UKBB CHOP Epi25k; do
   /opt/rCNV2/data_curation/phenotype/filter_HPO_per_sample.py \
     -o cleaned_phenos/intermediate/${cohort}.cleaned_phenos.preQC.txt \
     cleaned_phenos/all/${cohort}.cleaned_phenos.preQC.txt \
