@@ -42,8 +42,8 @@ gzip -f HPO_dict.tsv
 gsutil cp HPO_dict.tsv.gz gs://rcnv_project/refs/
 
 
-# Convert BCH, GDX, Coe, SSC, SickKids, and IU phenotypes
-for cohort in BCH GDX Coe SSC Epi25k SickKids IU; do
+# Convert BCH, GDX, Coe, SSC, and IU phenotypes
+for cohort in BCH GDX Coe SSC Epi25k IU; do
   /opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
     --obo hp.obo \
     -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
@@ -52,6 +52,24 @@ for cohort in BCH GDX Coe SSC Epi25k SickKids IU; do
     -o cleaned_phenos/all/${cohort}.cleaned_phenos.txt \
     raw_phenos/${cohort}.raw_phenos.txt
 done
+# Add dummy control lines to Coe phenotype file
+yes "HEALTHY_CONTROL" \
+| head -n $( fgrep Coe /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f4 ) \
+| awk -v OFS="\t" '{ print "Coe_CONTROL_"NR, $1 }' \
+>> cleaned_phenos/all/Coe.cleaned_phenos.txt
+
+
+# Convert SickKids phenotypes
+/opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
+  --obo hp.obo \
+  -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
+  -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
+  --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
+  -o cleaned_phenos/all/SickKids.cleaned_phenos.preQC.txt \
+  raw_phenos/SickKids.raw_phenos.txt
+fgrep -wf raw_phenos/SickKids.QC_pass_samples.list \
+  cleaned_phenos/all/SickKids.cleaned_phenos.preQC.txt \
+> cleaned_phenos/all/SickKids.cleaned_phenos.txt
 
 
 # Convert Epi25k case/control phenotypes
@@ -63,7 +81,7 @@ fgrep -wv HEALTHY_CONTROL raw_phenos/Epi25k.raw_phenos.txt \
     --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
     -o cleaned_phenos/all/Epi25k.cleaned_phenos.preQC.txt \
     /dev/stdin
-fgrep -w HEALTHY_CONTROL raw_phenos/Epi25k.raw_phenos.preQC.txt \
+fgrep -w HEALTHY_CONTROL raw_phenos/Epi25k.raw_phenos.txt \
 >> cleaned_phenos/all/Epi25k.cleaned_phenos.preQC.txt
 fgrep -wf raw_phenos/Epi25k.QC_pass_samples.list \
   cleaned_phenos/all/Epi25k.cleaned_phenos.preQC.txt \
@@ -103,6 +121,10 @@ yes $( fgrep "tourette" CHOP.raw_phenos.conversion_table.txt | cut -f2 ) \
 | head -n $( fgrep TSAICG /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f3 ) \
 | awk -v OFS="\t" '{ print "TSAICG_CASE_"NR, $1 }' \
 > cleaned_phenos/all/TSAICG.cleaned_phenos.txt
+yes "HEALTHY_CONTROL" \
+| head -n $( fgrep TSAICG /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f4 ) \
+| awk -v OFS="\t" '{ print "TSAICG_CONTROL_"NR, $1 }' \
+>> cleaned_phenos/all/TSAICG.cleaned_phenos.txt
 
 
 # Make dummy phenotype files for PGC
@@ -110,6 +132,19 @@ yes $( fgrep "schizophrenia" CHOP.raw_phenos.conversion_table.txt | cut -f2 ) \
 | head -n $( fgrep PGC /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f3 ) \
 | awk -v OFS="\t" '{ print "PGC_CASE_"NR, $1 }' \
 > cleaned_phenos/all/PGC.cleaned_phenos.txt
+yes "HEALTHY_CONTROL" \
+| head -n $( fgrep PGC /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f4 ) \
+| awk -v OFS="\t" '{ print "PGC_CONTROL_"NR, $1 }' \
+>> cleaned_phenos/all/PGC.cleaned_phenos.txt
+
+
+# Make dummy phenotype files for control-only cohorts (Cooper & TCGA)
+for cohort in Cooper TCGA; do
+  yes "HEALTHY_CONTROL" \
+  | head -n $( fgrep ${cohort} /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f4 ) \
+  | awk -v OFS="\t" -v cohort=${cohort} '{ print cohort"_CONTROL_"NR, $1 }' \
+  > cleaned_phenos/all/${cohort}.cleaned_phenos.txt
+done
 
 
 # Tabulate UKBB ICD-10 dictionary of all terms with at least 48 samples for manual review
