@@ -65,7 +65,6 @@ We included the following annotations:
 | Self-chain | UCSC | `chainSelf` | `coverage` | `log(x+0.01max(x))` |  
 | Max self-chain score | UCSC | `chainSelf:normScore` | `coverage` | None |  
 
-
 Following annotation, we collapsed the feature correlation structure with Eigendecomposition, and retained the top 10 components (ranked by % variance explained), labeled `Eigenfeatures`.  
 
 ### Dependencies  
@@ -80,18 +79,17 @@ $ docker pull talkowski/rcnv
 $ docker run --rm -it talkowski/rcnv
 
 (rcnv) root@hash:/# athena --help
-
 Usage: athena [OPTIONS] COMMAND [ARGS]...
 
 Options:
   --help  Show this message and exit.
 
 Commands:
-  annotate    Annotate bins
-  count-sv    Intersect SV and bins
-  decomp      Decompose bin annotations
-  make-bins   Create sequential bins
-  query       Mutation rate lookup
-  vcf-filter  Filter an input VCF
-  vcf-stats   Get SV size & spacing 
+  annotate-bins  Annotate bins
+  count-sv       Intersect SV and bins
+  eigen-bins     Eigendecomposition of annotations
+  make-bins      Create sequential bins
+  query          Mutation rate lookup
+  vcf-filter     Filter an input VCF
+  vcf-stats      Get SV size & spacing
 ```

@@ -115,38 +115,9 @@ task annotate_bins {
 
     # Annotate bins
     athena annotate-bins -z \
-      --chroms ${contig} \
+      --include-chroms ${contig} \
       -t refs/Affy_UKBB_axiom_probes.bed.gz -a count -n ukbbAxiom_probes \
-      -u decodeSexAveraged -a map-mean -n mean_recomb_rate \
-      -u decodeSexAveraged -a map-max -n max_recomb_rate \
-      -u wgEncodeDukeMapabilityUniqueness20bp -a map-mean -n uniqueness_20mer_mean \
-      -u wgEncodeDukeMapabilityUniqueness35bp -a map-mean -n uniqueness_35mer_mean \
-      -u snp151Common -a count-unique -n dbsnp151_common \
-      -u snpArrayAffy6 -a count-unique -n affy6_probes \
-      -u snpArrayAffy6SV -a count-unique -n affy6sv_probes \
-      -u snpArrayAffy5 -a count-unique -n affy5_probes \
-      -u snpArrayIlluminaHumanOmni1_Quad -a count-unique -n illOmni_probes \
-      -u snpArrayIllumina1M -a count-unique -n ill1M_probes \
-      -u snpArrayIllumina650 -a count-unique -n ill650_probes \
-      -u snpArrayIllumina550 -a count-unique -n ill550_probes \
-      -u agilentCgh1x244k -a count -n agilent244k_probes \
-      -u agilentCgh4x180k -a count -n agilent180k_probes \
-      -u agilentCgh2x105k -a count -n agilent105k_probes \
-      -u rmsk:genoName,genoStart,genoEnd -a coverage -n rmsk_all \
-      -u rmsk:genoName,genoStart,genoEnd,"repClass=LINE" -a coverage -n rmsk_LINE \
-      -u rmsk:genoName,genoStart,genoEnd,"repClass=SINE" -a coverage -n rmsk_SINE \
-      -u rmsk:genoName,genoStart,genoEnd,"repClass=LTR" -a coverage -n rmsk_LTR \
-      -u rmsk:genoName,genoStart,genoEnd,"repClass=DNA" -a coverage -n rmsk_DNA_repeats \
-      -u rmsk:genoName,genoStart,genoEnd,"repClass=Simple_repeat" -a coverage -n rmsk_simple_repeats \
-      -u rmsk:genoName,genoStart,genoEnd,"repClass=Low_complexity" -a coverage -n rmsk_low_complexity_repeats \
-      -u rmsk:genoName,genoStart,genoEnd,"repClass=Satellite" -a coverage -n rmsk_satellites \
-      -u nestedRepeats -a coverage -n nested_repeats \
-      -u microsat -a coverage -n microsatellites \
-      -u genomicSuperDups -a coverage -n segdups \
-      -u genomicSuperDups:fracMatch -a map-max -n max_segdup_identity \
-      -u simpleRepeat -a coverage -n simple_repeats \
-      -u chainSelf:tName,tStart,tEnd -a coverage -n self_chain \
-      -u chainSelf:tName,tStart,tEnd,normScore -a map-max -n max_self_chain_score \
+      --ucsc-list /opt/rCNV2/data_curation/binned_genome/genome_bin_ucsc_annotations.tsv \
       --fasta refs/GRCh37.primary_assembly.fa \
       --ucsc-ref hg19 \
       ${bins} \
