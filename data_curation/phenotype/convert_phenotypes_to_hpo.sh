@@ -189,15 +189,8 @@ fgrep -wf raw_phenos/UKBB.QC_pass_samples.list \
 
 # Pool all phenotypes across cohorts
 while read cohort; do
-  if [ -e cleaned_phenos/all/${cohort}.cleaned_phenos.txt ]; then
-    if [ ${cohort} == "CHOP" ] || [ ${cohort} == "UKBB" ]; then
-      fgrep -wf raw_phenos/${cohort}.QC_pass_samples.list \
-        cleaned_phenos/all/${cohort}.cleaned_phenos.txt
-    else
-      cat cleaned_phenos/all/${cohort}.cleaned_phenos.txt
-    fi
-  fi
-done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt ) \
+  cat cleaned_phenos/all/${cohort}.cleaned_phenos.txt
+done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt | fgrep -v "#" ) \
 > all_phenos.merged.txt
 
 

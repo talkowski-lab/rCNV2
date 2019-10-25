@@ -28,6 +28,8 @@ We selected a cutoff of 50% based on the following two facts:
 
 Thus, a 100kb CNV wholly contained within a 200kb window would count towards that window at 50% minimum overlap.  
 
+Finally, given that CNV breakpoint precision varies by locus, platform, and CNV calling algorithm, we systematically added ±25kb to the ends of each control CNV. We did this to conservatively protect against loci where control CNVs breakpoints were underestimated compared to cases.  
+
 ### 2. Calculate burden statistics between cases & controls  
 
 Once CNVs were tallied in cases and controls for each window, we next compared the ratios of CNV carriers between cases and controls using a one-sided Fisher's exact test.  
