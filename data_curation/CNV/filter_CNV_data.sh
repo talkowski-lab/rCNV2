@@ -22,8 +22,8 @@ docker run --rm -it talkowski/rcnv
 
 # Copy all raw CNV data and refs from Google Bucket (note: requires permissions)
 gcloud auth login
-gsutil cp -r gs://rcnv_project/raw_data/cnv ./
-gsutil cp -r gs://rcnv_project/refs ./
+gsutil -m cp -r gs://rcnv_project/raw_data/cnv ./
+gsutil -m cp -r gs://rcnv_project/refs ./
 
 
 
