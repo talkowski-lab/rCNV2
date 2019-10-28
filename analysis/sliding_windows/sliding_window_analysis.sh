@@ -19,11 +19,11 @@ docker run --rm -it talkowski/rcnv
 # from the project Google Bucket (note: requires permissions)
 gcloud auth login
 mkdir cleaned_cnv/
-gsutil cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
+gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
 mkdir windows/
-gsutil cp -r gs://rcnv_project/cleaned_data/binned_genome/* windows/
+gsutil -m cp -r gs://rcnv_project/cleaned_data/binned_genome/* windows/
 mkdir refs/
-gsutil cp gs://rcnv_project/analysis/analysis_refs/* refs/
+gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
 
 # Test/dev parameters (neurodevelopmental abnormality)
@@ -33,8 +33,10 @@ meta="meta1"
 freq_code="rCNV"
 metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
-binned_genome="windows/GRCh37.100kb_bins_10kb_steps.raw.bed.gz"
+binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 p_cutoff=0.00001
+bin_overlap=0.5
+pad_controls=25000
 
 
 # Count CNVs in cases and controls per phenotype, split by metacohort and CNV type
@@ -73,6 +75,8 @@ while read prefix hpo; do
 
       # Count CNVs
       /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
+        --fraction ${bin_overlap} \
+        --pad-controls ${pad_controls} \
         -t $CNV \
         --hpo ${hpo} \
         -z \
@@ -88,6 +92,7 @@ while read prefix hpo; do
         --bgzip \
         "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
         "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+        tabix -f "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
 
       # Generate Manhattan & QQ plots
       /opt/rCNV2/utils/plot_manhattan_qq.R \
@@ -103,8 +108,6 @@ while read prefix hpo; do
     done
 
     # Generate Miami & QQ plots
-    ncase=
-    nctrl=
     title="$descrip (${hpo})\nCohort '${meta}': $ncase cases vs $nctrl controls"
     /opt/rCNV2/utils/plot_manhattan_qq.R \
       --miami \

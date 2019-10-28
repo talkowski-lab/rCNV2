@@ -15,6 +15,7 @@ workflow sliding_window_analysis {
   File metacohort_sample_table
   File binned_genome
   Float bin_overlap
+  Int pad_controls
   Float p_cutoff
   String rCNV_bucket
 
@@ -59,6 +60,7 @@ task burden_test {
   String freq_code
   File binned_genome
   Float bin_overlap
+  Int pad_controls
   Float p_cutoff
   String rCNV_bucket
   String prefix
@@ -104,6 +106,7 @@ task burden_test {
         # Count CNVs
         /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
           --fraction ${bin_overlap} \
+          --pad-controls ${pad_controls} \
           -t $CNV \
           --hpo ${hpo} \
           -z \

@@ -106,7 +106,7 @@ scatter_stats <- function(dat, cnv, pt.cex=1.5,
          labels=round(10^logscale.rate.labels.at[x], 2), cex.axis=0.9, las=2)
   })
   mtext(2, text=paste(cnv, "per Sample"), line=2)
-  mtext(3, text=cnv, line=0.1, font=2)
+  mtext(3, text=paste(cnv, "Dataset Properties"), line=0.1, font=2)
   
   # Add legend
   # legend("topright", legend=c("Case", "Control", "Same cohort"),

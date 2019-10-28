@@ -8,9 +8,9 @@ In practice, this analysis was parallelized on [FireCloud/Terra](https://terra.b
 
 ## Sliding window analysis procedure
 
-We performed a standard procedure to conduct sliding window analyses for each [phenotype group](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/).  
+We executed a standardized procedure to conduct sliding window analyses for each [phenotype group](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/).  
 
-The steps in this procedure are described below:  
+The steps of this procedure are described below:  
 
 ### 1. Counting CNVs per window  
 
@@ -28,7 +28,7 @@ We selected a cutoff of 50% based on the following two facts:
 
 Thus, a 100kb CNV wholly contained within a 200kb window would count towards that window at 50% minimum overlap.  
 
-Finally, given that CNV breakpoint precision varies by locus, platform, and CNV calling algorithm, we systematically added ±25kb to the ends of each control CNV. We did this to conservatively protect against loci where control CNVs breakpoints were underestimated compared to cases.  
+Finally, given that CNV breakpoint precision varies by locus, platform, and CNV calling algorithm, we systematically extended the breakpoints of each control CNV by +25kb. We did this to conservatively protect against loci where control CNVs breakpoints were underestimated compared to cases.  
 
 ### 2. Calculate burden statistics between cases & controls  
 

@@ -18,8 +18,10 @@ import subprocess
 import gzip
 
 
-# Get header from BED file
 def get_bed_header(bedpath):
+    """
+    Get header from BED file
+    """
 
     if path.splitext(bedpath)[1] in '.gz .bgz .bgzip'.split():
         header = gzip.GzipFile(bedpath).readline().decode('utf-8').rstrip('\n')
@@ -29,8 +31,34 @@ def get_bed_header(bedpath):
     return header
 
 
-# Main block
+def process_cnvs(bedpath, pad_controls, control_hpo):
+    """
+    Read CNVs & extend control CNV breakpoints by a specified distance
+    """
+
+    cnvbt = pybedtools.BedTool(bedpath)
+
+    def _pad_control_cnv(feature, pad_controls, control_hpo):
+        """
+        Add a fixed distance to control CNV breakpoints
+        """
+
+        if feature[5] == control_hpo:
+            feature.start = max([0, feature.start-pad_controls])
+            feature.stop = feature.stop+pad_controls
+        
+        return feature
+
+    cnvbt = cnvbt.each(_pad_control_cnv, pad_controls, control_hpo).saveas()
+
+    return cnvbt
+
+
 def main():
+    """
+    Main block
+    """
+
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -38,6 +66,9 @@ def main():
     parser.add_argument('windows', help='BED file of windows.')
     parser.add_argument('-f', '--fraction', help='Minimum fraction of window ' +
                         'covered by a CNV to count as overlapping. [default: 0.75]',
+                        type=float, default=0.75)
+    parser.add_argument('--pad-controls', help='Distance to be added to control ' +
+                        'breakpoints. [default: 0]',
                         type=float, default=0.75)
     parser.add_argument('-t', '--type', help='Type of CNV to include (DEL/DUP). ' +
                         '[default: all]')
@@ -58,7 +89,7 @@ def main():
 
     header = get_bed_header(args.windows)
 
-    cnvbt = pybedtools.BedTool(args.cnvs)
+    cnvbt = process_cnvs(args.cnvs, args.pad_controls, args.control_hpo)
 
     if args.type is not None:
         if args.type != 'CNV':
