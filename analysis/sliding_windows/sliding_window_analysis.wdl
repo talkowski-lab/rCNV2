@@ -32,6 +32,7 @@ workflow sliding_window_analysis {
         freq_code="rCNV",
         binned_genome=binned_genome,
         bin_overlap=bin_overlap,
+        pad_controls=pad_controls,
         p_cutoff=p_cutoff,
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
@@ -68,7 +69,7 @@ task burden_test {
   command <<<
     # Copy CNV data
     mkdir cleaned_cnv/
-    gsutil cp -m ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
+    gsutil -m cp ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
 
     # Iterate over metacohorts
     while read meta cohorts; do
@@ -162,7 +163,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:ec9fbb493defb27b17c2ef3e3781d2a3b2849bfaf4f073a88b8c496239fb30ab"
+    docker: "talkowski/rcnv@sha256:60c99454272ed40e5946b5944eb7c3375e95b28146fc4035bafe0aec76a8128a"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

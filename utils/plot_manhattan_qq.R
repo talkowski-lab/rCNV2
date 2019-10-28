@@ -15,7 +15,7 @@ options(scipen=1000, stringsAsFactors=F)
 
 
 # Read an input file of association statistics
-read.stats <- function(stats.in, p.col.name="p", p.is.phred=F){
+read.stats <- function(stats.in, p.col.name="p", p.is.phred=F, min.p=10^-100){
   stats <- read.table(stats.in, header=T, comment.char="", sep="\t")
   
   # Get coordinates
@@ -40,6 +40,9 @@ read.stats <- function(stats.in, p.col.name="p", p.is.phred=F){
     stop(paste("Unable to identify p-value column by header name, ",
                p.col.name, ".", sep=""))
   }
+  
+  # Cap p-values at global min
+  p[which(p<min.p)] <- min.p
   
   data.frame("chr"=chr, "pos"=pos, "p"=p)
 }
@@ -407,6 +410,8 @@ option_list <- list(
               metavar="string"),
   make_option(c("--p-is-phred"), type="logical", default=F, action="store_true",
               help="supplied P-values are Phred-scaled (-log10[P]) [default %default]"),
+  make_option(c("--max-phred-p"), type="numeric", default=100, 
+              help="maximum P-value to report; more sigificant values will be rounded down [default %default]"),
   make_option(c("--cutoff"), type="numeric", default=10^-8, 
               help="P-value of significance threshold [default %default]",
               metavar="numeric"),
@@ -451,6 +456,7 @@ if(miami == F){
 }
 p.col.name <- opts$`p-col-name`
 p.is.phred <- opts$`p-is-phred`
+min.p <- 10^-(opts$`max-phred-p`)
 cutoff <- opts$cutoff
 highlight.in <- opts$`highlight-bed`
 highlight.name <- opts$`highlight-name`
@@ -472,9 +478,9 @@ if(miami == F){
 }
 
 # Load data
-stats <- read.stats(stats.in, p.col.name, p.is.phred)
+stats <- read.stats(stats.in, p.col.name, p.is.phred, min.p)
 if(miami == T){
-  stats2 <- read.stats(stats2.in, p.col.name, p.is.phred)
+  stats2 <- read.stats(stats2.in, p.col.name, p.is.phred, min.p)
 }
 
 if(!is.na(highlight.in)){

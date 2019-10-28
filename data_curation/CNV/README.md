@@ -6,7 +6,7 @@ All commands executed to filter the CNV data as descrbed below are contained in 
 
 In practice, the commands in `filter_CNV_data.sh` were parallelized in [FireCloud/Terra](https://portal.firecloud.org) with `filter_CNV_data.wdl`.  
 
-### CNV data sources  
+## CNV data sources  
 
 We aggregated CNV data from multiple sources, listed alphabetically below:  
 
@@ -33,7 +33,7 @@ We aggregated CNV data from multiple sources, listed alphabetically below:
 4. Only retained affected children from Sanders _et al._ and Zarrei _et al._, since all controls were first-degree relatives of affected cases.  
 5. Only retained normal samples from tumor:normal pairs, and excluded any donors with known blood cancer.  
 
-### Raw CNV data processing steps  
+## Raw CNV data processing steps  
 
 All CNV data native to hg18 was lifted over to hg19 using UCSC liftOver, requiring at least 50% of the original CNV to map successfully to hg19 in order to be retained.  
 
