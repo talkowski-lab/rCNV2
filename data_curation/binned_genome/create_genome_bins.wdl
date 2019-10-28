@@ -113,6 +113,9 @@ task annotate_bins {
     gsutil -m cp -r gs://rcnv_project/refs/Affy_UKBB_axiom_probes.bed.gz* refs/
     gsutil -m cp -r gs://rcnv_project/GRCh37_ref_build/* refs/
 
+    # Re-index reference fasta, otherwise pybedtools nuc throws an error
+    samtools faidx refs/GRCh37.primary_assembly.fa
+
     # Annotate bins
     athena annotate-bins -z \
       --include-chroms ${contig} \

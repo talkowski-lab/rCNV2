@@ -10,9 +10,11 @@
 
 # Barplot of samples per HPO term per metacohort
 
+
 # Set parameters
 options(scipen=1000, stringsAsFactors=F)
 meta.colors <- c("#264653", "#2A9D8F", "#E9C46A", "#F4A261")
+
 
 # Plotting functions
 plot.labels <- function(labels){
@@ -49,14 +51,17 @@ fraction.barplot <- function(counts, colors){
        labels=paste(seq(0, 100, 20), "%", sep=""))
 }
 
+
 # Read arguments
 args <- commandArgs(trailingOnly=T)
 tsv.in <- as.character(args[1])
 plot.out <- as.character(args[2])
 
+
 # Read data
 counts <- read.table(tsv.in, comment.char="", header=T, sep="\t")
 counts$label <- paste(counts[, 1], " (", counts$description, ")", sep="")
+
 
 # Plot data
 jpeg(plot.out, res=300, height=6*300, width=9*300)

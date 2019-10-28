@@ -28,14 +28,14 @@ We aggregated CNV data from multiple sources, listed alphabetically below:
 
 #### Notes on raw CNV data   
 1. Counts represent the number of samples retained after filtering outliers, described below.  
-2. Only retained control samples from Cooper _et al._. All cases from Cooper _et al._ also appear in Coe _et al._.  
+2. Only retained control samples from Cooper _et al._ All cases from Cooper _et al._ also appear in Coe _et al._  
 3. Excluded samples from Indiana University (IU) cohort derived from buccal swab DNA, samples with known aneuploidies or large runs of homozygosity, and samples with no phenotypic indication specified.  
 4. Only retained affected children from Sanders _et al._ and Zarrei _et al._, since all controls were first-degree relatives of affected cases.  
 5. Only retained normal samples from tumor:normal pairs, and excluded any donors with known blood cancer.  
 
 ### Raw CNV data processing steps  
 
-All CNV data native to hg18 was lifted over to hg19 coordinate space using UCSC liftOver, requiring at least 50% of the original CNV to map to hg19 successfully in order to be retained.  
+All CNV data native to hg18 was lifted over to hg19 using UCSC liftOver, requiring at least 50% of the original CNV to map successfully to hg19 in order to be retained.  
 
 Some datasets required manual curation prior to inclusion. Where necessary, these steps are enumerated below:  
 
@@ -51,20 +51,24 @@ Some datasets required manual curation prior to inclusion. Where necessary, thes
 The properties of each callset are listed below after initial data processing steps but prior to further filtering.  
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| PGC | 21,094 | 42,096 | 2.00 | 79.7 kb | 1:1.04 | 20,277 | 40,464 | 2.00 | 78.2 kb | 1:1.03 |
-| Cooper | 0 | 0 | - | - | - | 8,329 | 432,478 | 51.92 | 1.9 kb | 8.04:1 |
-| Coe | 29,083 | 28,782 | 0.99 | 188.4 kb | 1:1.11 | 11,256 | 273,331 | 24.28 | 53.4 kb | 1.24:1 |
-| SSC | 2,795 | 30,867 | 11.04 | 21.0 kb | 3.09:1 | 0 | 0 | - | - | - |
-| UKBB | 54,071 | 140,200 | 2.59 | 88.2 kb | 5.62:1 | 375,800 | 964,768 | 2.57 | 87.4 kb | 5.68:1 |
-| CHOP | 153,870 | 690,521 | 4.49 | 89.0 kb | 1:1.05 | 24,161 | 114,881 | 4.75 | 86.8 kb | 1.71:1 |
-| GDX | 9,959 | 20,789 | 2.09 | 196.3 kb | 1:1.76 | 0 | 0 | - | - | - |
-| TSAICG | 2,434 | 3,541 | 1.45 | 91.1 kb | 1.01:1 | 4,093 | 5,834 | 1.43 | 91.3 kb | 1:1.08 |
-| BCH | 3,591 | 5,211 | 1.45 | 206.4 kb | 1:1.27 | 0 | 0 | - | - | - |
-| TCGA | 0 | 0 | - | - | - | 8,670 | 201,712 | 23.27 | 101.1 kb | 1.19:1 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
+| BCH | 3,591 | 5,211 | 1.45 | 206.0 kb | 1:1.27 | 0 | 0 | 0 | NA | NA |  
+| CHOP | 153,870 | 690,521 | 4.49 | 89.0 kb | 1:1.05 | 24,161 | 114,881 | 4.75 | 87.0 kb | 1.71:1 |  
+| Coe | 29,083 | 28,782 | 0.99 | 188.0 kb | 1:1.11 | 11,256 | 273,331 | 24.28 | 53.0 kb | 1.24:1 |  
+| Cooper | 0 | 0 | 0 | NA | NA | 8,329 | 432,478 | 51.92 | 2.0 kb | 8.04:1 |  
+| Epi25k | 12,053 | 94,172 | 7.81 | 97.0 kb | 1:1.56 | 8,173 | 65,329 | 7.99 | 100.0 kb | 1:1.35 |  
+| GDX | 9,958 | 20,789 | 2.09 | 196.0 kb | 1:1.76 | 0 | 0 | 0 | NA | NA |  
+| IU | 1,576 | 4,940 | 3.13 | 99.0 kb | 1.38:1 | 0 | 0 | 0 | NA | NA |  
+| PGC | 21,094 | 42,096 | 2.0 | 80.0 kb | 1:1.04 | 20,277 | 40,464 | 2.0 | 78.0 kb | 1:1.03 |  
+| SSC | 2,795 | 30,867 | 11.04 | 21.0 kb | 3.09:1 | 0 | 0 | 0 | NA | NA |  
+| SickKids | 2,689 | 98,970 | 36.81 | 52.0 kb | 1:1.02 | 0 | 0 | 0 | NA | NA |  
+| TCGA | 0 | 0 | 0 | NA | NA | 8,670 | 201,712 | 23.27 | 101.0 kb | 1.19:1 |  
+| TSAICG | 2,434 | 3,541 | 1.45 | 91.0 kb | 1.01:1 | 4,093 | 5,834 | 1.43 | 91.0 kb | 1:1.08 |  
+| UKBB | 54,071 | 140,200 | 2.59 | 88.0 kb | 5.62:1 | 375,800 | 964,768 | 2.57 | 87.0 kb | 5.68:1 |  
 
+The information for this table was collected using `collect_cohort_stats.sh`, and is visualized below using `plot_cnv_stats_per_cohort.R`.  
 
-The information for this table was collected using `collect_cohort_stats.sh`.  
+![Raw CNV stats](https://storage.googleapis.com/rcnv_project/public/raw_cnv.stats.jpg)  
 
 ### Raw data access  
 
@@ -80,12 +84,18 @@ gs://rcnv_project/raw_data/cnv/Coe.raw.bed.gz
 gs://rcnv_project/raw_data/cnv/Coe.raw.bed.gz.tbi
 gs://rcnv_project/raw_data/cnv/Cooper.raw.bed.gz
 gs://rcnv_project/raw_data/cnv/Cooper.raw.bed.gz.tbi
+gs://rcnv_project/raw_data/cnv/Epi25k.raw.bed.gz
+gs://rcnv_project/raw_data/cnv/Epi25k.raw.bed.gz.tbi
 gs://rcnv_project/raw_data/cnv/GDX.raw.bed.gz
 gs://rcnv_project/raw_data/cnv/GDX.raw.bed.gz.tbi
+gs://rcnv_project/raw_data/cnv/IU.raw.bed.gz
+gs://rcnv_project/raw_data/cnv/IU.raw.bed.gz.tbi
 gs://rcnv_project/raw_data/cnv/PGC.raw.bed.gz
 gs://rcnv_project/raw_data/cnv/PGC.raw.bed.gz.tbi
 gs://rcnv_project/raw_data/cnv/SSC.raw.bed.gz
 gs://rcnv_project/raw_data/cnv/SSC.raw.bed.gz.tbi
+gs://rcnv_project/raw_data/cnv/SickKids.raw.bed.gz
+gs://rcnv_project/raw_data/cnv/SickKids.raw.bed.gz.tbi
 gs://rcnv_project/raw_data/cnv/TCGA.raw.bed.gz
 gs://rcnv_project/raw_data/cnv/TCGA.raw.bed.gz.tbi
 gs://rcnv_project/raw_data/cnv/TSAICG.raw.bed.gz
@@ -101,9 +111,9 @@ Note that permissions must be granted per user prior to data access.
 All raw CNV data was subjected to the same set of global filters:  
  * Restricted to autosomes
  * CNV size ≥ 100kb and ≤ 10Mb
- * Does not have substantial overlap<sup>1</sup> with a common (`AF`>1%) CNV in any population from WGS resolution in gnomAD-SV<sup>2</sup> ([Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
- * Does not have substantial overlap<sup>1</sup> with a common (`AF`>1%) CNV in any population from WGS resolution in the 1000 Genomes Project, Phase III ([Sudmant _et al._, _Nature_ (2015)](https://www.nature.com/articles/nature15394))  
- * Does not have substantial overlap<sup>1</sup> with a common (`AF`>1%) CNV from WGS resolution in the NIH Center for Common Disease Genetics SV callset ([Abel _et al._, _bioRxiv_ (2018)](https://www.biorxiv.org/content/10.1101/508515v1))  
+ * Does not have substantial overlap<sup>1</sup> with a common CNV (`AF`>1%) in any population from WGS resolution in gnomAD-SV<sup>2</sup> ([Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
+ * Does not have substantial overlap<sup>1</sup> with a common CNV (`AF`>1%) in any population from WGS resolution in the 1000 Genomes Project, Phase III ([Sudmant _et al._, _Nature_ (2015)](https://www.nature.com/articles/nature15394))  
+ * Does not have substantial overlap<sup>1</sup> with a common CNV (`AF`>1%) from WGS resolution in the NIH Center for Common Disease Genetics SV callset ([Abel _et al._, _bioRxiv_ (2018)](https://www.biorxiv.org/content/10.1101/508515v1))  
  * Does not have substantial overlap<sup>1</sup> with other CNVs in at least 1% of all samples
  * Does not have substantial overlap<sup>1</sup> with other CNVs in at least 1% of all samples within the same dataset or in any of the other array CNV datasets (compared pairwise in serial)
  * Not substantially covered<sup>3</sup> by somatically hypermutable sites (as applied in [Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
@@ -112,7 +122,7 @@ All raw CNV data was subjected to the same set of global filters:
 
 #### Notes on curation  
 1. "Substantial" overlap determined based on ≥50% reciprocal overlap using BEDTools ([Quinlan & Hall, _Bioinformatics_ (2010)](https://www.ncbi.nlm.nih.gov/pubmed/20110278)). For overlap-based comparisons, both breakpoints were required to be within ±50kb, and CNV type (DEL vs. DUP) was required to match.  
-2. The version of gnomAD-SV used for this analysis (gnomAD-SV v2.1, non-neuro) included 8,342 samples without known neuropsychiatric disorders as available from the gnomAD website](https://gnomad.broadinstitute.org/downloads/) and described in [Collins*, Brand*, et al.](https://www.biorxiv.org/content/10.1101/578674v1)  
+2. The version of gnomAD-SV used for this analysis (gnomAD-SV v2.1, non-neuro) included 8,342 samples without known neuropsychiatric disorders as [available from the gnomAD website](https://gnomad.broadinstitute.org/downloads/) and described in [Collins\*, Brand\*, _et al._](https://www.biorxiv.org/content/10.1101/578674v1)  
 3. "Substantial" coverage determined based on ≥30% coverage per BEDTools coverage ([Quinlan & Hall, _Bioinformatics_ (2010)](https://www.ncbi.nlm.nih.gov/pubmed/20110278)).
 
 ### Rare CNV callset properties
@@ -120,29 +130,33 @@ All raw CNV data was subjected to the same set of global filters:
 The properties of each rare CNV callset are listed below after the above filtering steps.  
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| PGC | 21,094 | 13,852 | 0.66 | 190.7 kb | 1:1.37 | 20,277 | 12,710 | 0.63 | 184.9 kb | 1:1.33 |
-| Cooper | 0 | 0 | - | - | - | 8,329 | 4,318 | 0.52 | 173.2 kb | 1.32:1 |
-| Coe | 29,083 | 18,259 | 0.63 | 263.9 kb | 1:1.22 | 11,256 | 10,154 | 0.90 | 184.9 kb | 1:1.81 |
-| SSC | 2,795 | 2,053 | 0.73 | 192.3 kb | 1:1.17 | 0 | 0 | - | - | - |
-| UKBB | 54,071 | 26,928 | 0.50 | 179.6 kb | 2.37:1 | 375,800 | 183,149 | 0.49 | 177.5 kb | 2.43:1 |
-| CHOP | 153,870 | 112,644 | 0.73 | 199.0 kb | 1:1.50 | 24,161 | 17,795 | 0.74 | 188.2 kb | 1:1.14 |
-| GDX | 9,959 | 9,820 | 0.99 | 257.5 kb | 1:1.36 | 0 | 0 | - | - | - |
-| TSAICG | 2,434 | 1,505 | 0.62 | 194.8 kb | 1:1.37 | 4,093 | 2,509 | 0.61 | 184.6 kb | 1:1.38 |
-| BCH | 3,591 | 2,784 | 0.78 | 329.0 kb | 1:1.45 | 0 | 0 | - | - | - |
-| TCGA | 0 | 0 | - | - | - | 8,670 | 5,019 | 0.58 | 175.0 kb | 1:2.22 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
+| BCH | 3,591 | 2,751 | 0.77 | 328.0 kb | 1:1.46 | 0 | 0 | 0 | NA | NA |  
+| CHOP | 153,870 | 108,913 | 0.71 | 203.0 kb | 1:1.45 | 24,161 | 17,548 | 0.73 | 188.0 kb | 1:1.12 |  
+| Coe | 29,083 | 17,901 | 0.62 | 263.0 kb | 1:1.21 | 11,256 | 9,661 | 0.86 | 185.0 kb | 1:1.75 |  
+| Cooper | 0 | 0 | 0 | NA | NA | 8,329 | 4,184 | 0.5 | 175.0 kb | 1.37:1 |  
+| Epi25k | 12,053 | 9,788 | 0.81 | 177.0 kb | 1:1.31 | 8,173 | 5,713 | 0.7 | 186.0 kb | 1:1.14 |  
+| GDX | 9,958 | 9,699 | 0.97 | 257.0 kb | 1:1.36 | 0 | 0 | 0 | NA | NA |  
+| IU | 1,576 | 1,516 | 0.96 | 210.0 kb | 1:1.40 | 0 | 0 | 0 | NA | NA |  
+| PGC | 21,094 | 13,523 | 0.64 | 190.0 kb | 1:1.37 | 20,277 | 12,450 | 0.61 | 184.0 kb | 1:1.32 |  
+| SSC | 2,795 | 1,998 | 0.71 | 195.0 kb | 1:1.14 | 0 | 0 | 0 | NA | NA |  
+| SickKids | 2,689 | 4,796 | 1.78 | 186.0 kb | 1:1.35 | 0 | 0 | 0 | NA | NA |  
+| TCGA | 0 | 0 | 0 | NA | NA | 8,670 | 4,912 | 0.57 | 177.0 kb | 1:2.18 |  
+| TSAICG | 2,434 | 1,477 | 0.61 | 196.0 kb | 1:1.39 | 4,093 | 2,466 | 0.6 | 184.0 kb | 1:1.39 |  
+| UKBB | 54,071 | 26,475 | 0.49 | 180.0 kb | 2.47:1 | 375,800 | 179,962 | 0.48 | 178.0 kb | 2.53:1 |  
 
+The information for this table was collected using `collect_cohort_stats.sh`, and is visualized below using `plot_cnv_stats_per_cohort.R`.  
 
-The information for this table was collected using `collect_cohort_stats.sh`.  
+![Rare CNV stats](https://storage.googleapis.com/rcnv_project/public/rare_cnv.stats.jpg)  
 
 ## Curation Steps: Ultra-rare CNVs  
 
 In parallel to the creation of the rare CNV dataset (described above), a dataset of ultra-rare CNVs was also generated.
 
 These ultra-rare CNVs were subjected to the same set of filters as above, with the following modifications:  
- * Does not have substantial overlap with **a non-ultra-rare (`AF`>0.01%) CNV** in any population from WGS resolution in gnomAD-SV (v2.1, non-neuro; see above) ([Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
- * Does not have substantial overlap with **a non-ultra-rare (`AF`>0.01%) CNV** in any population from WGS resolution in the 1000 Genomes Project, Phase III ([Sudmant _et al._, _Nature_ (2015)](https://www.nature.com/articles/nature15394))  
- * Does not have substantial overlap with **a non-ultra-rare (`AF`>0.01%) CNV** from WGS resolution in the NIH Center for Common Disease Genetics SV callset ([Abel _et al._, _bioRxiv_ (2018)](https://www.biorxiv.org/content/10.1101/508515v1))  
+ * Does not have substantial overlap with **a non-ultra-rare CNV (`AF`>0.01%)** in any population from WGS resolution in gnomAD-SV (v2.1, non-neuro; see above) ([Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
+ * Does not have substantial overlap with **a non-ultra-rare CNV (`AF`>0.01%)** in any population from WGS resolution in the 1000 Genomes Project, Phase III ([Sudmant _et al._, _Nature_ (2015)](https://www.nature.com/articles/nature15394))  
+ * Does not have substantial overlap with **a non-ultra-rare CNV (`AF`>0.01%)** from WGS resolution in the NIH Center for Common Disease Genetics SV callset ([Abel _et al._, _bioRxiv_ (2018)](https://www.biorxiv.org/content/10.1101/508515v1))  
  * Does not have substantial overlap with other CNVs in **at least 0.01% of all samples** within the same dataset or in any of the other array CNV datasets (compared pairwise in serial)
 
 
@@ -151,25 +165,30 @@ These ultra-rare CNVs were subjected to the same set of filters as above, with t
 The properties of each ultra-rare CNV callset are listed below after the above filtering steps.  
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| PGC | 21,094 | 5,691 | 0.27 | 245.4 kb | 1:1.63 | 20,277 | 4,963 | 0.24 | 235.9 kb | 1:1.51 |
-| Cooper | 0 | 0 | - | - | - | 8,329 | 1,773 | 0.21 | 211.0 kb | 1.22:1 |
-| Coe | 29,083 | 9,203 | 0.32 | 361.2 kb | 1:1.16 | 11,256 | 3,288 | 0.29 | 238.1 kb | 1:1.78 |
-| SSC | 2,795 | 742 | 0.27 | 260.5 kb | 1:1.23 | 0 | 0 | - | - | - |
-| UKBB | 54,071 | 12,733 | 0.24 | 216.2 kb | 2.30:1 | 375,800 | 85,726 | 0.23 | 213.7 kb | 2.31:1 |
-| CHOP | 153,870 | 41,951 | 0.27 | 254.1 kb | 1:1.48 | 24,161 | 7,502 | 0.31 | 237.6 kb | 1:1.49 |
-| GDX | 9,959 | 5,300 | 0.53 | 355.0 kb | 1:1.24 | 0 | 0 | - | - | - |
-| TSAICG | 2,434 | 656 | 0.27 | 240.3 kb | 1:1.55 | 4,093 | 1,017 | 0.25 | 238.9 kb | 1:1.69 |
-| BCH | 3,591 | 1,750 | 0.49 | 388.5 kb | 1:1.40 | 0 | 0 | - | - | - |
-| TCGA | 0 | 0 | - | - | - | 8,670 | 1,604 | 0.19 | 208.1 kb | 1:2.06 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
+| BCH | 3,591 | 1,725 | 0.48 | 393.0 kb | 1:1.40 | 0 | 0 | 0 | NA | NA |  
+| CHOP | 153,870 | 41,424 | 0.27 | 256.0 kb | 1:1.52 | 24,161 | 7,411 | 0.31 | 241.0 kb | 1:1.52 |  
+| Coe | 29,083 | 9,122 | 0.31 | 364.0 kb | 1:1.18 | 11,256 | 3,236 | 0.29 | 239.0 kb | 1:1.81 |  
+| Cooper | 0 | 0 | 0 | NA | NA | 8,329 | 1,735 | 0.21 | 214.0 kb | 1.18:1 |  
+| Epi25k | 12,053 | 3,541 | 0.29 | 229.0 kb | 1:1.38 | 8,173 | 1,970 | 0.24 | 229.0 kb | 1:1.35 |  
+| GDX | 9,958 | 5,263 | 0.53 | 356.0 kb | 1:1.26 | 0 | 0 | 0 | NA | NA |  
+| IU | 1,576 | 684 | 0.43 | 289.0 kb | 1:1.51 | 0 | 0 | 0 | NA | NA |  
+| PGC | 21,094 | 5,569 | 0.26 | 247.0 kb | 1:1.69 | 20,277 | 4,869 | 0.24 | 237.0 kb | 1:1.58 |  
+| SSC | 2,795 | 778 | 0.28 | 260.0 kb | 1:1.36 | 0 | 0 | 0 | NA | NA |  
+| SickKids | 2,689 | 2,153 | 0.8 | 228.0 kb | 1:1.58 | 0 | 0 | 0 | NA | NA |  
+| TCGA | 0 | 0 | 0 | NA | NA | 8,670 | 1,588 | 0.18 | 208.0 kb | 1:2.11 |  
+| TSAICG | 2,434 | 638 | 0.26 | 242.0 kb | 1:1.67 | 4,093 | 998 | 0.24 | 243.0 kb | 1:1.75 |  
+| UKBB | 54,071 | 12,531 | 0.23 | 217.0 kb | 2.27:1 | 375,800 | 84,330 | 0.22 | 214.0 kb | 2.28:1 |  
 
-The information for this table was collected using `collect_cohort_stats.sh`.  
+The information for this table was collected using `collect_cohort_stats.sh`, and is visualized below using `plot_cnv_stats_per_cohort.R`.  
+
+![Ultra-rare CNV stats](https://storage.googleapis.com/rcnv_project/public/ultrarare_cnv.stats.jpg)  
 
 ---  
 
 ## Case-control "metacohorts"  
 
-To control for potential technical differences between cohorts, we combined CNV data from multiple cohorts into four matched groups for burden testing, dubbed **metacohorts**.  
+For analyses, we combined CNV data from multiple cohorts into four matched groups, dubbed **metacohorts**, to control for technical differences between individual data sources and cohorts.  
 
 Individual cohorts were assigned to metacohorts on the basis of similarity in CNV counts across the genome, which matched expectations based on platforms and processing pipelines for each callset.  
 
@@ -179,31 +198,34 @@ For completeness, we also performed identical analyses on a pooled dataset of al
 
 | Metacohort ID | Case Source(s) | Number of Cases | Control Sources(s) | Number of Controls |  
 | :--- | :--- | ---: | :--- | ---: |  
-| `meta1` | Coe, BCH, GDX, IU | 42,653 | Coe, Cooper | 19,585 |  
-| `meta2` | PGC, SSC, TSAICG | 26,323 | TCGA, PGC, TSAICG | 33,040 |  
+| `meta1` | BCH, Coe, GDX, IU | 44,229 | Coe, Cooper | 19,585 |  
+| `meta2` | Epi25k, PGC, SSC, SickKids, TSAICG | 41,065 | Epi25k, PGC, TCGA, TSAICG | 41,213 |  
 | `meta3` | CHOP | 153,870 | CHOP | 24,161 |  
 | `meta4` | UKBB | 54,071 | UKBB | 375,800 |  
-| `mega` | Coe, BCH, GDX, PGC, SSC, TSAICG, CHOP, UKBB | 276,917 | Coe, Cooper, TCGA, PGC, TSAICG, CHOP, UKBB | 452,586 |  
-
+| `mega` | BCH, CHOP, Coe, Epi25k, GDX, IU, PGC, SSC, SickKids, TSAICG, UKBB | 293,235 | CHOP, Coe, Cooper, Epi25k, PGC, TCGA, TSAICG, UKBB | 460,759 |  
 
 ### Metacohort rare CNV callset properties  
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| meta1 | 42,653 | 30,863 | 0.72 | 265.4 kb | 1:1.28 | 19,585 | 14,472 | 0.74 | 182.0 kb | 1:1.38 |
-| meta2 | 26,323 | 17,410 | 0.66 | 191.4 kb | 1:1.34 | 33,040 | 20,238 | 0.61 | 183.2 kb | 1:1.51 |
-| meta3 | 153,870 | 112,644 | 0.73 | 199.0 kb | 1:1.50 | 24,161 | 17,795 | 0.74 | 188.2 kb | 1:1.14 |
-| meta4 | 54,071 | 26,928 | 0.50 | 179.6 kb | 2.37:1 | 375,800 | 183,149 | 0.49 | 177.5 kb | 2.43:1 |
-| mega | 276,917 | 187,845 | 0.68 | 203.8 kb | 1:1.21 | 452,586 | 235,654 | 0.52 | 179.0 kb | 1.82:1 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
+| meta1 | 44,229 | 31,867 | 0.72 | 264.0 kb | 1:1.28 | 19,585 | 13,845 | 0.71 | 182.0 kb | 1:1.34 |  
+| meta2 | 41,065 | 31,582 | 0.77 | 186.0 kb | 1:1.34 | 41,213 | 25,541 | 0.62 | 184.0 kb | 1:1.41 |  
+| meta3 | 153,870 | 108,913 | 0.71 | 203.0 kb | 1:1.45 | 24,161 | 17,548 | 0.73 | 188.0 kb | 1:1.12 |  
+| meta4 | 54,071 | 26,475 | 0.49 | 180.0 kb | 2.47:1 | 375,800 | 179,962 | 0.48 | 178.0 kb | 2.53:1 |  
+| mega | 293,235 | 198,837 | 0.68 | 204.0 kb | 1:1.19 | 460,759 | 236,896 | 0.51 | 179.0 kb | 1.85:1 |  
+
+![Rare CNV stats](https://storage.googleapis.com/rcnv_project/public/rare_cnv.metacohort.stats.jpg)  
 
 ### Metacohort ultra-rare CNV callset properties  
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| meta1 | 42,653 | 16,253 | 0.38 | 360.6 kb | 1:1.21 | 19,585 | 5,061 | 0.26 | 228.1 kb | 1:1.35 |
-| meta2 | 26,323 | 7,089 | 0.27 | 246.5 kb | 1:1.57 | 33,040 | 7,584 | 0.23 | 229.4 kb | 1:1.63 |
-| meta3 | 153,870 | 41,951 | 0.27 | 254.1 kb | 1:1.48 | 24,161 | 7,502 | 0.31 | 237.6 kb | 1:1.49 |
-| meta4 | 54,071 | 12,733 | 0.24 | 216.2 kb | 2.30:1 | 375,800 | 85,726 | 0.23 | 213.7 kb | 2.31:1 |
-| mega | 276,917 | 78,026 | 0.28 | 262.0 kb | 1:1.17 | 452,586 | 105,873 | 0.23 | 217.0 kb | 1.79:1 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
+| meta1 | 44,229 | 16,794 | 0.38 | 360.0 kb | 1:1.24 | 19,585 | 4,971 | 0.25 | 230.0 kb | 1:1.38 |  
+| meta2 | 41,065 | 12,679 | 0.31 | 239.0 kb | 1:1.56 | 41,213 | 9,425 | 0.23 | 230.0 kb | 1:1.62 |  
+| meta3 | 153,870 | 41,424 | 0.27 | 256.0 kb | 1:1.52 | 24,161 | 7,411 | 0.31 | 241.0 kb | 1:1.52 |  
+| meta4 | 54,071 | 12,531 | 0.23 | 217.0 kb | 2.27:1 | 375,800 | 84,330 | 0.22 | 214.0 kb | 2.28:1 |  
+| mega | 293,235 | 83,428 | 0.28 | 261.0 kb | 1:1.22 | 460,759 | 106,137 | 0.23 | 218.0 kb | 1.73:1 |  
 
-The information for these tables was collected using `collect_cohort_stats.sh`.  
+![Ultra-rare CNV stats](https://storage.googleapis.com/rcnv_project/public/ultrarare_cnv.metacohort.stats.jpg)  
+
+The information for these tables was collected using `collect_cohort_stats.sh` and visualized using `plot_cnv_stats_per_cohort.R`.  
