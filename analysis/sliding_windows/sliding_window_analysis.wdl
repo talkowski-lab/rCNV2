@@ -55,6 +55,8 @@ workflow sliding_window_analysis {
     # Perform meta-analysis of rCNV association statistics
     call meta_analysis as rCNV_meta_analysis {
       input:
+        stats_beds=rCNV_burden_test.stats_beds,
+        stats_bed_idxs=rCNV_burden_test.stats_bed_idxs,
         hpo=pheno[1],
         metacohort_list=metacohort_list,
         metacohort_sample_table=metacohort_sample_table,
@@ -184,15 +186,15 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:d1bb9b68186d6bf1c1995885e5d677a276c8b2c9dbed72e10a2e33f24cb1edd5"
+    docker: "talkowski/rcnv@sha256:8ff102a4b22757ece64eb161e1879d190e9efa8e95783d39cf83f87e8c783114"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
   }
 
   output {
-    # Array[File] stats_beds = glob("*.sliding_window.stats.bed.gz")
-    # Array[File] stats_bed_idxs = glob("*.sliding_window.stats.bed.gz.tbi")
+    Array[File] stats_beds = glob("*.sliding_window.stats.bed.gz")
+    Array[File] stats_bed_idxs = glob("*.sliding_window.stats.bed.gz.tbi")
     # Array[File] plots = glob("*.sliding_window.*.png")
   }
 }
@@ -200,6 +202,8 @@ task burden_test {
 
 # Run meta-analysis across metacohorts for a single phenotype
 task meta_analysis {
+  Array[File] stats_beds
+  Array[File] stats_bed_idxs
   String hpo
   File metacohort_list
   File metacohort_sample_table
@@ -212,9 +216,11 @@ task meta_analysis {
     set -e
 
     # Copy burden stats
-    gsutil -m cp \
-      ${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/** \
-      ./
+    find / -name "*${prefix}.${freq_code}.*.sliding_window.stats.bed.gz*" \
+    | xargs -I {} mv {} ./
+    # gsutil -m cp \
+    #   ${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/** \
+    #   ./
 
     # Get metadata for meta-analysis
     mega_idx=$( head -n1 "${metacohort_sample_table}" \
@@ -300,7 +306,7 @@ task meta_analysis {
   output {}
 
   runtime {
-    docker: "talkowski/rcnv@sha256:d1bb9b68186d6bf1c1995885e5d677a276c8b2c9dbed72e10a2e33f24cb1edd5"
+    docker: "talkowski/rcnv@sha256:8ff102a4b22757ece64eb161e1879d190e9efa8e95783d39cf83f87e8c783114"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

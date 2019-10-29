@@ -151,6 +151,7 @@ meta.re.single <- function(stats.merged, cohorts, row.idx){
                         "cohort_name"=cohorts)
   meta.res <- rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
                       measure="OR", random = ~ 1 | cohort, slab=cohort_name,
+                      digits=5, control=list(maxiter=1000, stepadj=0.5),
                       data=meta.df)
   as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
                meta.res$zval, -log10(meta.res$pval)))
