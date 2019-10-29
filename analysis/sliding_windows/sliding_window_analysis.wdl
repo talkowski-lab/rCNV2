@@ -17,6 +17,7 @@ workflow sliding_window_analysis {
   Float bin_overlap
   Int pad_controls
   Float p_cutoff
+  Float meta_p_cutoff
   String rCNV_bucket
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
@@ -37,6 +38,7 @@ workflow sliding_window_analysis {
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
     }
+    
     # # Run uCNV assocation tests per phenotype
     # call burden_test as uCNV_burden_test {
     #   input:
@@ -49,6 +51,18 @@ workflow sliding_window_analysis {
     #     rCNV_bucket=rCNV_bucket,
     #     prefix=pheno[0]
     # }
+
+    # Perform meta-analysis of rCNV association statistics
+    call meta_analysis as rCNV_meta_analysis {
+      input:
+        hpo=pheno[1],
+        metacohort_list=metacohort_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code="rCNV",
+        meta_p_cutoff=meta_p_cutoff,
+        rCNV_bucket=rCNV_bucket,
+        prefix=pheno[0]
+    }
   }
 }
 
@@ -67,6 +81,8 @@ task burden_test {
   String prefix
 
   command <<<
+    set -e
+
     # Copy CNV data
     mkdir cleaned_cnv/
     gsutil -m cp ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
@@ -95,12 +111,15 @@ task burden_test {
         case "$CNV" in
           DEL)
             highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz
+            highlight_title="Known DEL GDs (Owen 2018)"
             ;;
           DUP)
             highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz
+            highlight_title="Known DUP GDs (Owen 2018)"
             ;;
           *)
             highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.bed.gz
+            highlight_title="Known GDs (Owen 2018)"
             ;;
         esac
 
@@ -129,9 +148,10 @@ task burden_test {
         /opt/rCNV2/utils/plot_manhattan_qq.R \
           --p-col-name "fisher_phred_p" \
           --p-is-phred \
+          --max-phred-p 100 \
           --cutoff ${p_cutoff} \
           --highlight-bed "$highlight_bed" \
-          --highlight-name "Known GDs (Owen 2018)" \
+          --highlight-name "$highlight_title" \
           --title "$title" \
           "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz" \
           "$meta.${prefix}.${freq_code}.$CNV.sliding_window"
@@ -142,6 +162,7 @@ task burden_test {
         --miami \
         --p-col-name "fisher_phred_p" \
         --p-is-phred \
+        --max-phred-p 100 \
         --cutoff ${p_cutoff} \
         --highlight-bed /opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz \
         --highlight-name "Known DUP GDs (Owen 2018)" \
@@ -163,7 +184,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:60c99454272ed40e5946b5944eb7c3375e95b28146fc4035bafe0aec76a8128a"
+    docker: "talkowski/rcnv@sha256:d1bb9b68186d6bf1c1995885e5d677a276c8b2c9dbed72e10a2e33f24cb1edd5"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -176,3 +197,112 @@ task burden_test {
   }
 }
 
+
+# Run meta-analysis across metacohorts for a single phenotype
+task meta_analysis {
+  String hpo
+  File metacohort_list
+  File metacohort_sample_table
+  String freq_code
+  Float meta_p_cutoff
+  String rCNV_bucket
+  String prefix
+
+  command <<<
+    set -e
+
+    # Copy burden stats
+    gsutil -m cp \
+      ${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/** \
+      ./
+
+    # Get metadata for meta-analysis
+    mega_idx=$( head -n1 "${metacohort_sample_table}" \
+                | sed 's/\t/\n/g' \
+                | awk '{ if ($1=="mega") print NR }' )
+    ncase=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+             | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
+             | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+    nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
+             | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
+             | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+    title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
+
+    # Run meta-analysis for each CNV type
+    for CNV in DEL DUP CNV; do
+      # Set CNV-specific parameters
+      case "$CNV" in
+        DEL)
+          highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz
+          highlight_title="Known DEL GDs (Owen 2018)"
+          ;;
+        DUP)
+          highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz
+          highlight_title="Known DUP GDs (Owen 2018)"
+          ;;
+        *)
+          highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.bed.gz
+          highlight_title="Known GDs (Owen 2018)"
+          ;;
+      esac
+
+      # Perform meta-analysis
+      while read meta cohorts; do
+        echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+      done < <( fgrep -v mega ${metacohort_list} ) \
+      > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
+      /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
+        --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
+        ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
+        ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
+      bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
+      tabix -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz
+
+      # Generate Manhattan & QQ plots
+      /opt/rCNV2/utils/plot_manhattan_qq.R \
+        --p-col-name "meta_phred_p" \
+        --p-is-phred \
+        --cutoff ${meta_p_cutoff} \
+        --highlight-bed "$highlight_bed" \
+        --highlight-name "$highlight_title" \
+        --label-prefix "$CNV" \
+        --title "$title" \
+        "${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz" \
+        "${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis"
+    done
+
+    # Generate Miami & QQ plots
+    /opt/rCNV2/utils/plot_manhattan_qq.R \
+      --miami \
+      --p-col-name "meta_phred_p" \
+      --p-is-phred \
+      --cutoff ${meta_p_cutoff} \
+      --highlight-bed /opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz \
+      --highlight-name "Known DUP GDs (Owen 2018)" \
+      --label-prefix "DUP" \
+      --highlight-bed-2 /opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz \
+      --highlight-name-2 "Known DEL GDs (Owen 2018)" \
+      --label-prefix-2 "DEL" \
+      --title "$title" \
+      "${prefix}.${freq_code}.DUP.sliding_window.meta_analysis.stats.bed.gz" \
+      "${prefix}.${freq_code}.DEL.sliding_window.meta_analysis.stats.bed.gz" \
+      "${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis"
+
+    # Copy results to output bucket
+    gsutil -m cp *.sliding_window.meta_analysis.stats.bed.gz* \
+      "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/"
+    gsutil -m cp *.sliding_window.meta_analysis.*.jpg \
+      "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/plots/"
+    gsutil -m cp *.sliding_window.meta_analysis.*.png \
+      "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/plots/"
+  >>>
+
+  output {}
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:d1bb9b68186d6bf1c1995885e5d677a276c8b2c9dbed72e10a2e33f24cb1edd5"
+    preemptible: 1
+    memory: "4 GB"
+    bootDiskSizeGb: "20"
+  }  
+}

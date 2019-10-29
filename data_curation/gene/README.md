@@ -14,4 +14,5 @@ The Gencode definition of "canonical transcript" is [provided here](http://www.e
 
 We extracted all canonical transcripts from protein-coding genes using `get_canonical_transcripts.py`.  
 
-After filtering, we retained XXX genes for further analysis.  
+After filtering, we retained 20,243 genes for further analysis.  
+

@@ -30,7 +30,7 @@ wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/gencode.
   gencode.v19.pc_transcripts.fa.gz \
   gencode.v19.metadata.Transcript_source.gz \
   gencode.v19.canonical.tsv
-gzip gencode.v19.canonical.tsv
+gzip -f gencode.v19.canonical.tsv
 
 
 # Subset GTF to autosomal canonical protein-coding transcripts

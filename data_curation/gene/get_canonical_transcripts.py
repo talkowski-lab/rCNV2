@@ -231,7 +231,7 @@ def main():
                                on='transcript_id', how='left')        
 
     # Filter to canonical transcripts and save as tsv
-    canon = transcripts.groupby('gene_id').apply(select_canonical_transcript)
+    canon = transcripts.groupby('gene_name').apply(select_canonical_transcript)
     canon.to_csv(args.canonical_transcripts, index=False, sep='\t',
                  na_rep='NA', float_format='%0.f')
 

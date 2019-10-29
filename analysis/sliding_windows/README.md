@@ -51,9 +51,15 @@ Furthermore, for each pair of phenotype group & metacohort, two additional files
 
 All `.png` plots are annotated with 54 known genomic disorder loci (adapted from [Owen _et al._, _BMC Genomics_, 2018](https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-018-5292-7)), for reference.  
 
-### 3. Combine statistics across metacohorts (_where applicable_)  
+### 3. Combine association statistics across metacohorts  
 
-For phenotype groups with at least 100 cases represented in two or more metacohorts (see [the last table on this page](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/)), we XYZ...
+We combined CNV association statistics across metacohorts for each sliding window using a random-effects meta-analysis model.  
+
+This model was implemented using `rma.uni()` from [the `metafor` package in R](https://cran.r-project.org/web/packages/metafor/metafor.pdf).  
+
+Each phenotype & CNV were meta-analyzed separately for a total of three meta-analyses per phenotype.  
+
+Following meta-analysis, individual windows were assessed for genome-wide significance at a threshold of 1.93x10<sup>-5</sup>, corresponding to four times the Bonferroni correction for the number of non-overlapping 200kb windows tested.  
 
 ### 4. Collapse overlapping significant windows  
 
@@ -61,8 +67,8 @@ For phenotype groups with at least 100 cases represented in two or more metacoho
 
 #### _A note on data curation_  
 
-The information presented on this page references various curated datasets or references.  
+The information presented on this page references various curated datasets.  
 
 The curation of these datasets is documented elsewhere in this repository.  
 
-Please see the README available in the [the `data_curation/` subdirectory](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/).  
+Please see the README available in [the `data_curation/` subdirectory](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/).  
