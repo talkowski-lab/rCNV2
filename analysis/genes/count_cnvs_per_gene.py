@@ -179,8 +179,8 @@ def make_output_table(outbed, txbt, genes, cds_dict, control_counts,
     Format master table of counts per gene and write to outbed
     """
 
-    h_cols = '#chr start end gene cds control_count control_count_weighted ' + \
-             'case_count case_count_weighted'
+    h_cols = '#chr start end gene cds control_cnvs control_cnvs_weighted ' + \
+             'case_cnvs case_cnvs_weighted'
     header = '\t'.join(h_cols.split())
     outbed.write(header + '\n')
 

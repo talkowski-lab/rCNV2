@@ -35,6 +35,7 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 gtf="genes/gencode.v19.canonical.gtf.gz"
 pad_controls=25000
+p_cutoff=0.000002587992
 
 
 # Count CNVs in cases and controls per phenotype, split by metacohort and CNV type
@@ -81,30 +82,29 @@ while read prefix hpo; do
         --hpo ${hpo} \
         -z \
         -o "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
-        ${cnv_bed} \
+        "$cnv_bed" \
         ${gtf}
+      tabix -f "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz"
 
-      # # Perform burden test
-      # /opt/rCNV2/analysis/sliding_windows/window_burden_test.R \
-      #   --pheno-table refs/HPOs_by_metacohort.table.tsv \
-      #   --cohort-name $meta \
-      #   --case-hpo ${hpo} \
-      #   --bgzip \
-      #   "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
-      #   "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
-      #   tabix -f "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+      # Perform burden test
+      /opt/rCNV2/analysis/genes/gene_burden_test.R \
+        --pheno-table ${metacohort_sample_table} \
+        --cohort-name $meta \
+        --case-hpo ${hpo} \
+        --bgzip \
+        "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
+        "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
+      tabix -f "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
 
-      # # Generate Manhattan & QQ plots
-      # /opt/rCNV2/utils/plot_manhattan_qq.R \
-      #   --p-col-name "fisher_phred_p" \
-      #   --p-is-phred \
-      #   --cutoff ${p_cutoff} \
-      #   --highlight-bed "$highlight_bed" \
-      #   --highlight-name "$highlight_title" \
-      #   --label-prefix "$CNV" \
-      #   --title "$title" \
-      #   "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz" \
-      #   "$meta.${prefix}.${freq_code}.$CNV.sliding_window"
+      # Generate Manhattan & QQ plots
+      /opt/rCNV2/utils/plot_manhattan_qq.R \
+        --p-col-name "phred_p" \
+        --p-is-phred \
+        --max-phred-p 100 \
+        --cutoff ${p_cutoff} \
+        --title "$title" \
+        "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz" \
+        "$meta.${prefix}.${freq_code}.$CNV.gene_burden"
     done
 
     # # Generate Miami & QQ plots

@@ -187,7 +187,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:8ff102a4b22757ece64eb161e1879d190e9efa8e95783d39cf83f87e8c783114"
+    docker: "talkowski/rcnv@sha256:4148fea68ca3ab62eafada0243f0cd0d7135b00ce48a4fd0462741bf6dc3c8bc"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -310,7 +310,7 @@ task meta_analysis {
   output {}
 
   runtime {
-    docker: "talkowski/rcnv@sha256:40099e3588c1d9f6cd7bcaba1116b7bd66b7adbe0bf299863b4fefe43f7b36f2"
+    docker: "talkowski/rcnv@sha256:4148fea68ca3ab62eafada0243f0cd0d7135b00ce48a4fd0462741bf6dc3c8bc"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

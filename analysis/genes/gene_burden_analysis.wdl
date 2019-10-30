@@ -33,19 +33,6 @@ workflow gene_burden_analysis {
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
     }
-
-    # Run urCNV assocation tests per phenotype
-    call burden_test as rCNV_burden_test {
-      input:
-        hpo=pheno[1],
-        metacohort_list=metacohort_list,
-        metacohort_sample_table=metacohort_sample_table,
-        freq_code="urCNV",
-        gtf=gtf,
-        pad_controls=pad_controls,
-        rCNV_bucket=rCNV_bucket,
-        prefix=pheno[0]
-    }
   }
 }
 
@@ -62,9 +49,17 @@ task burden_test {
   String prefix
 
   command <<<
+    set -e
+
+    # Copy CNV data
+    mkdir cleaned_cnv/
+    gsutil -m cp ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
+
     # Iterate over metacohorts
     while read meta cohorts; do
-      cnv_bed="cleaned_cnv/$meta.$freq_code.bed.gz"
+
+      # Set metacohort parameters
+      cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
       descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
                  | awk -v FS="\t" '{ print $2 }' )
       meta_idx=$( head -n1 "${metacohort_sample_table}" \
@@ -76,7 +71,7 @@ task burden_test {
       nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
                | awk -v FS="\t" -v meta_idx="$meta_idx" '{ print $meta_idx }' \
                | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
-      title="$descrip (${hpo})\n$ncase cases vs $nctrl controls in '${meta}' cohort"
+      title="$descrip (${hpo})\n$ncase cases vs $nctrl controls in '$meta' cohort"
 
       # Iterate over CNV types
       for CNV in CNV DEL DUP; do
@@ -87,21 +82,55 @@ task burden_test {
           --hpo ${hpo} \
           -z \
           -o "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
-          ${cnv_bed} \
+          "$cnv_bed" \
           ${gtf}
         tabix -f "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz"
+
+        # Perform burden test
+        /opt/rCNV2/analysis/genes/gene_burden_test.R \
+          --pheno-table ${metacohort_sample_table} \
+          --cohort-name $meta \
+          --case-hpo ${hpo} \
+          --bgzip \
+          "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
+          "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
+        tabix -f "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
+
+        # Generate Manhattan & QQ plots
+        /opt/rCNV2/utils/plot_manhattan_qq.R \
+          --p-col-name "phred_p" \
+          --p-is-phred \
+          --max-phred-p 100 \
+          --cutoff ${p_cutoff} \
+          --title "$title" \
+          "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
+          "$meta.${prefix}.${freq_code}.$CNV.gene_burden"
       done
+
+      # Generate Miami & QQ plots
+      /opt/rCNV2/utils/plot_manhattan_qq.R \
+        --miami \
+        --p-col-name "phred_p" \
+        --p-is-phred \
+        --max-phred-p 100 \
+        --cutoff ${p_cutoff} \
+        --label-prefix "DUP" \
+        --label-prefix-2 "DEL" \
+        --title "$title" \
+        "$meta.${prefix}.${freq_code}.DUP.gene_burden.counts.bed.gz" \
+        "$meta.${prefix}.${freq_code}.DEL.gene_burden.counts.bed.gz" \
+        "$meta.${prefix}.${freq_code}.gene_burden"
     done < ${metacohort_list}
 
-    # # Copy results to output bucket
-    # gsutil -m cp *.gene_burden.stats.bed.gz* \
-    #   "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/stats/"
-    # gsutil -m cp *.gene_burden.*.png \
-    #   "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/plots/"
+    # Copy results to output bucket
+    gsutil -m cp *.gene_burden.stats.bed.gz* \
+      "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/stats/"
+    gsutil -m cp *.gene_burden.*.png \
+      "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/plots/"
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:8ff102a4b22757ece64eb161e1879d190e9efa8e95783d39cf83f87e8c783114"
+    docker: "talkowski/rcnv@sha256:4148fea68ca3ab62eafada0243f0cd0d7135b00ce48a4fd0462741bf6dc3c8bc"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
