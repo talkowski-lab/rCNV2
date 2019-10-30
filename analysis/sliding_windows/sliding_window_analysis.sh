@@ -167,6 +167,7 @@ for CNV in DEL DUP CNV; do
   > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
   /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
     --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
+    --model mh \
     ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
     ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
   bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed

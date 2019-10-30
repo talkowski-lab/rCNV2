@@ -77,18 +77,22 @@ manhattan <- function (df, cutoff=1e-08, highlights=NULL,
   indexes[, 2:4] <- apply(indexes[, 2:4], 2, as.numeric)
   
   df.plot <- as.data.frame(t(apply(df, 1, function(row){
+    contig.idx <- which(indexes[, 1]==as.numeric(row[1]))
     return(c(row[1], 
-             as.numeric(row[2]) + indexes[as.numeric(row[1]), 4] - indexes[as.numeric(row[1]), 3], 
+             as.numeric(row[2]) + indexes[contig.idx, 4] - indexes[contig.idx, 3], 
              as.numeric(row[3]), 
-             indexes[as.numeric(row[1]), 5]))
+             indexes[contig.idx, 5]))
   })))
   df.plot[, 2] <- as.numeric(as.character(df.plot[, 2]))
   df.plot[, 3] <- as.numeric(as.character(df.plot[, 3]))
   colnames(df.plot) <- c("chr", "pos", "p", "color")
   
+  # Drop rows with NA p-values
+  df.plot <- df.plot[which(!is.na(df.plot$p)), ]
+  
   if(is.null(ymax)){
     ymax <- -log10(df[which(!(is.na(df[, 3]))), 3])
-    ymax <- max(max(ymax[which(!(is.infinite(ymax)))]), -log10(cutoff) + 2)
+    ymax <- max(max(ymax[which(!(is.infinite(ymax)))], na.rm=T), -log10(cutoff) + 2, na.rm=T)
   }
   
   if(reflection == F){
@@ -499,7 +503,7 @@ if(miami == T){
 # Plotting protocol for Manhattan mode
 if(miami == F){
   
-  global.p.min <- min(c(stats$p, 10^-(-log10(cutoff) + 1)))
+  global.p.min <- min(c(stats$p, 10^-(-log10(cutoff) + 1)), na.rm=T)
   
   # Generate Manhattan plot
   manhattan.png.out <- paste(out.prefix, "manhattan.png", sep=".")

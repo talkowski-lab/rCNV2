@@ -140,8 +140,48 @@ combine.stats <- function(stats.list){
 }
 
 
-# Perform random-effects meta-analysis for a single window
-meta.re.single <- function(stats.merged, cohorts, row.idx){
+# Apply empirical continuity correction to meta-analysis data frame
+# Per Sweeting et al., Stat. Med., 2004 (section 3.3)
+sweeting.correction <- function(meta.df, cc.sum=0.01){
+  # Count number of carriers & non-carriers
+  n.alt <- sum(meta.df[, grep("_alt", colnames(meta.df), fixed=T)])
+  n.ref <- sum(meta.df[, grep("_ref", colnames(meta.df), fixed=T)])
+  # Require at least one CNV to be observed
+  if(n.alt>0){
+    nt <- n.alt
+    R <- n.ref/n.alt
+    # Pooled odds ratio estimate of all non-zero studies
+    nonzero.studies <- which(apply(meta.df[, grep("_alt", colnames(meta.df), fixed=T)], 1, sum)>0)
+    nonzero.case.odds <- sum(meta.df$case_alt[nonzero.studies])/sum(meta.df$case_ref[nonzero.studies])
+    nonzero.control.odds <- sum(meta.df$control_alt[nonzero.studies])/sum(meta.df$control_ref[nonzero.studies])
+    if(nonzero.control.odds>0){
+      ohat <- nonzero.case.odds/nonzero.control.odds
+    # Apply standard continuity correction of 0.5 to pooled estimate if no CNVs observed in controls  
+    }else{
+      nonzero.case.odds <- (sum(meta.df$case_alt[nonzero.studies])+0.5)/(sum(meta.df$case_ref[nonzero.studies])+0.5)
+      nonzero.control.odds <- (sum(meta.df$control_alt[nonzero.studies])+0.5)/(sum(meta.df$control_ref[nonzero.studies])+0.5)
+      ohat <- nonzero.case.odds/nonzero.control.odds
+    }
+    # Solve for kc & kt
+    kc <- R/(R+ohat)
+    kt <- ohat/(R+ohat)
+    # Compute continuity corrections
+    cor.case_alt <- cc.sum * kt
+    cor.case_ref <- cc.sum * kc
+    cor.control_alt <- cc.sum * (nt + kt)
+    cor.control_ref <- cc.sum * ((nt*R) + kc)
+    # Apply continuity corrections
+    meta.df$case_alt <- meta.df$case_alt + cor.case_alt
+    meta.df$case_ref <- meta.df$case_ref + cor.case_ref
+    meta.df$control_alt <- meta.df$control_alt + cor.control_alt
+    meta.df$control_ref <- meta.df$control_ref + cor.control_ref
+  }
+  return(meta.df)
+}
+
+
+# Make meta-analysis data frame for a single window
+make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T){
   ncohorts <- length(cohorts)
   meta.df <- data.frame("cohort"=1:ncohorts,
                         "control_ref"=as.numeric(stats.merged[row.idx, grep("control_ref", colnames(stats.merged), fixed=T)]),
@@ -149,16 +189,44 @@ meta.re.single <- function(stats.merged, cohorts, row.idx){
                         "control_alt"=as.numeric(stats.merged[row.idx, grep("control_alt", colnames(stats.merged), fixed=T)]),
                         "case_alt"=as.numeric(stats.merged[row.idx, grep("case_alt", colnames(stats.merged), fixed=T)]),
                         "cohort_name"=cohorts)
-  meta.res <- rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                      measure="OR", random = ~ 1 | cohort, slab=cohort_name,
-                      digits=5, control=list(maxiter=1000, stepadj=0.5),
-                      data=meta.df)
-  as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
-               meta.res$zval, -log10(meta.res$pval)))
+  if(empirical.continuity==T){
+    meta.df <- sweeting.correction(meta.df)
+  }
+  return(meta.df)
 }
-meta.re <- function(stats.merged, cohorts){
+
+
+# Perform meta-analysis for a single window
+meta.single <- function(stats.merged, cohorts, row.idx, empirical.continuity=T){
+  # If no CNVs are observed, return all NAs
+  if(sum(stats.merged[row.idx, grep("_alt", colnames(stats.merged), fixed=T)])>0){
+    meta.df <- make.meta.df(stats.merged, cohorts, row.idx, empirical.continuity)
+    # Meta-analysis
+    if(model=="re"){
+      meta.res <- rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                          measure="OR", data=meta.df, random = ~ 1 | cohort, slab=cohort_name,
+                          add=0, drop00=F, correct=F,
+                          digits=5, control=list(maxiter=1000, stepadj=0.5))
+      as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
+                   meta.res$zval, -log10(meta.res$pval)))
+    }else if(model=="mh"){
+      meta.res <- rma.mh(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                         measure="OR", data=meta.df, slab=cohort_name,
+                         add=0, drop00=F, correct=F)
+      as.numeric(c(meta.res$b, meta.res$ci.lb, meta.res$ci.ub,
+                   meta.res$zval, -log10(meta.res$pval)))
+      
+    }
+  }else{
+    rep(NA, 5)
+  }
+}
+
+
+# Wrapper function to perform a meta-analysis on all windows
+meta <- function(stats.merged, cohorts, model="re"){
   meta.stats <- t(sapply(1:nrow(stats.merged), function(i){
-    meta.re.single(stats.merged, cohorts, i)
+    meta.single(stats.merged, cohorts, i, model)
   }))
   meta.res <- cbind(stats.merged[, 1:3], meta.stats)
   colnames(meta.res) <- c("chr", "start", "end",
@@ -180,7 +248,10 @@ require(metafor, quietly=T)
 option_list <- list(
   make_option(c("--or-corplot"), type="character", default=NULL, 
               help="output .jpg file for pairwise odds ratio correlation plot [default %default]",
-              metavar="path")
+              metavar="path"),
+  make_option(c("--model"), type="character", default="mh", 
+              help="specify meta-analysis model ('re': random effects, 'mh': Mantel-Haenszel) [default %default]",
+              metavar="string")
 )
 
 # Get command-line arguments & options
@@ -193,12 +264,15 @@ opts <- args$options
 infile <- args$args[1]
 outfile <- args$args[2]
 corplot.out <- opts$`or-corplot`
+model <- opts$model
 
 # # Dev parameters
 # infile <- "~/scratch/window_meta_dummy_input.txt"
 # # infile <- "~/scratch/window_meta_dummy_input.ndd.txt"
+# outfile <- "~/scratch/window_meta_test_results.bed"
 # corplot.out <- "~/scratch/corplot.test.jpg"
 # # corplot.out <- "~/scratch/corplot.ndd.test.jpg"
+# model <- "mh"
 
 # Read list of cohorts to meta-analyze
 cohort.info <- read.table(infile, header=F, sep="\t")
@@ -217,7 +291,7 @@ if(!is.null(corplot.out)){
 
 # Conduct meta-analysis & write to file
 stats.merged <- combine.stats(stats.list)
-stats.meta <- meta.re(stats.merged, cohort.info[, 1])
+stats.meta <- meta(stats.merged, cohort.info[, 1], model=model)
 colnames(stats.meta)[1] <- "#chr"
 write.table(stats.meta, outfile, sep="\t",
             row.names=F, col.names=T, quote=F)
