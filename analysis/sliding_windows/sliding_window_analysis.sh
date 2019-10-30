@@ -133,73 +133,83 @@ done < refs/test_phenotypes.list
 
 
 # Run meta-analysis for each CNV type
-mega_idx=$( head -n1 "${metacohort_sample_table}" \
-            | sed 's/\t/\n/g' \
-            | awk '{ if ($1=="mega") print NR }' )
-ncase=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
-         | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
-         | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
-nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
-         | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
-         | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
-title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
-for CNV in DEL DUP CNV; do
-  # Set CNV-specific parameters
-  case "$CNV" in
-    DEL)
-      highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz
-      highlight_title="Known DEL GDs (Owen 2018)"
-      ;;
-    DUP)
-      highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz
-      highlight_title="Known DUP GDs (Owen 2018)"
-      ;;
-    *)
-      highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.bed.gz
-      highlight_title="Known GDs (Owen 2018)"
-      ;;
-  esac
+while read prefix hpo; do
+  descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+             | awk -v FS="\t" '{ print $2 }' )
+  mega_idx=$( head -n1 "${metacohort_sample_table}" \
+              | sed 's/\t/\n/g' \
+              | awk '{ if ($1=="mega") print NR }' )
+  ncase=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+           | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
+           | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+  nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
+           | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
+           | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+  title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
+  for CNV in DEL DUP CNV; do
+    # Set CNV-specific parameters
+    case "$CNV" in
+      DEL)
+        highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz
+        highlight_title="Known DEL GDs (Owen 2018)"
+        ;;
+      DUP)
+        highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz
+        highlight_title="Known DUP GDs (Owen 2018)"
+        ;;
+      *)
+        highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.bed.gz
+        highlight_title="Known GDs (Owen 2018)"
+        ;;
+    esac
 
-  # Perform meta-analysis
-  while read meta cohorts; do
-    echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
-  done < <( fgrep -v mega ${metacohort_list} ) \
-  > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
-  /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
-    --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
-    --model mh \
-    ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
-    ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
-  bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
-  tabix -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz
+    # Perform meta-analysis
+    while read meta cohorts; do
+      echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+    done < <( fgrep -v mega ${metacohort_list} ) \
+    > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
+    /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
+      --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
+      --model mh \
+      ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
+      ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
+    bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
+    tabix -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz
 
-  # Generate Manhattan & QQ plots
+    # Generate Manhattan & QQ plots
+    /opt/rCNV2/utils/plot_manhattan_qq.R \
+      --p-col-name "meta_phred_p" \
+      --p-is-phred \
+      --cutoff ${meta_p_cutoff} \
+      --highlight-bed "$highlight_bed" \
+      --highlight-name "$highlight_title" \
+      --label-prefix "$CNV" \
+      --title "$title" \
+      "${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz" \
+      "${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis"
+  done
+  # Generate Miami & QQ plots
   /opt/rCNV2/utils/plot_manhattan_qq.R \
+    --miami \
     --p-col-name "meta_phred_p" \
     --p-is-phred \
     --cutoff ${meta_p_cutoff} \
-    --highlight-bed "$highlight_bed" \
-    --highlight-name "$highlight_title" \
-    --label-prefix "$CNV" \
+    --highlight-bed /opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz \
+    --highlight-name "Known DUP GDs (Owen 2018)" \
+    --label-prefix "DUP" \
+    --highlight-bed-2 /opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz \
+    --highlight-name-2 "Known DEL GDs (Owen 2018)" \
+    --label-prefix-2 "DEL" \
     --title "$title" \
-    "${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz" \
-    "${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis"
-done
-# Generate Miami & QQ plots
-/opt/rCNV2/utils/plot_manhattan_qq.R \
-  --miami \
-  --p-col-name "meta_phred_p" \
-  --p-is-phred \
-  --cutoff ${meta_p_cutoff} \
-  --highlight-bed /opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz \
-  --highlight-name "Known DUP GDs (Owen 2018)" \
-  --label-prefix "DUP" \
-  --highlight-bed-2 /opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz \
-  --highlight-name-2 "Known DEL GDs (Owen 2018)" \
-  --label-prefix-2 "DEL" \
-  --title "$title" \
-  "${prefix}.${freq_code}.DUP.sliding_window.meta_analysis.stats.bed.gz" \
-  "${prefix}.${freq_code}.DEL.sliding_window.meta_analysis.stats.bed.gz" \
-  "${prefix}.${freq_code}.sliding_window.meta_analysis"
+    "${prefix}.${freq_code}.DUP.sliding_window.meta_analysis.stats.bed.gz" \
+    "${prefix}.${freq_code}.DEL.sliding_window.meta_analysis.stats.bed.gz" \
+    "${prefix}.${freq_code}.sliding_window.meta_analysis"
+done < refs/test_phenotypes.list
+
+
+# Compute final set of significant intervals via binwise covariance analysis
+# 1: extract significant windows. Retain original p-values
+# 2: bedtools intersect those windows versus 
+
 
 

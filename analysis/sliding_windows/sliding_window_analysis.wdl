@@ -135,15 +135,16 @@ task burden_test {
           -o "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
           $cnv_bed \
           ${binned_genome}
+        tabix -f "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz"
 
         # Perform burden test
         /opt/rCNV2/analysis/sliding_windows/window_burden_test.R \
-        --pheno-table ${metacohort_sample_table} \
-        --cohort-name $meta \
-        --case-hpo ${hpo} \
-        --bgzip \
-        "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
-        "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+          --pheno-table ${metacohort_sample_table} \
+          --cohort-name $meta \
+          --case-hpo ${hpo} \
+          --bgzip \
+          "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
+          "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
         tabix -f "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
 
         # Generate Manhattan & QQ plots
@@ -232,6 +233,8 @@ task meta_analysis {
     nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
              | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
              | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+    descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+               | awk -v FS="\t" '{ print $2 }' )
     title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
 
     # Run meta-analysis for each CNV type
@@ -298,7 +301,7 @@ task meta_analysis {
     # Copy results to output bucket
     gsutil -m cp *.sliding_window.meta_analysis.stats.bed.gz* \
       "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/"
-    gsutil -m cp *.sliding_window.meta_analysis.*.jpg \
+    gsutil -m cp *.sliding_window.or_corplot_grid.jpg \
       "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/plots/"
     gsutil -m cp *.sliding_window.meta_analysis.*.png \
       "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/plots/"
@@ -307,7 +310,7 @@ task meta_analysis {
   output {}
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e88c993c809f54bcf56cd44a92a93da188836188f41dd32bb09389ca989a8a9a"
+    docker: "talkowski/rcnv@sha256:40099e3588c1d9f6cd7bcaba1116b7bd66b7adbe0bf299863b4fefe43f7b36f2"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

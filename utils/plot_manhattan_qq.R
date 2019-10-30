@@ -613,5 +613,6 @@ if(miami == F){
      ymax=-log10(global.p.min),
      reflection=T,
      label.cex=0.9*label.cex)
+  dev.off()
 }
 
