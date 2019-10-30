@@ -200,6 +200,6 @@ done
   --title "$title" \
   "${prefix}.${freq_code}.DUP.sliding_window.meta_analysis.stats.bed.gz" \
   "${prefix}.${freq_code}.DEL.sliding_window.meta_analysis.stats.bed.gz" \
-  "${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis"
+  "${prefix}.${freq_code}.sliding_window.meta_analysis"
 
 

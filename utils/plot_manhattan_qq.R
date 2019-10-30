@@ -555,7 +555,7 @@ if(miami == F){
 # Plotting protocol for Miami mode
 }else{
   
-  global.p.min <- min(c(stats$p, stats2$p, 10^-(-log10(cutoff) + 1)))
+  global.p.min <- min(c(stats$p, stats2$p, 10^-(-log10(cutoff) + 1)), na.rm=T)
   
   # Generate Miami plot
   miami.png.out <- paste(out.prefix, "miami.png", sep=".")

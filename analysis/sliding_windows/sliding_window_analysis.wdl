@@ -259,6 +259,7 @@ task meta_analysis {
       > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
       /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
         --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
+        --model mh \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
@@ -292,7 +293,7 @@ task meta_analysis {
       --title "$title" \
       "${prefix}.${freq_code}.DUP.sliding_window.meta_analysis.stats.bed.gz" \
       "${prefix}.${freq_code}.DEL.sliding_window.meta_analysis.stats.bed.gz" \
-      "${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis"
+      "${prefix}.${freq_code}.sliding_window.meta_analysis"
 
     # Copy results to output bucket
     gsutil -m cp *.sliding_window.meta_analysis.stats.bed.gz* \
@@ -306,7 +307,7 @@ task meta_analysis {
   output {}
 
   runtime {
-    docker: "talkowski/rcnv@sha256:8ff102a4b22757ece64eb161e1879d190e9efa8e95783d39cf83f87e8c783114"
+    docker: "talkowski/rcnv@sha256:e88c993c809f54bcf56cd44a92a93da188836188f41dd32bb09389ca989a8a9a"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

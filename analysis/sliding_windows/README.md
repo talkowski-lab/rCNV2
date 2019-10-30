@@ -53,9 +53,11 @@ All `.png` plots are annotated with 54 known genomic disorder loci (adapted from
 
 ### 3. Combine association statistics across metacohorts  
 
-We combined CNV association statistics across metacohorts for each sliding window using a random-effects meta-analysis model.  
+We combined CNV association statistics across metacohorts for each sliding window using the Mantel-Haenszel meta-analysis method for fourfold-tables of count data.  
 
-This model was implemented using `rma.uni()` from [the `metafor` package in R](https://cran.r-project.org/web/packages/metafor/metafor.pdf).  
+This model was implemented using `rma.mh()` from [the `metafor` package in R](https://cran.r-project.org/web/packages/metafor/metafor.pdf).  
+
+Given that rare CNV counts per window are (_i_) sparse and (_ii_) zero-inflated, and furthermore that (_iii_) the case & control sample sizes are unbalanced for most phenotype groups (_e.g._, frequently >10- to 100-fold more controls than cases), we implemented an empirical continuity correction as proposed by [Sweeting _et al._, _Stat. Med._, 2004.](https://onlinelibrary.wiley.com/doi/10.1002/sim.1761)  
 
 Each phenotype & CNV were meta-analyzed separately for a total of three meta-analyses per phenotype.  
 
