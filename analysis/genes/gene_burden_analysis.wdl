@@ -84,7 +84,7 @@ task burden_test {
         # Count CNVs
         /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
           --pad-controls ${pad_controls} \
-          --weight-mode "light" \
+          --weight-mode "strong" \
           -t $CNV \
           --hpo ${hpo} \
           -z \
@@ -98,6 +98,7 @@ task burden_test {
           --pheno-table ${metacohort_sample_table} \
           --cohort-name $meta \
           --case-hpo ${hpo} \
+          --min-weighted-cnvs 0.5 \
           --bgzip \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
@@ -143,7 +144,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:84b1c5a9a68d1cc4c589f698c752ce20155b863d3fc09194500d6e96cb43df95"
+    docker: "talkowski/rcnv@sha256:63ba951ee73e4bded03de328f5cea7fb2eaf249472773cdedf407ecb3d3ed61c"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

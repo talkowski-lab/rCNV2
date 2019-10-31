@@ -71,30 +71,70 @@ import.bed <- function(bed.in, case.col.name, case.n, control.col.name, control.
 }
 
 
-# Test case:control CNV burden per gene
-burden.test <- function(bed, use.unweighted.controls, precision){
+# # Binned Z-test case:control CNV burden per gene
+# bin.burden.test <- function(bed, precision, bins=50){
+#   # Step 1: calculate case proportions and quantiles for all genes
+#   # Note: this also drops all double-zero genes
+#   bed$total.CNV.w <- bed$case.CNV.w + bed$control.CNV.w
+#   bed$delta.total <- bed$case.CNV.w - bed$control.CNV.w
+#   bed$delta.norm <- 100*(bed$case.CNV.w.norm - bed$control.CNV.w.norm)
+#   nonzero.idx <- which(bed$case.CNV + bed$control.CNV > 0)
+#   tbed <- bed[nonzero.idx, ]
+#   tbed$case.prop <- tbed$case.CNV.w / tbed$total.CNV.w
+#   tbed$quantile <- floor(bins*rank(tbed$total.CNV.w)/nrow(tbed)) + 1
+#   tbed$quantile[which(tbed$quantile==max(tbed$quantile))] <- max(tbed$quantile) - 1
+#   
+#   # Step 2: fit null distribution for total difference in normalized, weighted case:control counts
+#   # Fit separately for each quantile
+#   nonzero.idx <- which(tbed$case.CNV + tbed$control.CNV > 0)
+#   more.controls.idx <- intersect(which(tbed$control.CNV.freq >= tbed$case.CNV.freq),
+#                                  nonzero.idx)
+#   sds <- sapply(1:bins, function(q){
+#     null.vals.oneside <- abs(tbed$delta.norm[intersect(which(tbed$quantile==q), more.controls.idx)])
+#     null.vals <- c(-null.vals.oneside, null.vals.oneside)
+#     sd(null.vals, na.rm=T)
+#   })
+#   
+#   #Working code
+#   q <- 50
+#   hist(tbed$delta.norm[which(tbed$quantile==q)], breaks=50, freq=F)
+#   curve(dnorm(x, sd=sds[q]), add=T, col="red", lwd=2)
+#   
+#   # Step 3: calculate Z-score and p-value for each gene depending on quantile
+#   sapply(1:nrow(tbed), function(i){
+#     
+#   })
+# }
+
+
+# Z-test for case:control CNV burden per gene
+z.burden.test <- function(bed, use.unweighted.controls, min.total.CNV.w=1, precision){
   # Step 1: fit normal distribution to mirrored distribution of genes with more CNVs in controls than cases
   # Approach adopted from pLoF constraint calculations per Lek et al., Nature, 2016
-  # Note: use unweighted CNVs in controls, as only focal accumulation in cases matters
+  bed$total.CNV.w <- bed$case.CNV.w + bed$control.CNV.w
   nonzero.idx <- which(bed$case.CNV + bed$control.CNV > 0)
   more.controls.idx <- intersect(which(bed$control.CNV.freq >= bed$case.CNV.freq),
                                  nonzero.idx)
   if(use.unweighted.controls==T){
-    test.vals.raw <- bed$case.CNV.w.norm - bed$control.CNV.freq
+    bed$delta.total <- bed$case.CNV.w - bed$control.CNV
+    bed$delta.norm <- 100*(bed$case.CNV.w.norm - bed$control.CNV.freq)
   }else{
-    test.vals.raw <- bed$case.CNV.w.norm - bed$control.CNV.w.norm
+    bed$delta.total <- bed$case.CNV.w - bed$control.CNV.w
+    bed$delta.norm <- 100*(bed$case.CNV.w.norm - bed$control.CNV.w.norm)
   }
-  null.vals.oneside <- abs(test.vals.raw[more.controls.idx])
-  null.vals.oneside.capped <- null.vals.oneside[which(null.vals.oneside < quantile(null.vals.oneside, 0.995))]
-  null.vals <- c(-null.vals.oneside.capped, null.vals.oneside.capped)
+  null.vals.oneside <- abs(bed$delta.norm[more.controls.idx])
+  # null.vals.oneside.capped <- null.vals.oneside[which(null.vals.oneside < quantile(null.vals.oneside, 0.995))]
+  null.vals <- c(-null.vals.oneside, null.vals.oneside)
   null.mean <- mean(null.vals)
   null.sd <- sd(null.vals)
 
   # Step 2: compute Z-score and p-value for each gene according to null distribution
-  bed$CNV.w.norm.diff <- test.vals.raw
-  bed$Zscore <- bed$CNV.w.norm.diff / null.sd
+  bed$Zscore <- bed$delta.norm / null.sd
   bed$pvalue <- pnorm(bed$Zscore, lower.tail=F)
-
+  
+  # Step 3: overwrite all p-values below minimum case CNV count
+  bed$pvalue[which(bed$total.CNV.w < min.total.CNV.w)] <- NA
+  
   burden.bed <- data.frame("chr" = bed$chr,
                            "start" = bed$start,
                            "end" = bed$end,
@@ -143,6 +183,9 @@ option_list <- list(
               metavar="string"),
   make_option(c("--unweighted-controls"), action="store_true", default=FALSE,
               help="use unweighted control CNV counts for burden testing [default %default]"),
+  make_option(c("--min-weighted-cnvs"), type="numeric", default=1,
+              help="do not compute p-value for genes with fewer than N weighted CNVs [default %default]",
+              metavar="numeric"),
   make_option(c("--precision"), type="integer", default=6,
               help="level of precision for floats [default %default]",
               metavar="integer"),
@@ -180,6 +223,7 @@ control.hpo <- opts$`control-hpo`
 case.col.name <- opts$`case-column`
 control.col.name <- opts$`control-column`
 weighted.suffix <- opts$`weighted-suffix`
+min.total.CNV.w <- opts$`min-weighted-cnvs`
 use.unweighted.controls <- opts$`unweighted-controls`
 precision <- opts$precision
 
@@ -193,7 +237,8 @@ precision <- opts$precision
 # case.col.name <- "case_cnvs"
 # control.col.name <- "control_cnvs"
 # weighted.suffix <- "_weighted"
-# use.unweighted.controls <- T
+# use.unweighted.controls <- F
+# min.total.CNV.w <- 1
 # precision <- 6
 
 # Extract sample counts
@@ -204,7 +249,7 @@ bed <- import.bed(bed.in, case.col.name, sample.counts$case.n,
                   control.col.name, sample.counts$control.n)
 
 # Run burden tests
-burden.bed <- burden.test(bed, use.unweighted.controls, precision)
+burden.bed <- z.burden.test(bed, use.unweighted.controls, min.total.CNV.w, precision)
 
 # Format output
 colnames(burden.bed)[1] <- "#chr"

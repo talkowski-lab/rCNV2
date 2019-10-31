@@ -1,6 +1,6 @@
 # Sliding Window Analyses  
 
-We compared CNV counts between cases and controls across all 22 autosomes in regularized sliding windows. This process is described below.  
+We compared rare CNV counts between cases and controls across all 22 autosomes in regularized sliding windows. This process is described below.  
 
 The code to reproduce these analyses is contained in `sliding_window_analysis.sh`.  
 
@@ -12,9 +12,9 @@ We executed a standardized procedure to conduct sliding window analyses for each
 
 The steps of this procedure are described below:  
 
-### 1. Counting CNVs per window  
+### 1. Counting rare CNVs per window  
 
-For each [metacohort](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/), we intersected rare CNVs against [genome-wide sliding windows](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/binned_genome/) separately for cases and controls.  
+For each [metacohort](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/), we intersected [ultra-rare CNVs](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs) against [genome-wide sliding windows](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/binned_genome/) separately for cases and controls.  
 
 We conducted this procedure a total of three times per phenotype group & metacohort: once each for deletions, duplications, and all CNVs (deletions + duplications).  
 

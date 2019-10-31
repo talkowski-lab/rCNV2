@@ -62,7 +62,7 @@ while read prefix hpo; do
       # Count CNVs
       /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
         --pad-controls ${pad_controls} \
-        --weight-mode "light" \
+        --weight-mode "strong" \
         -t $CNV \
         --hpo ${hpo} \
         -z \
