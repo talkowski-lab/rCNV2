@@ -120,7 +120,7 @@ def process_gtf(gtf_in):
     return gtfbt, txbt, exonbt, genes, transcripts, cds_dict
 
 
-def overlap_cnvs_exons(cnvbt, exonbt, cds_dict, weight_mode):
+def overlap_cnvs_exons(cnvbt, exonbt, cds_dict, weight_mode, min_cds_ovr):
     """
     Compute fraction of CDS overlapped per gene for each CNV
     """
@@ -156,22 +156,27 @@ def overlap_cnvs_exons(cnvbt, exonbt, cds_dict, weight_mode):
         if cnvid not in cnv_weights.keys():
             cnv_weights[cnvid] = {}
         for gene, ovrbp in cnv_cds_sums[cnvid].items():
-            cnv_weights[cnvid][gene] = ovrbp / cds_dict[gene]
-        wsum = sum(cnv_weights[cnvid].values())
-        if weight_mode == 'weak':
-            cnv_weights[cnvid] = {gene: w / wsum for gene, w in cnv_weights[cnvid].items()}
-        elif weight_mode == 'strong':
-            cnv_weights[cnvid] = {gene: w / (2 ** (wsum - 1)) for gene, w in cnv_weights[cnvid].items()}
+            cds_ovr = ovrbp / cds_dict[gene]
+            if cds_ovr >= min_cds_ovr:
+                cnv_weights[cnvid][gene] = cds_ovr
+        if len(cnv_weights[cnvid]) > 0:
+            wsum = sum(cnv_weights[cnvid].values())
+            if weight_mode == 'weak' \
+            or wsum < 1:
+                cnv_weights[cnvid] = {gene: w / wsum for gene, w in cnv_weights[cnvid].items()}
+            elif weight_mode == 'strong':
+                cnv_weights[cnvid] = {gene: w / (2 ** (wsum - 1)) for gene, w in cnv_weights[cnvid].items()}
 
     # Collapse counts per gene
     raw_counts = {gene: len(cnvs) for gene, cnvs in cnvs_per_gene.items()}
     weighted_counts = {}
     for cnv, weights in cnv_weights.items():
-        for gene, w in weights.items():
-            if gene not in weighted_counts.keys():
-                weighted_counts[gene] = w
-            else:
-                weighted_counts[gene] += w
+        if len(weights) > 0:
+            for gene, w in weights.items():
+                if gene not in weighted_counts.keys():
+                    weighted_counts[gene] = w
+                else:
+                    weighted_counts[gene] += w
 
     return raw_counts, weighted_counts
 
@@ -212,6 +217,9 @@ def main():
     parser.add_argument('--weight-mode', help='Specify behavior for distributing ' +
                         'weight for multi-gene CNVs. [default: "strong"]',
                         choices=['weak', 'strong'], default='strong')
+    parser.add_argument('--min-cds-ovr', help='Minimum coding sequence overlap ' +
+                        'to consider a CNV gene-overlapping. [default: 0.2]',
+                        type=float, default=0.2)
     parser.add_argument('-t', '--type', help='Type of CNV to include (DEL/DUP). ' +
                         '[default: all]')
     parser.add_argument('--hpo', help='HPO term to consider for case samples. ' +
@@ -256,10 +264,12 @@ def main():
     # Intersect CNVs with exons
     case_cnvbt = cnvbt.filter(lambda x: args.control_hpo not in x[5].split(';'))
     case_counts, case_weights = overlap_cnvs_exons(case_cnvbt, exonbt, cds_dict, 
-                                                   args.weight_mode)
+                                                   args.weight_mode, 
+                                                   args.min_cds_ovr)
     control_cnvbt = cnvbt.filter(lambda x: args.control_hpo in x[5].split(';'))
     control_counts, control_weights = overlap_cnvs_exons(control_cnvbt, exonbt, 
-                                                         cds_dict, args.weight_mode)
+                                                         cds_dict, args.weight_mode,
+                                                         args.min_cds_ovr)
     
     # Format output table and write to outfile
     make_output_table(outbed, txbt, genes, cds_dict, control_counts, 

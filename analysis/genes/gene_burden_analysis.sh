@@ -35,6 +35,8 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 gtf="genes/gencode.v19.canonical.gtf.gz"
 pad_controls=50000
+min_cds_ovr=0.2
+min_weighted_cnvs=0.5
 p_cutoff=0.000002587992
 
 
@@ -63,6 +65,7 @@ while read prefix hpo; do
       /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
         --pad-controls ${pad_controls} \
         --weight-mode "strong" \
+        --min-cds-ovr ${min_cds_ovr} \
         -t $CNV \
         --hpo ${hpo} \
         -z \
@@ -76,6 +79,7 @@ while read prefix hpo; do
         --pheno-table ${metacohort_sample_table} \
         --cohort-name $meta \
         --case-hpo ${hpo} \
+        --min-weighted-cnvs ${min_weighted_cnvs} \
         --bgzip \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"

@@ -15,6 +15,8 @@ workflow gene_burden_analysis {
   File metacohort_sample_table
   File gtf
   Int pad_controls
+  Float min_cds_ovr
+  Float min_weighted_cnvs
   Float p_cutoff
   String rCNV_bucket
 
@@ -31,6 +33,8 @@ workflow gene_burden_analysis {
         freq_code="uCNV",
         gtf=gtf,
         pad_controls=pad_controls,
+        min_cds_ovr=min_cds_ovr,
+        min_weighted_cnvs=min_weighted_cnvs,
         p_cutoff=p_cutoff,
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
@@ -47,6 +51,8 @@ task burden_test {
   String freq_code
   File gtf
   Int pad_controls
+  Float min_cds_ovr
+  Float min_weighted_cnvs
   Float p_cutoff
   String rCNV_bucket
   String prefix
@@ -85,6 +91,7 @@ task burden_test {
         /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
           --pad-controls ${pad_controls} \
           --weight-mode "strong" \
+          --min-cds-ovr ${min_cds_ovr} \
           -t $CNV \
           --hpo ${hpo} \
           -z \
@@ -98,7 +105,7 @@ task burden_test {
           --pheno-table ${metacohort_sample_table} \
           --cohort-name $meta \
           --case-hpo ${hpo} \
-          --min-weighted-cnvs 0.5 \
+          --min-weighted-cnvs ${min_weighted_cnvs} \
           --bgzip \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
@@ -144,7 +151,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:63ba951ee73e4bded03de328f5cea7fb2eaf249472773cdedf407ecb3d3ed61c"
+    docker: "talkowski/rcnv@sha256:81bf495dd81ea316d850cc83a04d1a3fe2d1140e86daf3c8d3d1f31aee986ec7"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

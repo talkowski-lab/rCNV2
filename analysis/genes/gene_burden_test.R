@@ -184,7 +184,7 @@ option_list <- list(
   make_option(c("--unweighted-controls"), action="store_true", default=FALSE,
               help="use unweighted control CNV counts for burden testing [default %default]"),
   make_option(c("--min-weighted-cnvs"), type="numeric", default=1,
-              help="do not compute p-value for genes with fewer than N weighted CNVs [default %default]",
+              help="do not compute p-value for genes with fewer than N total weighted CNVs [default %default]",
               metavar="numeric"),
   make_option(c("--precision"), type="integer", default=6,
               help="level of precision for floats [default %default]",

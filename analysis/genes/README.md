@@ -22,15 +22,17 @@ We conducted this procedure a total of three times per phenotype group & metacoh
 
 The code to perform this step is contained in `count_cnvs_per_gene.py`.  
 
-We considered a CNV to overlap a gene if it overlapped any exons from that gene.  
+For each CNV-gene pair, we computed the total fraction of exonic bases (CDS) from the gene overlapped by the CNV.  
 
-For each overlapping CNV-gene pair, we computed the total fraction of exonic bases (CDS) from the gene overlapped by the CNV.  
+We considered a CNV to overlap a gene if it overlapped at least 20% of the coding sequence (CDS) from that gene.  
 
 Finally, for each CNV, we distributed weights across all overlapping genes proportionally to the sum of the CDS overlapped per gene. We weighted CNV contributions to each gene in this manner to avoid large CNV segments pushing all genes within those regions to significance. In this analysis, we were principally interested in individual genes with strong, focal effects.  
 
-Weights for each gene _i_ were computed as w<sub>_i_</sub> = CDS<sub>_i_</sub> / &Sigma;<sub>_i_</sub><sup>_N_</sup> CDS<sub>_i_</sub>
+For CNVs overlapping less than 1.0 total CDS, the CNV count was divided strictly proportionally among overlapped gene(s) according to their fraction of CDS overlapped.  
 
-Where w<sub>_i_</sub> is the per-gene weight, CDS<sub>_i_</sub> is the fraction of CDS from gene _i_ overlapped by the CNV, and &Sigma;<sub>_i_</sub><sup>_N_</sup> CDS<sub>_i_</sub> is the sum of the fractions of CDS for all _N_ genes overlapped by the CNV.  
+For all other CNVs overlapping more than a total of 1.0 CDS, weights for each gene _i_ were computed as w<sub>_i_</sub> = CDS<sub>_i_</sub> / 2 <sup>&Sigma;(CDS) - 1</sup>  
+
+Where w<sub>_i_</sub> is the per-gene weight, CDS<sub>_i_</sub> is the fraction of CDS from gene _i_ overlapped by the CNV, and &Sigma;(CDS) is the sum of the fractions of CDS for all genes overlapped by the CNV.  
 
 For clarity, two toy examples of this weighting process are highlighted below:  
 
@@ -42,15 +44,15 @@ For clarity, two toy examples of this weighting process are highlighted below:
 
 In Example #1 above, the CNV completely overlaps two genes and no others.  
 
-Since both genes are fully overlapped by the CNV, the CNV count is divided evenly by two (1.0 + 1.0), since both genes are 100% overlapped by the CNV. Therefore, each gene receives a weighted count of 0.5.  
+Since both genes are fully overlapped by the CNV, the CNV count is divided evenly by 2<sup>(1.0 + 1.0)</sup>, since both genes are 100% overlapped by the CNV. Therefore, each gene receives a weighted count of 0.5.  
 
 #### Example #2  
 | Gene | CNV overlap? | Pct of CDS overlapped by CNV | Weighted CNV count |  
 | :--- | :--- | ---: | ---: |  
 | Gene A | No | 0 | 0 |  
-| Gene B | Yes | 100% | 1 / 2.5 = 0.4 |  
-| Gene C | Yes | 100% | 1 / 2.5 = 0.4 |  
-| Gene D | Yes | 50% | 0.5 / 2.5 = 0.2 |  
+| Gene B | Yes | 100% | 1 / 2<sup>2.5</sup> = 0.18 |  
+| Gene C | Yes | 100% | 1 / 2<sup>2.5</sup> = 0.18 |  
+| Gene D | Yes | 50% | 0.5 / 2<sup>2.5</sup> = 0.09 |  
 
 In Example #2 above, the CNV overlaps three of four genes.  
 
@@ -58,7 +60,7 @@ Gene A is not overlapped, so is not assigned any weighted CNV count.
 
 Genes B, C, and D are all at least partially overlapped, but only Genes B and C are completely overlapped.  
 
-Thus, genes B, C, and D are each assigned a weight proportional to the fraction of their CDS overlapped by the CNV (CDS<sub>_i_</sub> / (1.0 + 1.0 + 0.5) =  CDS<sub>_i_</sub> / 2.5)
+Thus, genes B, C, and D are each assigned a weight proportional to the fraction of their CDS overlapped by the CNV (CDS<sub>_i_</sub> / 2<sup>(1.0 + 1.0 + 0.5)</sup> =  CDS<sub>_i_</sub> / 2<sup>2.5</sup> = CDS<sub>_i_</sub> / 5.66)
 
 
 ### 2. Calculate burden statistics between cases & controls  
@@ -83,6 +85,7 @@ Furthermore, for each pair of phenotype group & metacohort, two additional files
 6. `$metacohort.$hpo.rCNV.gene_burden.miami_with_qq.png`: a multi-panel composite plot of association statistics, combining a Miami plot with QQ plots for deletions and duplications separately  
 
 All `.png` plots are annotated with 2,939 genes known to be constrained against rare loss-of-function variation (adapted from gnomAD v2.1.1; [Karczewski _et al._, _bioRxiv_, 2019](https://www.biorxiv.org/content/10.1101/531210v3)), for reference.  
+
 
 ---  
 
