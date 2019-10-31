@@ -15,6 +15,7 @@ workflow gene_burden_analysis {
   File metacohort_sample_table
   File gtf
   Int pad_controls
+  Float p_cutoff
   String rCNV_bucket
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
@@ -30,6 +31,7 @@ workflow gene_burden_analysis {
         freq_code="rCNV",
         gtf=gtf,
         pad_controls=pad_controls,
+        p_cutoff=p_cutoff,
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
     }
@@ -45,15 +47,19 @@ task burden_test {
   String freq_code
   File gtf
   Int pad_controls
+  Float p_cutoff
   String rCNV_bucket
   String prefix
 
   command <<<
     set -e
 
-    # Copy CNV data
+    # Copy CNV data and constrained gene coordinates
     mkdir cleaned_cnv/
     gsutil -m cp ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
+    mkdir refs/
+    gsutil cp ${rCNV_bucket}/analysis/analysis_refs/gencode.v19.canonical.constrained.bed.gz \
+      refs/
 
     # Iterate over metacohorts
     while read meta cohorts; do
@@ -78,6 +84,7 @@ task burden_test {
         # Count CNVs
         /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
           --pad-controls ${pad_controls} \
+          --weight-mode "strong" \
           -t $CNV \
           --hpo ${hpo} \
           -z \
@@ -91,6 +98,7 @@ task burden_test {
           --pheno-table ${metacohort_sample_table} \
           --cohort-name $meta \
           --case-hpo ${hpo} \
+          --unweighted-controls \
           --bgzip \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
@@ -102,8 +110,10 @@ task burden_test {
           --p-is-phred \
           --max-phred-p 100 \
           --cutoff ${p_cutoff} \
+          --highlight-bed "refs/gencode.v19.canonical.constrained.bed.gz" \
+          --highlight-name "Constrained genes (gnomAD)" \
           --title "$title" \
-          "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
+          "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz" \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden"
       done
 
@@ -114,11 +124,15 @@ task burden_test {
         --p-is-phred \
         --max-phred-p 100 \
         --cutoff ${p_cutoff} \
+        --highlight-bed "refs/gencode.v19.canonical.constrained.bed.gz" \
+        --highlight-name "Constrained genes (gnomAD)" \
         --label-prefix "DUP" \
+        --highlight-bed-2 "refs/gencode.v19.canonical.constrained.bed.gz" \
+        --highlight-name-2 "Constrained genes (gnomAD)" \
         --label-prefix-2 "DEL" \
         --title "$title" \
-        "$meta.${prefix}.${freq_code}.DUP.gene_burden.counts.bed.gz" \
-        "$meta.${prefix}.${freq_code}.DEL.gene_burden.counts.bed.gz" \
+        "$meta.${prefix}.${freq_code}.DUP.gene_burden.stats.bed.gz" \
+        "$meta.${prefix}.${freq_code}.DEL.gene_burden.stats.bed.gz" \
         "$meta.${prefix}.${freq_code}.gene_burden"
     done < ${metacohort_list}
 
@@ -130,14 +144,14 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:4148fea68ca3ab62eafada0243f0cd0d7135b00ce48a4fd0462741bf6dc3c8bc"
+    docker: "talkowski/rcnv@sha256:aa3a504a7e405337e3118bba195f0f91d47bf74a6bc8383bbb02873eb74ee8ea"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
   }
 
   output {
-    Array[File] counts = glob("*.gene_burden.counts.bed.gz*")
+    Array[File] stats_beds = glob("*.gene_burden.stats.bed.gz")
+    Array[File] stats_bed_idxs = glob("*.gene_burden.stats.bed.gz.tbi")
   }
 }
-    

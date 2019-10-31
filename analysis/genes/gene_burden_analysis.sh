@@ -15,7 +15,7 @@
 docker run --rm -it talkowski/rcnv
 
 
-# Copy all filtered CNV data, sliding windows, and other references 
+# Copy all filtered CNV data, gene coordinates, and other references 
 # from the project Google Bucket (note: requires permissions)
 gcloud auth login
 mkdir cleaned_cnv/
@@ -59,25 +59,10 @@ while read prefix hpo; do
 
     # Iterate over CNV types
     for CNV in CNV DEL DUP; do
-      # # Set CNV-specific parameters
-      # case "$CNV" in
-      #   DEL)
-      #     highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz
-      #     highlight_title="Known DEL GDs (Owen 2018)"
-      #     ;;
-      #   DUP)
-      #     highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz
-      #     highlight_title="Known DUP GDs (Owen 2018)"
-      #     ;;
-      #   *)
-      #     highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.bed.gz
-      #     highlight_title="Known GDs (Owen 2018)"
-      #     ;;
-      # esac
-
       # Count CNVs
       /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
         --pad-controls ${pad_controls} \
+        --weight-mode "strong" \
         -t $CNV \
         --hpo ${hpo} \
         -z \
@@ -91,6 +76,7 @@ while read prefix hpo; do
         --pheno-table ${metacohort_sample_table} \
         --cohort-name $meta \
         --case-hpo ${hpo} \
+        --unweighted-controls \
         --bgzip \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
@@ -102,28 +88,30 @@ while read prefix hpo; do
         --p-is-phred \
         --max-phred-p 100 \
         --cutoff ${p_cutoff} \
+        --highlight-bed "refs/gencode.v19.canonical.constrained.bed.gz" \
+        --highlight-name "Constrained genes (gnomAD)" \
         --title "$title" \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz" \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden"
     done
 
-    # # Generate Miami & QQ plots
-    # title="$descrip (${hpo})\nCohort '${meta}': $ncase cases vs $nctrl controls"
-    # /opt/rCNV2/utils/plot_manhattan_qq.R \
-    #   --miami \
-    #   --p-col-name "fisher_phred_p" \
-    #   --p-is-phred \
-    #   --cutoff ${p_cutoff} \
-    #   --highlight-bed /opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz \
-    #   --highlight-name "Known DUP GDs (Owen 2018)" \
-    #   --label-prefix "DUP" \
-    #   --highlight-bed-2 /opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz \
-    #   --highlight-name-2 "Known DEL GDs (Owen 2018)" \
-    #   --label-prefix-2 "DEL" \
-    #   --title "$title" \
-    #   "$meta.${prefix}.${freq_code}.DUP.sliding_window.stats.bed.gz" \
-    #   "$meta.${prefix}.${freq_code}.DEL.sliding_window.stats.bed.gz" \
-    #   "$meta.${prefix}.${freq_code}.sliding_window"
+    # Generate Miami & QQ plots
+    /opt/rCNV2/utils/plot_manhattan_qq.R \
+      --miami \
+      --p-col-name "phred_p" \
+      --p-is-phred \
+      --max-phred-p 100 \
+      --cutoff ${p_cutoff} \
+      --highlight-bed "refs/gencode.v19.canonical.constrained.bed.gz" \
+      --highlight-name "Constrained genes (gnomAD)" \
+      --label-prefix "DUP" \
+      --highlight-bed-2 "refs/gencode.v19.canonical.constrained.bed.gz" \
+      --highlight-name-2 "Constrained genes (gnomAD)" \
+      --label-prefix-2 "DEL" \
+      --title "$title" \
+      "$meta.${prefix}.${freq_code}.DUP.gene_burden.stats.bed.gz" \
+      "$meta.${prefix}.${freq_code}.DEL.gene_burden.stats.bed.gz" \
+      "$meta.${prefix}.${freq_code}.gene_burden"
   done < ${metacohort_list}
 done < refs/test_phenotypes.list
 

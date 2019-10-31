@@ -69,7 +69,7 @@ def main():
                         type=float, default=0.75)
     parser.add_argument('--pad-controls', help='Distance to be added to control ' +
                         'breakpoints. [default: 0]',
-                        type=float, default=0.75)
+                        type=float, default=0)
     parser.add_argument('-t', '--type', help='Type of CNV to include (DEL/DUP). ' +
                         '[default: all]')
     parser.add_argument('--hpo', help='HPO term to consider for case samples. ' +

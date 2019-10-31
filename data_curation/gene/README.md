@@ -16,3 +16,14 @@ We extracted all canonical transcripts from protein-coding genes using `get_cano
 
 After filtering, we retained 19,346 genes for further analysis.  
 
+## Gene set definitions  
+
+For certain analyses, we considered various subsets of genes. These are defined below.  
+
+Note that all gene sets were required to have a unique match to a gene name from one of the 19,346 canonical, protein-coding genes curated for this study (as defined above).  
+
+| Gene set | # genes | Source | Description |  
+| :--- | ---: | :--- | :--- |  
+| Constrained genes | 2,939 | [Karczewski et al., bioRxiv (2019)](https://www.biorxiv.org/content/10.1101/531210v3) | Genes with pLI ≥ 0.95 |  
+
+

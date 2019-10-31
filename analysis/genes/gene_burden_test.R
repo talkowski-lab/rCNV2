@@ -72,25 +72,32 @@ import.bed <- function(bed.in, case.col.name, case.n, control.col.name, control.
 
 
 # Test case:control CNV burden per gene
-burden.test <- function(bed, precision){
+burden.test <- function(bed, use.unweighted.controls, precision){
   # Step 1: fit normal distribution to mirrored distribution of genes with more CNVs in controls than cases
   # Approach adopted from pLoF constraint calculations per Lek et al., Nature, 2016
+  # Note: use unweighted CNVs in controls, as only focal accumulation in cases matters
   nonzero.idx <- which(bed$case.CNV + bed$control.CNV > 0)
-  more.controls.idx <- which(bed$control.CNV.w.norm > bed$case.CNV.w.norm)
-  null.vals.oneside <- abs(bed$control.CNV.w.norm[more.controls.idx])
+  more.controls.idx <- which(bed$control.CNV.freq > bed$case.CNV.freq)
+  if(use.unweighted.controls==T){
+    test.vals.raw <- bed$case.CNV.w.norm - bed$control.CNV.freq
+  }else{
+    test.vals.raw <- bed$case.CNV.w.norm - bed$control.CNV.w.norm
+  }
+  null.vals.oneside <- abs(test.vals.raw[more.controls.idx])
   null.vals.oneside.capped <- null.vals.oneside[which(null.vals.oneside < quantile(null.vals.oneside, 0.99))]
   null.vals <- c(-null.vals.oneside.capped, null.vals.oneside.capped)
   null.mean <- 0
   null.sd <- sd(null.vals)
   
   # Step 2: compute Z-score and p-value for each gene according to null distribution
-  bed$CNV.w.norm.diff <- bed$case.CNV.w.norm - bed$control.CNV.w.norm
+  bed$CNV.w.norm.diff <- test.vals.raw
   bed$Zscore <- bed$CNV.w.norm.diff / null.sd
   bed$pvalue <- pnorm(bed$Zscore, lower.tail=F)
 
   burden.bed <- data.frame("chr" = bed$chr,
                            "start" = bed$start,
                            "end" = bed$end,
+                           "gene" = bed$gene,
                            "case_cnvs" = bed$case.CNV,
                            "case_freq" = round(bed$case.CNV.freq, precision),
                            "case_cnvs_weighted" = round(bed$case.CNV.w, precision),
@@ -133,6 +140,8 @@ option_list <- list(
   make_option(c("--weighted-suffix"), type="character", default='_weighted',
               help="suffix appended to the end of CNV count columns for weighted counts [default %default]",
               metavar="string"),
+  make_option(c("--unweighted-controls"), action="store_true", default=FALSE,
+              help="use unweighted control CNV counts for burden testing [default %default]"),
   make_option(c("--precision"), type="integer", default=6,
               help="level of precision for floats [default %default]",
               metavar="integer"),
@@ -170,6 +179,7 @@ control.hpo <- opts$`control-hpo`
 case.col.name <- opts$`case-column`
 control.col.name <- opts$`control-column`
 weighted.suffix <- opts$`weighted-suffix`
+use.unweighted.controls <- opts$`unweighted-controls`
 precision <- opts$precision
 
 # # DEV PARAMETERS:
@@ -192,7 +202,7 @@ bed <- import.bed(bed.in, case.col.name, sample.counts$case.n,
                   control.col.name, sample.counts$control.n)
 
 # Run burden tests
-burden.bed <- burden.test(bed, precision)
+burden.bed <- burden.test(bed, use.unweighted.controls, precision)
 
 # Format output
 colnames(burden.bed)[1] <- "#chr"
