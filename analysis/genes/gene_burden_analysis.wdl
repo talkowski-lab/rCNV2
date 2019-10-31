@@ -22,13 +22,13 @@ workflow gene_burden_analysis {
 
   # Scatter over phenotypes
   scatter ( pheno in phenotypes ) {
-    # Run rCNV assocation tests per phenotype
-    call burden_test as rCNV_burden_test {
+    # Run uCNV assocation tests per phenotype
+    call burden_test as uCNV_burden_test {
       input:
         hpo=pheno[1],
         metacohort_list=metacohort_list,
         metacohort_sample_table=metacohort_sample_table,
-        freq_code="rCNV",
+        freq_code="uCNV",
         gtf=gtf,
         pad_controls=pad_controls,
         p_cutoff=p_cutoff,
@@ -84,7 +84,7 @@ task burden_test {
         # Count CNVs
         /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
           --pad-controls ${pad_controls} \
-          --weight-mode "strong" \
+          --weight-mode "light" \
           -t $CNV \
           --hpo ${hpo} \
           -z \
@@ -98,7 +98,6 @@ task burden_test {
           --pheno-table ${metacohort_sample_table} \
           --cohort-name $meta \
           --case-hpo ${hpo} \
-          --unweighted-controls \
           --bgzip \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
@@ -144,7 +143,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:aa3a504a7e405337e3118bba195f0f91d47bf74a6bc8383bbb02873eb74ee8ea"
+    docker: "talkowski/rcnv@sha256:84b1c5a9a68d1cc4c589f698c752ce20155b863d3fc09194500d6e96cb43df95"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

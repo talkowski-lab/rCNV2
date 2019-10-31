@@ -65,6 +65,20 @@ workflow sliding_window_analysis {
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
     }
+
+    # # Perform meta-analysis of uCNV association statistics
+    # call meta_analysis as uCNV_meta_analysis {
+    #   input:
+    #     stats_beds=rCNV_burden_test.stats_beds,
+    #     stats_bed_idxs=rCNV_burden_test.stats_bed_idxs,
+    #     hpo=pheno[1],
+    #     metacohort_list=metacohort_list,
+    #     metacohort_sample_table=metacohort_sample_table,
+    #     freq_code="uCNV",
+    #     meta_p_cutoff=meta_p_cutoff,
+    #     rCNV_bucket=rCNV_bucket,
+    #     prefix=pheno[0]
+    # }
   }
 }
 
@@ -314,5 +328,41 @@ task meta_analysis {
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
-  }  
+  }
 }
+
+
+# task reset_gwide_signif {
+#   File phenotype_list
+#   File metacohort_list
+#   File metacohort_sample_table
+#   String freq_code
+#   Float gw_min_var_explained
+#   String rCNV_bucket
+
+#   command <<<
+#     set -e
+
+#     # Download all meta-analysis stats files
+#     mkdir stats/
+#     gsutil -m cp \
+#       ${rCNV_bucket}/analysis/sliding_windows/**.${freq_code}.**.sliding_window.meta_analysis.stats.bed.gz \
+#       stats/
+
+#     # Iterate over phenotypes and make matrix of p-values
+#     mkdir pvals/
+#     while read pheno hpo; do
+#       for CNV in DEL DUP; do
+#         zcat stats/$pheno.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz \
+#         | awk -v FS="\t" '{ if ($1 !~ "#") print $NF }' \
+#         | cat <( echo "$pheno.$CNV" ) - \
+#         > pvals/$pheno.$CNV.pvals.txt
+#       done
+#     done < ${phenotype_list}
+#     paste pvals/*.pvals.txt | gzip -c > pval_matrix.txt.gz
+
+
+#   >>>
+
+
+# }

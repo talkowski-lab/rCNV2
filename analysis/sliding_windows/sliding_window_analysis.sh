@@ -31,13 +31,15 @@ hpo="HP:0001250"
 prefix="HP0001250"
 meta="meta1"
 freq_code="rCNV"
+phenotype_list="refs/test_phenotypes.list"
 metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
+rCNV_bucket="gs://rcnv_project"
 p_cutoff=0.0000771724
 meta_p_cutoff=0.0000192931
 bin_overlap=0.5
-pad_controls=25000
+pad_controls=50000
 
 
 # Count CNVs in cases and controls per phenotype, split by metacohort and CNV type

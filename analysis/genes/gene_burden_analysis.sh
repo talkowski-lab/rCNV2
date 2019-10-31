@@ -25,16 +25,16 @@ mkdir refs/
 gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
 
-# Test/dev parameters (seizures)
-hpo="HP:0001250"
-prefix="HP0001250"
+# Test/dev parameters (NDDs)
+hpo="HP:0012759"
+prefix="HP0012759"
 meta="meta1"
-freq_code="rCNV"
+freq_code="uCNV"
 CNV="DEL"
 metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 gtf="genes/gencode.v19.canonical.gtf.gz"
-pad_controls=25000
+pad_controls=50000
 p_cutoff=0.000002587992
 
 
@@ -62,7 +62,7 @@ while read prefix hpo; do
       # Count CNVs
       /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
         --pad-controls ${pad_controls} \
-        --weight-mode "strong" \
+        --weight-mode "light" \
         -t $CNV \
         --hpo ${hpo} \
         -z \
@@ -76,7 +76,6 @@ while read prefix hpo; do
         --pheno-table ${metacohort_sample_table} \
         --cohort-name $meta \
         --case-hpo ${hpo} \
-        --unweighted-controls \
         --bgzip \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"

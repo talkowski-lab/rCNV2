@@ -77,18 +77,19 @@ burden.test <- function(bed, use.unweighted.controls, precision){
   # Approach adopted from pLoF constraint calculations per Lek et al., Nature, 2016
   # Note: use unweighted CNVs in controls, as only focal accumulation in cases matters
   nonzero.idx <- which(bed$case.CNV + bed$control.CNV > 0)
-  more.controls.idx <- which(bed$control.CNV.freq > bed$case.CNV.freq)
+  more.controls.idx <- intersect(which(bed$control.CNV.freq >= bed$case.CNV.freq),
+                                 nonzero.idx)
   if(use.unweighted.controls==T){
     test.vals.raw <- bed$case.CNV.w.norm - bed$control.CNV.freq
   }else{
     test.vals.raw <- bed$case.CNV.w.norm - bed$control.CNV.w.norm
   }
   null.vals.oneside <- abs(test.vals.raw[more.controls.idx])
-  null.vals.oneside.capped <- null.vals.oneside[which(null.vals.oneside < quantile(null.vals.oneside, 0.99))]
+  null.vals.oneside.capped <- null.vals.oneside[which(null.vals.oneside < quantile(null.vals.oneside, 0.995))]
   null.vals <- c(-null.vals.oneside.capped, null.vals.oneside.capped)
-  null.mean <- 0
+  null.mean <- mean(null.vals)
   null.sd <- sd(null.vals)
-  
+
   # Step 2: compute Z-score and p-value for each gene according to null distribution
   bed$CNV.w.norm.diff <- test.vals.raw
   bed$Zscore <- bed$CNV.w.norm.diff / null.sd
@@ -183,15 +184,16 @@ use.unweighted.controls <- opts$`unweighted-controls`
 precision <- opts$precision
 
 # # DEV PARAMETERS:
-# bed.in <- "~/scratch/meta1.HP0001250.rCNV.DEL.gene_burden.counts.bed.gz"
+# bed.in <- "~/scratch/meta1.HP0012759.uCNV.DEL.gene_burden.counts.bed.gz"
 # outfile <- "~/scratch/test_gene_burden.stats.txt"
 # pheno.table.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
 # cohort.name <- "meta1"
-# case.hpo <- "HP:0001250"
+# case.hpo <- "HP:0012759"
 # control.hpo <- "HEALTHY_CONTROL"
 # case.col.name <- "case_cnvs"
 # control.col.name <- "control_cnvs"
 # weighted.suffix <- "_weighted"
+# use.unweighted.controls <- T
 # precision <- 6
 
 # Extract sample counts
