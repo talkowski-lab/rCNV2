@@ -84,7 +84,7 @@ Furthermore, for each pair of phenotype group & metacohort, two additional files
 5. `$metacohort.$hpo.rCNV.gene_burden.miami.png`: a Miami plot of association statistics for each gene, with duplications above and deletions below the x-axis  
 6. `$metacohort.$hpo.rCNV.gene_burden.miami_with_qq.png`: a multi-panel composite plot of association statistics, combining a Miami plot with QQ plots for deletions and duplications separately  
 
-All `.png` plots are annotated with 2,939 genes known to be constrained against rare loss-of-function variation (adapted from gnomAD v2.1.1; [Karczewski _et al._, _bioRxiv_, 2019](https://www.biorxiv.org/content/10.1101/531210v3)), for reference.  
+All `.png` plots are annotated with genes that are both (_i_) reportedly associated with the HPO term per the HPO database and (_ii_) known to be constrained against rare loss-of-function variation (adapted from gnomAD v2.1.1; [Karczewski _et al._, _bioRxiv_, 2019](https://www.biorxiv.org/content/10.1101/531210v3)), for reference.  
 
 
 ---  

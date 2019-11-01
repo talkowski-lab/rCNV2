@@ -25,7 +25,102 @@ mkdir refs/
 gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
 
-# Test/dev parameters (NDDs)
+# Test/dev parameters for building null distribution
+hpo="HP:0000118"
+meta="meta1"
+freq_code="uCNV"
+CNV="DEL"
+metacohort_list="refs/rCNV_metacohort_list.txt"
+metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
+gtf="genes/gencode.v19.canonical.gtf.gz"
+weight_mode="weak"
+pad_controls=50000
+min_cds_ovr=0.2
+prefix="HP0000118"
+
+
+# Iterate over CNV types
+for CNV in DEL DUP CNV; do
+
+  # Iterate over metacohorts
+  while read meta cohorts; do
+
+    # Set metacohort parameters
+    cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
+    meta_idx=$( head -n1 "${metacohort_sample_table}" \
+                | sed 's/\t/\n/g' \
+                | awk -v meta="$meta" '{ if ($1==meta) print NR }' )
+    ncase=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+             | awk -v FS="\t" -v meta_idx="$meta_idx" '{ print $meta_idx }' \
+             | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+    nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
+             | awk -v FS="\t" -v meta_idx="$meta_idx" '{ print $meta_idx }' \
+             | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+
+    # Count CNVs
+    /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
+      --pad-controls ${pad_controls} \
+      --weight-mode ${weight_mode} \
+      --min-cds-ovr ${min_cds_ovr} \
+      -t ${CNV} \
+      --hpo ${hpo} \
+      -z \
+      -o "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.counts.bed.gz" \
+      "$cnv_bed" \
+      ${gtf}
+    tabix -f "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.counts.bed.gz"
+
+    # Build null distribution
+    /opt/rCNV2/analysis/genes/gene_burden_test.R \
+      --pheno-table ${metacohort_sample_table} \
+      --cohort-name $meta \
+      --case-hpo ${hpo} \
+      --build-null \
+      --null-dist-plot $meta.${prefix}.${freq_code}.${CNV}.gene_burden.null_fit.jpg \
+      --precision 8 \
+      "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.counts.bed.gz" \
+      "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.null_fit.txt"
+
+  done < ${metacohort_list}
+
+  # Merge null tables
+  cat *.${prefix}.${freq_code}.${CNV}.gene_burden.null_fit.txt \
+  | grep -ve '^cohort' \
+  | awk -v OFS="\t" -v freq_code=${freq_code} -v CNV=${CNV} \
+    '{ print freq_code, CNV, $0 }' \
+  | sort -Vk3,3 \
+  | cat <( head -n1 mega.${prefix}.${freq_code}.${CNV}.gene_burden.null_fit.txt \
+           | sed 's/^/#freq_code\tCNV\t/g' ) \
+        - \
+  > ${prefix}.${freq_code}.${CNV}.gene_burden.all_null_fits.txt
+
+  # Copy plots to rCNV bucket (note: requires permissions)
+  gsutil -m cp *null_fit.jpg \
+    gs://rcnv_project/analysis/gene_burden/null_fits/${freq_code}/plots/
+done
+
+# Merge null tables
+#TBD: produce uCNV.gene_burden.all_null.fits.txt
+
+
+
+
+# Test/dev parameters (seizures)
+hpo="HP:0001250"
+prefix="HP0001250"
+meta="meta2"
+freq_code="uCNV"
+CNV="DEL"
+metacohort_list="refs/rCNV_metacohort_list.txt"
+metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
+gtf="genes/gencode.v19.canonical.gtf.gz"
+null_table="uCNV.gene_burden.all_null.fits.txt"
+pad_controls=50000
+weight_mode="weak"
+min_cds_ovr=0.2
+p_cutoff=0.000002587992
+
+# Test/dev parameters (NDD)
 hpo="HP:0012759"
 prefix="HP0012759"
 meta="meta1"
@@ -34,19 +129,29 @@ CNV="DEL"
 metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 gtf="genes/gencode.v19.canonical.gtf.gz"
+null_table="HP0000118.uCNV.DEL.gene_burden.all_null_fits.txt"
 pad_controls=50000
+weight_mode="strong"
 min_cds_ovr=0.2
-min_weighted_cnvs=0.5
 p_cutoff=0.000002587992
 
 
 # Count CNVs in cases and controls per phenotype, split by metacohort and CNV type
 # Iterate over phenotypes
 while read prefix hpo; do
+
+  # Set HPO-specific parameters
   descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
              | awk -v FS="\t" '{ print $2 }' )
+  zcat refs/gencode.v19.canonical.constrained.bed.gz \
+  | fgrep -wf genes/gene_lists/$prefix.HPOdb.constrained.genes.list \
+  | cat <( echo -e "#chr\tstart\tend\tgene" ) - \
+  > $prefix.highlight_regions.bed
+
   # Iterate over metacohorts
   while read meta cohorts; do
+
+    # Set metacohort-specific parameters
     cnv_bed="cleaned_cnv/$meta.$freq_code.bed.gz"
     meta_idx=$( head -n1 "${metacohort_sample_table}" \
                 | sed 's/\t/\n/g' \
@@ -64,7 +169,7 @@ while read prefix hpo; do
       # Count CNVs
       /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
         --pad-controls ${pad_controls} \
-        --weight-mode "strong" \
+        --weight-mode ${weight_mode} \
         --min-cds-ovr ${min_cds_ovr} \
         -t $CNV \
         --hpo ${hpo} \
@@ -78,8 +183,10 @@ while read prefix hpo; do
       /opt/rCNV2/analysis/genes/gene_burden_test.R \
         --pheno-table ${metacohort_sample_table} \
         --cohort-name $meta \
+        --cnv $CNV \
+        --null-table-in ${null_table} \
+        --null-model "gaussian" \
         --case-hpo ${hpo} \
-        --min-weighted-cnvs ${min_weighted_cnvs} \
         --bgzip \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
@@ -91,8 +198,8 @@ while read prefix hpo; do
         --p-is-phred \
         --max-phred-p 100 \
         --cutoff ${p_cutoff} \
-        --highlight-bed "refs/gencode.v19.canonical.constrained.bed.gz" \
-        --highlight-name "Constrained genes (gnomAD)" \
+        --highlight-bed "$prefix.highlight_regions.bed" \
+        --highlight-name "Constrained genes associated with this phenotype" \
         --title "$title" \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz" \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden"
@@ -105,11 +212,11 @@ while read prefix hpo; do
       --p-is-phred \
       --max-phred-p 100 \
       --cutoff ${p_cutoff} \
-      --highlight-bed "refs/gencode.v19.canonical.constrained.bed.gz" \
-      --highlight-name "Constrained genes (gnomAD)" \
+      --highlight-bed "$prefix.highlight_regions.bed" \
+      --highlight-name "Constrained genes associated with this phenotype" \
       --label-prefix "DUP" \
-      --highlight-bed-2 "refs/gencode.v19.canonical.constrained.bed.gz" \
-      --highlight-name-2 "Constrained genes (gnomAD)" \
+      --highlight-bed-2 "$prefix.highlight_regions.bed" \
+      --highlight-name-2 "Constrained genes associated with this phenotype" \
       --label-prefix-2 "DEL" \
       --title "$title" \
       "$meta.${prefix}.${freq_code}.DUP.gene_burden.stats.bed.gz" \
