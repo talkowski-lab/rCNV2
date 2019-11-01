@@ -177,7 +177,7 @@ import.bed <- function(bed.in, case.col.name, case.n,
 plot.null.normal <- function(null.vals, null.mean, null.sd, cohort.name){
   plot.lims <- quantile(null.vals, c(0.001, 0.999))
   par(mar=c(4, 4, 2.5, 1), bty="n")
-  hist(null.vals, col="gray90", freq=F, main="", xlim=plot.lims,
+  hist(null.vals, col="gray90", freq=F, main="", xlim=plot.lims, breaks=50,
        xlab=bquote(Delta * "(Case, Control; %)"))
   curve(dnorm(x, null.mean, null.sd), add=T, lwd=2)
   mtext(3, line=0.2, font=2,
@@ -187,7 +187,7 @@ plot.null.normal <- function(null.vals, null.mean, null.sd, cohort.name){
 }
 plot.null.exp <- function(null.vals.oneside, null.exp.rate, cohort.name){
   par(mar=c(4, 4, 2.5, 1), bty="n")
-  hist(null.vals.oneside, col="gray90", freq=F, main="", 
+  hist(null.vals.oneside, col="gray90", freq=F, main="", breaks=50,
        xlim=c(0, quantile(null.vals.oneside, 0.999)),
        xlab=bquote(Delta * "(Case, Control; %)"))
   curve(dexp(x, null.exp.rate), add=T, lwd=2)

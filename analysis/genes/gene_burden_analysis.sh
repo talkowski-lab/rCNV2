@@ -35,7 +35,7 @@ metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 gtf="genes/gencode.v19.canonical.gtf.gz"
 weight_mode="weak"
 pad_controls=50000
-min_cds_ovr=0.2
+min_cds_ovr=0.1
 prefix="HP0000118"
 
 
@@ -93,10 +93,6 @@ for CNV in DEL DUP CNV; do
            | sed 's/^/#freq_code\tCNV\t/g' ) \
         - \
   > ${prefix}.${freq_code}.${CNV}.gene_burden.all_null_fits.txt
-
-  # Copy plots to rCNV bucket (note: requires permissions)
-  gsutil -m cp *null_fit.jpg \
-    gs://rcnv_project/analysis/gene_burden/null_fits/${freq_code}/plots/
 done
 
 # Merge null tables
@@ -117,7 +113,7 @@ gtf="genes/gencode.v19.canonical.gtf.gz"
 null_table="uCNV.gene_burden.all_null.fits.txt"
 pad_controls=50000
 weight_mode="weak"
-min_cds_ovr=0.2
+min_cds_ovr=0.1
 p_cutoff=0.000002587992
 
 # Test/dev parameters (NDD)
@@ -131,8 +127,8 @@ metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 gtf="genes/gencode.v19.canonical.gtf.gz"
 null_table="HP0000118.uCNV.DEL.gene_burden.all_null_fits.txt"
 pad_controls=50000
-weight_mode="strong"
-min_cds_ovr=0.2
+weight_mode="weak"
+min_cds_ovr=0.1
 p_cutoff=0.000002587992
 
 
@@ -152,7 +148,7 @@ while read prefix hpo; do
   while read meta cohorts; do
 
     # Set metacohort-specific parameters
-    cnv_bed="cleaned_cnv/$meta.$freq_code.bed.gz"
+    cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
     meta_idx=$( head -n1 "${metacohort_sample_table}" \
                 | sed 's/\t/\n/g' \
                 | awk -v meta="$meta" '{ if ($1==meta) print NR }' )
@@ -162,7 +158,7 @@ while read prefix hpo; do
     nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
              | awk -v FS="\t" -v meta_idx="$meta_idx" '{ print $meta_idx }' \
              | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
-    title="$descrip (${hpo})\n$ncase cases vs $nctrl controls in '${meta}' cohort"
+    title="$descrip (${hpo})\n$ncase cases vs $nctrl controls in '$meta' cohort"
 
     # Iterate over CNV types
     for CNV in CNV DEL DUP; do

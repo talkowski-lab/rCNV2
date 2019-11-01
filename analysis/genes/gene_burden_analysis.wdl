@@ -17,15 +17,30 @@ workflow gene_burden_analysis {
   Int pad_controls
   String weight_mode
   Float min_cds_ovr
-  Float min_weighted_cnvs
   Float p_cutoff
   String rCNV_bucket
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
-  Array[cnvs] = ['DEL', 'DUP', 'CNV']
+  Array[String] cnvs = ['DEL', 'DUP', 'CNV']
 
   # Scatter over CNV types
   scatter ( cnv in cnvs ) {
+    # Step 1.1: build null distributions of rCNV counts in all cases vs all controls
+    call build_null_distrib as build_rCNV_nulls {
+      input:
+        hpo="HP:0000118",
+        metacohort_list=metacohort_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code="rCNV",
+        CNV=cnv,
+        gtf=gtf,
+        pad_controls=pad_controls,
+        weight_mode=weight_mode,
+        min_cds_ovr=min_cds_ovr,
+        rCNV_bucket=rCNV_bucket,
+        prefix="HP000018"
+    }
+
     # Step 1.1: build null distributions of uCNV counts in all cases vs all controls
     call build_null_distrib as build_uCNV_nulls {
       input:
@@ -33,37 +48,59 @@ workflow gene_burden_analysis {
         metacohort_list=metacohort_list,
         metacohort_sample_table=metacohort_sample_table,
         freq_code="uCNV",
+        CNV=cnv,
         gtf=gtf,
         pad_controls=pad_controls,
         weight_mode=weight_mode,
         min_cds_ovr=min_cds_ovr,
-        min_weighted_cnvs=min_weighted_cnvs,
         rCNV_bucket=rCNV_bucket,
         prefix="HP000018"
     }
   }
   # Step 1.2: merge output of null distributions into master table
+  call merge_null_tables as merge_rCNV_nulls {
+    input:
+      null_tables=build_rCNV_nulls.null_fits,
+      freq_code="rCNV"
+  }
   call merge_null_tables as merge_uCNV_nulls {
-    null_tables=build_uCNV_nulls.null_fits,
-    freq_code="uCNV"
+    input:
+      null_tables=build_uCNV_nulls.null_fits,
+      freq_code="uCNV"
   }
 
 
   # Scatter over phenotypes
   scatter ( pheno in phenotypes ) {
+    # Step 2: run rCNV assocation tests per phenotype
+    call burden_test as rCNV_burden_test {
+      input:
+        hpo=pheno[1],
+        metacohort_list=metacohort_list,
+        metacohort_sample_table=metacohort_sample_table,
+        null_table=merge_rCNV_nulls.null_fit_table,
+        freq_code="rCNV",
+        gtf=gtf,
+        pad_controls=pad_controls,
+        weight_mode=weight_mode,
+        min_cds_ovr=min_cds_ovr,
+        p_cutoff=p_cutoff,
+        rCNV_bucket=rCNV_bucket,
+        prefix=pheno[0]
+    }
+
     # Step 2: run uCNV assocation tests per phenotype
     call burden_test as uCNV_burden_test {
       input:
         hpo=pheno[1],
         metacohort_list=metacohort_list,
         metacohort_sample_table=metacohort_sample_table,
-        null_fit_table=merge_uCNV_nulls.null_fit_table,
+        null_table=merge_uCNV_nulls.null_fit_table,
         freq_code="uCNV",
         gtf=gtf,
         pad_controls=pad_controls,
         weight_mode=weight_mode,
         min_cds_ovr=min_cds_ovr,
-        min_weighted_cnvs=min_weighted_cnvs,
         p_cutoff=p_cutoff,
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
@@ -81,11 +118,11 @@ task build_null_distrib {
   File metacohort_list
   File metacohort_sample_table
   String freq_code
+  String CNV
   File gtf
   Int pad_controls
   String weight_mode
   Float min_cds_ovr
-  Float min_weighted_cnvs
   String rCNV_bucket
   String prefix
 
@@ -157,7 +194,7 @@ task build_null_distrib {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:69e31e3629006501006f43c44ff5c53b6fa18c5ced2a70f4fafcdb589dd2b6bd"
+    docker: "talkowski/rcnv@sha256:3f38e5a51b35ac595bd8d8d5fea716fb91f9c74be02cb22e6033cc22d8125dfc"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -184,7 +221,7 @@ task merge_null_tables {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:69e31e3629006501006f43c44ff5c53b6fa18c5ced2a70f4fafcdb589dd2b6bd"
+    docker: "talkowski/rcnv@sha256:3f38e5a51b35ac595bd8d8d5fea716fb91f9c74be02cb22e6033cc22d8125dfc"
     preemptible: 1
   }
 
@@ -200,13 +237,12 @@ task burden_test {
   String hpo
   File metacohort_list
   File metacohort_sample_table
-  File null_fit_table
+  File null_table
   String freq_code
   File gtf
   Int pad_controls
   String weight_mode
   Float min_cds_ovr
-  Float min_weighted_cnvs
   Float p_cutoff
   String rCNV_bucket
   String prefix
@@ -233,7 +269,7 @@ task burden_test {
     while read meta cohorts; do
 
       # Set metacohort-specific parameters
-      cnv_bed="cleaned_cnv/$meta.$freq_code.bed.gz"
+      cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
       meta_idx=$( head -n1 "${metacohort_sample_table}" \
                   | sed 's/\t/\n/g' \
                   | awk -v meta="$meta" '{ if ($1==meta) print NR }' )
@@ -243,7 +279,7 @@ task burden_test {
       nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
                | awk -v FS="\t" -v meta_idx="$meta_idx" '{ print $meta_idx }' \
                | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
-      title="$descrip (${hpo})\n$ncase cases vs $nctrl controls in '${meta}' cohort"
+      title="$descrip (${hpo})\n$ncase cases vs $nctrl controls in '$meta' cohort"
 
       # Iterate over CNV types
       for CNV in CNV DEL DUP; do
@@ -313,7 +349,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:69e31e3629006501006f43c44ff5c53b6fa18c5ced2a70f4fafcdb589dd2b6bd"
+    docker: "talkowski/rcnv@sha256:3f38e5a51b35ac595bd8d8d5fea716fb91f9c74be02cb22e6033cc22d8125dfc"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

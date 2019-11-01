@@ -24,15 +24,15 @@ The code to perform this step is contained in `count_cnvs_per_gene.py`.
 
 For each CNV-gene pair, we computed the total fraction of exonic bases (CDS) from the gene overlapped by the CNV.  
 
-We considered a CNV to overlap a gene if it overlapped at least 20% of the coding sequence (CDS) from that gene.  
+We considered a CNV to overlap a gene if it overlapped at least 10% of the coding sequence (CDS) from that gene.  
 
 Finally, for each CNV, we distributed weights across all overlapping genes proportionally to the sum of the CDS overlapped per gene. We weighted CNV contributions to each gene in this manner to avoid large CNV segments pushing all genes within those regions to significance. In this analysis, we were principally interested in individual genes with strong, focal effects.  
 
 For CNVs overlapping less than 1.0 total CDS, the CNV count was divided strictly proportionally among overlapped gene(s) according to their fraction of CDS overlapped.  
 
-For all other CNVs overlapping more than a total of 1.0 CDS, weights for each gene _i_ were computed as w<sub>_i_</sub> = CDS<sub>_i_</sub> / 2 <sup>&Sigma;(CDS) - 1</sup>  
+For all other CNVs overlapping more than a total of 1.0 CDS, the weight for gene _i_ among _N_ total genes was computed as w<sub>_i_</sub> = CDS<sub>_i_</sub> / &Sigma;<sub>_k_</sub><sup>_N_</sup>(CDS<sub>_k_</sub>)
 
-Where w<sub>_i_</sub> is the per-gene weight, CDS<sub>_i_</sub> is the fraction of CDS from gene _i_ overlapped by the CNV, and &Sigma;(CDS) is the sum of the fractions of CDS for all genes overlapped by the CNV.  
+Where w<sub>_i_</sub> is the per-gene weight, CDS<sub>_i_</sub> is the fraction of CDS from gene _i_ overlapped by the CNV, and &Sigma;<sub>_k_</sub><sup>_N_</sup>(CDS<sub>_k_</sub>) is the sum of the fractions of CDS for all _N_ genes overlapped by the CNV.  
 
 For clarity, two toy examples of this weighting process are highlighted below:  
 
@@ -41,18 +41,20 @@ For clarity, two toy examples of this weighting process are highlighted below:
 | :--- | :--- | ---: | ---: |  
 | Gene A | Yes | 100% | 0.5 |  
 | Gene B | Yes | 100% | 0.5 |  
+| Gene C | No | 0% | 0 |  
+| Gene D | No | 0% | 0 |  
 
 In Example #1 above, the CNV completely overlaps two genes and no others.  
 
-Since both genes are fully overlapped by the CNV, the CNV count is divided evenly by 2<sup>(1.0 + 1.0)</sup>, since both genes are 100% overlapped by the CNV. Therefore, each gene receives a weighted count of 0.5.  
+Since both genes A and B are fully overlapped by the CNV, the CNV count is divided evenly by two (e.g., 1.0 + 1.0) among genes A and B, while genes C and D do not receive any weighted count.  
 
 #### Example #2  
 | Gene | CNV overlap? | Pct of CDS overlapped by CNV | Weighted CNV count |  
 | :--- | :--- | ---: | ---: |  
-| Gene A | No | 0 | 0 |  
-| Gene B | Yes | 100% | 1 / 2<sup>2.5</sup> = 0.18 |  
-| Gene C | Yes | 100% | 1 / 2<sup>2.5</sup> = 0.18 |  
-| Gene D | Yes | 50% | 0.5 / 2<sup>2.5</sup> = 0.09 |  
+| Gene A | No | 0% | 0 |  
+| Gene B | Yes | 100% | 1 / 2.5 = 0.4 |  
+| Gene C | Yes | 100% | 1 / 2.5 = 0.4 |  
+| Gene D | Yes | 50% | 0.5 / 2.5 = 0.2 |  
 
 In Example #2 above, the CNV overlaps three of four genes.  
 
@@ -60,7 +62,7 @@ Gene A is not overlapped, so is not assigned any weighted CNV count.
 
 Genes B, C, and D are all at least partially overlapped, but only Genes B and C are completely overlapped.  
 
-Thus, genes B, C, and D are each assigned a weight proportional to the fraction of their CDS overlapped by the CNV (CDS<sub>_i_</sub> / 2<sup>(1.0 + 1.0 + 0.5)</sup> =  CDS<sub>_i_</sub> / 2<sup>2.5</sup> = CDS<sub>_i_</sub> / 5.66)
+Thus, genes B, C, and D are each assigned a weight proportional to the fraction of their CDS overlapped by the CNV (CDS<sub>_i_</sub> / (1.0 + 1.0 + 0.5) =  CDS<sub>_i_</sub> / 2.5).  
 
 
 ### 2. Calculate burden statistics between cases & controls  
@@ -96,3 +98,43 @@ The information presented on this page references various curated datasets.
 The curation of these datasets is documented elsewhere in this repository.  
 
 Please see the README available in [the `data_curation/` subdirectory](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/).  
+
+
+---  
+
+## IGNORE THIS:  
+### Alternative Weighting Scheme  
+
+For CNVs overlapping less than 1.0 total CDS, the CNV count was divided strictly proportionally among overlapped gene(s) according to their fraction of CDS overlapped.  
+
+For all other CNVs overlapping more than a total of 1.0 CDS, weights for each gene _i_ were computed as w<sub>_i_</sub> = CDS<sub>_i_</sub> / 2 <sup>&Sigma;(CDS) - 1</sup>  
+
+Where w<sub>_i_</sub> is the per-gene weight, CDS<sub>_i_</sub> is the fraction of CDS from gene _i_ overlapped by the CNV, and &Sigma;(CDS) is the sum of the fractions of CDS for all genes overlapped by the CNV.  
+
+For clarity, two toy examples of this weighting process are highlighted below:  
+
+#### Example #1  
+| Gene | CNV overlap? | Pct of CDS overlapped by CNV | Weighted CNV count |  
+| :--- | :--- | ---: | ---: |  
+| Gene A | Yes | 100% | 0.5 |  
+| Gene B | Yes | 100% | 0.5 |  
+
+In Example #1 above, the CNV completely overlaps two genes and no others.  
+
+Since both genes are fully overlapped by the CNV, the CNV count is divided evenly by 2<sup>(1.0 + 1.0)</sup>, since both genes are 100% overlapped by the CNV. Therefore, each gene receives a weighted count of 0.5.  
+
+#### Example #2  
+| Gene | CNV overlap? | Pct of CDS overlapped by CNV | Weighted CNV count |  
+| :--- | :--- | ---: | ---: |  
+| Gene A | No | 0 | 0 |  
+| Gene B | Yes | 100% | 1 / 2<sup>2.5</sup> = 0.18 |  
+| Gene C | Yes | 100% | 1 / 2<sup>2.5</sup> = 0.18 |  
+| Gene D | Yes | 50% | 0.5 / 2<sup>2.5</sup> = 0.09 |  
+
+In Example #2 above, the CNV overlaps three of four genes.  
+
+Gene A is not overlapped, so is not assigned any weighted CNV count.  
+
+Genes B, C, and D are all at least partially overlapped, but only Genes B and C are completely overlapped.  
+
+Thus, genes B, C, and D are each assigned a weight proportional to the fraction of their CDS overlapped by the CNV (CDS<sub>_i_</sub> / 2<sup>(1.0 + 1.0 + 0.5)</sup> =  CDS<sub>_i_</sub> / 2<sup>2.5</sup> = CDS<sub>_i_</sub> / 5.66)
