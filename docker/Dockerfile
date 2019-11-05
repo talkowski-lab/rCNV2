@@ -23,6 +23,7 @@ RUN conda install -n rcnv -y -c bioconda bzip2
 RUN conda install -n rcnv -y -c bioconda click
 RUN conda install -n rcnv -y -c bioconda mysqlclient
 RUN conda install -n rcnv -y -c bioconda pybigwig
+RUN conda install -n rcnv -y -c conda-forge statsmodels
 ENV CONDA_DEFAULT_ENV rcnv
 RUN echo "source activate rcnv" >> ~/.bashrc
 ENV PATH /opt/conda/envs/rcnv/bin:$PATH
@@ -74,7 +75,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 5bb58cce0775f960cdd8b57e1a2072b0f7bf63a6 && \
+    git checkout dc98bb91290e7176410a284f50b61cbbfdfdc945 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)

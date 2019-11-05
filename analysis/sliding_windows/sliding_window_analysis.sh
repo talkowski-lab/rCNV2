@@ -134,6 +134,8 @@ while read prefix hpo; do
 done < refs/test_phenotypes.list
 
 
+
+
 # Run meta-analysis for each CNV type
 while read prefix hpo; do
   descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
@@ -190,6 +192,7 @@ while read prefix hpo; do
       "${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz" \
       "${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis"
   done
+
   # Generate Miami & QQ plots
   /opt/rCNV2/utils/plot_manhattan_qq.R \
     --miami \
@@ -209,9 +212,93 @@ while read prefix hpo; do
 done < refs/test_phenotypes.list
 
 
-# Compute final set of significant intervals via binwise covariance analysis
-# 1: extract significant windows. Retain original p-values
-# 2: bedtools intersect those windows versus 
+
+
+# Refine final set of significant segments
+# Test/dev parameters (seizures)
+freq_code="rCNV"
+CNV="DEL"
+phenotype_list="refs/test_phenotypes.list"
+metacohort_list="refs/rCNV_metacohort_list.txt"
+metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
+binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
+rCNV_bucket="gs://rcnv_project"
+meta_p_cutoff=0.0000192931
+sig_window_pad=1000000
+# Pseudocode for segment refinement algorithm:
+# 1: make matrix of all meta-P values across all phenotypes. One matrix each for DEL, DUP, CNV
+# 2: find all windows with at least one P-value at genome-wide significance
+# 3: pad significant windows ±1Mb (some arbitrarily large distance) and clump into regions with bedtools merge
+# 4: for each significant region...
+#   4.1: find sentinel (most significant) window across any phenotype
+#        (if multiple windows are equally significant, arbitrarily pick the left-most one)
+#   4.2: pool all case CNVs from associated phenotypes and control CNVs overlapping the sentinel window
+#   4.3: rank-order case CNVs based on nearest breakpoint coordinate to window
+#   4.4: incrementally add case CNVs one at a time (in order of nearest/smallest to farthest/largest) and run fisher's exact test for that subset of case CNVs to all control CNVs
+#   4.5: stop once incremental fisher's P-value reaches genome-wide significance
+#        (This reflects minimum CNV critical region with a direct genome-wide significant association)
+#   4.6: Strip out all case CNVs wholly contained within defined critical region, retest all bins in larger region, and re-iterate steps 4.1-4.5 if any bins remain residually significant
+# Download all meta-analysis stats files and necessary data
+mkdir cleaned_cnv/
+gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
+mkdir stats/
+gsutil -m cp \
+  ${rCNV_bucket}/analysis/sliding_windows/**.${freq_code}.**.sliding_window.meta_analysis.stats.bed.gz \
+  stats/
+mkdir windows/
+gsutil -m cp -r gs://rcnv_project/cleaned_data/binned_genome/* windows/
+mkdir refs/
+gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
+
+# Iterate over phenotypes and make matrix of p-values
+mkdir pvals/
+while read pheno hpo; do
+  for CNV in DEL DUP; do
+    zcat stats/$pheno.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz \
+    | awk -v FS="\t" '{ if ($1 !~ "#") print $NF }' \
+    | cat <( echo "$pheno.$CNV" ) - \
+    > pvals/$pheno.$CNV.pvals.txt
+  done
+done < ${phenotype_list}
+for CNV in DEL DUP; do
+  paste <( zcat windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz \
+           | cut -f1-3 ) \
+        pvals/*.$CNV.pvals.txt \
+  | bgzip -c \
+  > $CNV.pval_matrix.bed.gz
+done
+
+# Identify regions to be refined (get significant windows, and pad by $sig_window_pad)
+for CNV in DEL DUP; do
+  /opt/rCNV2/analysis/sliding_windows/get_significant_windows.R \
+    --p-is-phred \
+    --cutoff ${meta_p_cutoff} \
+    --pad-windows ${sig_window_pad} \
+    $CNV.pval_matrix.bed.gz \
+  | bedtools merge -i - \
+  | bgzip -c \
+  > $CNV.sig_regions_to_refine.bed.gz
+done
+
+# Refine associations within regions from above
+while read meta; do
+  echo -e "$meta\tcleaned_cnv/$meta.${freq_code}.bed.gz"
+done < <( cut -f1 ${metacohort_list} | fgrep -v "mega" )\
+> window_refinement.${freq_code}_input.tsv
+for CNV in DEL DUP; do
+  /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
+    --cnv-type $CNV \
+    --p-is-phred \
+    --cutoff ${meta_p_cutoff} \
+    --prefix "${freq_code}_$CNV" \
+    $CNV.sig_regions_to_refine.bed.gz \
+    window_refinement.${freq_code}_input.tsv \
+    $CNV.pval_matrix.bed.gz \
+    refs/HPOs_by_metacohort.table.tsv
+done
+
+
+
 
 
 

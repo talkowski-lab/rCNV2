@@ -82,8 +82,8 @@ pli_idx=$( zcat gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
            | head -n1 | sed 's/\t/\n/g' \
            | awk '{ if ($1=="pLI") print NR }' )
 loeuf_idx=$( zcat gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
-           | head -n1 | sed 's/\t/\n/g' \
-           | awk '{ if ($1=="oe_lof_upper_bin_6") print NR }' )
+             | head -n1 | sed 's/\t/\n/g' \
+             | awk '{ if ($1=="oe_lof_upper_bin_6") print NR }' )
 zcat gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
 | fgrep -wf gencode.v19.canonical.genes.list \
 | awk -v pli_idx=${pli_idx} -v loeuf_idx=${loeuf_idx} -v FS="\t" \

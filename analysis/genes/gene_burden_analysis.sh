@@ -140,9 +140,9 @@ while read prefix hpo; do
   descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
              | awk -v FS="\t" '{ print $2 }' )
   zcat refs/gencode.v19.canonical.constrained.bed.gz \
-  | fgrep -wf genes/gene_lists/$prefix.HPOdb.constrained.genes.list \
+  | fgrep -wf genes/gene_lists/${prefix}.HPOdb.constrained.genes.list \
   | cat <( echo -e "#chr\tstart\tend\tgene" ) - \
-  > $prefix.highlight_regions.bed
+  > ${prefix}.highlight_regions.bed
 
   # Iterate over metacohorts
   while read meta cohorts; do
@@ -194,7 +194,7 @@ while read prefix hpo; do
         --p-is-phred \
         --max-phred-p 100 \
         --cutoff ${p_cutoff} \
-        --highlight-bed "$prefix.highlight_regions.bed" \
+        --highlight-bed "${prefix}.highlight_regions.bed" \
         --highlight-name "Constrained genes associated with this phenotype" \
         --title "$title" \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz" \
@@ -208,10 +208,10 @@ while read prefix hpo; do
       --p-is-phred \
       --max-phred-p 100 \
       --cutoff ${p_cutoff} \
-      --highlight-bed "$prefix.highlight_regions.bed" \
+      --highlight-bed "${prefix}.highlight_regions.bed" \
       --highlight-name "Constrained genes associated with this phenotype" \
       --label-prefix "DUP" \
-      --highlight-bed-2 "$prefix.highlight_regions.bed" \
+      --highlight-bed-2 "${prefix}.highlight_regions.bed" \
       --highlight-name-2 "Constrained genes associated with this phenotype" \
       --label-prefix-2 "DEL" \
       --title "$title" \

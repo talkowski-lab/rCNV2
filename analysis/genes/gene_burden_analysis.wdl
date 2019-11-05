@@ -194,7 +194,7 @@ task build_null_distrib {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3f38e5a51b35ac595bd8d8d5fea716fb91f9c74be02cb22e6033cc22d8125dfc"
+    docker: "talkowski/rcnv@sha256:99f315980611283e31e8c120f480fc477445b5250050b7f91fc26755868ab203"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -221,7 +221,7 @@ task merge_null_tables {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3f38e5a51b35ac595bd8d8d5fea716fb91f9c74be02cb22e6033cc22d8125dfc"
+    docker: "talkowski/rcnv@sha256:99f315980611283e31e8c120f480fc477445b5250050b7f91fc26755868ab203"
     preemptible: 1
   }
 
@@ -252,18 +252,18 @@ task burden_test {
 
     # Copy CNV data and constrained gene coordinates
     mkdir cleaned_cnv/
-    gsutil -m cp ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
+    gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
+    gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
     mkdir refs/
-    gsutil cp ${rCNV_bucket}/analysis/analysis_refs/gencode.v19.canonical.constrained.bed.gz \
-      refs/
+    gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
     # Set HPO-specific parameters
     descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
                | awk -v FS="\t" '{ print $2 }' )
     zcat refs/gencode.v19.canonical.constrained.bed.gz \
-    | fgrep -wf genes/gene_lists/$prefix.HPOdb.constrained.genes.list \
+    | fgrep -wf genes/gene_lists/${prefix}.HPOdb.constrained.genes.list \
     | cat <( echo -e "#chr\tstart\tend\tgene" ) - \
-    > $prefix.highlight_regions.bed
+    > ${prefix}.highlight_regions.bed
 
     # Iterate over metacohorts
     while read meta cohorts; do
@@ -315,7 +315,7 @@ task burden_test {
           --p-is-phred \
           --max-phred-p 100 \
           --cutoff ${p_cutoff} \
-          --highlight-bed "$prefix.highlight_regions.bed" \
+          --highlight-bed "${prefix}.highlight_regions.bed" \
           --highlight-name "Constrained genes associated with this phenotype" \
           --title "$title" \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz" \
@@ -329,10 +329,10 @@ task burden_test {
         --p-is-phred \
         --max-phred-p 100 \
         --cutoff ${p_cutoff} \
-        --highlight-bed "$prefix.highlight_regions.bed" \
+        --highlight-bed "${prefix}.highlight_regions.bed" \
         --highlight-name "Constrained genes associated with this phenotype" \
         --label-prefix "DUP" \
-        --highlight-bed-2 "$prefix.highlight_regions.bed" \
+        --highlight-bed-2 "${prefix}.highlight_regions.bed" \
         --highlight-name-2 "Constrained genes associated with this phenotype" \
         --label-prefix-2 "DEL" \
         --title "$title" \
@@ -342,6 +342,8 @@ task burden_test {
     done < ${metacohort_list}
 
     # Copy results to output bucket
+    gsutil -m cp *.gene_burden.counts.bed.gz* \
+      "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/counts/"
     gsutil -m cp *.gene_burden.stats.bed.gz* \
       "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/stats/"
     gsutil -m cp *.gene_burden.*.png \
@@ -349,7 +351,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3f38e5a51b35ac595bd8d8d5fea716fb91f9c74be02cb22e6033cc22d8125dfc"
+    docker: "talkowski/rcnv@sha256:99f315980611283e31e8c120f480fc477445b5250050b7f91fc26755868ab203"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
