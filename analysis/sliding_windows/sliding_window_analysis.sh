@@ -249,32 +249,56 @@ gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 # Count CNVs in cases and controls per phenotype, split by metacohort and CNV type
 # Iterate over phenotypes
 while read prefix hpo; do
-
-  mkdir shuffled_cnv/
-
   for i in $( seq 1 ${n_pheno_perms} ); do
 
     # Shuffle phenotypes for each metacohort CNV dataset, and restrict CNVs from
     # phenotype of relevance
+    if ! [ -e shuffled_cnv/ ]; then
+      mkdir shuffled_cnv/
+    fi
     yes $i | head -n1000000 > seed_$i.txt
     while read meta cohorts; do
+
       cnvbed="cleaned_cnv/$meta.${freq_code}.bed.gz"
-      tabix -H $cnvbed > shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed
-      paste <( zcat $cnvbed | sed '1d' | cut -f1-5 ) \
-            <( zcat $cnvbed | sed '1d' | cut -f6 \
-               | shuf --random-source seed_$i.txt ) \
-      | awk -v hpo=${hpo} '{ if ($NF ~ "HEALTHY_CONTROL" || $NF ~ hpo) print $0 }' \
-      >> shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed
-      bgzip -f shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed
+
+      # Determine CNV size quintiles
+      for CNV in DEL DUP; do
+        zcat $cnvbed \
+        | awk -v CNV="$CNV" '{ if ($1 !~ "#" && $5==CNV) print $3-$2 }' \
+        | /opt/rCNV2/utils/quantiles.py \
+          --quantiles "0,0.2,0.4,0.6,0.8,1.0" \
+          --no-header \
+        > $meta.$CNV.quantiles.tsv
+      done
+
+      # Shuffle phenotypes, matching by CNV type and size quintile
+      for CNV in DEL DUP; do
+        for qr in $( seq 1 5 ); do
+          smin=$( awk -v qr="$qr" '{ if (NR==qr) print $2 }' $meta.$CNV.quantiles.tsv )
+          smax=$( awk -v qr="$qr" '{ if (NR==(qr+1)) print $2 + 1 }' $meta.$CNV.quantiles.tsv )
+          zcat $cnvbed | sed '1d' \
+          | awk -v smin="$smin" -v smax="$smax" '{ if ($3-$2>=smin && $3-$2<smax) print $0 }' \
+          > cnv_subset.bed
+          paste <( cut -f1-5 cnv_subset.bed ) \
+                <( cut -f6 cnv_subset.bed | shuf --random-source seed_$i.txt ) \
+          | awk -v hpo=${hpo} '{ if ($NF ~ "HEALTHY_CONTROL" || $NF ~ hpo) print $0 }'
+          rm cnv_subset.bed
+        done
+      done \
+      | sort -Vk1,1 -k2,2n -k3,3n \
+      | cat <( tabix -H $cnvbed ) - \
+      | bgzip -c \
+      > shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz
       tabix -f shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz
+
     done < ${metacohort_list}
 
     # Iterate over CNV types
-    for CNV in DEL DUP CNV; do
+    for CNV in DEL DUP; do
       # Perform association test for each metacohort
       while read meta cohorts; do
 
-        echo -e "[$( date )] Starting permutation $i for $CNV in $hpo from $meta...\n"
+        echo -e "[$( date )] Starting permutation $i for $CNV in ${hpo} from $meta...\n"
 
         cnv_bed="shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz"
 
@@ -299,7 +323,7 @@ while read prefix hpo; do
           "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
           tabix -f "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
 
-      done < ${metacohort_list}
+      done < <( fgrep -v "mega" ${metacohort_list} )
 
       # Perform meta-analysis
       while read meta cohorts; do
@@ -318,11 +342,35 @@ while read prefix hpo; do
       gsutil cp \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
         "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/permutations/"
+    done
 
+  done
+done < refs/test_phenotypes.list
+
+# Gather all permutation results and compute FDR CDFs
+mkdir perm_res/
+while read prefix hpo; do
+  echo -e "$prefix\n\n"
+  gsutil -m cp \
+    "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/permutations/**.stats.perm_*.bed.gz" \
+    perm_res/
+  for CNV in DEL DUP; do
+    for i in $( seq 1 ${n_pheno_perms} ); do
+      zcat perm_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
+      | grep -ve '^#' \
+      | awk '{ print $NF }' \
+      | cat <( echo "$prefix.$CNV.$i" ) - \
+      > perm_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.permuted_p_values.$i.txt
     done
   done
+done < ${phenotype_list}
+paste perm_res/*.sliding_window.meta_analysis.permuted_p_values.*.txt \
+| gzip -c \
+> ${freq_code}.permuted_pval_matrix.txt.gz
 
-done < refs/test_phenotypes.list
+
+for CNV in DEL DUP; do
+done
 
 
 

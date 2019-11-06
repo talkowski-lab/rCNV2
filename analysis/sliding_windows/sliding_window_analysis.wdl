@@ -9,6 +9,9 @@
 # Analysis of case-control CNV burdens in sliding windows, genome-wide
 
 
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/1/plain-WDL/descriptor" as scattered_perm
+
+
 workflow sliding_window_analysis {
   File phenotype_list
   File metacohort_list
@@ -41,7 +44,7 @@ workflow sliding_window_analysis {
     }
 
     # Permute phenotypes to estimate empirical FDR
-    call permuted_burden_test as rCNV_perm_test {
+    call scattered_perm.scattered_sliding_window_perm_test as rCNV_perm_test {
       input:
         hpo=pheno[1],
         metacohort_list=metacohort_list,
@@ -205,109 +208,6 @@ task burden_test {
 }
 
 
-# Permute phenotype labels to determine empirical FDR for a single phenotype
-task permuted_burden_test {
-  String hpo
-  File metacohort_list
-  File metacohort_sample_table
-  String freq_code
-  File binned_genome
-  Float bin_overlap
-  Int pad_controls
-  Float p_cutoff
-  Int n_pheno_perms
-  String rCNV_bucket
-  String prefix
-
-  command <<<
-    set -e
-
-    # Copy CNV data
-    mkdir cleaned_cnv/
-    gsutil -m cp ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
-
-    mkdir shuffled_cnv/
-
-    for i in $( seq 1 ${n_pheno_perms} ); do
-
-      # Shuffle phenotypes for each metacohort CNV dataset, and restrict CNVs from
-      # phenotype of relevance
-      yes $i | head -n1000000 > seed_$i.txt
-      while read meta cohorts; do
-        cnvbed="cleaned_cnv/$meta.${freq_code}.bed.gz"
-        tabix -H $cnvbed > shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed
-        paste <( zcat $cnvbed | sed '1d' | cut -f1-5 ) \
-              <( zcat $cnvbed | sed '1d' | cut -f6 \
-                 | shuf --random-source seed_$i.txt ) \
-        | awk -v hpo=${hpo} '{ if ($NF ~ "HEALTHY_CONTROL" || $NF ~ hpo) print $0 }' \
-        >> shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed
-        bgzip -f shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed
-        tabix -f shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz
-      done < ${metacohort_list}
-
-      # Iterate over CNV types
-      for CNV in DEL DUP CNV; do
-        # Perform association test for each metacohort
-        while read meta cohorts; do
-
-          echo -e "[$( date )] Starting permutation $i for $CNV in $hpo from $meta...\n"
-
-          cnv_bed="shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz"
-
-          # Count CNVs
-          /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
-            --fraction ${bin_overlap} \
-            --pad-controls ${pad_controls} \
-            -t $CNV \
-            --hpo ${hpo} \
-            -z \
-            -o "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
-            $cnv_bed \
-            ${binned_genome}
-
-          # Perform burden test
-          /opt/rCNV2/analysis/sliding_windows/window_burden_test.R \
-            --pheno-table ${metacohort_sample_table} \
-            --cohort-name $meta \
-            --case-hpo ${hpo} \
-            --bgzip \
-            "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
-            "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
-            tabix -f "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
-
-        done < ${metacohort_list}
-
-        # Perform meta-analysis
-        while read meta cohorts; do
-          echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
-        done < <( fgrep -v mega ${metacohort_list} ) \
-        > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
-        /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
-          --model mh \
-          --p-is-phred \
-          ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
-          ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
-        bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
-        tabix -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz
-
-        # Copy results to output bucket
-        gsutil cp \
-          ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
-          "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/permutations/"
-
-      done
-    done
-  >>>
-
-  runtime {
-    docker: "talkowski/rcnv@sha256:54981cd33c35f8efec42074409730f6616a1d8914569a5926962a5a2c4b84db9"
-    preemptible: 1
-    memory: "4 GB"
-    bootDiskSizeGb: "20"
-  }
-}
-
-
 # Run meta-analysis across metacohorts for a single phenotype
 task meta_analysis {
   Array[File] stats_beds
@@ -418,7 +318,7 @@ task meta_analysis {
   output {}
 
   runtime {
-    docker: "talkowski/rcnv@sha256:54981cd33c35f8efec42074409730f6616a1d8914569a5926962a5a2c4b84db9"
+    docker: "talkowski/rcnv@sha256:4a7bdca530b6f2c3ff761267d738ee44baeab7645cb6ba145f8c9620a8871b3a"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
