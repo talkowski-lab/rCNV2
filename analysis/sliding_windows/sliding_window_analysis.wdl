@@ -222,21 +222,27 @@ task permuted_burden_test {
   command <<<
     set -e
 
+    # Copy CNV data
+    mkdir cleaned_cnv/
+    gsutil -m cp ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
+
     mkdir shuffled_cnv/
 
     for i in $( seq 1 ${n_pheno_perms} ); do
 
-      # Shuffle phenotypes for each metacohort CNV dataset
+      # Shuffle phenotypes for each metacohort CNV dataset, and restrict CNVs from
+      # phenotype of relevance
       yes $i | head -n1000000 > seed_$i.txt
       while read meta cohorts; do
-        cnvbed="cleaned_cnv/$meta.$freq_code.bed.gz"
-        tabix -H $cnvbed > shuffled_cnv/$meta.$freq_code.pheno_shuf.bed
+        cnvbed="cleaned_cnv/$meta.${freq_code}.bed.gz"
+        tabix -H $cnvbed > shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed
         paste <( zcat $cnvbed | sed '1d' | cut -f1-5 ) \
               <( zcat $cnvbed | sed '1d' | cut -f6 \
                  | shuf --random-source seed.txt ) \
-        >> shuffled_cnv/$meta.$freq_code.pheno_shuf.bed
-        bgzip -f shuffled_cnv/$meta.$freq_code.pheno_shuf.bed
-        tabix -f shuffled_cnv/$meta.$freq_code.pheno_shuf.bed.gz
+        | awk -v hpo=${hpo} '{ if ($NF ~ "HEALTHY_CONTROL" || $NF ~ hpo) print $0 }' \
+        >> shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed
+        bgzip -f shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed
+        tabix -f shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz
       done < ${metacohort_list}
 
       # Iterate over metacohorts & CNV types
@@ -245,7 +251,7 @@ task permuted_burden_test {
 
           echo -e "[$( date )] Starting permutation $i for $CNV in $hpo from $meta...\n"
 
-          cnv_bed="shuffled_cnv/$meta.$freq_code.pheno_shuf.bed.gz"
+          cnv_bed="shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz"
 
           # Count CNVs
           /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
@@ -255,12 +261,12 @@ task permuted_burden_test {
             --hpo ${hpo} \
             -z \
             -o "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
-            ${cnv_bed} \
+            "$cnv_bed" \
             ${binned_genome}
 
           # Perform burden test
           /opt/rCNV2/analysis/sliding_windows/window_burden_test.R \
-            --pheno-table refs/HPOs_by_metacohort.table.tsv \
+            --pheno-table ${metacohort_sample_table} \
             --cohort-name $meta \
             --case-hpo ${hpo} \
             --bgzip \
@@ -268,13 +274,12 @@ task permuted_burden_test {
             "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
             tabix -f "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
 
-          # Perform meta-analysis
+          # Perform meta-analysis (no OR correlation plot)
           while read meta cohorts; do
             echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
           done < <( fgrep -v mega ${metacohort_list} ) \
           > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
           /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
-            --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
             --model mh \
             ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
             ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
@@ -291,7 +296,7 @@ task permuted_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:4148fea68ca3ab62eafada0243f0cd0d7135b00ce48a4fd0462741bf6dc3c8bc"
+    docker: "talkowski/rcnv@sha256:9604bae89713210c5c11c91e6fff35cb2774c745c5bfb3df0ce7a268a6afb1e5"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -415,38 +420,3 @@ task meta_analysis {
   }
 }
 
-
-# task reset_gwide_signif {
-#   File phenotype_list
-#   File metacohort_list
-#   File metacohort_sample_table
-#   String freq_code
-#   Float gw_min_var_explained
-#   String rCNV_bucket
-
-#   command <<<
-#     set -e
-
-#     # Download all meta-analysis stats files
-#     mkdir stats/
-#     gsutil -m cp \
-#       ${rCNV_bucket}/analysis/sliding_windows/**.${freq_code}.**.sliding_window.meta_analysis.stats.bed.gz \
-#       stats/
-
-#     # Iterate over phenotypes and make matrix of p-values
-#     mkdir pvals/
-#     while read pheno hpo; do
-#       for CNV in DEL DUP; do
-#         zcat stats/$pheno.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz \
-#         | awk -v FS="\t" '{ if ($1 !~ "#") print $NF }' \
-#         | cat <( echo "$pheno.$CNV" ) - \
-#         > pvals/$pheno.$CNV.pvals.txt
-#       done
-#     done < ${phenotype_list}
-#     paste pvals/*.pvals.txt | gzip -c > pval_matrix.txt.gz
-
-
-#   >>>
-
-
-# }

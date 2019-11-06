@@ -27,15 +27,19 @@ calc.or <- function(control_ref, control_alt, case_ref, case_alt, adj=0.5){
 
 
 # Read an input file of association statistics
-read.stats <- function(stats.in, prefix){
+read.stats <- function(stats.in, prefix, p.is.phred){
   # Read data & subset to necessary columns
   stats <- read.table(stats.in, header=T, sep="\t", comment.char="")
   colnames(stats)[1] <- "chr"
   cols.to.keep <- c("chr", "start", "end", "case_alt", "case_ref",
-                    "control_alt", "control_ref")
+                    "control_alt", "control_ref", "fisher_phred_p")
   stats <- stats[, which(colnames(stats) %in% cols.to.keep)]
   stats$odds_ratio <- calc.or(stats$control_ref, stats$control_alt,
                               stats$case_ref, stats$case_alt)
+  colnames(stats)[which(colnames(stats)=="fisher_phred_p")] <- "p_value"
+  if(p.is.phred==T){
+    stats$p_value <- 10^-stats$p_value
+  }
   colnames(stats)[-(1:3)] <- paste(prefix, colnames(stats)[-(1:3)], sep=".")
   return(stats)
 }
@@ -136,6 +140,11 @@ combine.stats <- function(stats.list){
                     all=F, sort=F)
   }
   merged[, -c(1:3)] <- apply(merged[, -c(1:3)], 2, as.numeric)
+  # Count number of nominally significant individual cohorts
+  n_nom_sig <- apply(merged[, grep(".p_value", colnames(merged), fixed=T)],
+                     1, function(pvals){length(which(pvals<=0.05))})
+  merged$n_nominal_cohorts <- n_nom_sig
+  merged <- merged[, -grep(".p_value", colnames(merged), fixed=T)]
   return(merged)
 }
 
@@ -228,8 +237,10 @@ meta <- function(stats.merged, cohorts, model="re"){
   meta.stats <- t(sapply(1:nrow(stats.merged), function(i){
     meta.single(stats.merged, cohorts, i, model)
   }))
-  meta.res <- cbind(stats.merged[, 1:3], meta.stats)
-  colnames(meta.res) <- c("chr", "start", "end",
+  keep.orig.cols <- c("chr", "start", "end", "n_nominal_cohorts")
+  meta.res <- cbind(stats.merged[, which(colnames(stats.merged) %in% keep.orig.cols)],
+                    meta.stats)
+  colnames(meta.res) <- c("chr", "start", "end", "n_nominal_cohorts",
                           "meta_OR", "meta_OR_lower", "meta_OR_upper",
                           "meta_z", "meta_phred_p")
   return(meta.res)
@@ -251,7 +262,9 @@ option_list <- list(
               metavar="path"),
   make_option(c("--model"), type="character", default="mh", 
               help="specify meta-analysis model ('re': random effects, 'mh': Mantel-Haenszel) [default %default]",
-              metavar="string")
+              metavar="string"),
+  make_option(c("--p-is-phred"), action="store_true", default=FALSE, 
+              help="provided P-values are Phred-scaled (-log10(P)) [default %default]")
 )
 
 # Get command-line arguments & options
@@ -265,6 +278,7 @@ infile <- args$args[1]
 outfile <- args$args[2]
 corplot.out <- opts$`or-corplot`
 model <- opts$model
+p.is.phred <- opts$`p-is-phred`
 
 # # Dev parameters
 # infile <- "~/scratch/window_meta_dummy_input.txt"
@@ -273,11 +287,14 @@ model <- opts$model
 # corplot.out <- "~/scratch/corplot.test.jpg"
 # # corplot.out <- "~/scratch/corplot.ndd.test.jpg"
 # model <- "mh"
+# p.is.phred <- T
 
 # Read list of cohorts to meta-analyze
 cohort.info <- read.table(infile, header=F, sep="\t")
 ncohorts <- nrow(cohort.info)
-stats.list <- lapply(1:ncohorts, function(i){read.stats(cohort.info[i, 2], cohort.info[i, 1])})
+stats.list <- lapply(1:ncohorts, function(i){read.stats(cohort.info[i, 2], 
+                                                        cohort.info[i, 1],
+                                                        p.is.phred)})
 names(stats.list) <- cohort.info[, 1]
 
 # Plot correlations of odds ratios between cohorts, if optioned

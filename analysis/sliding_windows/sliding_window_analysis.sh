@@ -249,17 +249,19 @@ while read prefix hpo; do
 
   for i in $( seq 1 ${n_pheno_perms} ); do
 
-    # Shuffle phenotypes for each metacohort CNV dataset
+    # Shuffle phenotypes for each metacohort CNV dataset, and restrict CNVs from
+    # phenotype of relevance
     yes $i | head -n1000000 > seed_$i.txt
     while read meta cohorts; do
-      cnvbed="cleaned_cnv/$meta.$freq_code.bed.gz"
-      tabix -H $cnvbed > shuffled_cnv/$meta.$freq_code.pheno_shuf.bed
+      cnvbed="cleaned_cnv/$meta.${freq_code}.bed.gz"
+      tabix -H $cnvbed > shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed
       paste <( zcat $cnvbed | sed '1d' | cut -f1-5 ) \
             <( zcat $cnvbed | sed '1d' | cut -f6 \
-               | shuf --random-source seed.txt ) \
-      >> shuffled_cnv/$meta.$freq_code.pheno_shuf.bed
-      bgzip -f shuffled_cnv/$meta.$freq_code.pheno_shuf.bed
-      tabix -f shuffled_cnv/$meta.$freq_code.pheno_shuf.bed.gz
+               | shuf --random-source seed_$i.txt ) \
+      | awk -v hpo=${hpo} '{ if ($NF ~ "HEALTHY_CONTROL" || $NF ~ hpo) print $0 }' \
+      >> shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed
+      bgzip -f shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed
+      tabix -f shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz
     done < ${metacohort_list}
 
     # Iterate over metacohorts & CNV types
@@ -268,7 +270,7 @@ while read prefix hpo; do
 
         echo -e "[$( date )] Starting permutation $i for $CNV in $hpo from $meta...\n"
 
-        cnv_bed="shuffled_cnv/$meta.$freq_code.pheno_shuf.bed.gz"
+        cnv_bed="shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz"
 
         # Count CNVs
         /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
@@ -278,7 +280,7 @@ while read prefix hpo; do
           --hpo ${hpo} \
           -z \
           -o "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
-          ${cnv_bed} \
+          $cnv_bed \
           ${binned_genome}
 
         # Perform burden test
@@ -317,8 +319,6 @@ done < refs/test_phenotypes.list
 
 
 
-
-
 # Refine final set of significant segments
 # Test/dev parameters (seizures)
 freq_code="rCNV"
@@ -330,19 +330,7 @@ binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
 meta_p_cutoff=0.0000192931
 sig_window_pad=1000000
-# Pseudocode for segment refinement algorithm:
-# 1: make matrix of all meta-P values across all phenotypes. One matrix each for DEL, DUP, CNV
-# 2: find all windows with at least one P-value at genome-wide significance
-# 3: pad significant windows ±1Mb (some arbitrarily large distance) and clump into regions with bedtools merge
-# 4: for each significant region...
-#   4.1: find sentinel (most significant) window across any phenotype
-#        (if multiple windows are equally significant, arbitrarily pick the left-most one)
-#   4.2: pool all case CNVs from associated phenotypes and control CNVs overlapping the sentinel window
-#   4.3: rank-order case CNVs based on nearest breakpoint coordinate to window
-#   4.4: incrementally add case CNVs one at a time (in order of nearest/smallest to farthest/largest) and run fisher's exact test for that subset of case CNVs to all control CNVs
-#   4.5: stop once incremental fisher's P-value reaches genome-wide significance
-#        (This reflects minimum CNV critical region with a direct genome-wide significant association)
-#   4.6: Strip out all case CNVs wholly contained within defined critical region, retest all bins in larger region, and re-iterate steps 4.1-4.5 if any bins remain residually significant
+
 # Download all meta-analysis stats files and necessary data
 mkdir cleaned_cnv/
 gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
@@ -355,14 +343,19 @@ gsutil -m cp -r gs://rcnv_project/cleaned_data/binned_genome/* windows/
 mkdir refs/
 gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
-# Iterate over phenotypes and make matrix of p-values
+# Iterate over phenotypes and make matrix of p-values and odds ratios (lower 95% CI)
 mkdir pvals/
+mkdir ors/
 while read pheno hpo; do
   for CNV in DEL DUP; do
     zcat stats/$pheno.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz \
     | awk -v FS="\t" '{ if ($1 !~ "#") print $NF }' \
     | cat <( echo "$pheno.$CNV" ) - \
     > pvals/$pheno.$CNV.pvals.txt
+    zcat stats/$pheno.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz \
+    | awk -v FS="\t" '{ if ($1 !~ "#") print $5 }' \
+    | cat <( echo "$pheno.$CNV" ) - \
+    > pvals/$pheno.$CNV.or_lower.txt
   done
 done < ${phenotype_list}
 for CNV in DEL DUP; do
@@ -371,7 +364,19 @@ for CNV in DEL DUP; do
         pvals/*.$CNV.pvals.txt \
   | bgzip -c \
   > $CNV.pval_matrix.bed.gz
+  paste <( zcat windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz \
+           | cut -f1-3 ) \
+        pvals/*.$CNV.or_lower.txt \
+  | bgzip -c \
+  > $CNV.or_lower_matrix.bed.gz
 done
+
+# Iterate over phenotypes and count number of individual cohorts with nominal 
+# significance per window
+mkdir nomsig/
+while read pheno hpo; do
+  
+done < ${phenotype_list}
 
 # Identify regions to be refined (get significant windows, and pad by $sig_window_pad)
 for CNV in DEL DUP; do
