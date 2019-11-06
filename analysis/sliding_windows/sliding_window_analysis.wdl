@@ -17,6 +17,7 @@ workflow sliding_window_analysis {
   Float bin_overlap
   Int pad_controls
   Float p_cutoff
+  Int n_pheno_perms
   Float meta_p_cutoff
   String rCNV_bucket
 
@@ -38,19 +39,22 @@ workflow sliding_window_analysis {
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
     }
-    
-    # # Run uCNV assocation tests per phenotype
-    # call burden_test as uCNV_burden_test {
-    #   input:
-    #     hpo=pheno[1],
-    #     metacohort_list=metacohort_list,
-    #     metacohort_sample_table=metacohort_sample_table,
-    #     freq_code="uCNV",
-    #     binned_genome=binned_genome,
-    #     bin_overlap=bin_overlap,
-    #     rCNV_bucket=rCNV_bucket,
-    #     prefix=pheno[0]
-    # }
+
+    # Permute phenotypes to estimate empirical FDR
+    call permuted_burden_test as rCNV_perm_test {
+      input:
+        hpo=pheno[1],
+        metacohort_list=metacohort_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code="rCNV",
+        binned_genome=binned_genome,
+        bin_overlap=bin_overlap,
+        pad_controls=pad_controls,
+        p_cutoff=p_cutoff,
+        n_pheno_perms=n_pheno_perms,
+        rCNV_bucket=rCNV_bucket,
+        prefix=pheno[0]
+    }
 
     # Perform meta-analysis of rCNV association statistics
     call meta_analysis as rCNV_meta_analysis {
@@ -65,20 +69,6 @@ workflow sliding_window_analysis {
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
     }
-
-    # # Perform meta-analysis of uCNV association statistics
-    # call meta_analysis as uCNV_meta_analysis {
-    #   input:
-    #     stats_beds=rCNV_burden_test.stats_beds,
-    #     stats_bed_idxs=rCNV_burden_test.stats_bed_idxs,
-    #     hpo=pheno[1],
-    #     metacohort_list=metacohort_list,
-    #     metacohort_sample_table=metacohort_sample_table,
-    #     freq_code="uCNV",
-    #     meta_p_cutoff=meta_p_cutoff,
-    #     rCNV_bucket=rCNV_bucket,
-    #     prefix=pheno[0]
-    # }
   }
 }
 
@@ -211,6 +201,100 @@ task burden_test {
     Array[File] stats_beds = glob("*.sliding_window.stats.bed.gz")
     Array[File] stats_bed_idxs = glob("*.sliding_window.stats.bed.gz.tbi")
     # Array[File] plots = glob("*.sliding_window.*.png")
+  }
+}
+
+
+# Permute phenotype labels to determine empirical FDR for a single phenotype
+task permuted_burden_test {
+  String hpo
+  File metacohort_list
+  File metacohort_sample_table
+  String freq_code
+  File binned_genome
+  Float bin_overlap
+  Int pad_controls
+  Float p_cutoff
+  Int n_pheno_perms
+  String rCNV_bucket
+  String prefix
+
+  command <<<
+    set -e
+
+    mkdir shuffled_cnv/
+
+    for i in $( seq 1 ${n_pheno_perms} ); do
+
+      # Shuffle phenotypes for each metacohort CNV dataset
+      yes $i | head -n1000000 > seed_$i.txt
+      while read meta cohorts; do
+        cnvbed="cleaned_cnv/$meta.$freq_code.bed.gz"
+        tabix -H $cnvbed > shuffled_cnv/$meta.$freq_code.pheno_shuf.bed
+        paste <( zcat $cnvbed | sed '1d' | cut -f1-5 ) \
+              <( zcat $cnvbed | sed '1d' | cut -f6 \
+                 | shuf --random-source seed.txt ) \
+        >> shuffled_cnv/$meta.$freq_code.pheno_shuf.bed
+        bgzip -f shuffled_cnv/$meta.$freq_code.pheno_shuf.bed
+        tabix -f shuffled_cnv/$meta.$freq_code.pheno_shuf.bed.gz
+      done < ${metacohort_list}
+
+      # Iterate over metacohorts & CNV types
+      while read meta cohorts; do
+        for CNV in DEL DUP CNV; do
+
+          echo -e "[$( date )] Starting permutation $i for $CNV in $hpo from $meta...\n"
+
+          cnv_bed="shuffled_cnv/$meta.$freq_code.pheno_shuf.bed.gz"
+
+          # Count CNVs
+          /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
+            --fraction ${bin_overlap} \
+            --pad-controls ${pad_controls} \
+            -t $CNV \
+            --hpo ${hpo} \
+            -z \
+            -o "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
+            ${cnv_bed} \
+            ${binned_genome}
+
+          # Perform burden test
+          /opt/rCNV2/analysis/sliding_windows/window_burden_test.R \
+            --pheno-table refs/HPOs_by_metacohort.table.tsv \
+            --cohort-name $meta \
+            --case-hpo ${hpo} \
+            --bgzip \
+            "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
+            "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+            tabix -f "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+
+          # Perform meta-analysis
+          while read meta cohorts; do
+            echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+          done < <( fgrep -v mega ${metacohort_list} ) \
+          > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
+          /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
+            --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
+            --model mh \
+            ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
+            ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
+          bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
+          tabix -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz
+
+          # Copy results to output bucket
+          gsutil cp \
+            ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
+            "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/permutations/"
+        done
+      done < ${metacohort_list}
+    done
+  >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:4148fea68ca3ab62eafada0243f0cd0d7135b00ce48a4fd0462741bf6dc3c8bc"
+    preemptible: 1
+    memory: "4 GB"
+    bootDiskSizeGb: "20"
   }
 }
 

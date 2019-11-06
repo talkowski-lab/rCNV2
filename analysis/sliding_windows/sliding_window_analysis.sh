@@ -214,6 +214,111 @@ done < refs/test_phenotypes.list
 
 
 
+# Run phenotype permutation to determine empirical FDR cutoff
+# Test/dev parameters
+hpo="HP:0001250"
+prefix="HP0001250"
+meta="meta1"
+freq_code="rCNV"
+phenotype_list="refs/test_phenotypes.list"
+metacohort_list="refs/rCNV_metacohort_list.txt"
+metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
+binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
+rCNV_bucket="gs://rcnv_project"
+p_cutoff=0.0000771724
+n_pheno_perms=10
+i=1
+bin_overlap=0.5
+pad_controls=50000
+
+# Copy all filtered CNV data, sliding windows, and other references 
+# from the project Google Bucket (note: requires permissions)
+gcloud auth login
+mkdir cleaned_cnv/
+gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
+mkdir windows/
+gsutil -m cp -r gs://rcnv_project/cleaned_data/binned_genome/* windows/
+mkdir refs/
+gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
+
+# Count CNVs in cases and controls per phenotype, split by metacohort and CNV type
+# Iterate over phenotypes
+while read prefix hpo; do
+
+  mkdir shuffled_cnv/
+
+  for i in $( seq 1 ${n_pheno_perms} ); do
+
+    # Shuffle phenotypes for each metacohort CNV dataset
+    yes $i | head -n1000000 > seed_$i.txt
+    while read meta cohorts; do
+      cnvbed="cleaned_cnv/$meta.$freq_code.bed.gz"
+      tabix -H $cnvbed > shuffled_cnv/$meta.$freq_code.pheno_shuf.bed
+      paste <( zcat $cnvbed | sed '1d' | cut -f1-5 ) \
+            <( zcat $cnvbed | sed '1d' | cut -f6 \
+               | shuf --random-source seed.txt ) \
+      >> shuffled_cnv/$meta.$freq_code.pheno_shuf.bed
+      bgzip -f shuffled_cnv/$meta.$freq_code.pheno_shuf.bed
+      tabix -f shuffled_cnv/$meta.$freq_code.pheno_shuf.bed.gz
+    done < ${metacohort_list}
+
+    # Iterate over metacohorts & CNV types
+    while read meta cohorts; do
+      for CNV in DEL DUP CNV; do
+
+        echo -e "[$( date )] Starting permutation $i for $CNV in $hpo from $meta...\n"
+
+        cnv_bed="shuffled_cnv/$meta.$freq_code.pheno_shuf.bed.gz"
+
+        # Count CNVs
+        /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
+          --fraction ${bin_overlap} \
+          --pad-controls ${pad_controls} \
+          -t $CNV \
+          --hpo ${hpo} \
+          -z \
+          -o "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
+          ${cnv_bed} \
+          ${binned_genome}
+
+        # Perform burden test
+        /opt/rCNV2/analysis/sliding_windows/window_burden_test.R \
+          --pheno-table refs/HPOs_by_metacohort.table.tsv \
+          --cohort-name $meta \
+          --case-hpo ${hpo} \
+          --bgzip \
+          "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
+          "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+          tabix -f "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+
+        # Perform meta-analysis
+        while read meta cohorts; do
+          echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+        done < <( fgrep -v mega ${metacohort_list} ) \
+        > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
+        /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
+          --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
+          --model mh \
+          ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
+          ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
+        bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
+        tabix -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz
+
+        # Copy results to output bucket
+        gsutil cp \
+          ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
+          "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/permutations/"
+      done
+    done < ${metacohort_list}
+  done
+
+done < refs/test_phenotypes.list
+
+
+
+
+
+
 # Refine final set of significant segments
 # Test/dev parameters (seizures)
 freq_code="rCNV"
