@@ -136,10 +136,10 @@ done < refs/test_phenotypes.list
 
 
 
-# Run meta-analysis for each CNV type
+# Run meta-analysis for each phenotype
 while read prefix hpo; do
-  descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
-             | awk -v FS="\t" '{ print $2 }' )
+
+  # Get metadata for meta-analysis
   mega_idx=$( head -n1 "${metacohort_sample_table}" \
               | sed 's/\t/\n/g' \
               | awk '{ if ($1=="mega") print NR }' )
@@ -149,7 +149,11 @@ while read prefix hpo; do
   nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
            | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
            | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+  descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+             | awk -v FS="\t" '{ print $2 }' )
   title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
+
+  # Run meta-analysis for each CNV type
   for CNV in DEL DUP CNV; do
     # Set CNV-specific parameters
     case "$CNV" in
@@ -175,6 +179,7 @@ while read prefix hpo; do
     /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
       --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
       --model mh \
+      --p-is-phred \
       ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
       ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
     bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
@@ -264,9 +269,10 @@ while read prefix hpo; do
       tabix -f shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz
     done < ${metacohort_list}
 
-    # Iterate over metacohorts & CNV types
-    while read meta cohorts; do
-      for CNV in DEL DUP CNV; do
+    # Iterate over CNV types
+    for CNV in DEL DUP CNV; do
+      # Perform association test for each metacohort
+      while read meta cohorts; do
 
         echo -e "[$( date )] Starting permutation $i for $CNV in $hpo from $meta...\n"
 
@@ -285,7 +291,7 @@ while read prefix hpo; do
 
         # Perform burden test
         /opt/rCNV2/analysis/sliding_windows/window_burden_test.R \
-          --pheno-table refs/HPOs_by_metacohort.table.tsv \
+          --pheno-table ${metacohort_sample_table} \
           --cohort-name $meta \
           --case-hpo ${hpo} \
           --bgzip \
@@ -293,25 +299,27 @@ while read prefix hpo; do
           "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
           tabix -f "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
 
-        # Perform meta-analysis
-        while read meta cohorts; do
-          echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
-        done < <( fgrep -v mega ${metacohort_list} ) \
-        > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
-        /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
-          --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
-          --model mh \
-          ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
-          ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
-        bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
-        tabix -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz
+      done < ${metacohort_list}
 
-        # Copy results to output bucket
-        gsutil cp \
-          ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
-          "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/permutations/"
-      done
-    done < ${metacohort_list}
+      # Perform meta-analysis
+      while read meta cohorts; do
+        echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+      done < <( fgrep -v mega ${metacohort_list} ) \
+      > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
+      /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
+        --model mh \
+        --p-is-phred \
+        ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
+        ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
+      bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
+      tabix -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz
+
+      # Copy results to output bucket
+      gsutil cp \
+        ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
+        "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/permutations/"
+
+    done
   done
 
 done < refs/test_phenotypes.list
@@ -355,7 +363,7 @@ while read pheno hpo; do
     zcat stats/$pheno.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz \
     | awk -v FS="\t" '{ if ($1 !~ "#") print $5 }' \
     | cat <( echo "$pheno.$CNV" ) - \
-    > pvals/$pheno.$CNV.or_lower.txt
+    > ors/$pheno.$CNV.lnOR_lower.txt
   done
 done < ${phenotype_list}
 for CNV in DEL DUP; do
@@ -366,17 +374,17 @@ for CNV in DEL DUP; do
   > $CNV.pval_matrix.bed.gz
   paste <( zcat windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz \
            | cut -f1-3 ) \
-        pvals/*.$CNV.or_lower.txt \
+        ors/*.$CNV.lnOR_lower.txt \
   | bgzip -c \
-  > $CNV.or_lower_matrix.bed.gz
+  > $CNV.lnOR_lower_matrix.bed.gz
 done
 
-# Iterate over phenotypes and count number of individual cohorts with nominal 
-# significance per window
-mkdir nomsig/
-while read pheno hpo; do
-  
-done < ${phenotype_list}
+# # Iterate over phenotypes and count number of individual cohorts with nominal 
+# # significance per window
+# mkdir nomsig/
+# while read pheno hpo; do
+
+# done < ${phenotype_list}
 
 # Identify regions to be refined (get significant windows, and pad by $sig_window_pad)
 for CNV in DEL DUP; do
@@ -404,7 +412,7 @@ for CNV in DEL DUP; do
     $CNV.sig_regions_to_refine.bed.gz \
     window_refinement.${freq_code}_input.tsv \
     $CNV.pval_matrix.bed.gz \
-    refs/HPOs_by_metacohort.table.tsv
+    ${metacohort_sample_table}
 done
 
 

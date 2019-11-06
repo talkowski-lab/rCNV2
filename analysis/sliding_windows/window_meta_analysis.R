@@ -241,7 +241,7 @@ meta <- function(stats.merged, cohorts, model="re"){
   meta.res <- cbind(stats.merged[, which(colnames(stats.merged) %in% keep.orig.cols)],
                     meta.stats)
   colnames(meta.res) <- c("chr", "start", "end", "n_nominal_cohorts",
-                          "meta_OR", "meta_OR_lower", "meta_OR_upper",
+                          "meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper",
                           "meta_z", "meta_phred_p")
   return(meta.res)
 }

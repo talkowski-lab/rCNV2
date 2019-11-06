@@ -238,16 +238,17 @@ task permuted_burden_test {
         tabix -H $cnvbed > shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed
         paste <( zcat $cnvbed | sed '1d' | cut -f1-5 ) \
               <( zcat $cnvbed | sed '1d' | cut -f6 \
-                 | shuf --random-source seed.txt ) \
+                 | shuf --random-source seed_$i.txt ) \
         | awk -v hpo=${hpo} '{ if ($NF ~ "HEALTHY_CONTROL" || $NF ~ hpo) print $0 }' \
         >> shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed
         bgzip -f shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed
         tabix -f shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz
       done < ${metacohort_list}
 
-      # Iterate over metacohorts & CNV types
-      while read meta cohorts; do
-        for CNV in DEL DUP CNV; do
+      # Iterate over CNV types
+      for CNV in DEL DUP CNV; do
+        # Perform association test for each metacohort
+        while read meta cohorts; do
 
           echo -e "[$( date )] Starting permutation $i for $CNV in $hpo from $meta...\n"
 
@@ -261,7 +262,7 @@ task permuted_burden_test {
             --hpo ${hpo} \
             -z \
             -o "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
-            "$cnv_bed" \
+            $cnv_bed \
             ${binned_genome}
 
           # Perform burden test
@@ -274,29 +275,32 @@ task permuted_burden_test {
             "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
             tabix -f "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
 
-          # Perform meta-analysis (no OR correlation plot)
-          while read meta cohorts; do
-            echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
-          done < <( fgrep -v mega ${metacohort_list} ) \
-          > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
-          /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
-            --model mh \
-            ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
-            ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
-          bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
-          tabix -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz
+        done < ${metacohort_list}
 
-          # Copy results to output bucket
-          gsutil cp \
-            ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
-            "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/permutations/"
-        done
-      done < ${metacohort_list}
+        # Perform meta-analysis
+        while read meta cohorts; do
+          echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+        done < <( fgrep -v mega ${metacohort_list} ) \
+        > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
+        /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
+          --model mh \
+          --p-is-phred \
+          ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
+          ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
+        bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
+        tabix -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz
+
+        # Copy results to output bucket
+        gsutil cp \
+          ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
+          "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/permutations/"
+
+      done
     done
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:9604bae89713210c5c11c91e6fff35cb2774c745c5bfb3df0ce7a268a6afb1e5"
+    docker: "talkowski/rcnv@sha256:54981cd33c35f8efec42074409730f6616a1d8914569a5926962a5a2c4b84db9"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -366,6 +370,7 @@ task meta_analysis {
       /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
         --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
         --model mh \
+        --p-is-phred \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
@@ -413,7 +418,7 @@ task meta_analysis {
   output {}
 
   runtime {
-    docker: "talkowski/rcnv@sha256:4148fea68ca3ab62eafada0243f0cd0d7135b00ce48a4fd0462741bf6dc3c8bc"
+    docker: "talkowski/rcnv@sha256:54981cd33c35f8efec42074409730f6616a1d8914569a5926962a5a2c4b84db9"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
