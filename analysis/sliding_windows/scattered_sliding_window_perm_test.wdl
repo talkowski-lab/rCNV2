@@ -90,7 +90,8 @@ task permuted_burden_test {
           smin=$( awk -v qr="$qr" '{ if (NR==qr) print $2 }' $meta.$CNV.quantiles.tsv )
           smax=$( awk -v qr="$qr" '{ if (NR==(qr+1)) print $2 + 1 }' $meta.$CNV.quantiles.tsv )
           zcat $cnvbed | sed '1d' \
-          | awk -v smin="$smin" -v smax="$smax" '{ if ($3-$2>=smin && $3-$2<smax) print $0 }' \
+          | awk -v smin="$smin" -v smax="$smax" -v CNV="$CNV" \
+            '{ if ($3-$2>=smin && $3-$2<smax && $5==CNV) print $0 }' \
           > cnv_subset.bed
           paste <( cut -f1-5 cnv_subset.bed ) \
                 <( cut -f6 cnv_subset.bed | shuf --random-source seed_$i.txt ) \
@@ -155,13 +156,20 @@ task permuted_burden_test {
       gsutil cp \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
         "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/permutations/"
+
+      echo "Done" > complete.txt
     done
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:4a7bdca530b6f2c3ff761267d738ee44baeab7645cb6ba145f8c9620a8871b3a"
+    docker: "talkowski/rcnv@sha256:9e0a5cd39c623a5e977cff7146b1c8688c8c76fa8320cad4d324cf099b2534fd"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
+  }
+
+  output {
+    # Note: must delocalize _something_ otherwise Cromwell will bypass this step
+    File completion_marker = "complete.txt"
   }
 }

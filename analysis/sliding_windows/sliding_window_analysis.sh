@@ -277,7 +277,8 @@ while read prefix hpo; do
           smin=$( awk -v qr="$qr" '{ if (NR==qr) print $2 }' $meta.$CNV.quantiles.tsv )
           smax=$( awk -v qr="$qr" '{ if (NR==(qr+1)) print $2 + 1 }' $meta.$CNV.quantiles.tsv )
           zcat $cnvbed | sed '1d' \
-          | awk -v smin="$smin" -v smax="$smax" '{ if ($3-$2>=smin && $3-$2<smax) print $0 }' \
+          | awk -v smin="$smin" -v smax="$smax" -v CNV="$CNV" \
+            '{ if ($3-$2>=smin && $3-$2<smax && $5==CNV) print $0 }' \
           > cnv_subset.bed
           paste <( cut -f1-5 cnv_subset.bed ) \
                 <( cut -f6 cnv_subset.bed | shuf --random-source seed_$i.txt ) \
@@ -368,9 +369,12 @@ paste perm_res/*.sliding_window.meta_analysis.permuted_p_values.*.txt \
 | gzip -c \
 > ${freq_code}.permuted_pval_matrix.txt.gz
 
+# Calculate empirical FDR
+/opt/rCNV2/analysis/sliding_windows/calc_empirical_fdr.R \
+  --plot ${freq_code}.FDR_permutation_results.png \
+  ${freq_code}.permuted_pval_matrix.txt.gz \
+  ${freq_code}.empirical_fdr_cutoffs.tsv
 
-for CNV in DEL DUP; do
-done
 
 
 

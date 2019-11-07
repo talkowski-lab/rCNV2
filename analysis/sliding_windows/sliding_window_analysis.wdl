@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens in sliding windows, genome-wide
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/1/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/3/plain-WDL/descriptor" as scattered_perm
 
 
 workflow sliding_window_analysis {
@@ -21,7 +21,6 @@ workflow sliding_window_analysis {
   Int pad_controls
   Float p_cutoff
   Int n_pheno_perms
-  Float meta_p_cutoff
   String rCNV_bucket
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
@@ -59,6 +58,16 @@ workflow sliding_window_analysis {
         prefix=pheno[0]
     }
 
+    # Determine appropriate genome-wide P-value threshold for meta-analysis
+    call calc_meta_p_cutoff as rCNV_calc_meta_p_cutoff {
+      input:
+        phenotype_list=phenotype_list,
+        freq_code="rCNV",
+        n_pheno_perms=n_pheno_perms,
+        rCNV_bucket=rCNV_bucket,
+        dummy_completion_markers=rCNV_perm_test.completion_marker
+    }
+
     # Perform meta-analysis of rCNV association statistics
     call meta_analysis as rCNV_meta_analysis {
       input:
@@ -68,7 +77,7 @@ workflow sliding_window_analysis {
         metacohort_list=metacohort_list,
         metacohort_sample_table=metacohort_sample_table,
         freq_code="rCNV",
-        meta_p_cutoff=meta_p_cutoff,
+        meta_p_cutoff=rCNV_calc_meta_p_cutoff.meta_p_cutoff,
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
     }
@@ -205,6 +214,60 @@ task burden_test {
     Array[File] stats_bed_idxs = glob("*.sliding_window.stats.bed.gz.tbi")
     # Array[File] plots = glob("*.sliding_window.*.png")
   }
+}
+
+
+# Aggregate all genome-wide permutation results to determine empirical P-value cutoff
+task calc_meta_p_cutoff {
+  File phenotype_list
+  String freq_code
+  Int n_pheno_perms
+  String rCNV_bucket
+  Array[File] dummy_completion_markers #Must delocalize something or Cromwell will bypass permutation test
+
+  command <<<
+    # Gather all permutation results and compute FDR CDFs
+    mkdir perm_res/
+    while read prefix hpo; do
+      echo -e "$prefix\n\n"
+      gsutil -m cp \
+        "${rCNV_bucket}/analysis/sliding_windows/$prefix/${freq_code}/permutations/**.stats.perm_*.bed.gz" \
+        perm_res/
+      for CNV in DEL DUP; do
+        for i in $( seq 1 ${n_pheno_perms} ); do
+          zcat perm_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
+          | grep -ve '^#' \
+          | awk '{ print $NF }' \
+          | cat <( echo "$prefix.$CNV.$i" ) - \
+          > perm_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.permuted_p_values.$i.txt
+        done
+      done
+    done < ${phenotype_list}
+    paste perm_res/*.sliding_window.meta_analysis.permuted_p_values.*.txt \
+    | gzip -c \
+    > ${freq_code}.permuted_pval_matrix.txt.gz
+
+    # Calculate empirical FDR
+    /opt/rCNV2/analysis/sliding_windows/calc_empirical_fdr.R \
+      --plot ${freq_code}.FDR_permutation_results.png \
+      ${freq_code}.permuted_pval_matrix.txt.gz \
+      ${freq_code}.empirical_fdr_cutoffs.tsv
+
+    tail -n1 ${freq_code}.empirical_fdr_cutoffs.tsv | cut -f3 \
+    > meta_p_cutoff.txt
+  >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:4148fea68ca3ab62eafada0243f0cd0d7135b00ce48a4fd0462741bf6dc3c8bc"
+    preemptible: 1
+    memory: "4 GB"
+    bootDiskSizeGb: "20"
+  }
+
+  output {
+    File perm_results_plot = "${freq_code}.FDR_permutation_results.png"
+    Float meta_p_cutoff = read_float(meta_p_cutoff.txt)
+  }  
 }
 
 
