@@ -44,30 +44,6 @@ def _make_window_id(coords):
                                        str(coords['end']))
 
 
-def load_pvalues(pvalues_bed, cnv_type, p_is_phred=False):
-    """
-    Import p-values matrix as dataframe
-    """
-
-    # Read pvalues_bed header to get phenotype keys
-    pvals_header = get_bed_header(pvalues_bed)
-    pval_cols = pvals_header.rstrip().split('\t')
-    pval_cols = [x.replace('.' + cnv_type, '').replace('#', '') for x in pval_cols]
-
-    # Format & transform pvalue matrix
-    pvals_df = pandas.read_table(pvalues_bed, names=pval_cols, comment='#')
-    coords = pvals_df.iloc[:,0:3]
-    window_ids = coords.apply(_make_window_id, axis=1)
-    pvals = pvals_df.iloc[:,3:]
-    if p_is_phred:
-        pvals = pvals.apply(lambda x: 10 ** -x, axis=0)
-
-    pvals_out = pandas.concat([coords, window_ids, pvals], axis=1, ignore_index=True)
-    pvals_out.columns = ['chr', 'start', 'end', 'id'] + pval_cols[3:]
-    
-    return pvals_out
-
-
 def load_sig_matrix(sig_matrix, cnv_type):
     """
     Load a matrix of True/False significance indications per window per phenotype
@@ -80,13 +56,45 @@ def load_sig_matrix(sig_matrix, cnv_type):
 
     # Read sig matrix and add window IDs
     sig_df = pandas.read_table(sig_matrix, names=sig_cols, comment='#')
-    coords = sig_df.iloc[:,0:3]
+    coords = sig_df.iloc[:, 0:3]
     window_ids = coords.apply(_make_window_id, axis=1)
-    sig_labs = sig_df.iloc[:,3:]
+    sig_labs = sig_df.iloc[:, 3:]
     sig_out = pandas.concat([coords, window_ids, sig_labs], axis=1, ignore_index=True)
     sig_out.columns = ['chr', 'start', 'end', 'id'] + sig_cols[3:]
 
-    return sig_out
+    # Subset to BedTool of windows significant in at least one phenotype
+    sig_windows = sig_out[sig_out.iloc[:, 4:].apply(any, axis=1)].iloc[:, 0:4]
+    sig_windows_bt = pbt.BedTool.from_dataframe(sig_windows)
+
+    return sig_out, sig_windows_bt
+
+
+def load_pvalues(pvalues_bed, sig_windows_bt, cnv_type, p_is_phred=False):
+    """
+    Import p-values matrix as dataframe
+    """
+
+    # Read pvalues_bed header to get phenotype keys
+    pvals_header = get_bed_header(pvalues_bed)
+    pval_cols = pvals_header.rstrip().split('\t')
+    pval_cols = [x.replace('.' + cnv_type, '').replace('#', '') for x in pval_cols]
+
+    # Format & transform pvalue matrix
+    pvals_bt = pbt.BedTool(pvalues_bed).intersect(sig_windows_bt, wa=True, u=True)
+    pvals_df = pvals_bt.to_dataframe()
+    pvals_df.columns = pval_cols
+    coords = pvals_df.iloc[:,0:3]
+    window_ids = coords.apply(_make_window_id, axis=1)
+    pvals = pvals_df.iloc[:,3:]
+    if p_is_phred:
+        pvals = pvals.apply(lambda x: 10 ** -x, axis=0)
+
+    pvals_out = pandas.concat([coords, window_ids, pvals], axis=1, ignore_index=True)
+    pvals_out.columns = ['chr', 'start', 'end', 'id'] + pval_cols[3:]
+
+    sig_ids = list(sig_windows_bt.to_dataframe().iloc[:, 3].values.flatten())
+
+    return pvals_out[pvals_out['id'].isin(sig_ids)]
 
 
 def get_pvalues(region, pvals, sig_mat, reg_pval_int, cutoff):
@@ -508,11 +516,13 @@ def main():
     if args.prefix is None:
         args.prefix = args.cnv_type
 
-    # Load p-value matrix
-    pvals = load_pvalues(args.pvalues, args.cnv_type, args.p_is_phred)
+    # Load significance matrix & BedTool of significant windows
+    sig_mat, sig_windows_bt = load_sig_matrix(args.sig_matrix, args.cnv_type)
 
-    # Load significance matrix
-    sig_mat = load_sig_matrix(args.sig_matrix, args.cnv_type)
+    # Load p-value matrix for significant windows
+    pvals = load_pvalues(args.pvalues, sig_windows_bt, args.cnv_type, 
+                         args.p_is_phred)
+    import pdb; pdb.set_trace()
 
     # Load case/control sample counts
     samples_df = pandas.read_table(args.pheno_table, header=0, comment=None)

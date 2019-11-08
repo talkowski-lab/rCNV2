@@ -404,6 +404,8 @@ mkdir windows/
 gsutil -m cp -r gs://rcnv_project/cleaned_data/binned_genome/* windows/
 mkdir refs/
 gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
+mkdir phenos/
+gsutil -m cp gs://rcnv_project/cleaned_data/phenotypes/filtered/* phenos/
 
 # Iterate over phenotypes and make matrix of p-values, odds ratios (lower 95% CI), and nominal sig cohorts
 mkdir pvals/
@@ -474,9 +476,9 @@ done
 
 # Refine associations within regions from above
 while read meta; do
-  echo -e "$meta\tcleaned_cnv/$meta.${freq_code}.bed.gz"
+  echo -e "$meta\tcleaned_cnv/$meta.${freq_code}.bed.gz\tphenos/$meta.cleaned_phenos.txt"
 done < <( cut -f1 ${metacohort_list} | fgrep -v "mega" )\
-> window_refinement.${freq_code}_input.tsv
+> window_refinement.${freq_code}_metacohort_info.tsv
 for CNV in DEL DUP; do
   /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
     --cnv-type $CNV \
@@ -484,7 +486,7 @@ for CNV in DEL DUP; do
     --min-p ${meta_p_cutoff} \
     --prefix "${freq_code}_$CNV_min_credible_region" \
     ${freq_code}.$CNV.sig_regions_to_refine.bed.gz \
-    window_refinement.${freq_code}_input.tsv \
+    window_refinement.${freq_code}_metacohort_info.tsv \
     $CNV.pval_matrix.bed.gz \
     ${freq_code}.$CNV.all_windows_labeled.bed.gz \
     ${metacohort_sample_table}

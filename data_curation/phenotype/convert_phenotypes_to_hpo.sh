@@ -315,6 +315,15 @@ for cohort in UKBB CHOP; do
 done
 
 
+# Merge final phenotype lists per metacohort
+while read name cohorts; do
+  for cohort in $( echo "$cohorts" | sed 's/;/\n/g' ); do
+    cat cleaned_phenos/filtered/${cohort}.cleaned_phenos.txt
+  done \
+  > cleaned_phenos/filtered/${name}.cleaned_phenos.txt
+done < rCNV_metacohort_list.txt
+
+
 # Copy all final data to Google bucket (requires permissions)
 gsutil -m cp -r cleaned_phenos/* gs://rcnv_project/cleaned_data/phenotypes/
 gsutil cp samples_per_HPO.txt \

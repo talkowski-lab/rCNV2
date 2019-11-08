@@ -8,7 +8,7 @@
 
 # Filter raw CNV data to rare and ultra-rare subsets
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:filter_cnvs_singleCohort/versions/45/plain-WDL/descriptor" as filter_single
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:filter_cnvs_singleCohort/versions/46/plain-WDL/descriptor" as filter_single
 
 
 workflow filter_CNV_data {
@@ -94,7 +94,7 @@ task combine_subsets {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:c1803b167628b6fa5bd04e7d993706c9ef579f53c4e0e187e808791cf61c04f9"
+    docker: "talkowski/rcnv@sha256:f15f25e75adf9a055be738659b436f911e55e362e31bd0c5fdc0b6e1e10b4c6f"
     preemptible: 1
   }
 
