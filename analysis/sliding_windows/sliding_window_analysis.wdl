@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens in sliding windows, genome-wide
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/3/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/5/plain-WDL/descriptor" as scattered_perm
 
 
 workflow sliding_window_analysis {
@@ -57,18 +57,20 @@ workflow sliding_window_analysis {
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
     }
+  }
 
-    # Determine appropriate genome-wide P-value threshold for meta-analysis
-    call calc_meta_p_cutoff as rCNV_calc_meta_p_cutoff {
-      input:
-        phenotype_list=phenotype_list,
-        freq_code="rCNV",
-        n_pheno_perms=n_pheno_perms,
-        rCNV_bucket=rCNV_bucket,
-        dummy_completion_markers=rCNV_perm_test.completion_marker
-    }
+  # Determine appropriate genome-wide P-value threshold for meta-analysis
+  call calc_meta_p_cutoff as rCNV_calc_meta_p_cutoff {
+    input:
+      phenotype_list=phenotype_list,
+      freq_code="rCNV",
+      n_pheno_perms=n_pheno_perms,
+      rCNV_bucket=rCNV_bucket,
+      dummy_completion_markers=rCNV_perm_test.completion_marker
+  }
 
-    # Perform meta-analysis of rCNV association statistics
+  # Perform meta-analysis of rCNV association statistics
+  scatter ( pheno in phenotypes ) {
     call meta_analysis as rCNV_meta_analysis {
       input:
         stats_beds=rCNV_burden_test.stats_beds,
@@ -258,23 +260,24 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:4148fea68ca3ab62eafada0243f0cd0d7135b00ce48a4fd0462741bf6dc3c8bc"
+    docker: "talkowski/rcnv@sha256:0558a314df1fe483945027e894c64d222d189830efa2ad52883e69e0a7336ef5"
     preemptible: 1
-    memory: "4 GB"
+    memory: "16 GB"
+    disks: "local-disk 100 HDD"
     bootDiskSizeGb: "20"
   }
 
   output {
     File perm_results_plot = "${freq_code}.FDR_permutation_results.png"
-    Float meta_p_cutoff = read_float(meta_p_cutoff.txt)
+    Float meta_p_cutoff = read_float("meta_p_cutoff.txt")
   }  
 }
 
 
 # Run meta-analysis across metacohorts for a single phenotype
 task meta_analysis {
-  Array[File] stats_beds
-  Array[File] stats_bed_idxs
+  Array[Array[File]] stats_beds
+  Array[Array[File]] stats_bed_idxs
   String hpo
   File metacohort_list
   File metacohort_sample_table
@@ -381,7 +384,7 @@ task meta_analysis {
   output {}
 
   runtime {
-    docker: "talkowski/rcnv@sha256:4a7bdca530b6f2c3ff761267d738ee44baeab7645cb6ba145f8c9620a8871b3a"
+    docker: "talkowski/rcnv@sha256:0558a314df1fe483945027e894c64d222d189830efa2ad52883e69e0a7336ef5"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

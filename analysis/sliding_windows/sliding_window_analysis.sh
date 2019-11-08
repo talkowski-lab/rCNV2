@@ -37,7 +37,7 @@ metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
 p_cutoff=0.0000771724
-meta_p_cutoff=0.0000192931
+meta_p_cutoff=0.000000629506182857198
 bin_overlap=0.5
 pad_controls=50000
 
@@ -388,7 +388,9 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
-meta_p_cutoff=0.0000192931
+meta_p_cutoff=0.000000629506182857198
+meta_or_cutoff=2
+meta_nominal_cohorts_cutoff=2
 sig_window_pad=1000000
 
 # Download all meta-analysis stats files and necessary data
@@ -403,9 +405,10 @@ gsutil -m cp -r gs://rcnv_project/cleaned_data/binned_genome/* windows/
 mkdir refs/
 gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
-# Iterate over phenotypes and make matrix of p-values and odds ratios (lower 95% CI)
+# Iterate over phenotypes and make matrix of p-values, odds ratios (lower 95% CI), and nominal sig cohorts
 mkdir pvals/
 mkdir ors/
+mkdir nomsig/
 while read pheno hpo; do
   for CNV in DEL DUP; do
     zcat stats/$pheno.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz \
@@ -413,9 +416,13 @@ while read pheno hpo; do
     | cat <( echo "$pheno.$CNV" ) - \
     > pvals/$pheno.$CNV.pvals.txt
     zcat stats/$pheno.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz \
-    | awk -v FS="\t" '{ if ($1 !~ "#") print $5 }' \
+    | awk -v FS="\t" '{ if ($1 !~ "#") print $6 }' \
     | cat <( echo "$pheno.$CNV" ) - \
     > ors/$pheno.$CNV.lnOR_lower.txt
+    zcat stats/$pheno.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz \
+    | awk -v FS="\t" '{ if ($1 !~ "#") print $4 }' \
+    | cat <( echo "$pheno.$CNV" ) - \
+    > nomsig/$pheno.$CNV.nomsig_counts.txt
   done
 done < ${phenotype_list}
 for CNV in DEL DUP; do
@@ -429,25 +436,40 @@ for CNV in DEL DUP; do
         ors/*.$CNV.lnOR_lower.txt \
   | bgzip -c \
   > $CNV.lnOR_lower_matrix.bed.gz
+  paste <( zcat windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz \
+           | cut -f1-3 ) \
+        nomsig/*.$CNV.nomsig_counts.txt \
+  | bgzip -c \
+  > $CNV.nominal_cohort_counts.bed.gz
 done
 
-# # Iterate over phenotypes and count number of individual cohorts with nominal 
-# # significance per window
-# mkdir nomsig/
-# while read pheno hpo; do
-
-# done < ${phenotype_list}
-
-# Identify regions to be refined (get significant windows, and pad by $sig_window_pad)
+# Get matrix of window significance labels
 for CNV in DEL DUP; do
   /opt/rCNV2/analysis/sliding_windows/get_significant_windows.R \
+    --pvalues $CNV.pval_matrix.bed.gz \
     --p-is-phred \
-    --cutoff ${meta_p_cutoff} \
-    --pad-windows ${sig_window_pad} \
-    $CNV.pval_matrix.bed.gz \
+    --max-p ${meta_p_cutoff} \
+    --odds-ratios $CNV.lnOR_lower_matrix.bed.gz \
+    --or-is-ln \
+    --min-or ${meta_or_cutoff} \
+    --nominal-counts $CNV.nominal_cohort_counts.bed.gz \
+    --min-nominal ${meta_nominal_cohorts_cutoff} \
+    --out-prefix ${freq_code}.$CNV. \
+    ${binned_genome}
+  bgzip -f ${freq_code}.$CNV.all_windows_labeled.bed
+  bgzip -f ${freq_code}.$CNV.significant_windows.bed
+done
+
+# Define regions to be refined (sig windows padded by $sig_window_pad and merged)
+for CNV in DEL DUP; do
+  zcat ${freq_code}.$CNV.significant_windows.bed.gz \
+  | fgrep -v "#" \
+  | awk -v buf=${sig_window_pad} -v OFS="\t" '{ print $1, $2-buf, $3+buf }' \
+  | awk -v OFS="\t" '{ if ($2<0) $2=0; print $1, $2, $3 }' \
+  | sort -Vk1,1 -k2,2V -k3,3V \
   | bedtools merge -i - \
   | bgzip -c \
-  > $CNV.sig_regions_to_refine.bed.gz
+  > ${freq_code}.$CNV.sig_regions_to_refine.bed.gz
 done
 
 # Refine associations within regions from above
@@ -459,11 +481,12 @@ for CNV in DEL DUP; do
   /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
     --cnv-type $CNV \
     --p-is-phred \
-    --cutoff ${meta_p_cutoff} \
-    --prefix "${freq_code}_$CNV" \
-    $CNV.sig_regions_to_refine.bed.gz \
+    --min-p ${meta_p_cutoff} \
+    --prefix "${freq_code}_$CNV_min_credible_region" \
+    ${freq_code}.$CNV.sig_regions_to_refine.bed.gz \
     window_refinement.${freq_code}_input.tsv \
     $CNV.pval_matrix.bed.gz \
+    ${freq_code}.$CNV.all_windows_labeled.bed.gz \
     ${metacohort_sample_table}
 done
 

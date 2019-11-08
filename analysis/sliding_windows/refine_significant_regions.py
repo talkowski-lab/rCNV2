@@ -34,6 +34,16 @@ def get_bed_header(bedpath):
     return header
 
 
+def _make_window_id(coords):
+    """
+    Create window ID based on coordinates
+    """
+
+    return 'window_{0}_{1}_{2}'.format(str(coords['chr']), 
+                                       str(coords['start']), 
+                                       str(coords['end']))
+
+
 def load_pvalues(pvalues_bed, cnv_type, p_is_phred=False):
     """
     Import p-values matrix as dataframe
@@ -45,46 +55,78 @@ def load_pvalues(pvalues_bed, cnv_type, p_is_phred=False):
     pval_cols = [x.replace('.' + cnv_type, '').replace('#', '') for x in pval_cols]
 
     # Format & transform pvalue matrix
-    pvals_bt = pandas.read_table(pvalues_bed, names=pval_cols, comment='#')
-    coords = pvals_bt.iloc[:,0:3]
-    def _make_window_id(coords_i):
-        return 'pval_window_{0}_{1}_{2}'.format(str(coords_i['chr']), 
-                                                str(coords_i['start']), 
-                                                str(coords_i['end']))
+    pvals_df = pandas.read_table(pvalues_bed, names=pval_cols, comment='#')
+    coords = pvals_df.iloc[:,0:3]
     window_ids = coords.apply(_make_window_id, axis=1)
-    pvals = pvals_bt.iloc[:,3:]
+    pvals = pvals_df.iloc[:,3:]
     if p_is_phred:
         pvals = pvals.apply(lambda x: 10 ** -x, axis=0)
 
     pvals_out = pandas.concat([coords, window_ids, pvals], axis=1, ignore_index=True)
     pvals_out.columns = ['chr', 'start', 'end', 'id'] + pval_cols[3:]
+    
     return pvals_out
 
 
-def get_pvalues(region, pvals, reg_pval_int, cutoff):
+def load_sig_matrix(sig_matrix, cnv_type):
+    """
+    Load a matrix of True/False significance indications per window per phenotype
+    """
+
+    # Read sig_matrix header to get phenotype keys
+    sig_header = get_bed_header(sig_matrix)
+    sig_cols = sig_header.rstrip().split('\t')
+    sig_cols = [x.replace('.' + cnv_type, '').replace('#', '') for x in sig_cols]
+
+    # Read sig matrix and add window IDs
+    sig_df = pandas.read_table(sig_matrix, names=sig_cols, comment='#')
+    coords = sig_df.iloc[:,0:3]
+    window_ids = coords.apply(_make_window_id, axis=1)
+    sig_labs = sig_df.iloc[:,3:]
+    sig_out = pandas.concat([coords, window_ids, sig_labs], axis=1, ignore_index=True)
+    sig_out.columns = ['chr', 'start', 'end', 'id'] + sig_cols[3:]
+
+    return sig_out
+
+
+def get_pvalues(region, pvals, sig_mat, reg_pval_int, cutoff):
     """
     Extract peak p-values and significant phenotypes for a query region
     """
-    
-    # Extract p-value windows within query region
+
+    # Extract p-value and sig windows within query region
     hits = reg_pval_int.filter(lambda x: x.chrom == region.chrom and \
                                          x.start == region.start and \
                                          x.end == region.end)
     hit_ids = [x[6] for x in hits]
     pval_hits = pvals[pvals['id'].isin(hit_ids)]
+    sig_mat_hits = sig_mat[sig_mat['id'].isin(hit_ids)]
 
-    # Find peak p-value for each phenotype
     p_peak = {}
+    sig_bin_ids = {}
     signif_hpos = []
+    signif_p_peak = {}
     for pheno in list(pvals.columns[4:]):
         hpo = pheno.replace('HP', 'HP:')
+
+        # Find peak p-value (irrespective of significance)
         minp = nanmin(pval_hits[pheno])
         peak_ids = list(pval_hits[pval_hits[pheno] == minp]['id'])
         p_peak[hpo] = (minp, peak_ids)
-        if not isnan(minp) and minp <= cutoff:
+
+        # Find significant windows
+        sig_hit_ids = list(sig_mat_hits[sig_mat_hits[pheno]]['id'].values.flatten())
+        sig_bin_ids[pheno] = sig_hit_ids
+
+        # Find highest p-value among significant windows
+        if len(sig_hit_ids) > 0:
             signif_hpos.append(hpo)
+            pval_hits_sig = pval_hits[pval_hits['id'].isin(sig_hit_ids)]
+            sig_minp = nanmin(pval_hits_sig[pheno])
+            sig_peak_ids = list(pval_hits_sig[pval_hits_sig[pheno] == sig_minp]['id'])
+            signif_p_peak[hpo] = (sig_minp, sig_peak_ids)
     
-    return p_peak, signif_hpos
+    return p_peak, sig_bin_ids, signif_hpos, signif_p_peak
 
 
 def get_sentinel_window(p_peaks, pvals):
@@ -105,7 +147,8 @@ def get_sentinel_window(p_peaks, pvals):
     return sentinel
     
 
-def load_regions(regions_in, pvals, samples_df, cnv_type, cutoff, prefix):
+def load_regions(regions_in, pvals, sig_matrix, samples_df, cnv_type, 
+                 cutoff, prefix):
     """
     Read BED of regions to refine, and annotate with p-values
     """
@@ -122,13 +165,16 @@ def load_regions(regions_in, pvals, samples_df, cnv_type, cutoff, prefix):
         rname = '{0}_region_{1}:{2}-{3}'.format(prefix, str(r.chrom),
                                                 str(r.start), str(r.end))
 
-        p_peaks, signif_hpos = get_pvalues(r, pvals, reg_pvals_int, cutoff)
+        p_peaks, sig_bin_ids, \
+        signif_hpos, signif_p_peaks = get_pvalues(r, pvals, sig_matrix, 
+                                                  reg_pvals_int, cutoff)
 
-        sentinel_id = get_sentinel_window(p_peaks, pvals)
+        sentinel_id = get_sentinel_window(signif_p_peaks, pvals)
 
         sentinel_pvals = pvals[pvals['id'].isin([sentinel_id])].iloc[:1, 4:].values.flatten().tolist()
         sent_pval_tuples = tuple(zip(pvals.columns[4:].tolist(), sentinel_pvals))
-        sent_hpos = [hpo.replace('HP', 'HP:') for hpo, p in sent_pval_tuples if p <= cutoff]
+        sent_hpos = [hpo.replace('HP', 'HP:') for hpo, p in sent_pval_tuples \
+                     if p <= cutoff and hpo.replace('HP', 'HP:') in signif_hpos]
 
         s_counts = samples_df[samples_df['hpo'].isin(sent_hpos)].loc[:, ['hpo', 'total']]
         s_counts.sort_values(by='total', inplace=True, ascending=False)
@@ -140,11 +186,27 @@ def load_regions(regions_in, pvals, samples_df, cnv_type, cutoff, prefix):
                               'end' : r.end, 
                               'region_id' : rname, 
                               'signif_hpos' : signif_hpos, 
-                              'p_peaks' : p_peaks,
+                              'signif_bin_ids' : sig_bin_ids,
+                              'p_peaks' : signif_p_peaks,
+                              'p_peaks_anysig' : p_peaks,
                               'sentinel_id' : sentinel_id, 
                               'sentinel_hpo' : sentinel_pheno}
 
     return regions
+
+
+def print_region_info(regions, rid):
+    """
+    Print basic region info prior to refinement
+    """
+
+    print('\nBeginning refinement of {0}...'.format(rid))
+    rsize = regions[rid]['end'] - regions[rid]['start']
+    print('  * Region size: {:,} kb'.format(int(round(rsize/1000))))
+    n_phenos = len(regions[rid]['signif_hpos'])
+    pheno_str = ', '.join(regions[rid]['signif_hpos'])
+    print('  * Associated with {0} phenotypes ({1})'.format(str(n_phenos), 
+                                                              pheno_str))
 
 
 def intersect_cnvs(query_bt, cnvs, cnv_type, case_hpos, control_hpo, 
@@ -329,7 +391,7 @@ def get_min_case_cnvs(sentinel, case_cnvs, control_cnvs, cohorts, samples_df,
 def refine_sentinel(regions, rid, pvals, samples_df, cnvs_table, 
                     cnv_type, control_hpo, cutoff, resolution=10000):
     """
-    Define minimum critical region for a single sentiel window
+    Define minimum critical region for a single sentinel window
     """
 
     # Get sentinel information
@@ -338,6 +400,10 @@ def refine_sentinel(regions, rid, pvals, samples_df, cnvs_table,
     sent_bt = pbt.BedTool.from_dataframe(sent_w.iloc[:,0:3])
     sent_mid = (sent_bt[0].start + sent_bt[0].end) / 2
     sent_hpo = regions[rid]['sentinel_hpo']
+
+    # Print sentinel information for logging
+    print('  * Sentinel window: {0}'.format(sentinel))
+    print('  * Sentinel phenotype: {0}'.format(sent_hpo))
 
     # Intersect sentinel window with CNVs from sentinel phenotype
     cohorts = [s.split('\t')[0] for s in open(cnvs_table).readlines()]
@@ -366,20 +432,35 @@ def refine_sentinel(regions, rid, pvals, samples_df, cnvs_table,
     k_case_cnvs = get_min_case_cnvs(sentinel, case_cnvs, control_cnvs, cohorts, 
                                     samples_df, sent_hpo, control_hpo, cutoff)
     min_case_cnvs = case_cnvs.iloc[0:k_case_cnvs, :]
+    min_case_cnv_ids = list(min_case_cnvs['cnv_id'].values.flatten())
     def _round_to(x, to):
         to * round(x / to)
+
+    # Median coordinates of this minimum CNV set defines the associated region
     refined_chrom = regions[rid]['chr']
     refined_start = int(resolution * floor(median(min_case_cnvs['start']) / resolution))
     refined_end = int(resolution * ceil(median(min_case_cnvs['end']) / resolution))
     refined_size = int(refined_end - refined_start)
 
-    # Print result
-    msg = 'Region {0}, originally {1}kb, was refined to {2}kb critical region ' + \
-          '({3}:{4}-{5}) using {6} of {7} case CNVs for {8}.\n'
-    print(msg.format(rid, str(int(regions[rid]['end']-regions[rid]['start'])/1000),
-                     str(refined_size/1000), refined_chrom, str(refined_start), 
+    # TODO: re-run association test against larger region
+    # determine which phenotypes and CNVs belong to this region (to be excluded downstream)
+
+    # Print result to log
+    msg = '  * Successfully refined to {0} kb minimal credible region ' + \
+          '({1}:{2}-{3}) using {4} of {5} case CNVs for {6}.'
+    print(msg.format(str(refined_size/1000), refined_chrom, str(refined_start), 
                      str(refined_end), str(k_case_cnvs), str(len(case_cnvs)), 
                      sent_hpo))
+
+    # Return refined region
+    new_region = {'chr' : refined_chrom,
+                  'start' : refined_start,
+                  'end' : refined_end,
+                  'size' : refined_size,
+                  'sentinel_hpo' : sent_hpo,
+                  'sentinel_case_CNVs' : min_case_cnv_ids}
+
+    return new_region
 
 
 def main():
@@ -396,16 +477,23 @@ def main():
                         'name and path to CNV BED file for each cohort.')
     parser.add_argument('pvalues', help='BED file of original sliding windows ' +
                          'and p-values for each phenotype.')
+    parser.add_argument('sig_matrix', help='BED file of original sliding windows ' +
+                         'with TRUE/FALSE label of significance for each phenotype.')
     parser.add_argument('pheno_table', help='table with counts of samples per ' +
                         'HPO term per cohort.')
     parser.add_argument('--cnv-type', help='type of CNVs to evaluate. [default: ' + 
                         'use all CNVs]', choices=['CNV', 'DEL', 'DUP'], 
                         default='CNV')
-    parser.add_argument('--cutoff', help='P-value of significance threshold. ' + 
+    parser.add_argument('--min-p', help='P-value of significance threshold. ' + 
                         '[default: 10e-8]', default=10e-8, type=float)
     parser.add_argument('--p-is-phred', help='supplied P-values are Phred-scaled ' +
                         '(-log10[P]). [default: False]', default=False, 
                         action='store_true')
+    parser.add_argument('--min-nominal-cohorts', help='P-value of significance threshold. ' + 
+                        '[default: 2]', default=2, type=float)
+    parser.add_argument('--min-or-lower', help='Minimum lower 95\% confidence interval ' + 
+                        'of the odds ratio. [default: 2] ' + 
+                        '[default: 2]', default=2, type=float)
     parser.add_argument('--control-hpo', default='HEALTHY_CONTROL', help='HPO code ' +
                         'to use for control CNV counts. [default: HEALTHY_CONTROL]')
     parser.add_argument('--resolution', help='Round refined region coordinates ' + 
@@ -423,19 +511,40 @@ def main():
     # Load p-value matrix
     pvals = load_pvalues(args.pvalues, args.cnv_type, args.p_is_phred)
 
+    # Load significance matrix
+    sig_mat = load_sig_matrix(args.sig_matrix, args.cnv_type)
+
     # Load case/control sample counts
     samples_df = pandas.read_table(args.pheno_table, header=0, comment=None)
     samples_df.columns = [x.replace('#', '').lower() for x in samples_df.columns]
 
     # Read original list of regions to refine
-    regions = load_regions(args.regions, pvals, samples_df, args.cnv_type, 
-                           args.cutoff, args.prefix)
+    regions = load_regions(args.regions, pvals, sig_mat, samples_df, 
+                           args.cnv_type, args.min_p, args.prefix)
 
     # Refine regions one at a time
+    k = 0
+    refined_regions = []
+    # region_blacklist = []
     for rid in regions.keys():
-        refine_sentinel(regions, rid, pvals, samples_df, args.cnvs_table, 
-                        args.cnv_type, args.control_hpo, args.cutoff, 
-                        args.resolution)
+        print_region_info(regions, rid)
+
+        i = 0
+        # Sequentially process all sentinels
+        while len(regions[rid]['signif_hpos']) > 0:
+            i += 1
+            k += 1
+            print('--Refining sentinel window #{0}'.format(str(i)))
+            new_region = refine_sentinel(regions, rid, pvals, samples_df, 
+                                         args.cnvs_table, args.cnv_type, 
+                                         args.control_hpo, args.min_p, 
+                                         args.resolution)
+            new_region['id'] = '_'.join([args.prefix, str(k)])
+
+            # # Exclude this region from future analyses 
+            # cnv_blacklist = cnv_blacklist + new_region['sentinel_case_CNVs']
+            # cnv_blacklist = list(set(cnv_blacklist))
+        print('--No additional sentinel windows identified; region fully refined.')
 
 
 if __name__ == '__main__':

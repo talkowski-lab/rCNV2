@@ -38,6 +38,10 @@ workflow scattered_sliding_window_perm_test {
 	      prefix=prefix
 	  }
 	}
+
+  output {
+    File completion_marker = rCNV_perm_test.completion_marker[0]
+  }
 }
 
 
@@ -157,8 +161,8 @@ task permuted_burden_test {
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
         "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/permutations/"
 
-      echo "Done" > complete.txt
     done
+    echo "Done" > complete.txt
   >>>
 
   runtime {
@@ -168,8 +172,8 @@ task permuted_burden_test {
     bootDiskSizeGb: "20"
   }
 
+  # Note: must delocalize _something_ otherwise Cromwell will bypass this step
   output {
-    # Note: must delocalize _something_ otherwise Cromwell will bypass this step
     File completion_marker = "complete.txt"
   }
 }
