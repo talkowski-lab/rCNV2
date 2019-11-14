@@ -61,9 +61,14 @@ Given that rare CNV counts per window are (_i_) sparse and (_ii_) zero-inflated,
 
 Each phenotype & CNV were meta-analyzed separately for a total of three meta-analyses per phenotype.  
 
-Following meta-analysis, individual windows were assessed for genome-wide significance at a threshold of 1.93x10<sup>-5</sup>, corresponding to four times the Bonferroni correction for the number of non-overlapping 200kb windows tested.  
+Following meta-analysis, individual windows were labeled as genome-wide significant if the met the following three criteria:
+1. _P_<sub>meta</sub> ≤ 10<sup>-6</sup> (_note: threshold of 10<sup>-6</sup> corresponds to a study-wide FDR of 1% via phenotype permutation analysis_);  
+2. Lower bound of 95% confidence interval of meta-analysis odds ratio ≥ 2; and  
+3. Nominally significant in ≥ 2 metacohorts.  
 
-### 4. Collapse overlapping significant windows  
+### 4. Refine associations to minimal credible regions  
+
+TBD
 
 ---  
 

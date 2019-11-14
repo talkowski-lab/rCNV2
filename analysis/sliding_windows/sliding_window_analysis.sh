@@ -37,7 +37,7 @@ metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
 p_cutoff=0.0000771724
-meta_p_cutoff=0.000000629506182857198
+meta_p_cutoff=0.000001
 bin_overlap=0.5
 pad_controls=50000
 
@@ -388,10 +388,12 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
-meta_p_cutoff=0.000000629506182857198
+meta_p_cutoff=0.000001
 meta_or_cutoff=2
 meta_nominal_cohorts_cutoff=2
 sig_window_pad=1000000
+refine_max_cnv_size=3000000
+refine_min_case_cnvs=1
 
 # Download all meta-analysis stats files and necessary data
 mkdir cleaned_cnv/
@@ -462,6 +464,7 @@ for CNV in DEL DUP; do
   bgzip -f ${freq_code}.$CNV.significant_windows.bed
 done
 
+
 # Define regions to be refined (sig windows padded by $sig_window_pad and merged)
 for CNV in DEL DUP; do
   zcat ${freq_code}.$CNV.significant_windows.bed.gz \
@@ -482,14 +485,21 @@ done < <( cut -f1 ${metacohort_list} | fgrep -v "mega" )\
 for CNV in DEL DUP; do
   /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
     --cnv-type $CNV \
-    --p-is-phred \
     --min-p ${meta_p_cutoff} \
-    --prefix "${freq_code}_$CNV_min_credible_region" \
+    --p-is-phred \
+    --min-or-lower 0 \
+    --retest-min-or-lower ${meta_or_cutoff} \
+    --max-cnv-size ${refine_max_cnv_size} \
+    --min-nominal ${meta_nominal_cohorts_cutoff} \
+    --credible-interval 0.9 \
+    --prefix "${freq_code}_$CNV" \
     ${freq_code}.$CNV.sig_regions_to_refine.bed.gz \
     window_refinement.${freq_code}_metacohort_info.tsv \
     $CNV.pval_matrix.bed.gz \
     ${freq_code}.$CNV.all_windows_labeled.bed.gz \
-    ${metacohort_sample_table}
+    ${metacohort_sample_table} \
+    ${freq_code}.$CNV.significant_regions.associations.bed \
+    ${freq_code}.$CNV.significant_regions.loci.bed
 done
 
 
