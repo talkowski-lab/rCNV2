@@ -474,18 +474,15 @@ task refine_regions {
       | cat <( echo "$pheno.${CNV}" ) - \
       > nomsig/$pheno.${CNV}.nomsig_counts.txt
     done < ${phenotype_list}
-    paste <( zcat windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz \
-             | cut -f1-3 ) \
+    paste <( zcat ${binned_genome} | cut -f1-3 ) \
           pvals/*.${CNV}.pvals.txt \
     | bgzip -c \
     > ${CNV}.pval_matrix.bed.gz
-    paste <( zcat windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz \
-             | cut -f1-3 ) \
+    paste <( zcat ${binned_genome} | cut -f1-3 ) \
           ors/*.${CNV}.lnOR_lower.txt \
     | bgzip -c \
     > ${CNV}.lnOR_lower_matrix.bed.gz
-    paste <( zcat windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz \
-             | cut -f1-3 ) \
+    paste <( zcat ${binned_genome} | cut -f1-3 ) \
           nomsig/*.${CNV}.nomsig_counts.txt \
     | bgzip -c \
     > ${CNV}.nominal_cohort_counts.bed.gz
@@ -555,7 +552,7 @@ task refine_regions {
 
 
   runtime {
-    docker: "talkowski/rcnv@sha256:8442203e9e55cc857dd2b4ff3261f77f910bc211e729a4a3a902707f7283a526"
+    docker: "talkowski/rcnv@sha256:711c0520e3abd12291bfc01c066d7d33ea4575cdabfb6de907f09df5860ea5ba"
     preemptible: 1
     memory: "16 GB"
     bootDiskSizeGb: "20"

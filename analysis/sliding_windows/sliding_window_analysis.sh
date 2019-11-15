@@ -428,18 +428,15 @@ for CNV in DEL DUP; do
   done < ${phenotype_list}
 done
 for CNV in DEL DUP; do
-  paste <( zcat windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz \
-           | cut -f1-3 ) \
+  paste <( zcat ${binned_genome} | cut -f1-3 ) \
         pvals/*.$CNV.pvals.txt \
   | bgzip -c \
   > $CNV.pval_matrix.bed.gz
-  paste <( zcat windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz \
-           | cut -f1-3 ) \
+  paste <( zcat ${binned_genome} | cut -f1-3 ) \
         ors/*.$CNV.lnOR_lower.txt \
   | bgzip -c \
   > $CNV.lnOR_lower_matrix.bed.gz
-  paste <( zcat windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz \
-           | cut -f1-3 ) \
+  paste <( zcat ${binned_genome} | cut -f1-3 ) \
         nomsig/*.$CNV.nomsig_counts.txt \
   | bgzip -c \
   > $CNV.nominal_cohort_counts.bed.gz

@@ -93,11 +93,11 @@ Given that rare CNV counts per window are (a) sparse and (b) zero-inflated, and 
 Each phenotype & CNV type were meta-analyzed separately for a total of three meta-analyses per phenotype.  
 
 Following meta-analysis, individual windows were labeled as genome-wide significant if the met the following three criteria:
-1. _P_<sub>meta</sub> ≤ 10<sup>-6</sup>;  
+1. _P_<sub>meta</sub> ≤ 6.3x10<sup>-7</sup>;  
 2. Lower bound of 95% confidence interval of odds ratio ≥ 2; and  
 3. Nominally significant in ≥ 2 metacohorts.  
 
-_Note: a P<sub>meta</sub> threshold of 10<sup>-6</sup> was determined to correspond to a study-wide FDR of 1% via phenotype permutation analysis (not described here)_
+_Note: a P<sub>meta</sub> threshold of 6.3x10<sup>-7</sup> was determined to correspond to a study-wide FDR of 1% via phenotype permutation analysis (not described here)_
 
 #### Output files  
 
@@ -109,30 +109,30 @@ These files are stored in the same location as the per-metacohort analysis resul
 
 Lastly, we collapsed all significant windows across phenotypes and refined them to discrete intervals.  
 
-For each locus with significant evidence of rCNVs being associated with one or more phenotypes, we aimed to identify:  
+For each locus with a significant association between rCNVs and one or more phenotypes, we aimed to identify:  
 1. all statistically independent associations that were _individually_ genome-wide significant; and
 3. refine these associations to the minimal interval that contained the causal element(s) with 90% confidence (_i.e._, analogous to 90% credible sets from common variant GWAS).  
 
 This procedure is described below, and was performed separately for deletions and duplications using `refine_significant_regions.py`.  
 
-First, all windows significant in at least one phenotype were collapsed into a list of larger nonredundant `query regions` to be refined. These query regions were created by merging overlapping significant windows, and clustering all merged windows within ±1Mb. Finally, query regions were extended by ±1Mb on each side, such that no significant window was closer than ±1Mb to the edge of each query region.  
+First, all windows significant in at least one phenotype were collapsed into a list of larger nonredundant `query regions` by merging overlapping significant windows and clustering all merged windows within ±1Mb. The boundaries of these query regions were extended by +1Mb on each side such that no significant window was closer than 1Mb to the boundary of its query region.  
 
 Next, for each query region, we performed the following steps:
 1. Designated the significant window with strongest P-value from any phenotype as the `sentinel window`.  
 2. Designated all phenotypes with at least one significant association in the region as the `sentinel phenotypes`.  
 3. Gathered all rCNVs overlapping the sentinel window in sentinel phenotypes & controls.  
 4. Ordered all case CNVs based on the smallest max breakpoint distance to middle of sentinel window.  
-5. Added case CNVs one at a time (in order) and ran a Mantel-Haenszel meta-analysis with Sweeting correction against all control CNVs until the test reaches P ≤ 10-6 and at least two metacohorts have Fisher’s exact P ≤ 0.05.  
-  * _Note: Step 5 was attempted first with CNVs covering at least half of the sentinel window, and restricted to case CNVs ≤ 3Mb in size. If genome-wide significance was not achieved for this subset, the test was expanded to include all CNVs overlapping the sentinel window irrespective of size or window overlap._  
+5. Added case CNVs one at a time (in order) and ran a Mantel-Haenszel (M-H) meta-analysis with Sweeting correction against all control CNVs until the test reached P ≤ 6.3x10<sup>-7</sup> and at least two metacohorts had Fisher’s exact P ≤ 0.05.  
+  * _Note: Step 5 was attempted first with CNVs covering at least 50% of the sentinel window, and restricted to case CNVs ≤ 3Mb in size. If genome-wide significance was not achieved for this smaller subset of case CNVs, the test was expanded to include all CNVs overlapping the sentinel window irrespective of size or fracion of the window overlapped._  
 6. When the M-H test reached significance, we defined the `minimal credible region` as the middle 90% of the CNV density for the minimal set of case CNVs required to achieve genome-wide significance for the sentinel window.  
-7. Exclude all sentinel CNVs and other case CNVs at least 50% covered by the minimal credible region from step 6.  
-8-N. Recompute all association statistics for each phenotype at every window within the query region after conditioning on the removal of case CNVs from step 7. Repeat steps 1-7 until no more genome-wide significant windows exist within the query region.  
+7. Exclude all sentinel case CNVs and other case CNVs at least 50% covered by the minimal credible region from step 6.  
+8. Recompute all association statistics for each phenotype at every window within the query region after conditioning on the case CNVs excluded in step 7. Repeat steps 1-7 as needed until no more genome-wide significant windows exist within the query region.  
 
-The output of this process was a set of minimal credible regions, where each credible region contained at least one genome-wide significant association between rCNVs and a phenotype group.  
-
-Each minimal credible region was:
+The output of this process was a set of minimal credible regions, where each credible region contained at least one genome-wide significant association between rCNVs and a phenotype group, and each minimal credible region was:
 1. 90% confident to contain the causal element(s) for that association, and 
 2. Statistically independent from all other minimal credible regions.  
+
+For each minimal credible region, we re-computed an odds ratio, 95% confidence interval, and P-value using an M-H meta-analysis with Sweeting correction for **all rCNVs that overlap the region**, not just those that overlapped the sentinel window. Thus, it was frequently the case that the estimated odds ratio or significance of the minimal credible region was reduced compared to the sentinel window, although the sentinel window was used to declare a genome-wide significant association at that locus.  
 
 #### Output files  
 
