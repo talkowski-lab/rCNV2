@@ -21,6 +21,11 @@ workflow sliding_window_analysis {
   Int pad_controls
   Float p_cutoff
   Int n_pheno_perms
+  Float meta_or_cutoff
+  Int meta_nominal_cohorts_cutoff
+  Float credible_interval
+  Int sig_window_pad
+  Int refine_max_cnv_size
   String rCNV_bucket
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
@@ -89,10 +94,26 @@ workflow sliding_window_analysis {
   scatter ( cnv in ["DEL", "DUP"] ) {
     call refine_regions as refine_rCNV_regions {
       input:
-
+      completion_tokens=rCNV_meta_analysis.completion_token,
+      phenotype_list=phenotype_list,
+      metacohort_list=metacohort_list,
+      binned_genome=binned_genome,
+      freq_code="rCNV",
+      CNV=cnv,
+      meta_p_cutoff=rCNV_calc_meta_p_cutoff.meta_p_cutoff,
+      meta_or_cutoff=meta_or_cutoff,
+      meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+      credible_interval=credible_interval,
+      sig_window_pad=sig_window_pad,
+      refine_max_cnv_size=refine_max_cnv_size,
+      rCNV_bucket=rCNV_bucket
     }
   }
-  
+
+  output {
+    Array[File] final_sig_regions = refine_rCNV_regions.final_loci
+    Array[File] final_sig_associations = refine_rCNV_regions.final_associations
+  }
 }
 
 
@@ -409,13 +430,15 @@ task meta_analysis {
 # Refine associated regions to minimal credible regions
 task refine_regions {
   Array[File] completion_tokens # Must delocalize something from meta-analysis step to prevent caching
+  File phenotype_list
   File metacohort_list
-  File metacohort_sample_table
+  File binned_genome
   String freq_code
   String CNV
   Float meta_p_cutoff
   Float meta_or_cutoff
   Int meta_nominal_cohorts_cutoff
+  Float credible_interval
   Int sig_window_pad
   Int refine_max_cnv_size
   String rCNV_bucket
@@ -428,8 +451,6 @@ task refine_regions {
     gsutil -m cp \
       ${rCNV_bucket}/analysis/sliding_windows/**.${freq_code}.**.sliding_window.meta_analysis.stats.bed.gz \
       stats/
-    mkdir windows/
-    gsutil -m cp -r gs://rcnv_project/cleaned_data/binned_genome/* windows/
     mkdir refs/
     gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
     mkdir phenos/
@@ -507,7 +528,7 @@ task refine_regions {
       --retest-min-or-lower ${meta_or_cutoff} \
       --max-cnv-size ${refine_max_cnv_size} \
       --min-nominal ${meta_nominal_cohorts_cutoff} \
-      --credible-interval 0.9 \
+      --credible-interval ${credible_interval} \
       --prefix "${freq_code}_${CNV}" \
       --log ${freq_code}.${CNV}.region_refinement.log \
       ${freq_code}.${CNV}.sig_regions_to_refine.bed.gz \
@@ -534,12 +555,11 @@ task refine_regions {
 
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0558a314df1fe483945027e894c64d222d189830efa2ad52883e69e0a7336ef5"
+    docker: "talkowski/rcnv@sha256:8442203e9e55cc857dd2b4ff3261f77f910bc211e729a4a3a902707f7283a526"
     preemptible: 1
     memory: "16 GB"
     bootDiskSizeGb: "20"
     disks: "local-disk 100 HDD"
   }
 }
-
 
