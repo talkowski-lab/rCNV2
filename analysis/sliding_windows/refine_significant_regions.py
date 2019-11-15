@@ -19,6 +19,8 @@ import numpy as np
 import statsmodels.api as sm
 import scipy.stats as sstats
 import argparse
+from sys import stdout
+from operator import itemgetter
 
 
 def get_bed_header(bedpath):
@@ -276,18 +278,20 @@ def load_regions(regions_in, sig_df, sig_bt, pvals, cnv_type, pad_sentinel, pref
     return regions, regions_bt
 
 
-def print_region_info(regions, rid):
+def print_region_info(regions, rid, logfile):
     """
     Print basic region info prior to refinement
     """
 
-    print('\nBeginning refinement of {0}...'.format(rid))
+    print('\nBeginning refinement of {0}...'.format(rid), file=logfile)
     rsize = regions[rid]['end'] - regions[rid]['start']
-    print('  * Query region size: {:,} kb'.format(int(round(rsize/1000))))
+    print('  * Query region size: {:,} kb'.format(int(round(rsize/1000))), 
+          file=logfile)
     n_phenos = len(regions[rid]['sig_hpos'])
     pheno_str = ', '.join(regions[rid]['sig_hpos'])
     print('  * Associated with {0} phenotypes ({1})'.format(str(n_phenos), 
-                                                              pheno_str))
+                                                              pheno_str), 
+          file=logfile)
 
 
 def get_cc_counts(cohorts, case_hpos, control_hpos):
@@ -557,7 +561,7 @@ def calc_credible_interval(cnvs_df, method='density', resolution=10000, cred=0.8
 
 def refine_sentinel(regions, rid, sig_df, sig_bt, pvals, cohorts, cnv_type, 
                     control_hpo, min_p, min_or_lower, min_nominal, exclude_cnvs, 
-                    max_size=10000000, min_case_cnvs=3, resolution=10000, 
+                    logfile, max_size=10000000, min_case_cnvs=3, resolution=10000, 
                     cred=0.8, ci_method='density'):
     """
     Define minimum critical region for a single sentinel window
@@ -577,11 +581,12 @@ def refine_sentinel(regions, rid, sig_df, sig_bt, pvals, cohorts, cnv_type,
     sent_mid = (sent_bt[0].start + sent_bt[0].end) / 2
 
     # Print sentinel information for logging
-    print('  * Sentinel window: {0}'.format(sent_wid))
+    print('  * Sentinel window: {0}'.format(sent_wid), file=logfile)
     print('  * Strongest association: P = {:.2E} in {}'.format(sentinel['pvalue'], 
-                                                               sentinel['best_hpo']))
+                                                               sentinel['best_hpo']), 
+          file=logfile)
     print('  * Sentinel window associated with {0} phenotypes ({1})'.\
-          format(str(len(sent_hpos)), ', '.join(sent_hpos)))
+          format(str(len(sent_hpos)), ', '.join(sent_hpos)), file=logfile)
 
     # Get case/control sample counts for sentinel phenotypes
     # case_hpos = regions[rid]['sig_hpos']
@@ -625,10 +630,14 @@ def refine_sentinel(regions, rid, sig_df, sig_bt, pvals, cohorts, cnv_type,
 
     # Print sentinel sample & CNV data
     if len(case_cnvs) >= min_case_cnvs:
-        print('  * M-H effective case count: {:,}'.format(total_n_case))
-        print('  * Found {:,} qualifying case {}s'.format(len(case_cnvs), cnv_type))
-        print('  * M-H effective control count: {:,}'.format(total_n_control))
-        print('  * Found {:,} qualifying control {}s'.format(len(control_cnvs), cnv_type))
+        print('  * M-H effective case count: {:,}'.format(total_n_case), 
+              file=logfile)
+        print('  * Found {:,} qualifying case {}s'.format(len(case_cnvs), cnv_type), 
+              file=logfile)
+        print('  * M-H effective control count: {:,}'.format(total_n_control), 
+              file=logfile)
+        print('  * Found {:,} qualifying control {}s'.format(len(control_cnvs), cnv_type), 
+              file=logfile)
     else:
         exit('  * Error: not enough qualifying case CNVs detected.')
 
@@ -657,7 +666,8 @@ def refine_sentinel(regions, rid, sig_df, sig_bt, pvals, cohorts, cnv_type,
         # Rerun incremental analysis 
         msg = '  * The {:,} qualifying case {}s were insufficient to establish ' + \
               'significance. Re-trying with all {:,} {}s overlapping window.'
-        print(msg.format(len(case_cnvs), cnv_type, len(all_case_cnvs), cnv_type))
+        print(msg.format(len(case_cnvs), cnv_type, len(all_case_cnvs), cnv_type), 
+              file=logfile)
 
         k_case_cnvs, sig = get_min_case_cnvs(all_case_cnvs, all_control_cnvs, 
                                              cc_counts, min_p, min_or_lower, 
@@ -672,7 +682,7 @@ def refine_sentinel(regions, rid, sig_df, sig_bt, pvals, cohorts, cnv_type,
         else:
             msg = '  * The larger set of {:,} case {}s were insufficient to establish ' + \
                   'significance. Using all CNVs to define minimal credible region.'
-            print(msg.format(len(all_case_cnvs), cnv_type))
+            print(msg.format(len(all_case_cnvs), cnv_type), file=logfile)
             min_case_cnvs = all_case_cnvs
             min_case_cnv_ids = list(min_case_cnvs['cnv_id'].values.flatten())
             n_eff_case_cnvs = len(all_case_cnvs)
@@ -687,7 +697,8 @@ def refine_sentinel(regions, rid, sig_df, sig_bt, pvals, cohorts, cnv_type,
     msg = '  * Successfully refined to {:,} kb minimal credible region ' + \
           '({}:{:,}-{:,}) using {:,} of {:,} case CNVs'
     print(msg.format(int(np.floor(refined_size / 1000)), refined_chrom, 
-                     refined_start, refined_end, k_case_cnvs, n_eff_case_cnvs))
+                     refined_start, refined_end, k_case_cnvs, n_eff_case_cnvs), 
+          file=logfile)
 
     # Get any other case CNVs matching description of critical region but not 
     # included in genome-wide significance minimal set or significance test
@@ -705,7 +716,7 @@ def refine_sentinel(regions, rid, sig_df, sig_bt, pvals, cohorts, cnv_type,
     # Print number of CNVs excluded to log
     msg = '  * Excluding {:,} case {}s for subsequent conditional analyses due ' + \
           'to at least 50% coverage by minimal credible region.'
-    print(msg.format(len(all_case_cnv_ids), cnv_type))
+    print(msg.format(len(all_case_cnv_ids), cnv_type), file=logfile)
 
     # Return refined region
     new_region = {'chr' : refined_chrom, 
@@ -1009,31 +1020,31 @@ def write_associations(mcr_stats, fout, cnv_type):
     header_cols = '#chr start end region_id size cnv hpo or or_ci_lower or_ci_upper ' + \
                   'pvalue sentinel_start sentinel_end sentinel_id sentinel_or ' + \
                   'sentinel_or_lower sentinel_or_upper sentinel_pvalue'
-    fout.write(header_cols.split() + '\n')
+    fout.write('\t'.join(header_cols.split()) + '\n')
 
     # Iterate over HPOs for each MCR
-    for mcr in mcr_stats:
-        base_mcr_info = '\t'.join([mcr['chr'], str(mcr['start']), str(mcr['end']),
-                                   mcr['mcr_id'], str(mcr['size']), cnv_type])
+    for mcr in mcr_stats.values():
+        base_mcr_info = '\t'.join([mcr['chr'], str(mcr['start']), str(mcr['end']), 
+                                   mcr['id'], str(mcr['size']), cnv_type])
 
         for hpo in mcr['hpos']:
             hpo_mcr_stats = mcr[hpo]['mcr']
-            hpo_mcr_info = '\t'.join(hpo, 
-                                     str(round(hpo_mcr_stats['oddsratio'], 2)),
-                                     str(round(hpo_mcr_stats['or_ci'][0], 2)),
-                                     str(round(hpo_mcr_stats['or_ci'][1], 2)),
-                                     '{:.2e}'.format(hpo_mcr_stats['pvalue'][1]))
+            hpo_mcr_info = '\t'.join([hpo, 
+                                      str(round(hpo_mcr_stats['oddsratio'], 2)),
+                                      str(round(hpo_mcr_stats['or_ci'][0], 2)),
+                                      str(round(hpo_mcr_stats['or_ci'][1], 2)),
+                                      '{:.2e}'.format(hpo_mcr_stats['pvalue'])])
 
             hpo_sent_stats = mcr[hpo]['sentinel']
-            hpo_sent_info = '\t'.join(hpo_sent_stats['wid'],
-                                      str(hpo_sent_stats['start']),
-                                      str(hpo_sent_stats['end']),
-                                      str(round(hpo_sent_stats['oddsratio'], 2)),
-                                      str(round(hpo_sent_stats['or_ci'][0], 2)),
-                                      str(round(hpo_sent_stats['or_ci'][1], 2)),
-                                      '{:.2e}'.format(hpo_sent_stats['pvalue'][1]))
+            hpo_sent_info = '\t'.join([hpo_sent_stats['wid'],
+                                       str(hpo_sent_stats['start']),
+                                       str(hpo_sent_stats['end']),
+                                       str(round(hpo_sent_stats['oddsratio'], 2)),
+                                       str(round(hpo_sent_stats['or_ci'][0], 2)),
+                                       str(round(hpo_sent_stats['or_ci'][1], 2)),
+                                       '{:.2e}'.format(hpo_sent_stats['pvalue'])])
 
-            fout.write(base_mcr_info + hpo_mcr_stats + hpo_sent_info + '\n')
+            fout.write('\t'.join([base_mcr_info, hpo_mcr_info, hpo_sent_info]) + '\n')
 
 
 def write_regions(mcr_stats, fout, cnv_type):
@@ -1044,19 +1055,19 @@ def write_regions(mcr_stats, fout, cnv_type):
     # Write header
     header_cols = '#chr start end region_id size cnv pooled_or pooled_or_ci_lower ' + \
                   'pooled_or_ci_upper pooled_pvalue hpos'
-    fout.write(header_cols.split() + '\n')
+    fout.write('\t'.join(header_cols.split()) + '\n')
 
     # Iterate over MCRs
-    for mcr in mcr_stats:
-        base_mcr_info = '\t'.join([mcr['chr'], str(mcr['start']), str(mcr['end']),
-                                  mcr['mcr_id'], str(mcr['size']), cnv_type])
-        assoc_stats = '\t'.join(str(round(mcr['pooled_oddsratio'], 2)),
-                                str(round(mcr['pooled_or_ci'][0], 2)),
-                                str(round(mcr['pooled_or_ci'][1], 2)),
-                                '{:.2e}'.format(mcr['pooled_pvalue'][1]))
-        hpos = ';'.join(mcr['hpo'])
+    for mcr in mcr_stats.values():
+        base_mcr_info = '\t'.join([mcr['chr'], str(mcr['start']), str(mcr['end']), 
+                                  mcr['id'], str(mcr['size']), cnv_type])
+        assoc_stats = '\t'.join([str(round(mcr['pooled_oddsratio'], 2)),
+                                 str(round(mcr['pooled_or_ci'][0], 2)),
+                                 str(round(mcr['pooled_or_ci'][1], 2)),
+                                 '{:.2e}'.format(mcr['pooled_pvalue'])])
+        hpos = ';'.join(mcr['hpos'])
 
-        fout.write(base_mcr_info + assoc_stats + hpos + '\n')
+        fout.write('\t'.join([base_mcr_info, assoc_stats, hpos]) + '\n')
 
 
 def main():
@@ -1076,8 +1087,6 @@ def main():
                          'and p-values for each phenotype.')
     parser.add_argument('sig_df', help='BED file of original sliding windows ' +
                          'with TRUE/FALSE label of significance for each phenotype.')
-    parser.add_argument('pheno_table', help='Table with counts of samples per ' +
-                        'HPO term per cohort.')
     parser.add_argument('associations_out', help='Path to output BED with HPO-level ' +
                         'association stats (one line per phenotype-region pair.')
     parser.add_argument('regions_out', help='Path to output BED with region-level ' +
@@ -1103,7 +1112,7 @@ def main():
                         'minimal credible region. [default: 1]', 
                         default=1, type=int)
     parser.add_argument('--min-case-cnvs', help='Minimum count of CNVs required ' +
-                        'per independent minimal credible region [default: 2]', 
+                        'per independent minimal credible region [default: 1]', 
                         default=1, type=int)
     parser.add_argument('--control-hpo', default='HEALTHY_CONTROL', help='HPO code ' +
                         'to use for control CNV counts. [default: HEALTHY_CONTROL]')
@@ -1119,8 +1128,10 @@ def main():
     parser.add_argument('--pad-sentinel', help='Distance from sentinel window to ' + 
                         'look for other significant associations. [default: 100000]', 
                         default=100000, type=int)
-    parser.add_argument('--prefix', help='string to append to all refined regions. ' +
+    parser.add_argument('--prefix', help='String to append to all refined regions. ' +
                         '[default: CNV type (specified above)]', default=None)
+    parser.add_argument('--log', help='Output file for all progress logging. ' +
+                        '[default: stdout]', default='stdout')
 
     args = parser.parse_args()
 
@@ -1131,6 +1142,10 @@ def main():
     # Open connections to outfiles
     assocs_fout = open(args.associations_out, 'w')
     regions_fout = open(args.regions_out, 'w')
+    if args.log in 'stdout - /dev/stdout'.split():
+        logfile = stdout
+    else:
+        logfile = open(args.log, 'w')
 
     # Load p-values, significance matrix & BedTool of significant windows
     sig_df, sig_bt = load_sig_df(args.sig_df, args.cnv_type)
@@ -1146,7 +1161,7 @@ def main():
                                        args.prefix)
     orig_regions = regions.copy()
     msg = '* Identified {:,} query regions to be refined. Beginning refinement:\n'
-    print(msg.format(len(regions)))
+    print(msg.format(len(regions)), file=logfile)
 
     # Load cohort info, including CNVs & HPOs
     cohorts = load_cohort_info(args.cohort_info, regions_bt, args.cnv_type)
@@ -1157,24 +1172,21 @@ def main():
     used_cnvs = []
     used_cnv_bt = None
     for rid in regions.keys():
-        print_region_info(regions, rid)
-        local_mcrs = []
+        print_region_info(regions, rid, logfile)
 
         i = 0
         # Sequentially process all sentinels
         while len(regions[rid]['sig_hpos']) > 0:
             i += 1
             k += 1
-            print('--Refining sentinel window #{0}'.format(str(i)))
+            print('--Refining sentinel window #{0}'.format(str(i)), file=logfile)
             new_region = refine_sentinel(regions, rid, sig_df, sig_bt, pvals, 
                                          cohorts, args.cnv_type, args.control_hpo, 
                                          args.min_p, args.min_or_lower, 
-                                         args.min_nominal, used_cnvs, 
+                                         args.min_nominal, used_cnvs, logfile, 
                                          args.max_cnv_size, args.min_case_cnvs, 
                                          args.resolution, args.credible_interval,
                                          args.ci_method)
-            new_region['id'] = '_'.join([args.prefix, 'min_credible_region', str(k)])
-            local_mcrs.append(new_region)
             all_mcrs.append(new_region)
 
             # Add used CNVs to blacklist
@@ -1192,12 +1204,18 @@ def main():
             update_regions([rid], regions, sig_df, orig_sig_df, sig_bt, pvals, 
                            args.pad_sentinel)
 
-        print('--No additional sentinel windows identified; region fully refined.\n')
+        print('--No additional sentinel windows identified; region fully refined.\n',
+              file=logfile)
+
+    # Sort & name final MCRs
+    all_mcrs = sorted(all_mcrs, key=itemgetter('chr', 'start', 'end'))
+    for i in range(0, k): 
+        all_mcrs[i]['id'] = '_'.join([args.prefix, 'min_credible_region', str(i + 1)])
 
     # Calculate final association statistics for minimal critical regions
     msg = '* Finished refining {:,} minimal credible regions from {:,} query regions. ' + \
           'Now calculating conditional association statistics.\n'
-    print(msg.format(len(all_mcrs), len(regions)))
+    print(msg.format(len(all_mcrs), len(regions)), file=logfile)
     final_stats = get_final_stats(all_mcrs, cohorts, orig_sig_df, orig_pvals,
                                   args.control_hpo)
 

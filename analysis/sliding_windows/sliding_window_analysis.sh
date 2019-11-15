@@ -380,12 +380,11 @@ paste perm_res/*.sliding_window.meta_analysis.permuted_p_values.*.txt \
 
 
 # Refine final set of significant segments
-# Test/dev parameters (seizures)
+# Test/dev parameters
 freq_code="rCNV"
 CNV="DEL"
 phenotype_list="refs/test_phenotypes.list"
 metacohort_list="refs/rCNV_metacohort_list.txt"
-metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
 meta_p_cutoff=0.000001
@@ -393,7 +392,6 @@ meta_or_cutoff=2
 meta_nominal_cohorts_cutoff=2
 sig_window_pad=1000000
 refine_max_cnv_size=3000000
-refine_min_case_cnvs=1
 
 # Download all meta-analysis stats files and necessary data
 mkdir cleaned_cnv/
@@ -413,8 +411,8 @@ gsutil -m cp gs://rcnv_project/cleaned_data/phenotypes/filtered/* phenos/
 mkdir pvals/
 mkdir ors/
 mkdir nomsig/
-while read pheno hpo; do
-  for CNV in DEL DUP; do
+for CNV in DEL DUP; do
+  while read pheno hpo; do
     zcat stats/$pheno.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz \
     | awk -v FS="\t" '{ if ($1 !~ "#") print $NF }' \
     | cat <( echo "$pheno.$CNV" ) - \
@@ -427,8 +425,8 @@ while read pheno hpo; do
     | awk -v FS="\t" '{ if ($1 !~ "#") print $4 }' \
     | cat <( echo "$pheno.$CNV" ) - \
     > nomsig/$pheno.$CNV.nomsig_counts.txt
-  done
-done < ${phenotype_list}
+  done < ${phenotype_list}
+done
 for CNV in DEL DUP; do
   paste <( zcat windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz \
            | cut -f1-3 ) \
@@ -493,14 +491,17 @@ for CNV in DEL DUP; do
     --min-nominal ${meta_nominal_cohorts_cutoff} \
     --credible-interval 0.9 \
     --prefix "${freq_code}_$CNV" \
+    --log ${freq_code}.$CNV.region_refinement.log \
     ${freq_code}.$CNV.sig_regions_to_refine.bed.gz \
     window_refinement.${freq_code}_metacohort_info.tsv \
     $CNV.pval_matrix.bed.gz \
     ${freq_code}.$CNV.all_windows_labeled.bed.gz \
-    ${metacohort_sample_table} \
-    ${freq_code}.$CNV.significant_regions.associations.bed \
-    ${freq_code}.$CNV.significant_regions.loci.bed
+    ${freq_code}.$CNV.final_regions.associations.bed \
+    ${freq_code}.$CNV.final_regions.loci.bed
+  bgzip -f ${freq_code}.$CNV.final_regions.associations.bed
+  bgzip -f ${freq_code}.$CNV.final_regions.loci.bed
 done
+
 
 
 
