@@ -444,6 +444,8 @@ task refine_regions {
   String rCNV_bucket
 
   command <<<
+    set -e
+    
     # Download all meta-analysis stats files and necessary data
     mkdir cleaned_cnv/
     gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
