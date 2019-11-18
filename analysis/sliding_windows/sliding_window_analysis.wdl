@@ -235,7 +235,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:4148fea68ca3ab62eafada0243f0cd0d7135b00ce48a4fd0462741bf6dc3c8bc"
+    docker: "talkowski/rcnv@sha256:0690bb2725ca42d713e99ed04e5544162dc6786d47004a63b205d23b74c946bb"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -290,7 +290,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0558a314df1fe483945027e894c64d222d189830efa2ad52883e69e0a7336ef5"
+    docker: "talkowski/rcnv@sha256:0690bb2725ca42d713e99ed04e5544162dc6786d47004a63b205d23b74c946bb"
     preemptible: 1
     memory: "16 GB"
     disks: "local-disk 100 HDD"
@@ -419,7 +419,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0558a314df1fe483945027e894c64d222d189830efa2ad52883e69e0a7336ef5"
+    docker: "talkowski/rcnv@sha256:0690bb2725ca42d713e99ed04e5544162dc6786d47004a63b205d23b74c946bb"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -445,7 +445,7 @@ task refine_regions {
 
   command <<<
     set -e
-    
+
     # Download all meta-analysis stats files and necessary data
     mkdir cleaned_cnv/
     gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
@@ -538,6 +538,16 @@ task refine_regions {
       ${freq_code}.${CNV}.final_regions.loci.bed
     bgzip -f ${freq_code}.${CNV}.final_regions.associations.bed
     bgzip -f ${freq_code}.${CNV}.final_regions.loci.bed
+    
+    # Annotate final regions with genes
+    gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
+    for CNV in DEL DUP; do
+      /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
+        -o ${freq_code}.$CNV.final_regions.loci.bed \
+        ${freq_code}.$CNV.final_regions.loci.bed.gz \
+        genes/gencode.v19.canonical.gtf.gz
+        bgzip -f ${freq_code}.$CNV.final_regions.loci.bed
+    done
 
     # Copy results to output bucket
     gsutil -m cp ${freq_code}.${CNV}.final_regions.*.bed.gz \
@@ -554,7 +564,7 @@ task refine_regions {
 
 
   runtime {
-    docker: "talkowski/rcnv@sha256:711c0520e3abd12291bfc01c066d7d33ea4575cdabfb6de907f09df5860ea5ba"
+    docker: "talkowski/rcnv@sha256:0690bb2725ca42d713e99ed04e5544162dc6786d47004a63b205d23b74c946bb"
     preemptible: 1
     memory: "16 GB"
     bootDiskSizeGb: "20"

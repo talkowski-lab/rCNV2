@@ -459,7 +459,6 @@ for CNV in DEL DUP; do
   bgzip -f ${freq_code}.$CNV.significant_windows.bed
 done
 
-
 # Define regions to be refined (sig windows padded by $sig_window_pad and merged)
 for CNV in DEL DUP; do
   zcat ${freq_code}.$CNV.significant_windows.bed.gz \
@@ -499,6 +498,15 @@ for CNV in DEL DUP; do
   bgzip -f ${freq_code}.$CNV.final_regions.loci.bed
 done
 
+# Annotate final regions with genes
+gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
+for CNV in DEL DUP; do
+  /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
+    -o ${freq_code}.$CNV.final_regions.loci.bed \
+    ${freq_code}.$CNV.final_regions.loci.bed.gz \
+    genes/gencode.v19.canonical.gtf.gz
+    bgzip -f ${freq_code}.$CNV.final_regions.loci.bed
+done
 
 
 

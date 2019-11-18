@@ -55,7 +55,10 @@ for freq in rCNV uCNV; do
         zcat cleaned_cnv/$meta.$freq.bed.gz \
         | sed '1d' \
         | awk -v OFS="\t" -v CNV=$CNV '{ if ($NF !~ "HEALTHY_CONTROL" && $5==CNV) \
-            print "chr"$1, $2, $3, $4"__"$NF }'
+            print "chr"$1, $2, $3, $4"__"$NF }' \
+        | bedtools subtract \
+          -a - \
+          -b <( awk -v OFS="\t" '{ print "chr"$1, $2, 1000000000 }' refs/GRCh37.genome )
       done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt )
       # Control CNVs
       while read meta cohorts; do
@@ -63,7 +66,10 @@ for freq in rCNV uCNV; do
         zcat cleaned_cnv/$meta.$freq.bed.gz \
         | sed '1d' \
         | awk -v OFS="\t" -v CNV=$CNV '{ if ($NF=="HEALTHY_CONTROL" && $5==CNV) \
-            print "chr"$1, $2, $3, $4"__"$NF }'
+            print "chr"$1, $2, $3, $4"__"$NF }' \
+        | bedtools subtract \
+          -a - \
+          -b <( awk -v OFS="\t" '{ print "chr"$1, $2, 1000000000 }' refs/GRCh37.genome )
       done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt )
     done \
     | gzip -c \

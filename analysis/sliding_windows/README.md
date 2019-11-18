@@ -93,11 +93,11 @@ Given that rare CNV counts per window are (a) sparse and (b) zero-inflated, and 
 Each phenotype & CNV type were meta-analyzed separately for a total of three meta-analyses per phenotype.  
 
 Following meta-analysis, individual windows were labeled as genome-wide significant if the met the following three criteria:
-1. _P_<sub>meta</sub> ≤ 6.3x10<sup>-7</sup>;  
+1. _P_<sub>meta</sub> ≤ 10<sup>-6</sup>;  
 2. Lower bound of 95% confidence interval of odds ratio ≥ 2; and  
 3. Nominally significant in ≥ 2 metacohorts.  
 
-_Note: a P<sub>meta</sub> threshold of 6.3x10<sup>-7</sup> was determined to correspond to a study-wide FDR of 1% via phenotype permutation analysis (not described here)_
+_Note: a P<sub>meta</sub> threshold of 10<sup>-6</sup> was determined to correspond to a study-wide FDR of 1% via phenotype permutation analysis (not described here)_
 
 #### Output files  
 
@@ -122,7 +122,7 @@ Next, for each query region, we performed the following steps:
 2. Designated all phenotypes with at least one significant association in the region as the `sentinel phenotypes`.  
 3. Gathered all rCNVs overlapping the sentinel window in sentinel phenotypes & controls.  
 4. Ordered all case CNVs based on the smallest max breakpoint distance to middle of sentinel window.  
-5. Added case CNVs one at a time (in order) and ran a Mantel-Haenszel (M-H) meta-analysis with Sweeting correction against all control CNVs until the test reached P ≤ 6.3x10<sup>-7</sup> and at least two metacohorts had Fisher’s exact P ≤ 0.05.  
+5. Added case CNVs one at a time (in order) and ran a Mantel-Haenszel (M-H) meta-analysis with Sweeting correction against all control CNVs until the test reached P ≤ 10<sup>-6</sup> and at least two metacohorts had Fisher’s exact P ≤ 0.05.  
   * _Note: Step 5 was attempted first with CNVs covering at least 50% of the sentinel window, and restricted to case CNVs ≤ 3Mb in size. If genome-wide significance was not achieved for this smaller subset of case CNVs, the test was expanded to include all CNVs overlapping the sentinel window irrespective of size or fracion of the window overlapped._  
 6. When the M-H test reached significance, we defined the `minimal credible region` as the middle 90% of the CNV density for the minimal set of case CNVs required to achieve genome-wide significance for the sentinel window.  
 7. Exclude all sentinel case CNVs and other case CNVs at least 50% covered by the minimal credible region from step 6.  

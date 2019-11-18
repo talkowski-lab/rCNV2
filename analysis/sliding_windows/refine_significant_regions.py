@@ -1208,7 +1208,7 @@ def main():
               file=logfile)
 
     # Sort & name final MCRs
-    all_mcrs = sorted(all_mcrs, key=itemgetter('chr', 'start', 'end'))
+    all_mcrs = sorted(all_mcrs, key=lambda x: (int(x['chr']), int(x['start']), int(x['end'])))
     for i in range(0, k): 
         all_mcrs[i]['id'] = '_'.join([args.prefix, 'min_credible_region', str(i + 1)])
 
