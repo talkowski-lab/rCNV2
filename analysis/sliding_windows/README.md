@@ -1,14 +1,16 @@
 # Sliding Window Analyses  
 
-We compared rare CNV counts between cases and controls across all 22 autosomes in regularized sliding windows. This process is described below.  
+We compared rare CNV (rCNV) counts between cases and controls across all 22 autosomes in regularized sliding windows. This process is described below.  
 
 The code to reproduce these analyses is contained in `sliding_window_analysis.sh`.  
 
 In practice, this analysis was parallelized on [FireCloud/Terra](https://terra.bio) using `sliding_window_analysis.wdl`.  
 
-## Summary of Results  
+## TL;DR: Summary of sliding window results  
 
-Summary plots for the final results of the sliding window analysis described below can be generated using `regions_summary.plot.R`, which generates the following multi-panel figure:  
+Skipping ahead to the final outcome of this analysis, we identified a set of regions where [rCNVs](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs) are statistically associated with at least one of [30 disease phenotypes](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype#tldr-final-outcome-of-phenotype-curation) at genome-wide significance.  
+
+The details of this procedure are described below, but summary plots for the final results can be generated using `regions_summary.plot.R`, which includes the following multi-panel figure:  
 
 ![rCNV Region Summary Stats](https://storage.googleapis.com/rcnv_project/public/rCNV.final_regions.multipanel_summary.jpg)  
 
@@ -20,7 +22,7 @@ The four steps of this procedure are described below:
 
 ### 1. Count rare CNVs per window  
 
-For each [metacohort](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/), we intersected [rare CNVs](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs) against [genome-wide sliding windows](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/binned_genome/) separately for cases and controls.  
+For each [metacohort](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/), we intersected rCNVs against [genome-wide sliding windows](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/binned_genome/) separately for cases and controls.  
 
 We conducted this procedure a total of three times per phenotype group & metacohort: once each for deletions, duplications, and all CNVs (deletions + duplications).  
 
