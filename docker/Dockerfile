@@ -57,11 +57,13 @@ RUN apt-get update -qqy && apt-get install -qqy \
     gcloud --version
 VOLUME ["/root/.config"]
 
-# Install R packages
+# Install R packages (note: intentionally do this in chunks for less painful re-builds)
 RUN apt-get -qqy update \
     && apt-get -qqy install libxrender1 libcairo2-dev libxt-dev libx11-dev
 RUN apt-get -qqy upgrade
 RUN Rscript -e "sapply(c('optparse','metafor','KernSmooth','metap','MASS'),\
+    function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
+RUN Rscript -e "sapply(c('beeswarm'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 
 # Install Athena toolkit
@@ -75,7 +77,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout e19502e32f8c060507e3060e470ee907749183ac && \
+    git checkout ff83cbb186268c15ed688b0b7cd11e11a5791395 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)

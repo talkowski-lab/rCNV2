@@ -508,6 +508,12 @@ for CNV in DEL DUP; do
     bgzip -f ${freq_code}.$CNV.final_regions.loci.bed
 done
 
+# Plot summary figures for final regions
+/opt/rCNV2/analysis/sliding_windows/regions_summary.plot.R \
+  -o "${freq_code}.final_regions." \
+  ${freq_code}.DEL.final_regions.loci.bed.gz \
+  ${freq_code}.DUP.final_regions.loci.bed.gz
+
 
 
 

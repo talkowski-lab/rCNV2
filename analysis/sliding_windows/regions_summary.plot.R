@@ -150,7 +150,7 @@ plot.genesVsHpos <- function(DEL, DUP, title.cex=1){
   axis(2, las=2, line=-0.4, tick=F)
   mtext(2, text="Associated HPOs", line=2.25, cex=title.cex)
   text(x=par("usr")[2], y=0.025*par("usr")[4], pos=2,
-       labels=bquote(italic(R)^2 == .(round(cor(sizes, hpos), 3))))
+       labels=bquote(italic(R)^2 == .(round(cor(genes, hpos), 3))))
   mtext(3, line=0.2, font=2, text="Genes vs. HPOs", cex=title.cex)
 }
 
@@ -192,44 +192,44 @@ DEL <- load.loci(DEL.in)
 DUP <- load.loci(DUP.in)
 
 # Plot size
-pdf(paste(out.prefix, "region_sizes.pdf", sep=""),
-    height=3, width=3)
+jpeg(paste(out.prefix, "region_sizes.jpg", sep=""),
+    height=3*350, width=3*350, res=350)
 plot.size(DEL, DUP)
 dev.off()
 
 # Plot count of genes
-pdf(paste(out.prefix, "gene_count.pdf", sep=""),
-    height=3, width=3)
+jpeg(paste(out.prefix, "gene_count.jpg", sep=""),
+    height=3*350, width=3*350, res=350)
 plot.genes(DEL, DUP)
 dev.off()
 
 # Plot count of HPOs
-pdf(paste(out.prefix, "hpo_count.pdf", sep=""),
-    height=3, width=3)
+jpeg(paste(out.prefix, "hpo_count.jpg", sep=""),
+    height=3*350, width=3*350, res=350)
 plot.hpos(DEL, DUP)
 dev.off()
 
 # Plot size vs genes
-pdf(paste(out.prefix, "size_vs_genes.pdf", sep=""),
-    height=3, width=3)
+jpeg(paste(out.prefix, "size_vs_genes.jpg", sep=""),
+    height=3*350, width=3*350, res=350)
 plot.sizeVsGenes(DEL, DUP)
 dev.off()
 
 # Plot size vs HPOs
-pdf(paste(out.prefix, "size_vs_hpos.pdf", sep=""),
-    height=3, width=3)
+jpeg(paste(out.prefix, "size_vs_hpos.jpg", sep=""),
+    height=3*350, width=3*350, res=350)
 plot.sizeVsHpos(DEL, DUP)
 dev.off()
 
 # Plot genes vs HPOs
-pdf(paste(out.prefix, "genes_vs_hpos.pdf", sep=""),
-    height=3, width=3)
+jpeg(paste(out.prefix, "genes_vs_hpos.jpg", sep=""),
+    height=3*350, width=3*350, res=350)
 plot.genesVsHpos(DEL, DUP)
 dev.off()
 
 # Plot combined six-panel figure
-pdf(paste(out.prefix, "multipanel_summary.pdf", sep=""),
-    height=4, width=6)
+jpeg(paste(out.prefix, "multipanel_summary.jpg", sep=""),
+    height=4*350, width=6*350, res=350)
 layout(matrix(1:6, nrow=2, byrow=T))
 plot.size(DEL, DUP, title.cex=0.75)
 plot.genes(DEL, DUP, title.cex=0.75)
