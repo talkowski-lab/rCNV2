@@ -6,6 +6,12 @@ The code to reproduce these analyses is contained in `sliding_window_analysis.sh
 
 In practice, this analysis was parallelized on [FireCloud/Terra](https://terra.bio) using `sliding_window_analysis.wdl`.  
 
+## Summary of Results  
+
+Summary plots for the final results of the sliding window analysis described below can be generated using `regions_summary.plot.R`, which generates the following multi-panel figure:  
+
+![rCNV Region Summary Stats](https://storage.googleapis.com/rcnv_project/public/rCNV.final_regions.multipanel_summary.jpg)  
+
 ## Sliding window analysis procedure
 
 We executed a standardized procedure to conduct sliding window analyses for each [phenotype group](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/).  
@@ -153,11 +159,6 @@ gs://rcnv_project/results/sliding_windows/rCNV.DUP.final_regions.associations.be
 gs://rcnv_project/results/sliding_windows/rCNV.DUP.region_refinement.log
 ```
 
-### Results  
-
-Summary plots for the final results of this sliding window analysis can be generated using `regions_summary.plot.R`, which generates the following multi-panel figure:  
-
-![rCNV Region Summary Stats](https://storage.googleapis.com/rcnv_project/public/rCNV.final_regions.multipanel_summary.jpg)  
 
 ---  
 
