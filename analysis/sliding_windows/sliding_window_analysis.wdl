@@ -94,20 +94,29 @@ workflow sliding_window_analysis {
   scatter ( cnv in ["DEL", "DUP"] ) {
     call refine_regions as refine_rCNV_regions {
       input:
-      completion_tokens=rCNV_meta_analysis.completion_token,
-      phenotype_list=phenotype_list,
-      metacohort_list=metacohort_list,
-      binned_genome=binned_genome,
-      freq_code="rCNV",
-      CNV=cnv,
-      meta_p_cutoff=rCNV_calc_meta_p_cutoff.meta_p_cutoff,
-      meta_or_cutoff=meta_or_cutoff,
-      meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
-      credible_interval=credible_interval,
-      sig_window_pad=sig_window_pad,
-      refine_max_cnv_size=refine_max_cnv_size,
-      rCNV_bucket=rCNV_bucket
+        completion_tokens=rCNV_meta_analysis.completion_token,
+        phenotype_list=phenotype_list,
+        metacohort_list=metacohort_list,
+        binned_genome=binned_genome,
+        freq_code="rCNV",
+        CNV=cnv,
+        meta_p_cutoff=rCNV_calc_meta_p_cutoff.meta_p_cutoff,
+        meta_or_cutoff=meta_or_cutoff,
+        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+        credible_interval=credible_interval,
+        sig_window_pad=sig_window_pad,
+        refine_max_cnv_size=refine_max_cnv_size,
+        rCNV_bucket=rCNV_bucket
     }
+  }
+
+  # Plot summary metrics for final credible regions
+  call plot_region_summary as plot_rCNV_regions {
+    input:
+      freq_code="rCNV",
+      DEL_regions=refine_rCNV_regions.final_loci[0],
+      DUP_regions=refine_rCNV_regions.final_loci[1],
+      rCNV_bucket=rCNV_bucket
   }
 
   output {
@@ -560,13 +569,42 @@ task refine_regions {
     File logfile = "${freq_code}.${CNV}.region_refinement.log"
   }
 
-
   runtime {
     docker: "talkowski/rcnv@sha256:6104e61757dd2ef0b5259cd07a71bf0b2972fb0e4e55027e9507aae87c49a920"
     preemptible: 1
     memory: "16 GB"
     bootDiskSizeGb: "20"
     disks: "local-disk 100 HDD"
+  }
+}
+
+
+task plot_region_summary {
+  String freq_code
+  File DEL_regions
+  File DUP_regions
+  String rCNV_bucket
+
+  command <<<
+    /opt/rCNV2/analysis/sliding_windows/regions_summary.plot.R \
+      -o "${freq_code}.final_regions." \
+      ${DEL_regions} \
+      ${DUP_regions}
+
+    gsutil -m cp \
+      ./*.jpg \
+      "${rCNV_bucket}/results/sliding_windows/plots/"
+    gsutil -m cp \
+      "${freq_code}.final_regions.multipanel_summary.jpg" \
+      gs://rcnv_project/public/
+    gsutil acl ch -u AllUsers:R gs://rcnv_project/public/*.jpg
+  >>>
+
+  output {}
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:a3cdbdeab7f494a722402bda2939d9f525468fb8d843bc31f2d7618b3e9ea0bb"
+    preemptible: 1
   }
 }
 

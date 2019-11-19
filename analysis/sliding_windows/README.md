@@ -153,6 +153,12 @@ gs://rcnv_project/results/sliding_windows/rCNV.DUP.final_regions.associations.be
 gs://rcnv_project/results/sliding_windows/rCNV.DUP.region_refinement.log
 ```
 
+### Results  
+
+Summary plots for the final results of this sliding window analysis can be generated using `regions_summary.plot.R`, which generates the following multi-panel figure:  
+
+![rCNV Region Summary Stats](https://storage.googleapis.com/rcnv_project/public/rCNV.final_regions.multipanel_summary.jpg)  
+
 ---  
 
 #### _A note on data curation_  
