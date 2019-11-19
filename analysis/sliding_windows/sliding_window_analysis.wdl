@@ -541,13 +541,11 @@ task refine_regions {
     
     # Annotate final regions with genes
     gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
-    for CNV in DEL DUP; do
-      /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
-        -o ${freq_code}.$CNV.final_regions.loci.bed \
-        ${freq_code}.$CNV.final_regions.loci.bed.gz \
-        genes/gencode.v19.canonical.gtf.gz
-        bgzip -f ${freq_code}.$CNV.final_regions.loci.bed
-    done
+    /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
+      -o ${freq_code}.${CNV}.final_regions.loci.bed \
+      ${freq_code}.${CNV}.final_regions.loci.bed.gz \
+      genes/gencode.v19.canonical.gtf.gz
+    bgzip -f ${freq_code}.${CNV}.final_regions.loci.bed
 
     # Copy results to output bucket
     gsutil -m cp ${freq_code}.${CNV}.final_regions.*.bed.gz \
@@ -564,7 +562,7 @@ task refine_regions {
 
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0690bb2725ca42d713e99ed04e5544162dc6786d47004a63b205d23b74c946bb"
+    docker: "talkowski/rcnv@sha256:6104e61757dd2ef0b5259cd07a71bf0b2972fb0e4e55027e9507aae87c49a920"
     preemptible: 1
     memory: "16 GB"
     bootDiskSizeGb: "20"
