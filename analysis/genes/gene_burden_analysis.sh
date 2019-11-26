@@ -22,11 +22,12 @@ mkdir cleaned_cnv/
 gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
 gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
 mkdir refs/
+gsutil -m cp gs://rcnv_project/refs/GRCh37.*.bed.gz refs/
 gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
 
 # Test/dev parameters for building null distribution
-hpo="HP:0000118"
+hpo="HP:0012759"
 meta="meta1"
 freq_code="uCNV"
 CNV="DEL"
@@ -36,14 +37,16 @@ gtf="genes/gencode.v19.canonical.gtf.gz"
 weight_mode="weak"
 pad_controls=50000
 min_cds_ovr=0.1
-prefix="HP0000118"
+prefix="HP0012759"
 
 
 # Iterate over CNV types
 for CNV in DEL DUP CNV; do
+  echo $CNV
 
   # Iterate over metacohorts
   while read meta cohorts; do
+    echo $meta
 
     # Set metacohort parameters
     cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
@@ -64,7 +67,11 @@ for CNV in DEL DUP CNV; do
       --min-cds-ovr ${min_cds_ovr} \
       -t ${CNV} \
       --hpo ${hpo} \
+      --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
+      --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+      --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
       -z \
+      --verbose \
       -o "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.counts.bed.gz" \
       "$cnv_bed" \
       ${gtf}
@@ -146,6 +153,7 @@ while read prefix hpo; do
 
   # Iterate over metacohorts
   while read meta cohorts; do
+    echo $meta
 
     # Set metacohort-specific parameters
     cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
@@ -162,6 +170,7 @@ while read prefix hpo; do
 
     # Iterate over CNV types
     for CNV in CNV DEL DUP; do
+      echo $CNV
       # Count CNVs
       /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
         --pad-controls ${pad_controls} \
@@ -169,7 +178,11 @@ while read prefix hpo; do
         --min-cds-ovr ${min_cds_ovr} \
         -t $CNV \
         --hpo ${hpo} \
+        --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
+        --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+        --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
         -z \
+        --verbose \
         -o "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
         "$cnv_bed" \
         ${gtf}

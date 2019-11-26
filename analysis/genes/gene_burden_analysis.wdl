@@ -135,9 +135,11 @@ task build_null_distrib {
     mkdir refs/
     gsutil cp ${rCNV_bucket}/analysis/analysis_refs/gencode.v19.canonical.constrained.bed.gz \
       refs/
+    gsutil -m cp ${rCNV_bucket}/refs/GRCh37.*.bed.gz refs/
 
     # Iterate over metacohorts
     while read meta cohorts; do
+      echo $meta
 
       # Set metacohort parameters
       cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
@@ -255,6 +257,7 @@ task burden_test {
     gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
     gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
     mkdir refs/
+    gsutil -m cp ${rCNV_bucket}/refs/GRCh37.*.bed.gz refs/
     gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
     # Set HPO-specific parameters
@@ -267,6 +270,7 @@ task burden_test {
 
     # Iterate over metacohorts
     while read meta cohorts; do
+      echo $meta
 
       # Set metacohort-specific parameters
       cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
@@ -283,6 +287,7 @@ task burden_test {
 
       # Iterate over CNV types
       for CNV in CNV DEL DUP; do
+        echo $CNV
         # Count CNVs
         /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
           --pad-controls ${pad_controls} \

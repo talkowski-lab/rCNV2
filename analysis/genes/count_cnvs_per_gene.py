@@ -57,7 +57,7 @@ def process_cnvs(bedpath, pad_controls, case_hpo, control_hpo):
     return cnvbt
 
 
-def process_gtf(gtf_in):
+def process_gtf(gtf_in, bl_list, xcov=0.3):
     """
     Read gtf, format entries, and compute various metadata
     """
@@ -103,6 +103,23 @@ def process_gtf(gtf_in):
         return feature
 
     gtfbt = gtfbt.filter(_filter_gtf).filter(_clean_feature).saveas()
+
+    def _blacklist_genes(bt, bl, xcov):
+        """
+        Remove genes based on overlap with blacklist
+        """
+
+        txcov = bt.coverage(bl).filter(lambda x: x[2] == 'transcript')
+        keepers = [x.attrs['gene_name'] for x in txcov if float(x.fields[-1]) < xcov]
+        return bt.filter(lambda x: x.attrs['gene_name'] in keepers)
+
+    # Filter genes based on blacklist overlap
+    if bl_list is not None:
+        for bl in bl_list:
+            gtfbt = _blacklist_genes(gtfbt, bl, xcov).saveas()
+    keepers = list(set([x.attrs['gene_name'] for x in gtfbt]))
+    genes = [g for g in genes if g in keepers]
+    transcripts = [g for g in transcripts if g in keepers]
 
     # Build dictionary of cds lengths per gene
     cds_dict = {}
@@ -193,11 +210,15 @@ def make_output_table(outbed, txbt, genes, cds_dict, control_counts,
     outbed.write(header + '\n')
 
     for i in txbt:
-        gene = i.attrs['gene_name']
-        gline = [i.chrom, i.start, i.end, gene, cds_dict.get(gene, 'NA'),
-                 control_counts.get(gene, 0), control_weights.get(gene, 0),
-                 case_counts.get(gene, 0), case_weights.get(gene, 0)]
-        outbed.write('\t'.join([str(x) for x in gline]) + '\n')
+        gene_id = i.attrs['gene_name']
+        gline = [i.chrom, i.start, i.end, gene_id, cds_dict.get(gene_id, 'NA'),
+                 control_counts.get(gene_id, 0), control_weights.get(gene_id, 0),
+                 case_counts.get(gene_id, 0), case_weights.get(gene_id, 0)]
+        gline_str = '\t'.join([str(x) for x in gline]) + '\n'
+        outbed.write(gline_str)
+
+    # Must close output file to flush buffer (end of chr22 sometimes gets clipped)
+    outbed.close()
 
 
 def main():
@@ -228,10 +249,18 @@ def main():
     parser.add_argument('--control-hpo', default='HEALTHY_CONTROL', help='HPO code ' +
                         'to use for control CNV counts. [default: HEALTHY_CONTROL]',
                         dest='control_hpo')
+    parser.add_argument('-x', '--blacklist', action='append', help='BED file ' +
+                        'containing regions to blacklist based on overlap with ' +
+                        'genes. May be specified multiple times.')
+    parser.add_argument('--xcov', type=float, help='Maximum coverage ' + 
+                        'by any blacklist before excluding a gene. [default: 0.3]',
+                        default=0.3)
     parser.add_argument('-o', '--outbed', help='Path to output file. ' +
                         '[default: stdout]')
     parser.add_argument('-z', '--bgzip', dest='bgzip', action='store_true',
                         help='Compress output BED with bgzip.')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Print ' + 
+                        'diagnostics.')
     
     args = parser.parse_args()
 
@@ -259,7 +288,13 @@ def main():
             cnvbt = cnvbt.filter(lambda x: args.type in x.fields).saveas()
 
     # Extract relevant data from input GTF
-    gtfbt, txbt, exonbt, genes, transcripts, cds_dict = process_gtf(args.gtf)
+    gtfbt, txbt, exonbt, genes, transcripts, cds_dict \
+        = process_gtf(args.gtf, args.blacklist, args.xcov)
+    if args.verbose:
+        msg = 'Loaded {:,} {} from input gtf'
+        print(msg.format(len(txbt), 'transcripts'))
+        print(msg.format(len(exonbt), 'exons'))
+        print(msg.format(len(genes), 'gene symbols'))
 
     # Intersect CNVs with exons
     case_cnvbt = cnvbt.filter(lambda x: args.control_hpo not in x[5].split(';'))

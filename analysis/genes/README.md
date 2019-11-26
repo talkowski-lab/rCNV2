@@ -1,6 +1,6 @@
 # Gene-Based Analyses  
 
-We compared ultra-rare CNV counts between cases and controls for each of 19,346 canonical, protein-coding genes across all 22 autosomes. This process is described below.  
+We compared ultra-rare CNV counts between cases and controls for each canonical, protein-coding gene across all 22 autosomes. This process is described below.  
 
 The code to reproduce these analyses is contained in `gene_burden_analysis.sh`.  
 
@@ -14,7 +14,14 @@ The steps of this procedure are described below:
 
 ### 1. Counting weighted ultra-rare CNVs per gene  
 
-For each [metacohort](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/), we intersected [ultra-rare CNVs](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-ultra-rare-cnvs) against [all canonical, autosomal, protein-coding genes](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene/) separately for cases and controls.  
+For each [metacohort](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/), we intersected [ultra-rare CNVs](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-ultra-rare-cnvs) against [canonical, autosomal, protein-coding genes](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene/) separately for cases and controls.  
+
+We further excluded genes if their canonical transcript met any of the following criteria:
+1. Less than 30% covered by somatically hypermutable sites (as applied in [Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674));  
+2. Less than 30% covered by segmental duplications and/or simple, low-complexity, or satellite repeats; and  
+3. Less than 30% covered by N-masked regions of the hg19 reference genome assembly.  
+
+After all filtering, we retained 17,811 genes for these analyses.  
 
 Unlike the [sliding window analysis](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/sliding_windows), we restricted CNVs in this analysis to ultra-rare frequencies, as this analysis was specifically interested in individual genes with highly penetrant phenotypic effects when deleted or duplicated.  
 
