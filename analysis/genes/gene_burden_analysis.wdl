@@ -160,7 +160,11 @@ task build_null_distrib {
         --min-cds-ovr ${min_cds_ovr} \
         -t ${CNV} \
         --hpo ${hpo} \
+        --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
+        --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+        --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
         -z \
+        --verbose \
         -o "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.counts.bed.gz" \
         "$cnv_bed" \
         ${gtf}
@@ -196,7 +200,7 @@ task build_null_distrib {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:99f315980611283e31e8c120f480fc477445b5250050b7f91fc26755868ab203"
+    docker: "talkowski/rcnv@sha256:ba47749208bed2e7e7d03cba7bd66c926681889de7ac5549b234c1a0965cac68"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -223,7 +227,7 @@ task merge_null_tables {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:99f315980611283e31e8c120f480fc477445b5250050b7f91fc26755868ab203"
+    docker: "talkowski/rcnv@sha256:ba47749208bed2e7e7d03cba7bd66c926681889de7ac5549b234c1a0965cac68"
     preemptible: 1
   }
 
@@ -295,7 +299,11 @@ task burden_test {
           --min-cds-ovr ${min_cds_ovr} \
           -t $CNV \
           --hpo ${hpo} \
+          --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
+          --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+          --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
           -z \
+          --verbose \
           -o "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
           "$cnv_bed" \
           ${gtf}
@@ -356,7 +364,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:99f315980611283e31e8c120f480fc477445b5250050b7f91fc26755868ab203"
+    docker: "talkowski/rcnv@sha256:ba47749208bed2e7e7d03cba7bd66c926681889de7ac5549b234c1a0965cac68"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

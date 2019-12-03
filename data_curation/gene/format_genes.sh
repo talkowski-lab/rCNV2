@@ -22,8 +22,8 @@ alias addcom="sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta'"
 
 # Download analysis references
 mkdir refs/
-gsutil -m cp gs://rcnv_project/analysis/analysis_refs/** \
-  refs/
+gsutil -m cp gs://rcnv_project/analysis/analysis_refs/** refs/
+gsutil -m cp gs://rcnv_project/refs/** refs/
 
 
 # Download all gene data from Gencode v19
@@ -68,6 +68,26 @@ zcat gencode.v19.canonical.gtf.gz \
 | sed 's/gene_name\ //g' | tr -d '"' \
 | awk '{ print $1 }' | sort -Vk1,1 | uniq \
 > gencode.v19.canonical.genes.list
+
+
+# Gather per-gene metadata (genomic)
+wget ftp://ftp.ensembl.org/pub/grch37/current/fasta/homo_sapiens/dna/Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz
+gunzip Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz
+bgzip Homo_sapiens.GRCh37.dna.primary_assembly.fa
+samtools faidx Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz
+for wrapper in 1; do 
+  echo -e "refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz\tcoverage\trepeat_cov"
+  echo -e "refs/GRCh37.somatic_hypermutable_sites.bed.gz\tcoverage\thypermutable_cov"
+  echo -e "https://hgdownload.soe.ucsc.edu/gbdb/hg19/bbi/wgEncodeCrgMapabilityAlign100mer.bw\tmap-meap\talign_100mer"
+done > gene_features.athena_tracklist.tsv
+/opt/rCNV2/data_curation/gene/get_gene_features.py \
+  --get-genomic \
+  --centro-telo-bed refs/GRCh37.centromeres_telomeres.bed.gz \
+  --ref-fasta Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz \
+  --athena-tracks gene_features.athena_tracklist.tsv \
+  --outbed gencode.v19.canonical.genomic_features.bed.gz \
+  --bgzip \
+  gencode.v19.canonical.gtf.gz
 
 
 # Copy canonical gene metadata to rCNV bucket (note: requires permissions)

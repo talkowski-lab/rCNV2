@@ -76,6 +76,12 @@ Thus, genes B, C, and D are each assigned a weight proportional to the fraction 
 
 Once wighted CNVs were tallied in cases and controls for each window, we next compared the ratios of ultra-rare CNVs between cases and controls using the following procedure:  
 
+(Working idea for CNV burden test, as old distribution-based methods did not work)
+
+1. Count total # of weighted cnvs per gene ( case + control )  
+2. Adjust based on gene features (maybe not necessary?)  
+3. Proportion test of case:control (?) to get p-value  
+
 
 
 The code to perform this step is contained in `gene_burden_test.R`.  
