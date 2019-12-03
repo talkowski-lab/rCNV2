@@ -13,7 +13,9 @@ Collect features per gene for an input gtf
 import pybedtools as pbt
 import numpy as np
 import pandas as pd
-from athena.mutrate import add_nuc_content, add_bedtool_track
+from pysam import faidx
+import csv
+from athena.mutrate import add_local_track
 import argparse
 from sys import stdout
 from os import path
@@ -240,6 +242,19 @@ def get_chrom_pos_stats(genes, tx_stats, chrom_stats):
     return chrom_pos_stats
 
 
+def calc_gc(chrom, start, end, ref_fasta):
+    """
+    Calculate GC content of an interval
+    Dev note: ran into tmp file memory issues with pybedtools nucleotide_content()
+    """
+
+    seq = faidx(ref_fasta, '{}:{}-{}'.format(chrom, str(start), str(end)))\
+          .replace('\n', '').upper().replace('N', '')
+    n_gc = seq.count('G') + seq.count('G')
+
+    return n_gc / len(seq)
+
+
 def get_genomic_features(genes, txbt, exonbt, min_intron_size=4, 
                          chrom_stats=None, ref_fasta=None, athena_tracks=None, 
                          no_scaling=False):
@@ -297,21 +312,25 @@ def get_genomic_features(genes, txbt, exonbt, min_intron_size=4,
     # Add GC content, if optioned
     if ref_fasta is not None:
         header_cols.append('gc_pct')
-        # Dev note: must iterate over features in txbt rather than calling
-        # nucleotide_content() on entire txbt due to odd tmp file truncation
-        # when run in Docker. Unclear reason, but this works around it.
         for x in txbt:
             gene = x.attrs['gene_name']
-            xbt = pbt.BedTool('\t'.join([x.chrom, str(x.start), str(x.end)]) + '\n', 
-                              from_string=True)
-            try:
-                gfeats_tmp[gene] = float(xbt.nucleotide_content(fi=ref_fasta)[0][4])
-            except:
-                import pdb; pdb.set_trace()
+            gfeats_tmp[gene].append(calc_gc(x.chrom, x.start, x.end, ref_fasta))
 
-    # Add coverage of specified tracks, if any
-    # if athena_tracks is not None:
-    #     import pdb; pdb.set_trace()
+    # Add annotations from specified tracks, if optioned
+    if athena_tracks is not None:
+        add_header_cols = []
+        tx_bed_str = ['\t'.join([x.chrom, str(x.start), str(x.end), x.attrs['gene_name']]) \
+                      for x in txbt]
+        tx_bed = pbt.BedTool('\n'.join(tx_bed_str), from_string=True)
+        with open(athena_tracks) as tsv:
+            reader = csv.reader(tsv, delimiter='\t')
+            for track, action, tname in reader:
+                add_header_cols.append(tname)
+                newanno = {x[3]: float(x[4]) for x in \
+                           add_local_track(tx_bed, track, action, 8, True)}
+                for gene, val in newanno.items():
+                    gfeats_tmp[gene].append(val)
+        header_cols = header_cols + add_header_cols
 
     # Format output string of all genomic features per gene
     header = '\t'.join(header_cols)

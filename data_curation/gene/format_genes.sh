@@ -78,7 +78,7 @@ samtools faidx Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz
 for wrapper in 1; do 
   echo -e "refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz\tcoverage\trepeat_cov"
   echo -e "refs/GRCh37.somatic_hypermutable_sites.bed.gz\tcoverage\thypermutable_cov"
-  echo -e "https://hgdownload.soe.ucsc.edu/gbdb/hg19/bbi/wgEncodeCrgMapabilityAlign100mer.bw\tmap-meap\talign_100mer"
+  echo -e "https://hgdownload.soe.ucsc.edu/gbdb/hg19/bbi/wgEncodeCrgMapabilityAlign100mer.bw\tmap-mean\talign_100mer"
 done > gene_features.athena_tracklist.tsv
 /opt/rCNV2/data_curation/gene/get_gene_features.py \
   --get-genomic \
