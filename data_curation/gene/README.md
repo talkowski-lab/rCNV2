@@ -20,21 +20,25 @@ For certain analyses, we used per-gene features across a variety of categories.
 
 These "gene features" are described below.  
 
+In practice, the feature collection process was parallelized parallelized in [FireCloud/Terra](https://portal.firecloud.org) with `get_gene_metadata.wdl`.  
+
 #### Gene features: genomic  
 
 We collected the following genome-based gene features:  
 
 | Feature name | Abbreviation | Description | Source |  
 | :--- | :--- | :--- | :--- |  
-| Gene length | `gene_length` | Length of gene body corresponding to canonical transcript (log<sub>10</sub>-scaled) | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) |
+| Gene length | `gene_length` | Length of gene body corresponding to canonical transcript (log<sub>10</sub>-scaled) | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) |  
+| Dist. to nearest gene | `nearest_gene` | Distance to nearest other gene (log<sub>10</sub>-scaled). Defaults to zero for overlapping genes. | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
+| Genes within 1Mb | `genes_within_1mb` | Count of all other genes within ±1Mb of gene body | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) |  
 | Length of coding sequence | `cds_length` | Length of coding sequence (log<sub>10</sub>-scaled) | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
 | Number of exons | `n_exons` | Number of non-overlapping exons | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
 | Min. exon size | `min_exon_size` | Size of smallest exon (log<sub>10</sub>-scaled) | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
 | Median exon size | `med_exon_size` | Median exon size (log<sub>10</sub>-scaled) | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
 | Max. exon size | `max_exon_size` | Size of largest exon (log<sub>10</sub>-scaled) | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
-| Min. intron size | `min_intron_size` | Size of smallest intron (log<sub>10</sub>-scaled) | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
-| Median intron size | `med_intron_size` | Median intron size (log<sub>10</sub>-scaled) | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
-| Max. intron size | `max_intron_size` | Size of largest intron (log<sub>10</sub>-scaled) | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
+| Min. intron size | `min_intron_size` | Size of smallest intron (log<sub>10</sub>-scaled). Defauts to zero for single-exon genes. | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
+| Median intron size | `med_intron_size` | Median intron size (log<sub>10</sub>-scaled). Defauts to zero for single-exon genes. | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
+| Max. intron size | `max_intron_size` | Size of largest intron (log<sub>10</sub>-scaled). Defauts to zero for single-exon genes. | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
 | Dist. to telomere | `telomere_dist` | Absolute distance to nearest telomere | [UCSC Genome Browser](http://genome.ucsc.edu) |    
 | Dist. to centromere | `centromere_dist` | Absolute distance to nearest centromere | [UCSC Genome Browser](http://genome.ucsc.edu) |  
 | Norm. dist. to telomere | `telomere_dist_norm` | Distance to nearest telomere, normalized to chromosome arm length | [UCSC Genome Browser](http://genome.ucsc.edu) |    
@@ -43,7 +47,6 @@ We collected the following genome-based gene features:
 | Repetitive sequence content | `repeat_cov` | Fraction of gene body covered by segmental duplications and/or simple/low-complexity/satellite repeats | [UCSC Genome Browser](http://genome.ucsc.edu) |  
 | Hypermutable region content | `repeat_cov` | Fraction of gene body covered by hypermutable sequences | Various sources as described in [_Collins\*, Brand\*, et al._ (2019)](https://broad.io/gnomad_sv) |  
 | Sequence alignability | `align_100mer` | Mean 100mer alignability score over the gene body | [UCSC Genome Browser](http://genome.ucsc.edu) |  
-
 
 #### Gene features: expression  
 

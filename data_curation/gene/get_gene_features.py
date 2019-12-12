@@ -107,9 +107,9 @@ def load_cens_tels(chrom_stats_bed):
     return chrom_stats
 
 
-def get_tx_stats(genes, txbt):
+def get_tx_stats(genes, txbt, max_dist=1000000):
     """
-    Collect dict of lengths of transcripts
+    Collect dict of lengths & relations of transcripts
     """
 
     tx_stats = {}
@@ -118,27 +118,39 @@ def get_tx_stats(genes, txbt):
         gene_name = tx.attrs['gene_name']
         txlen = tx.length
         txcoords = '\t'.join([tx.chrom, str(tx.start), str(tx.end)]) + '\n'
+        dists = [i for i in txbt.filter(lambda x: x.name != gene_name).\
+                                 absolute_distance(pbt.BedTool(txcoords, from_string=True))]
+        mindist = max([np.nanmin(dists), 1])
+        n_nearby = len([i for i in dists if i <= max_dist])
         if gene_name not in tx_stats.keys():
             tx_stats[gene_name] = {'tx_coords' : txcoords,
-                                   'tx_len' : [txlen]}
+                                   'tx_len' : [txlen],
+                                   'nearest_gene' : mindist,
+                                   'genes_within_1mb' : n_nearby}
         else:
             tx_stats[gene_name]['tx_coords'] \
                 = tx_stats[gene_name]['tx_coords'] + txcoords
             tx_stats[gene_name]['tx_len'].append(txlen)
+            tx_stats[gene_name]['nearest_gene'].append(mindist)
+            tx_stats[gene_name]['genes_within_1mb'].append(n_nearby)
 
     for gene in genes:
         if gene in tx_stats.keys():
             tx_stats[gene]['tx_coords'] = pbt.BedTool(tx_stats[gene]['tx_coords'],
                                                       from_string=True)
             tx_stats[gene]['tx_len'] = np.nanmedian(tx_stats[gene]['tx_len'])
+            tx_stats[gene]['tx_len'] = np.nanmedian(tx_stats[gene]['nearest_gene'])
+            tx_stats[gene]['tx_len'] = np.nanmedian(tx_stats[gene]['genes_within_1mb'])
         else:
             tx_stats[gene]['tx_coords'] = pbt.BedTool('\n', from_string=True)
             tx_stats[gene]['tx_len'] = np.nan
+            tx_stats[gene]['nearest_gene'] = np.nan
+            tx_stats[gene]['genes_within_1mb'] = np.nan
 
     return tx_stats
 
 
-def calc_interval_stats(bedt):
+def calc_interval_stats(bedt, default=1):
     """
     Calculate basic statistics for a BedTool of intervals
     """
@@ -150,10 +162,10 @@ def calc_interval_stats(bedt):
         medsize = np.nanmedian([x.length for x in bedt])
         sumsize = int(np.nansum([x.length for x in bedt.merge()]))
     else:
-        minsize = np.nan
-        maxsize = np.nan
-        medsize = np.nan
-        sumsize = np.nan
+        minsize = default
+        maxsize = default
+        medsize = default
+        sumsize = default
 
     istats = {'n' : ni,
               'min_size' : minsize,
@@ -270,8 +282,9 @@ def get_genomic_features(genes, txbt, exonbt, min_intron_size=4,
                                                      min_intron_size)
 
     # Compile feature headers for output file
-    header_cols = 'gene_length cds_length n_exons min_exon_size med_exon_size ' + \
-                  'max_exon_size min_intron_size med_intron_size max_intron_size'
+    header_cols = 'gene_length nearest_gene genes_within_1mb cds_length n_exons ' + \
+                  'min_exon_size med_exon_size max_exon_size min_intron_size ' + \
+                  'med_intron_size max_intron_size'
     header_cols = header_cols.split()
 
     # Extract basic genomic features per gene
@@ -280,6 +293,8 @@ def get_genomic_features(genes, txbt, exonbt, min_intron_size=4,
         # Scale features unless specified otherwise
         if not no_scaling:
             gfeats = [np.log10(int(tx_stats[gene].get('tx_len', 'NA'))),
+                      np.log10(int(tx_stats[gene].get('nearest_gene', 'NA'))),
+                      int(tx_stats[gene].get('genes_within_1mb', 'NA')),
                       np.log10(exon_stats[gene]['stats']['summed_size']),
                       exon_stats[gene]['stats']['n'],
                       np.log10(exon_stats[gene]['stats']['min_size']),
@@ -290,6 +305,8 @@ def get_genomic_features(genes, txbt, exonbt, min_intron_size=4,
                       np.log10(intron_stats[gene]['stats']['max_size'])]
         else:
             gfeats = [int(tx_stats[gene].get('tx_len', 'NA')),
+                      tx_stats[gene].get('nearest_gene', 'NA'),
+                      tx_stats[gene].get('genes_within_1mb', 'NA'),
                       exon_stats[gene]['stats']['summed_size'],
                       exon_stats[gene]['stats']['n'],
                       exon_stats[gene]['stats']['min_size'],
@@ -365,6 +382,9 @@ def write_outbed(outbed, header, genes, txbt, genomic_features):
             outstr = outstr + '\t' + genomic_features[gene]
 
         outbed.write(outstr + '\n')
+
+    # Close connection to flush buffer
+    outbed.close()
 
 
 def main():

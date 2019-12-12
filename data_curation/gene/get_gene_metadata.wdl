@@ -10,19 +10,24 @@
 
 workflow get_gene_metadata {
   File gtf
+  File ref_fasta
+  File ref_fasta_idx
+  Float eigenfeatures_min_var_exp
   String gtf_prefix
   File contiglist
   String rCNV_bucket
 
-  Array[String] contigs = read_lines(contiglist)
+  Array[Array[String]] contigs = read_tsv(contiglist)
 
   # Scatter over contigs and gather metadata for all genes per contig
   scatter ( contig in contigs ) {
     call get_genomic_data {
       input:
         gtf=gtf,
+        ref_fasta=ref_fasta,
+        ref_fasta_idx=ref_fasta_idx,
         prefix=gtf_prefix,
-        contig=contig,
+        contig=contig[0],
         rCNV_bucket=rCNV_bucket
     }
   }
@@ -31,12 +36,15 @@ workflow get_gene_metadata {
   call merge_metadata as merge_genomic_data {
     input:
       data_shards=get_genomic_data.metadata_table,
+      eigenfeatures_min_var_exp=eigenfeatures_min_var_exp,
       prefix="${gtf_prefix}.genomic_features",
+      eigen_prefix="genomic_eigenfeature",
       rCNV_bucket=rCNV_bucket
   }
 
   output {
-    genes_genomic_metadata = merge_genomic_data.merged_data
+    File genes_genomic_metadata = merge_genomic_data.merged_data
+    File genes_genomic_eigen_metadata = merge_genomic_data.merged_data_eigen
   }
 }
 
@@ -44,6 +52,8 @@ workflow get_gene_metadata {
 # Collect genomic metadata for all genes from a single contig
 task get_genomic_data {
   File gtf
+  File ref_fasta
+  File ref_fasta_idx
   String prefix
   String contig
   String rCNV_bucket
@@ -55,15 +65,11 @@ task get_genomic_data {
     mkdir refs/
     gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/** refs/
     gsutil -m cp ${rCNV_bucket}/refs/** refs/
-    wget ftp://ftp.ensembl.org/pub/grch37/current/fasta/homo_sapiens/dna/Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz
-    gunzip Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz
-    bgzip Homo_sapiens.GRCh37.dna.primary_assembly.fa
-    samtools faidx Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz
 
     # Subset input files to chromosome of interest
     tabix -f ${gtf}
     tabix -h ${gtf} ${contig} | bgzip -c > subset.gtf.gz
-    samtools faidx Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz ${contig} \
+    samtools faidx ${ref_fasta} ${contig} \
     | bgzip -c \
     > ref.fa.gz
     samtools faidx ref.fa.gz
@@ -87,7 +93,7 @@ task get_genomic_data {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f15f25e75adf9a055be738659b436f911e55e362e31bd0c5fdc0b6e1e10b4c6f"
+    docker: "talkowski/rcnv@sha256:3e319c3d6c7bea29b92e09c64c9a752712649334d98bd75fff2414e10c56ccb1"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"
@@ -100,10 +106,12 @@ task get_genomic_data {
 }
 
 
-# Generic function to merge metadata tables across chromosomes
+# Generic function to merge metadata tables across chromosomes & upload to rCNV_bucket
 task merge_metadata {
   Array[File] data_shards
+  Float eigenfeatures_min_var_exp
   String prefix
+  String eigen_prefix
   String rCNV_bucket
 
   command <<<
@@ -119,10 +127,22 @@ task merge_metadata {
     | cat header.txt - \
     | bgzip -c \
     > ${prefix}.bed.gz
+
+    athena eigen-bins \
+      --min-variance ${eigenfeatures_min_var_exp} \
+      --fill-missing mean \
+      --skip-columns 4 \
+      --prefix ${eigen_prefix} \
+      --bgzip \
+      ${prefix}.eigenfeatures.bed.gz
+
+    gsutil -m cp \
+      ${prefix}*bed.gz \
+      ${rCNV_bucket}/cleaned_data/genes/
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f15f25e75adf9a055be738659b436f911e55e362e31bd0c5fdc0b6e1e10b4c6f"
+    docker: "talkowski/rcnv@sha256:3e319c3d6c7bea29b92e09c64c9a752712649334d98bd75fff2414e10c56ccb1"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"
@@ -131,6 +151,7 @@ task merge_metadata {
 
   output {
    File merged_data = "${prefix}.bed.gz"
+   File merged_data_eigen = "${prefix}.eigenfeatures.bed.gz"
   }
 }
 
