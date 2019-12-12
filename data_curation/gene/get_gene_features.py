@@ -107,10 +107,38 @@ def load_cens_tels(chrom_stats_bed):
     return chrom_stats
 
 
+def get_neighbor_dists(tx, txdf):
+    """
+    Get absolute distances for one query transcript and all other transcripts
+    Dev note: necessary to avoid unexplained bottlenecks on some chromosomes 
+              using pbt.absolute_distance()
+    """
+
+    txdf_sub = txdf[(txdf['chr'] == int(tx.chrom)) & \
+                    (txdf['end'] != tx.end) & \
+                    (txdf['start'] != tx.start + 1)]
+    txints = txdf_sub.iloc[:, 1:].to_numpy()
+
+    def _get_dist(r1, r2):
+        """
+        Calculate absolute distance between two intervals
+        Adapted from: https://stackoverflow.com/a/16843530
+        """
+        x, y = sorted((r1, r2))
+        if x[0] <= x[1] < y[0] and all(y[0] <= y[1] for y in (r1, r2)):
+            return y[0] - x[1]
+        return 0
+
+    return [_get_dist(list(x), [tx.start + 1, tx.end]) for x in txints]
+
+
 def get_tx_stats(genes, txbt, max_dist=1000000):
     """
     Collect dict of lengths & relations of transcripts
     """
+
+    txdf = txbt.to_dataframe().iloc[:, [0, 3, 4]]
+    txdf.columns = ['chr', 'start', 'end']
 
     tx_stats = {}
 
@@ -118,8 +146,7 @@ def get_tx_stats(genes, txbt, max_dist=1000000):
         gene_name = tx.attrs['gene_name']
         txlen = tx.length
         txcoords = '\t'.join([tx.chrom, str(tx.start), str(tx.end)]) + '\n'
-        dists = [i for i in txbt.filter(lambda x: x.name != gene_name).\
-                                 absolute_distance(pbt.BedTool(txcoords, from_string=True))]
+        dists = get_neighbor_dists(tx, txdf)
         mindist = max([np.nanmin(dists), 1])
         n_nearby = len([i for i in dists if i <= max_dist])
         if gene_name not in tx_stats.keys():
@@ -267,15 +294,12 @@ def calc_gc(chrom, start, end, ref_fasta):
     return n_gc / len(seq)
 
 
-def get_genomic_features(genes, txbt, exonbt, min_intron_size=4, 
+def get_genomic_features(genes, txbt, exonbt, tx_stats, min_intron_size=4, 
                          chrom_stats=None, ref_fasta=None, athena_tracks=None, 
                          no_scaling=False):
     """
     Collect various genomic features per gene
     """
-
-    # Transcript length
-    tx_stats = get_tx_stats(genes, txbt)
 
     # Exon & intron stats
     exon_stats, intron_stats = get_exon_intron_stats(genes, tx_stats, exonbt,
@@ -359,13 +383,10 @@ def get_genomic_features(genes, txbt, exonbt, min_intron_size=4,
     return header, genomic_features
 
 
-def write_outbed(outbed, header, genes, txbt, genomic_features):
+def write_outbed(outbed, header, genes, txbt, tx_stats, genomic_features):
     """
     Format output table of features and write to output BED file
     """
-
-    # Collect transcript coordinates
-    tx_stats = get_tx_stats(genes, txbt)
 
     # Write header
     outbed.write(header + '\n')
@@ -431,6 +452,9 @@ def main():
     # Load & filter input GTF
     gtfbt, txbt, exonbt, genes, transcripts = process_gtf(args.gtf)
 
+    # Get transcript stats
+    tx_stats = get_tx_stats(genes, txbt)
+
     # Get genomic features, if optioned
     if args.get_genomic:
         if args.centro_telo_bed is not None:
@@ -438,6 +462,7 @@ def main():
         else:
             chrom_stats = None
         header_add, genomic_features = get_genomic_features(genes, txbt, exonbt, 
+                                                            tx_stats,
                                                             args.min_intron_size,
                                                             chrom_stats,
                                                             args.ref_fasta,
@@ -448,7 +473,7 @@ def main():
         genomic_features = None
 
     # Format output table of features
-    write_outbed(outbed, outbed_header, genes, txbt, genomic_features)
+    write_outbed(outbed, outbed_header, genes, txbt, tx_stats, genomic_features)
     if args.outbed is not None \
     and args.outbed not in 'stdout -'.split() \
     and args.bgzip:

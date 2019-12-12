@@ -20,7 +20,9 @@ For certain analyses, we used per-gene features across a variety of categories.
 
 These "gene features" are described below.  
 
-In practice, the feature collection process was parallelized parallelized in [FireCloud/Terra](https://portal.firecloud.org) with `get_gene_metadata.wdl`.  
+For each feature set, we controlled for inter-feature correlation structure by decomposing all features with principal components analysis and retaining the top "eigenfeatures" that explained at least 90% of variance.  
+
+In practice, the feature collection and decomposition process was parallelized in [FireCloud/Terra](https://portal.firecloud.org) with `get_gene_metadata.wdl`.  
 
 #### Gene features: genomic  
 

@@ -237,7 +237,7 @@ fit <- glm(case.CNV.w ~ control.CNV.w + eigenfeature_1 + eigenfeature_2 + eigenf
 pred.case <- predict.glm(fit, data=bed, type="response")
 
 # IDEA:
-# predict: n_case_cnvs_weighted ~ n_control_cnvs_weighted + pcs1-N
+# predict: n_case_cnvs ~ n_control_cnvs_in_gene + n_case_cnvs_in_1Mb_region + gene_pcs1-N
 # then:
 # chisq test based on expected # case CNVs
 
