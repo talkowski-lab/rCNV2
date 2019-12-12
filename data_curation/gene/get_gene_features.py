@@ -139,8 +139,8 @@ def get_tx_stats(genes, txbt, max_dist=1000000):
             tx_stats[gene]['tx_coords'] = pbt.BedTool(tx_stats[gene]['tx_coords'],
                                                       from_string=True)
             tx_stats[gene]['tx_len'] = np.nanmedian(tx_stats[gene]['tx_len'])
-            tx_stats[gene]['tx_len'] = np.nanmedian(tx_stats[gene]['nearest_gene'])
-            tx_stats[gene]['tx_len'] = np.nanmedian(tx_stats[gene]['genes_within_1mb'])
+            tx_stats[gene]['nearest_gene'] = np.nanmedian(tx_stats[gene]['nearest_gene'])
+            tx_stats[gene]['genes_within_1mb'] = np.nanmedian(tx_stats[gene]['genes_within_1mb'])
         else:
             tx_stats[gene]['tx_coords'] = pbt.BedTool('\n', from_string=True)
             tx_stats[gene]['tx_len'] = np.nan

@@ -34,31 +34,11 @@ get.sample.counts <- function(pheno.table.in, cohort.name,
 
 
 # Load an input bed file of gene features
-import.features <- function(features.in, pca=T, min.var.exp=0.9){
+import.features <- function(features.in){
   # Load raw features
   features <- read.table(features.in, sep="\t", header=T, comment.char="")
   colnames(features)[1] <- "chr"
   features[, 5:ncol(features)] <- apply(features[, 5:ncol(features)], 2, as.numeric)
-  
-  # Perform PCA on features, if optioned
-  if(pca==T){
-    # Impute missing values as median, and scale to standard normal
-    feat.df <- features[, 5:ncol(features)]
-    feat.df <- apply(feat.df, 2, function(vals){
-      missing.idx <- which(is.na(vals) | is.infinite(vals) | is.nan(vals))
-      if(length(missing.idx) > 0){
-        vals[missing.idx] <- median(vals, na.rm=T)
-      }
-      vals <- scale(vals, scale=T, center=T)
-      return(vals)
-    })
-    pca <- prcomp(feat.df)
-    cum.var.exp <- as.numeric(summary(pca)$importance[3, ])
-    n.pc.min <- min(which(cum.var.exp >= min.var.exp))
-    feat.df <- pca$x[, 1:n.pc.min]
-    colnames(feat.df) <- paste("eigenfeature", 1:n.pc.min, sep="_")
-    features <- cbind(features[, 1:4], feat.df)
-  }
   return(features)
 }
 
