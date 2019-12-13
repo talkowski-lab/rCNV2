@@ -62,6 +62,9 @@ cat \
 
 
 # Apply pext filter to exons from canonical transcripts
+# Note: pext pre-formatting takes several hours locally; was parallelized in cloud 
+# using process_pext.wdl, and can be downloaded (with permissions) at 
+# gs://rcnv_project/cleaned_data/genes/annotations/gnomad.v2.1.1.pext.bed.gz
 gsutil -m cp \
   gs://gnomad-public/papers/2019-tx-annotation/pre_computed/all.possible.snvs.tx_annotated.022719.tsv.bgz \
   ./
@@ -72,18 +75,33 @@ tabix -s 1 -b 2 -e 2 -S 1 \
 | sort -Vk1,1 -k2,2n -k3,3n \
 | bgzip -c \
 > gnomad.v2.1.1.pext.bed.gz
+tabix -f gnomad.v2.1.1.pext.bed.gz
+/opt/rCNV2/data_curation/gene/apply_pext_filter.py \
+  --min-pext 0.1 \
+  -o gencode.v19.canonical.pext_filtered.gtf.gz \
+  --bgzip \
+  --lost-genes genes_lost_during_pext_filtering.genes.list \
+  gencode.v19.canonical.gtf.gz \
+  gnomad.v2.1.1.pext.bed.gz
 
 
 # Make gene list of all canonical autosomal genes used in analysis
-zcat gencode.v19.canonical.gtf.gz \
-| awk -v FS="\t" '{ if ($3=="gene") print $9 }' \
-| sed 's/;/\n/g' | fgrep "gene_name" \
-| sed 's/gene_name\ //g' | tr -d '"' \
-| awk '{ print $1 }' | sort -Vk1,1 | uniq \
-> gencode.v19.canonical.genes.list
+for gtf in gencode.v19.canonical gencode.v19.canonical.pext_filtered; do
+  zcat ${gtf}.gtf.gz \
+  | awk -v FS="\t" '{ if ($3=="transcript") print $9 }' \
+  | sed 's/;/\n/g' | fgrep "gene_name" \
+  | sed 's/gene_name\ //g' | tr -d '"' \
+  | awk '{ print $1 }' | sort -Vk1,1 | uniq \
+  > ${gtf}.genes.list
+done
+zcat gencode.v19.canonical.tsv.gz \
+| fgrep -wf gencode.v19.canonical.pext_filtered.genes.list \
+| gzip -c \
+> gencode.v19.canonical.pext_filtered.tsv.gz
 
 
 # Gather per-gene metadata (genomic)
+# Note: this is parallelized in FireCloud with get_gene_metadata.wdl
 wget ftp://ftp.ensembl.org/pub/grch37/current/fasta/homo_sapiens/dna/Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz
 gunzip Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz
 bgzip Homo_sapiens.GRCh37.dna.primary_assembly.fa
@@ -98,14 +116,14 @@ done > gene_features.athena_tracklist.tsv
   --centro-telo-bed refs/GRCh37.centromeres_telomeres.bed.gz \
   --ref-fasta Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz \
   --athena-tracks gene_features.athena_tracklist.tsv \
-  --outbed gencode.v19.canonical.genomic_features.bed.gz \
+  --outbed gencode.v19.canonical.pext_filtered.genomic_features.bed.gz \
   --bgzip \
-  gencode.v19.canonical.gtf.gz
+  gencode.v19.canonical.pext_filtered.gtf.gz
 
 
 # Copy canonical gene metadata to rCNV bucket (note: requires permissions)
-gsutil cp gencode.v19.canonical.*.gz gs://rcnv_project/cleaned_data/genes/
-gsutil cp gencode.v19.canonical.genes.list \
+gsutil -m cp gencode.v19.canonical*.gz gs://rcnv_project/cleaned_data/genes/
+gsutil -m cp gencode.v19.canonical*genes.list \
   gs://rcnv_project/cleaned_data/genes/gene_lists/
 
 
@@ -118,30 +136,30 @@ loeuf_idx=$( zcat gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
              | head -n1 | sed 's/\t/\n/g' \
              | awk '{ if ($1=="oe_lof_upper_bin_6") print NR }' )
 zcat gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
-| fgrep -wf gencode.v19.canonical.genes.list \
+| fgrep -wf gencode.v19.canonical.pext_filtered.genes.list \
 | awk -v pli_idx=${pli_idx} -v loeuf_idx=${loeuf_idx} -v FS="\t" \
   '{ if ($pli_idx >= 0.9 || $loeuf_idx == 0 ) print $1 }' \
 | sort -Vk1,1 \
 > gnomad.v2.1.1.lof_constrained.genes.list
-awk '{ print "gene_name \""$1"\";" }' \
+awk '{ print "gene_name \""$1"\"" }' \
 gnomad.v2.1.1.lof_constrained.genes.list \
-| fgrep -wf - <( zcat gencode.v19.canonical.gtf.gz ) \
+| fgrep -wf - <( zcat gencode.v19.canonical.pext_filtered.gtf.gz ) \
 | awk -v FS="\t" '{ if ($3=="transcript") print }' \
-> gencode.v19.canonical.constrained.gtf
+> gencode.v19.canonical.pext_filtered.constrained.gtf
 while read gene; do
-  fgrep -w "\"$gene\";" gencode.v19.canonical.constrained.gtf \
+  fgrep -w "\"$gene\"" gencode.v19.canonical.pext_filtered.constrained.gtf \
   | awk -v OFS="\t" -v gene=$gene '{ print $1, $4, $5, gene }'
 done < gnomad.v2.1.1.lof_constrained.genes.list \
 | sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
 | cat <( echo -e "#chr\tstart\tend\tgene" ) - \
 | bgzip -c \
-> gencode.v19.canonical.constrained.bed.gz
+> gencode.v19.canonical.pext_filtered.constrained.bed.gz
 
 
 # Copy constrained gene files to rCNV bucket (note: requires permissions)
-gsutil cp gencode.v19.canonical.constrained.bed.gz \
+gsutil -m cp gencode.v19.canonical.pext_filtered.constrained.bed.gz \
   gs://rcnv_project/analysis/analysis_refs/
-gsutil cp gnomad.v2.1.1.lof_constrained.genes.list \
+gsutil -m cp gnomad.v2.1.1.lof_constrained.genes.list \
   gs://rcnv_project/cleaned_data/genes/gene_lists/
 
 
@@ -150,7 +168,7 @@ wget http://compbio.charite.de/jenkins/job/hpo.annotations.monthly/lastSuccessfu
 while read pheno hpo; do
   awk -v hpo=${hpo} '{ if ($1==hpo) print $NF }' \
     ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt \
-  | fgrep -wf gencode.v19.canonical.genes.list \
+  | fgrep -wf gencode.v19.canonical.pext_filtered.genes.list \
   | sort -Vk1,1 | uniq \
   > $pheno.HPOdb.genes.list
 done < refs/test_phenotypes.list
@@ -183,7 +201,7 @@ echo "| :--- | ---: | :--- | :--- | :---- | " \
 # All genes
 for wrapper in 1; do
   echo "All genes"
-  wc -l gencode.v19.canonical.genes.list \
+  wc -l gencode.v19.canonical.pext_filtered.genes.list \
   | awk -v OFS="\t" '{ print $1, "`"$2"`" }' \
   | sed 's/\.genes\.list//g' | addcom
   echo "Gencode v19 [Harrow _et al._, _Genome Res._, 2012](https://www.ncbi.nlm.nih.gov/pubmed/22955987)"
@@ -219,6 +237,4 @@ while read pheno hpo; do
 done < refs/test_phenotypes.list \
 >> genelist_table.html.txt
 cat genelist_table.html.txt
-
-
 

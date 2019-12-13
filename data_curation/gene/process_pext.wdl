@@ -9,6 +9,7 @@
 # Process gnomAD pext data
 
 workflow process_pext {
+  File pext_gs_path
   String output_filename
   File contiglist
   String storage_bucket
@@ -19,6 +20,7 @@ workflow process_pext {
   scatter ( contig in contigs ) {
     call format_pext {
       input:
+        pextfile=pext_gs_path,
         contig=contig[0]
     }
   }
@@ -35,20 +37,16 @@ workflow process_pext {
 
 # Format pext data for a single chromosome
 task format_pext {
+  File pextfile
   String contig
-  String rCNV_bucket
 
   command <<<
-    gsutil -m cp \
-      gs://gnomad-public/papers/2019-tx-annotation/pre_computed/all.possible.snvs.tx_annotated.022719.tsv.bgz \
-      ./
-    tabix -s 1 -b 2 -e 2 -S 1 \
-      all.possible.snvs.tx_annotated.022719.tsv.bgz
+    tabix -s 1 -b 2 -e 2 -S 1 ${pextfile} 
     /opt/rCNV2/data_curation/gene/process_pext.py \
       --contig ${contig} \
       -o pext_data.${contig}.bed.gz \
       --bgzip \
-      all.possible.snvs.tx_annotated.022719.tsv.bgz
+      ${pextfile}
   >>>
 
   output {
@@ -56,7 +54,7 @@ task format_pext {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:1b3910427c948c50677f89e444910bed4c43a690503a7b9efc90bfe427ad1ba8"
+    docker: "talkowski/rcnv@sha256:e86cc8899a1f5e74f24dd12d8ae2cc562de1f52846cd6de61e1579f699329abe"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 50 SSD"
@@ -73,22 +71,25 @@ task mergesort_bed {
 
   command <<<
     zcat ${sep=" " beds} \
-    | sort -Vk1,1 -k2,2n -k3,3n \
+    | sort -Vk1,1 -k2,2n -k3,3n -Vk4,4 \
     | bgzip -c \
     > ${output_filename}
+    tabix -f ${output_filename}
 
-    gsutil -m cp ${output_filename} ${upload_to_bucket}
+    gsutil -m cp ${output_filename}* ${upload_to_bucket}
   >>>
 
   output {
     File mergesorted_bed = "${output_filename}"
+    File mergesorted_bed_idx = "${output_filename}.tbi"
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:1b3910427c948c50677f89e444910bed4c43a690503a7b9efc90bfe427ad1ba8"
+    docker: "talkowski/rcnv@sha256:e86cc8899a1f5e74f24dd12d8ae2cc562de1f52846cd6de61e1579f699329abe"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 50 SSD"
     bootDiskSizeGb: "20"
   }
 }
+

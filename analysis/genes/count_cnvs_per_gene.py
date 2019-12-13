@@ -137,7 +137,7 @@ def process_gtf(gtf_in, bl_list, xcov=0.3):
     return gtfbt, txbt, exonbt, genes, transcripts, cds_dict
 
 
-def overlap_cnvs_exons(cnvbt, exonbt, cds_dict, weight_mode, min_cds_ovr):
+def overlap_cnvs_exons(cnvbt, exonbt, cds_dict, weight_mode, min_cds_ovr, max_genes):
     """
     Compute fraction of CDS overlapped per gene for each CNV
     """
@@ -183,12 +183,17 @@ def overlap_cnvs_exons(cnvbt, exonbt, cds_dict, weight_mode, min_cds_ovr):
                 cnv_weights[cnvid] = {gene: w / wsum for gene, w in cnv_weights[cnvid].items()}
             elif weight_mode == 'strong':
                 cnv_weights[cnvid] = {gene: w / (2 ** (wsum - 1)) for gene, w in cnv_weights[cnvid].items()}
+    
+    # Exclude CNVs based on overlapping more than max_genes
+    cnvs_to_exclude = [cid for cid in cnv_cds_sums.keys() \
+                       if len(cnv_weights.get(cid, [])) > max_genes]
 
     # Collapse counts per gene
-    raw_counts = {gene: len(cnvs) for gene, cnvs in cnvs_per_gene.items()}
+    raw_counts = {gene: len([x for x in cnvs if x not in cnvs_to_exclude]) \
+                  for gene, cnvs in cnvs_per_gene.items()}
     weighted_counts = {}
     for cnv, weights in cnv_weights.items():
-        if len(weights) > 0:
+        if len(weights) > 0 and cnv not in cnvs_to_exclude:
             for gene, w in weights.items():
                 if gene not in weighted_counts.keys():
                     weighted_counts[gene] = w
@@ -264,6 +269,12 @@ def main():
     parser.add_argument('--min-cds-ovr', help='Minimum coding sequence overlap ' +
                         'to consider a CNV gene-overlapping. [default: 0.2]',
                         type=float, default=0.2)
+    parser.add_argument('--max-genes', help='Maximum number of genes overlapped by ' + 
+                        'a CNV before being the CNV is excluded. [default: 20000]',
+                        type=int, default=20000)
+    parser.add_argument('--max-genes-in-cases-only', action='store_true',
+                        help='Only apply --max-genes to case CNVs. [default: ' +
+                        'apply to both case & control CNVs]')
     parser.add_argument('-t', '--type', help='Type of CNV to include (DEL/DUP). ' +
                         '[default: all]')
     parser.add_argument('--hpo', help='HPO term to consider for case samples. ' +
@@ -325,11 +336,14 @@ def main():
     case_cnvbt = cnvbt.filter(lambda x: args.control_hpo not in x[5].split(';'))
     case_counts, case_weights, case_cnv_weights \
         = overlap_cnvs_exons(case_cnvbt, exonbt, cds_dict, args.weight_mode, 
-                             args.min_cds_ovr)
+                             args.min_cds_ovr, args.max_genes)
+    max_genes_controls = args.max_genes
+    if args.max_genes_in_cases_only:
+        max_genes_controls = 20000
     control_cnvbt = cnvbt.filter(lambda x: args.control_hpo in x[5].split(';'))
     control_counts, control_weights, control_cnv_weights \
         = overlap_cnvs_exons(control_cnvbt, exonbt, cds_dict, args.weight_mode, 
-                             args.min_cds_ovr)
+                             args.min_cds_ovr, max_genes_controls)
     
     # Format output main counts table and write to outfile
     make_output_table(outbed, txbt, genes, cds_dict, control_counts, 

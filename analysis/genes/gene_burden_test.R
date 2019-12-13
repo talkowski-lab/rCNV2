@@ -160,10 +160,10 @@ import.bed <- function(bed.in, case.col.name, case.n,
   
   # Calculate odds ratio
   or.df <- as.data.frame(t(sapply(1:nrow(bed), function(i){
-    calc.or(control.ref=control.n-bed$control.CNV.w[i],
-            case.ref=case.n-bed$case.CNV.w[i],
-            control.alt=bed$control.CNV.w[i],
-            case.alt=bed$case.CNV.w[i],
+    calc.or(control.ref=control.n-bed$control.CNV[i],
+            case.ref=case.n-bed$case.CNV[i],
+            control.alt=bed$control.CNV[i],
+            case.alt=bed$case.CNV[i],
             conf=0.95, cc.sum=0.01)
   })))
   colnames(or.df) <- c("ln.OR", "ln.OR.lower", "ln.OR.upper")
@@ -173,163 +173,74 @@ import.bed <- function(bed.in, case.col.name, case.n,
 }
 
 
-# Plot null distribution
-plot.null.normal <- function(null.vals, null.mean, null.sd, cohort.name){
-  plot.lims <- quantile(null.vals, c(0.001, 0.999))
-  par(mar=c(4, 4, 2.5, 1), bty="n")
-  hist(null.vals, col="gray90", freq=F, main="", xlim=plot.lims, breaks=50,
-       xlab=bquote(Delta * "(Case, Control; %)"))
-  curve(dnorm(x, null.mean, null.sd), add=T, lwd=2)
-  mtext(3, line=0.2, font=2,
-        text=paste("Gaussian null fit for\n",
-                   prettyNum(length(null.vals)/2, big.mark=","),
-                   "genes from", cohort.name))
-}
-plot.null.exp <- function(null.vals.oneside, null.exp.rate, cohort.name){
-  par(mar=c(4, 4, 2.5, 1), bty="n")
-  hist(null.vals.oneside, col="gray90", freq=F, main="", breaks=50,
-       xlim=c(0, quantile(null.vals.oneside, 0.999)),
-       xlab=bquote(Delta * "(Case, Control; %)"))
-  curve(dexp(x, null.exp.rate), add=T, lwd=2)
-  mtext(3, line=0.2, font=2,
-        text=paste("Exponential null fit for\n",
-                   prettyNum(length(null.vals.oneside), big.mark=","),
-                   "genes from", cohort.name))
-}
-plot.null <- function(null.vals, null.mean, null.sd, null.exp.rate, cohort.name){
-  par(mfrow=c(1, 2))
-  plot.null.normal(null.vals, null.mean, null.sd, cohort.name)
-  plot.null.exp(null.vals[which(null.vals>=0)], null.exp.rate, cohort.name)
-}
-
-
-# Build null distribution of CNVs in cases vs controls
-build.null <- function(bed, use.unweighted.controls, min.total.CNV=NULL, 
-                       precision, null.dist.plot.out, cohort.name){
-  # Fit normal distribution to mirrored distribution of delta.norm 
-  # for genes with at least as many CNVs in controls than cases
-  # Approach adopted from pLoF constraint calculations per Lek et al., Nature, 2016
-  bed$total.CNV <- bed$case.CNV + bed$control.CNV
-  bed$total.CNV.w <- bed$case.CNV.w + bed$control.CNV.w
-  nonzero.idx <- which(bed$total.CNV > 0)
-  if(is.null(min.total.CNV)){
-    min.total.CNV <- floor(quantile(bed$total.CNV[which(bed$total.CNV < quantile(bed$total.CNV, 0.95, na.rm=T))], 0.25))
-    min.total.CNV <- max(c(1, min.total.CNV))
-  }
-  training.idx <- which(bed$control.CNV.freq >= bed$case.CNV.freq
-                        & bed$total.CNV >= min.total.CNV)
-  cat(paste("gene_burden_test.R::build.null identified",
-            prettyNum(length(training.idx), big.mark=","),
-            "genes for null distribution fitting with at least", 
-            prettyNum(min.total.CNV, big.mark=","),
-            "CNVs in total between cases & controls, and where",
-            "control frequency is at least equal to case frequency\n"))
-  if(use.unweighted.controls==T){
-    bed$delta.total <- bed$case.CNV.w - bed$control.CNV
-    bed$delta.norm <- 100*(bed$case.CNV.w.norm - bed$control.CNV.freq)
+# Fisher's exact test for a single vector of CNV counts
+burden.test.single <- function(counts){
+  case.cnv <- as.integer(counts[1])
+  control.cnv <- as.integer(counts[2])
+  case.ref <- as.integer(counts[3])
+  control.ref <- as.integer(counts[4])
+  
+  if(case.cnv == 0 & control.cnv == 0){
+    p <- 1
+    or <- c(NA,NA,NA)
   }else{
-    bed$delta.total <- bed$case.CNV.w - bed$control.CNV.w
-    bed$delta.norm <- 100*(bed$case.CNV.w.norm - bed$control.CNV.w.norm)
+    cnv.mat <- matrix(c(control.ref, case.ref, control.cnv, case.cnv),
+                      byrow=T, nrow=2)
+    
+    p <- fisher.test(cnv.mat, alternative="greater")$p.value
+    or <- fisher.test(cnv.mat)
+    or <- c(or$estimate, or$conf.int)
   }
-  null.vals.oneside <- abs(bed$delta.norm[training.idx])
-  null.vals <- c(-null.vals.oneside, null.vals.oneside)
-  # Fit gaussian null
-  gaus.fit <- fitdistr(null.vals, "normal")
-  null.mean <- 0
-  # null.sd <- sd(null.vals)
-  null.sd <- as.numeric(gaus.fit$estimate[2])
-  gaus.loglik <- gaus.fit$loglik
-  # Fit exponential null
-  exp.fit <- fitdistr(null.vals.oneside, "exponential")
-  null.exp.rate <- as.numeric(exp.fit$estimate)
-  exp.loglik <- exp.fit$loglik  
   
-  # Plot distributions & fits
-  jpeg(null.dist.plot.out, height=300*3, width=300*7, res=300)
-  plot.null(null.vals, null.mean, null.sd, null.exp.rate, cohort.name)
-  dev.off()
-  
-  # Return fit values
-  data.frame("cohort"=cohort.name,
-             "genes_trained"=length(training.idx),
-             "min_CNV_per_gene"=min.total.CNV,
-             "gaussian_mean"=round(null.mean, precision),
-             "gaussian_sd"=round(null.sd, precision),
-             "gaussian_loglik"=round(gaus.loglik, precision),
-             "exponential_rate"=round(null.exp.rate, precision),
-             "exponential_loglik"=round(exp.loglik, precision))
+  f.res <- as.numeric(c(p, or))
+  names(f.res) <- c("p", "OR", "OR.lower", "OR.upper")
+  return(f.res)
 }
 
 
-# Read null model parameters from prespecified table (for burden testing)
-parse.null.table <- function(null.table.in, cohort.name, cnv, null.model){
-  nt <- read.table(null.table.in, sep="\t", header=T, comment.char="")
-  if(null.model=="gaussian"){
-    null.params <- c("mean"=nt$gaussian_mean[which(nt$CNV==cnv & nt$cohort==cohort.name)],
-                     "sd"=nt$gaussian_sd[which(nt$CNV==cnv & nt$cohort==cohort.name)])
-  }else if(null.model=="exponential"){
-    null.params <- c("rate"=nt$exponential_rate[which(nt$CNV==cnv & nt$cohort==cohort.name)])
-  }else{
-    stop(paste("gene_burden_test.R::parse.null.table does not ",
-               "recognize null.model '", null.model, "'", sep=""))
-  }
-  return(null.params)
+# Compute Fisher's exact test lookup table
+build.fisher.lookup.table <- function(bed){
+  counts.df <- unique(bed[, which(colnames(bed) %in% c("case.CNV", "control.CNV",
+                                                        "case.ref", "control.ref"))])
+  counts.df <- counts.df[with(counts.df, order(control.CNV, case.CNV)),]
+  
+  f.stats <- t(apply(counts.df, 1, burden.test.single))
+  
+  f.table <- cbind(counts.df, f.stats)
+  return(f.table)
 }
 
 
-# Z-test for case:control CNV burden per gene
-z.burden.test <- function(bed, use.unweighted.controls, null.model, null.params, 
-                          min.total.CNV, precision){
-  # Prepare data for Z-test
-  bed$total.CNV <- bed$case.CNV + bed$control.CNV
-  bed$total.CNV.w <- bed$case.CNV.w + bed$control.CNV.w
-  if(use.unweighted.controls==T){
-    bed$delta.total <- bed$case.CNV.w - bed$control.CNV
-    bed$delta.norm <- 100*(bed$case.CNV.w.norm - bed$control.CNV.freq)
-  }else{
-    bed$delta.total <- bed$case.CNV.w - bed$control.CNV.w
-    bed$delta.norm <- 100*(bed$case.CNV.w.norm - bed$control.CNV.w.norm)
-  }
+# Fisher's exact test of case:control CNV burden per bin
+burden.test <- function(bed, precision){
+  f.table <- build.fisher.lookup.table(bed)
   
-  # Compute test statistic & p-value
-  if(null.model=="gaussian"){
-    bed$Zscore <- bed$delta.norm / null.params[2]
-    bed$pvalue <- pnorm(bed$Zscore, lower.tail=F)
-  }else if(null.model=="exponential"){
-    bed$Zscore <- NA
-    bed$pvalue <- pexp(bed$delta.norm, rate=null.params[1], lower.tail=F)
-  }
+  f.res <- merge(bed, f.table, sort=F, all.x=T, all.y=F,
+                 c("case.CNV", "control.CNV",
+                   "case.ref", "control.ref"))
+  f.res <- f.res[with(f.res, order(chr, start)), ]
   
-  # Overwrite p-values for genes with fewer than min.total.CNV
-  bed$pvalue[which(bed$total.CNV < min.total.CNV)] <- NA
-  
-  burden.bed <- data.frame("chr" = bed$chr,
-                           "start" = bed$start,
-                           "end" = bed$end,
-                           "gene" = bed$gene,
-                           "case_cnvs" = bed$case.CNV,
-                           "case_freq" = round(bed$case.CNV.freq, precision),
-                           "case_cnvs_weighted" = round(bed$case.CNV.w, precision),
-                           "case_freq_weighted" = round(bed$case.CNV.w.norm, precision),
-                           "control_cnvs" = bed$control.CNV,
-                           "control_freq" = round(bed$control.CNV.freq, precision),
-                           "control_cnvs_weighted" = round(bed$control.CNV.w, precision),
-                           "control_freq_weighted" = round(bed$control.CNV.w.norm, precision),
-                           "ln_odds_ratio" = round(bed$ln.OR, precision),
-                           "ln_odds_ratio_lower" = round(bed$ln.OR.lower, precision),
-                           "ln_odds_ratio_upper" = round(bed$ln.OR.upper, precision),
-                           "z_score" = round(bed$Zscore, precision),
-                           "phred_p" = round(-log10(bed$pvalue), precision))
-  
-  return(burden.bed)
+  fisher.bed <- data.frame("chr" = f.res$chr,
+                           "start" = f.res$start, 
+                           "end" = f.res$end,
+                           "gene" = f.res$gene,
+                           "case_alt" = f.res$case.CNV,
+                           "case_ref" = f.res$case.ref,
+                           "case_freq" = round(f.res$case.CNV.freq, precision),
+                           "control_alt" = f.res$control.CNV, 
+                           "control_ref" = f.res$control.ref,
+                           "control_freq" = round(f.res$control.CNV.freq, precision),
+                           "fisher_phred_p" = round(-log10(f.res$p), precision),
+                           "fisher_OR" = round(f.res$OR, precision), 
+                           "fisher_OR_lower" = round(f.res$OR.lower, precision), 
+                           "fisher_OR_upper" = round(f.res$OR.upper, precision))
+  return(fisher.bed)
 }
-
 
 #################
 ### RSCRIPT BLOCK
 #################
 require(optparse, quietly=T)
-require(MASS, quietly=T)
 
 # List of command-line options
 option_list <- list(
@@ -341,12 +252,6 @@ option_list <- list(
               metavar="string"),
   make_option(c("--cnv"), type="character", default=NULL,
               help="CNV class to test (options: 'CNV', 'DEL', 'DUP') [default %default]",
-              metavar="string"),
-  make_option(c("--null-table-in"), type="character", default=NULL,
-              help="table with null distribution parameters [default %default]",
-              metavar="file"),
-  make_option(c("--null-model"), type="character", default="gaussian",
-              help="specify null distribution to model (options: 'gaussian', 'exponential') [default %default]",
               metavar="string"),
   make_option(c("--case-hpo"), type="character", default=NULL,
               help="HPO term to use for case samples [default %default]",
@@ -363,16 +268,6 @@ option_list <- list(
   make_option(c("--weighted-suffix"), type="character", default='_weighted',
               help="suffix appended to the end of CNV count columns for weighted counts [default %default]",
               metavar="string"),
-  make_option(c("--unweighted-controls"), action="store_true", default=FALSE,
-              help="use unweighted control CNV counts for burden testing [default %default]"),
-  make_option(c("--min-cnvs"), type="numeric", default=NULL,
-              help="do not include genes with fewer than N total CNVs in model [default: infer cutoff from data]",
-              metavar="numeric"),
-  make_option(c("--build-null"), action="store_true", default=FALSE,
-              help="build null distribution *instead* of performing burden testing [default %default]"),
-  make_option(c("--null-dist-plot"), type="character", default="null_dist.jpg",
-              help="path to plot null distribution (only used with --build-null) [default %default]",
-              metavar="path"),
   make_option(c("--precision"), type="integer", default=6,
               help="level of precision for floats [default %default]",
               metavar="integer"),
@@ -399,13 +294,6 @@ if(is.null(opts$`cohort-name`)){
 if(is.null(opts$`case-hpo`)){
   stop("Must specify --case-hpo\n")
 }
-if(is.null(opts$`null-table-in`)
-   & opts$`build-null` == FALSE){
-  stop("Must provide --null-table-in or specify --build-null")
-}
-if(!(opts$`null-model` %in% c("gaussian", "exponential"))){
-  stop("--null-model must be either 'gaussian' or 'exponential'")
-}
 
 # Writes args & opts to vars
 bed.in <- args$args[1]
@@ -413,51 +301,24 @@ outfile <- args$args[2]
 pheno.table.in <- opts$`pheno-table`
 cohort.name <- opts$`cohort-name`
 cnv <- opts$cnv
-null.table.in <- opts$`null-table-in`
-null.model <- opts$`null-model`
 case.hpo <- opts$`case-hpo`
 control.hpo <- opts$`control-hpo`
 case.col.name <- opts$`case-column`
 control.col.name <- opts$`control-column`
 weighted.suffix <- opts$`weighted-suffix`
-min.total.CNV <- opts$`min-cnvs`
-use.unweighted.controls <- opts$`unweighted-controls`
-do.build.null <- opts$`build-null`
-null.dist.plot.out <- opts$`null-dist-plot`
 precision <- opts$precision
 
-# # DEV PARAMETERS (FOR NULL BUILDING):
-# bed.in <- "~/scratch/meta1.HP0000118.uCNV.DEL.gene_burden.counts.bed.gz"
-# outfile <- "~/scratch/test_gene_burden.null.txt"
-# pheno.table.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
-# cohort.name <- "meta1"
-# case.hpo <- "HP:0000118"
-# control.hpo <- "HEALTHY_CONTROL"
-# case.col.name <- "case_cnvs"
-# control.col.name <- "control_cnvs"
-# weighted.suffix <- "_weighted"
-# use.unweighted.controls <- F
-# min.total.CNV <- NULL
-# do.build.null <- T
-# null.dist.plot.out <- "~/scratch/null_dist.jpg"
-# precision <- 6
-
 # # DEV PARAMETERS (FOR BURDEN TESTING):
-# bed.in <- "~/scratch/meta1.HP0001250.uCNV.DEL.gene_burden.counts.bed.gz"
-# outfile <- "~/scratch/test_gene_burden.stats.txt"
-# pheno.table.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
-# null.table.in <- "~/scratch/uCNV.gene_burden.all_null.fits.txt"
-# null.model <- "gaussian"
+# bed.in <- "~/scratch/gene_burden_test/counts/meta1.HP0012638.rCNV.DEL.gene_burden.counts.bed.gz"
+# outfile <- "~/scratch/gene_burden_test/test_gene_burden.stats.txt"
+# pheno.table.in <- "~/scratch/gene_burden_test/HPOs_by_metacohort.table.tsv"
 # cohort.name <- "meta1"
 # cnv <- "DEL"
-# case.hpo <- "HP:0001250"
+# case.hpo <- "HP:0012638"
 # control.hpo <- "HEALTHY_CONTROL"
 # case.col.name <- "case_cnvs"
 # control.col.name <- "control_cnvs"
 # weighted.suffix <- "_weighted"
-# use.unweighted.controls <- F
-# min.total.CNV <- 1
-# do.build.null <- F
 # precision <- 6
 
 # Extract sample counts
@@ -468,36 +329,15 @@ sample.counts <- get.sample.counts(pheno.table.in, cohort.name,
 bed <- import.bed(bed.in, case.col.name, sample.counts$case.n,
                   control.col.name, sample.counts$control.n)
 
-# Build null, if optioned
-if(do.build.null == T){
-  # Build null
-  null.dist <- build.null(bed, use.unweighted.controls, min.total.CNV, 
-                          precision, null.dist.plot.out, cohort.name)
-  write.table(null.dist, outfile, sep="\t",
-              col.names=T, row.names=F, quote=F)
-  # Otherwise, run burden tests
-}else{
-  # Reset parameters
-  if(is.null(min.total.CNV)){
-    min.total.CNV <- 0
-  }
-  
-  # Read null distribution
-  null.params <- parse.null.table(null.table.in, cohort.name, 
-                                  cnv, null.model)
-  
-  # Run burden tests
-  burden.bed <- z.burden.test(bed, use.unweighted.controls, 
-                              null.model, null.params, 
-                              min.total.CNV, precision)
-  
-  # Format output
-  colnames(burden.bed)[1] <- "#chr"
-  if(length(grep(".gz", outfile, fixed=T)) > 0){
-    outfile <- tools::file_path_sans_ext(outfile)
-  }
-  write.table(burden.bed, outfile, sep="\t", col.names=T, row.names=F, quote=F)
-  if(opts$bgzip == TRUE){
-    system(paste("bgzip -f", outfile),wait=T)
-  }
+# Run burden tests
+fisher.bed <- burden.test(bed, precision)
+
+# Format output
+colnames(fisher.bed)[1] <- "#chr"
+if(length(grep(".gz", outfile, fixed=T)) > 0){
+  outfile <- tools::file_path_sans_ext(outfile)
+}
+write.table(fisher.bed, outfile, sep="\t", col.names=T, row.names=F, quote=F)
+if(opts$bgzip == TRUE){
+  system(paste("bgzip -f", outfile),wait=T)
 }

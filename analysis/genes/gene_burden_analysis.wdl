@@ -17,62 +17,17 @@ workflow gene_burden_analysis {
   Int pad_controls
   String weight_mode
   Float min_cds_ovr
+  Int max_genes_per_case_cnv
   Float p_cutoff
   String rCNV_bucket
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
   Array[String] cnvs = ['DEL', 'DUP', 'CNV']
 
-  # Scatter over CNV types
-  scatter ( cnv in cnvs ) {
-    # Step 1.1: build null distributions of rCNV counts in all cases vs all controls
-    call build_null_distrib as build_rCNV_nulls {
-      input:
-        hpo="HP:0000118",
-        metacohort_list=metacohort_list,
-        metacohort_sample_table=metacohort_sample_table,
-        freq_code="rCNV",
-        CNV=cnv,
-        gtf=gtf,
-        pad_controls=pad_controls,
-        weight_mode=weight_mode,
-        min_cds_ovr=min_cds_ovr,
-        rCNV_bucket=rCNV_bucket,
-        prefix="HP000018"
-    }
-
-    # Step 1.1: build null distributions of uCNV counts in all cases vs all controls
-    call build_null_distrib as build_uCNV_nulls {
-      input:
-        hpo="HP:0000118",
-        metacohort_list=metacohort_list,
-        metacohort_sample_table=metacohort_sample_table,
-        freq_code="uCNV",
-        CNV=cnv,
-        gtf=gtf,
-        pad_controls=pad_controls,
-        weight_mode=weight_mode,
-        min_cds_ovr=min_cds_ovr,
-        rCNV_bucket=rCNV_bucket,
-        prefix="HP000018"
-    }
-  }
-  # Step 1.2: merge output of null distributions into master table
-  call merge_null_tables as merge_rCNV_nulls {
-    input:
-      null_tables=build_rCNV_nulls.null_fits,
-      freq_code="rCNV"
-  }
-  call merge_null_tables as merge_uCNV_nulls {
-    input:
-      null_tables=build_uCNV_nulls.null_fits,
-      freq_code="uCNV"
-  }
-
 
   # Scatter over phenotypes
   scatter ( pheno in phenotypes ) {
-    # Step 2: run rCNV assocation tests per phenotype
+    # Step 1: Run rCNV assocation tests per phenotype
     call burden_test as rCNV_burden_test {
       input:
         hpo=pheno[1],
@@ -84,12 +39,13 @@ workflow gene_burden_analysis {
         pad_controls=pad_controls,
         weight_mode=weight_mode,
         min_cds_ovr=min_cds_ovr,
+        max_genes_per_case_cnv=max_genes_per_case_cnv,
         p_cutoff=p_cutoff,
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
     }
 
-    # Step 2: run uCNV assocation tests per phenotype
+    # Step 1: Run uCNV assocation tests per phenotype
     call burden_test as uCNV_burden_test {
       input:
         hpo=pheno[1],
@@ -101,140 +57,15 @@ workflow gene_burden_analysis {
         pad_controls=pad_controls,
         weight_mode=weight_mode,
         min_cds_ovr=min_cds_ovr,
+        max_genes_per_case_cnv=max_genes_per_case_cnv,
         p_cutoff=p_cutoff,
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
     }
 
-    # Step 3: run meta-analysis to combine association stats per metacohort
+    # Step 2: run meta-analysis to combine association stats per metacohort
     # TBD
   }
-}
-
-
-# Build null distribution of expected case:control CNV differences
-task build_null_distrib {
-  String hpo
-  File metacohort_list
-  File metacohort_sample_table
-  String freq_code
-  String CNV
-  File gtf
-  Int pad_controls
-  String weight_mode
-  Float min_cds_ovr
-  String rCNV_bucket
-  String prefix
-
-  command <<<
-    set -e
-
-    # Copy CNV data and constrained gene coordinates
-    mkdir cleaned_cnv/
-    gsutil -m cp ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
-    mkdir refs/
-    gsutil cp ${rCNV_bucket}/analysis/analysis_refs/gencode.v19.canonical.constrained.bed.gz \
-      refs/
-    gsutil -m cp ${rCNV_bucket}/refs/GRCh37.*.bed.gz refs/
-
-    # Iterate over metacohorts
-    while read meta cohorts; do
-      echo $meta
-
-      # Set metacohort parameters
-      cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
-      meta_idx=$( head -n1 "${metacohort_sample_table}" \
-                  | sed 's/\t/\n/g' \
-                  | awk -v meta="$meta" '{ if ($1==meta) print NR }' )
-      ncase=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
-               | awk -v FS="\t" -v meta_idx="$meta_idx" '{ print $meta_idx }' \
-               | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
-      nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
-               | awk -v FS="\t" -v meta_idx="$meta_idx" '{ print $meta_idx }' \
-               | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
-
-      # Count CNVs
-      /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
-        --pad-controls ${pad_controls} \
-        --weight-mode ${weight_mode} \
-        --min-cds-ovr ${min_cds_ovr} \
-        -t ${CNV} \
-        --hpo ${hpo} \
-        --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
-        --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
-        --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
-        -z \
-        --verbose \
-        -o "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.counts.bed.gz" \
-        "$cnv_bed" \
-        ${gtf}
-      tabix -f "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.counts.bed.gz"
-
-      # Build null distribution
-      /opt/rCNV2/analysis/genes/gene_burden_test.R \
-        --pheno-table ${metacohort_sample_table} \
-        --cohort-name $meta \
-        --case-hpo ${hpo} \
-        --build-null \
-        --null-dist-plot $meta.${prefix}.${freq_code}.${CNV}.gene_burden.null_fit.jpg \
-        --precision 8 \
-        "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.counts.bed.gz" \
-        "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.null_fit.txt"
-
-    done < ${metacohort_list}
-
-    # Merge null tables
-    cat *.${prefix}.${freq_code}.${CNV}.gene_burden.null_fit.txt \
-    | grep -ve '^cohort' \
-    | awk -v OFS="\t" -v freq_code=${freq_code} -v CNV=${CNV} \
-      '{ print freq_code, CNV, $0 }' \
-    | sort -Vk3,3 \
-    | cat <( head -n1 mega.${prefix}.${freq_code}.${CNV}.gene_burden.null_fit.txt \
-             | sed 's/^/#freq_code\tCNV\t/g' ) \
-          - \
-    > ${prefix}.${freq_code}.${CNV}.gene_burden.all_null_fits.txt
-
-    # Copy plots to rCNV bucket (note: requires permissions)
-    gsutil -m cp *null_fit.jpg \
-      gs://rcnv_project/analysis/gene_burden/null_fits/${freq_code}/plots/
-  >>>
-
-  runtime {
-    docker: "talkowski/rcnv@sha256:ba47749208bed2e7e7d03cba7bd66c926681889de7ac5549b234c1a0965cac68"
-    preemptible: 1
-    memory: "4 GB"
-    bootDiskSizeGb: "20"
-  }
-
-  output {
-    File null_fits = "${prefix}.${freq_code}.${CNV}.gene_burden.all_null_fits.txt"
-  }
-}
-
-
-# Merge null distribution tables
-task merge_null_tables {
-  Array[File] null_tables
-  String freq_code
-
-  command <<<
-    head -n1 ${null_tables[0]} > header.txt
-    cat ${sep=' ' null_tables} \
-    | fgrep -v "#" \
-    | sort -Vk1,1 -k2,2V -k3,3V \
-    | cat header.txt - \
-    > "${freq_code}.gene_burden.all_null_fits.txt"
-  >>>
-
-  runtime {
-    docker: "talkowski/rcnv@sha256:ba47749208bed2e7e7d03cba7bd66c926681889de7ac5549b234c1a0965cac68"
-    preemptible: 1
-  }
-
-  output {
-    File null_fit_table = "${freq_code}.gene_burden.all_null_fits.txt"
-  }
-
 }
 
 
@@ -243,12 +74,12 @@ task burden_test {
   String hpo
   File metacohort_list
   File metacohort_sample_table
-  File null_table
   String freq_code
   File gtf
   Int pad_controls
   String weight_mode
   Float min_cds_ovr
+  Int max_genes_per_case_cnv
   Float p_cutoff
   String rCNV_bucket
   String prefix
@@ -297,6 +128,8 @@ task burden_test {
           --pad-controls ${pad_controls} \
           --weight-mode ${weight_mode} \
           --min-cds-ovr ${min_cds_ovr} \
+          --max-genes ${max_genes_per_case_cnv} \
+          --max-genes-in-cases-only \
           -t $CNV \
           --hpo ${hpo} \
           --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
@@ -314,8 +147,6 @@ task burden_test {
           --pheno-table ${metacohort_sample_table} \
           --cohort-name $meta \
           --cnv $CNV \
-          --null-table-in ${null_table} \
-          --null-model "gaussian" \
           --case-hpo ${hpo} \
           --bgzip \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
