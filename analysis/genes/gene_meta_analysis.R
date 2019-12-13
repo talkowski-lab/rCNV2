@@ -169,7 +169,7 @@ combine.stats <- function(stats.list){
                     by=c("chr", "start", "end", "gene"),
                     all=F, sort=F)
   }
-  merged[, -c(1:3)] <- apply(merged[, -c(1:3)], 2, as.numeric)
+  merged[, -c(1:4)] <- apply(merged[, -c(1:4)], 2, as.numeric)
   return(merged)
 }
 
@@ -220,8 +220,8 @@ make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T)
   meta.df <- data.frame("cohort"=1:ncohorts,
                         "control_ref"=as.numeric(stats.merged[row.idx, grep("control_ref", colnames(stats.merged), fixed=T)]),
                         "case_ref"=as.numeric(stats.merged[row.idx, grep("case_ref", colnames(stats.merged), fixed=T)]),
-                        "control_alt"=as.numeric(stats.merged[row.idx, grep("control_alt", colnames(stats.merged), fixed=T)]),
-                        "case_alt"=as.numeric(stats.merged[row.idx, grep("case_alt", colnames(stats.merged), fixed=T)]),
+                        "control_alt"=as.numeric(stats.merged[row.idx, grep("control_cnvs", colnames(stats.merged), fixed=T)]),
+                        "case_alt"=as.numeric(stats.merged[row.idx, grep("case_cnvs", colnames(stats.merged), fixed=T)]),
                         "cohort_name"=cohorts)
   if(empirical.continuity==T){
     meta.df <- sweeting.correction(meta.df)
@@ -233,7 +233,7 @@ make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T)
 # Perform meta-analysis for a single window
 meta.single <- function(stats.merged, cohorts, row.idx, empirical.continuity=T){
   # If no CNVs are observed, return all NAs
-  if(sum(stats.merged[row.idx, grep("_alt", colnames(stats.merged), fixed=T)])>0){
+  if(sum(stats.merged[row.idx, grep("_cnvs_weighted", colnames(stats.merged), fixed=T)])>0){
     meta.df <- make.meta.df(stats.merged, cohorts, row.idx, empirical.continuity)
     # Meta-analysis
     if(model=="re"){
@@ -276,7 +276,7 @@ meta <- function(stats.merged, cohorts, model="re"){
 
 # Load required libraries
 require(optparse, quietly=T)
-require(metap, quietly=T)
+require(metafor, quietly=T)
 
 # List of command-line options
 option_list <- list(
@@ -319,13 +319,13 @@ corplot.out <- opts$`z-corplot`
 model <- opts$model
 
 # # Dev parameters
-# infile <- "~/scratch/gene_meta_dummy_input.txt"
-# outfile <- "~/scratch/gene_meta_test_results.bed"
-# pheno.table.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
-# case.hpo <- "HP:0001250"
+# infile <- "~/scratch/gene_burden_test/gene.meta_test.input.txt"
+# outfile <- "~/scratch/gene_burden_test/gene.meta_test.results.bed"
+# pheno.table.in <- "~/scratch/gene_burden_test/HPOs_by_metacohort.table.tsv"
+# case.hpo <- "HP:0012638"
 # control.hpo <- "HEALTHY_CONTROL"
-# corplot.out <- "~/scratch/gene_corplot.test.jpg"
-# model <- "wz"
+# corplot.out <- "~/scratch/gene_burden_test/gene_corplot.test.jpg"
+# model <- "mh"
 
 # Read list of cohorts to meta-analyze
 cohort.info <- load.cohort.info(infile, pheno.table.in, case.hpo, control.hpo)
@@ -334,14 +334,14 @@ stats.list <- lapply(1:ncohorts, function(i){read.stats(cohort.info[i, 2], cohor
                                                         cohort.info[i, 3], cohort.info[i, 4])})
 names(stats.list) <- cohort.info[, 1]
 
-# Plot correlations of Z-scores between cohorts, if optioned
-if(!is.null(corplot.out)){
-  jpeg(corplot.out, res=300, 
-       height=300*(3.5+(ncohorts/2)),
-       width=300*(4+(ncohorts/2)))
-  z.corplot.grid(stats.list, pt.cex=0.25)
-  dev.off()
-}
+# # Plot correlations of Z-scores between cohorts, if optioned
+# if(!is.null(corplot.out)){
+#   jpeg(corplot.out, res=300, 
+#        height=300*(3.5+(ncohorts/2)),
+#        width=300*(4+(ncohorts/2)))
+#   z.corplot.grid(stats.list, pt.cex=0.25)
+#   dev.off()
+# }
 
 # Conduct meta-analysis & write to file
 stats.merged <- combine.stats(stats.list)

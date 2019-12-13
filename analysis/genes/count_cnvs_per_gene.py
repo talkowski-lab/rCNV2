@@ -195,7 +195,7 @@ def overlap_cnvs_exons(cnvbt, exonbt, cds_dict, weight_mode, min_cds_ovr):
                 else:
                     weighted_counts[gene] += w
 
-    return raw_counts, weighted_counts
+    return raw_counts, weighted_counts, cnv_weights
 
 
 def make_output_table(outbed, txbt, genes, cds_dict, control_counts,
@@ -219,6 +219,29 @@ def make_output_table(outbed, txbt, genes, cds_dict, control_counts,
 
     # Must close output file to flush buffer (end of chr22 sometimes gets clipped)
     outbed.close()
+
+
+def write_annotated_cnvs(cnvbt, cnvs_out, case_cnv_weights, control_cnv_weights, 
+                         control_hpo='HEALTHY_CONTROL'):
+    """
+    Format & write BED file of CNVs annotated with gene overlaps
+    """
+
+    # Write header to output file
+    hcols = '#chr start end cnvid cnv phenos ngenes genes'
+    cnvs_out.write('\t'.join(hcols.split()) + '\n')
+
+    for cnv in cnvbt:
+        cnvid = cnv.name
+        if cnv.fields[-1] == control_hpo:
+            cnv_dict = control_cnv_weights
+        else:
+            cnv_dict = case_cnv_weights
+        hits = cnv_dict.get(cnvid, {})
+        ngenes = len(hits)
+        genes = ';'.join(sorted(hits.keys()))
+        outfields = cnv.fields + [str(ngenes), genes]
+        cnvs_out.write('\t'.join(outfields) + '\n')
 
 
 def main():
@@ -257,6 +280,8 @@ def main():
                         default=0.3)
     parser.add_argument('-o', '--outbed', help='Path to output file. ' +
                         '[default: stdout]')
+    parser.add_argument('--cnvs-out', help='Path to output BED file for CNVs ' + 
+                        'annotated with genes disrupted.')
     parser.add_argument('-z', '--bgzip', dest='bgzip', action='store_true',
                         help='Compress output BED with bgzip.')
     parser.add_argument('-v', '--verbose', action='store_true', help='Print ' + 
@@ -298,21 +323,34 @@ def main():
 
     # Intersect CNVs with exons
     case_cnvbt = cnvbt.filter(lambda x: args.control_hpo not in x[5].split(';'))
-    case_counts, case_weights = overlap_cnvs_exons(case_cnvbt, exonbt, cds_dict, 
-                                                   args.weight_mode, 
-                                                   args.min_cds_ovr)
+    case_counts, case_weights, case_cnv_weights \
+        = overlap_cnvs_exons(case_cnvbt, exonbt, cds_dict, args.weight_mode, 
+                             args.min_cds_ovr)
     control_cnvbt = cnvbt.filter(lambda x: args.control_hpo in x[5].split(';'))
-    control_counts, control_weights = overlap_cnvs_exons(control_cnvbt, exonbt, 
-                                                         cds_dict, args.weight_mode,
-                                                         args.min_cds_ovr)
+    control_counts, control_weights, control_cnv_weights \
+        = overlap_cnvs_exons(control_cnvbt, exonbt, cds_dict, args.weight_mode, 
+                             args.min_cds_ovr)
     
-    # Format output table and write to outfile
+    # Format output main counts table and write to outfile
     make_output_table(outbed, txbt, genes, cds_dict, control_counts, 
                       control_weights, case_counts, case_weights)
     if args.outbed is not None \
     and args.outbed not in 'stdout -'.split() \
     and args.bgzip:
         subprocess.run(['bgzip', '-f', outbed_path])
+
+    # If optioned, format annotated CNV BED file and write to args.cnvs_out
+    if args.cnvs_out is not None:
+        if path.splitext(args.cnvs_out)[-1] in '.gz .bz .bgz .bgzip .gzip'.split():
+            cnvs_outpath = path.splitext(args.cnvs_out)[0]
+            bgzip_cnvs_out = True
+        else:
+            cnvs_outpath = args.cnvs_out
+        cnvs_out = open(cnvs_outpath, 'w')
+        write_annotated_cnvs(cnvbt, cnvs_out, case_cnv_weights, 
+                             control_cnv_weights, args.control_hpo)
+        if bgzip_cnvs_out:
+            subprocess.run(['bgzip', '-f', cnvs_outpath])
 
 
 if __name__ == '__main__':

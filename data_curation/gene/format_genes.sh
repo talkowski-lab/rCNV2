@@ -61,6 +61,19 @@ cat \
 > gencode.v19.canonical.gtf.gz
 
 
+# Apply pext filter to exons from canonical transcripts
+gsutil -m cp \
+  gs://gnomad-public/papers/2019-tx-annotation/pre_computed/all.possible.snvs.tx_annotated.022719.tsv.bgz \
+  ./
+tabix -s 1 -b 2 -e 2 -S 1 \
+  all.possible.snvs.tx_annotated.022719.tsv.bgz
+/opt/rCNV2/data_curation/gene/process_pext.py \
+  all.possible.snvs.tx_annotated.022719.tsv.bgz \
+| sort -Vk1,1 -k2,2n -k3,3n \
+| bgzip -c \
+> gnomad.v2.1.1.pext.bed.gz
+
+
 # Make gene list of all canonical autosomal genes used in analysis
 zcat gencode.v19.canonical.gtf.gz \
 | awk -v FS="\t" '{ if ($3=="gene") print $9 }' \

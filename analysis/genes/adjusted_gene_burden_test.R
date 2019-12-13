@@ -46,7 +46,8 @@ import.features <- function(features.in){
 # Process an input bed file of genes and counts
 import.bed <- function(bed.in, features, 
                        case.col.name, case.n, 
-                       control.col.name, control.n){
+                       control.col.name, control.n,
+                       neighbor.dist=1000000){
   bed <- read.table(bed.in, sep="\t", header=T, comment.char="")
   
   case.col.idx <- which(colnames(bed)==case.col.name)
@@ -91,11 +92,51 @@ import.bed <- function(bed.in, features,
   bed$all.CNV.w <- bed$case.CNV.w + bed$control.CNV.w
   bed$all.CNV.w.norm <- bed$all.CNV.w / (case.n + control.n)
   
+  # Add regional annotation of average # of CNVs per 
+  # neighboring genes within a prespecified distance
+  bed$avg_neighbor.all.CNV <- sapply(1:nrow(bed), function(i){
+    counts <- bed$all.CNV[which(bed$chr == bed$chr[i]
+                                & bed$start <= bed$end[i] + neighbor.dist
+                                & bed$end >= bed$start[i] - neighbor.dist
+                                & bed$gene != bed$gene[i])]
+    if(length(counts) > 0){
+      mean(counts)
+    }else{
+      return(0)
+    }
+  })
+  
   # Append gene features
   bed <- merge(bed, features, by=c("chr", "start", "end", "gene"),
-              all=F, sort=F, suffixes=c(".cnvs", ".features"))
+               all=F, sort=F, suffixes=c(".cnvs", ".features"))
   
   return(bed)
+}
+
+
+# Predict number of case CNVs per gene
+predict.case.cnvs.singleChrom <- function(bed, test.chrom, pred.colName="case.CNV.w.norm"){
+  # Clean data
+  cols_to_keep <- c("control.CNV.w.norm")
+  df.sub <- bed[, c(which(colnames(bed)==pred.colName),
+                    which(colnames(bed) %in% cols_to_keep),
+                    grep("eigenfeature", colnames(bed)))]
+  colnames(df.sub)[1] <- "response"
+  df.train <- df.sub[which(bed$chr!=test.chrom), ]
+  df.test <- df.sub[which(bed$chr==test.chrom), ]
+  
+  # Fit model
+  fit <- glm(response ~ ., data=df.train)
+  
+  # Predict on unseen data
+  pred.vals <- predict.glm(fit, newdata=df.test)
+  names(pred.vals) <- bed$gene[which(bed$chr==test.chrom)]
+  return(pred.vals)
+}
+predict.case.cnvs <- function(bed, pred.colName="case.CNV.w.norm"){
+  pred.vals <- unlist(sapply(unique(bed$chr), function(test.chrom){
+    predict.case.cnvs.singleChrom(bed, test.chrom, pred.colName)
+  }))
 }
 
 
@@ -175,11 +216,11 @@ weighted.suffix <- opts$`weighted-suffix`
 precision <- opts$precision
 
 # DEV PARAMETERS:
-bed.in <- "~/scratch/gene_burden_test/counts/meta1.HP0012638.rCNV.DEL.gene_burden.counts.bed.gz"
-features.in <- "~/scratch/gene_burden_test/gencode.v19.canonical.genomic_features.bed.gz"
-outfile <- "~/scratch/gene_burden_test/meta1.HP0012638.rCNV.DEL.gene_burden_stats.bed.gz"
+bed.in <- "~/scratch/gene_burden_test/counts/meta2.HP0012638.uCNV.DEL.gene_burden.counts.bed.gz"
+features.in <- "~/scratch/gene_burden_test/gencode.v19.canonical.genomic_features.eigenfeatures.bed.gz"
+outfile <- "~/scratch/gene_burden_test/meta2.HP0012638.uCNV.DEL.gene_burden_stats.bed.gz"
 pheno.table.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
-cohort.name <- "meta1"
+cohort.name <- "meta2"
 case.hpo <- "HP:0012638"
 control.hpo <- "HEALTHY_CONTROL"
 case.col.name <- "case_cnvs"
@@ -201,11 +242,11 @@ bed <- import.bed(bed.in, features, case.col.name, sample.counts$case.n,
 ## DEV EXPLORATORY ANALYSES
 for(i in 19:ncol(bed)){
   if(length(unique(bed[, i])) > 1){
-    plot(bed[, i], sqrt(bed$all.CNV), main=colnames(bed)[i], cex=0.5,
+    plot(bed[, i], bed$all.CNV, main=colnames(bed)[i], cex=0.5,
          xlab=colnames(bed)[i], ylab="All CNVs")
-    abline(lm(sqrt(bed$all.CNV) ~ bed[, i]), col="red")
+    abline(lm(bed$all.CNV ~ bed[, i]), col="red")
     text(x=mean(par("usr")[1:2]), y=par("usr")[4], pos=1, col="red",
-         labels=cor(bed[, i], sqrt(bed$all.CNV)))
+         labels=cor(bed[, i], bed$all.CNV))
   }
 }
 
@@ -225,8 +266,8 @@ bed$mean_control_CNVs_nearby <- sapply(1:nrow(bed), function(i){
 })
 bed$mean_case_CNVs_nearby <- sapply(1:nrow(bed), function(i){
   m <- mean(bed$case.CNV[setdiff(which(bed$chr==bed$chr[i] & 
-                                            (abs(bed$end[i] - bed$start) <= 1000000 | abs(bed$end - bed$start[i]) <= 1000000)),
-                                    i)])
+                                         (abs(bed$end[i] - bed$start) <= 1000000 | abs(bed$end - bed$start[i]) <= 1000000)),
+                                 i)])
   if(is.na(m)){
     m <- 0
   }

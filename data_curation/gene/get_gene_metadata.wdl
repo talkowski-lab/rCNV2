@@ -93,9 +93,9 @@ task get_genomic_data {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:74f3d1e57981ea622f4c05a8e9738e5fcbf3edcd471a06cccbffb93b60530f85"
+    docker: "talkowski/rcnv@sha256:1b3910427c948c50677f89e444910bed4c43a690503a7b9efc90bfe427ad1ba8"
     preemptible: 1
-    memory: "8 GB"
+    memory: "4 GB"
     disks: "local-disk 100 SSD"
     bootDiskSizeGb: "20"
   }
@@ -134,6 +134,7 @@ task merge_metadata {
       --skip-columns 4 \
       --prefix ${eigen_prefix} \
       --bgzip \
+      ${prefix}.bed.gz \
       ${prefix}.eigenfeatures.bed.gz
 
     gsutil -m cp \
@@ -142,9 +143,9 @@ task merge_metadata {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:74f3d1e57981ea622f4c05a8e9738e5fcbf3edcd471a06cccbffb93b60530f85"
+    docker: "talkowski/rcnv@sha256:1b3910427c948c50677f89e444910bed4c43a690503a7b9efc90bfe427ad1ba8"
     preemptible: 1
-    memory: "8 GB"
+    memory: "4 GB"
     disks: "local-disk 100 SSD"
     bootDiskSizeGb: "20"
   }
