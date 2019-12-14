@@ -93,7 +93,7 @@ task get_genomic_data {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:bf03ac7e38233b504f2ecb63a99c2106fae52a6e8bb5a8010a1319a5ba7ee1db"
+    docker: "talkowski/rcnv@sha256:3f33790812f5d5a9c27104f437a1e1e01513b0bd89c199c08d94ec6b144533ae"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"
@@ -143,7 +143,7 @@ task merge_metadata {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:bf03ac7e38233b504f2ecb63a99c2106fae52a6e8bb5a8010a1319a5ba7ee1db"
+    docker: "talkowski/rcnv@sha256:3f33790812f5d5a9c27104f437a1e1e01513b0bd89c199c08d94ec6b144533ae"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"

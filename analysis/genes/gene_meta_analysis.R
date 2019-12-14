@@ -291,7 +291,7 @@ option_list <- list(
               help="output .jpg file for pairwise odds ratio correlation plot [default %default]",
               metavar="path"),
   make_option(c("--model"), type="character", default="wz", 
-              help="specify meta-analysis model ('wz': weighted Z, 'fisher': Fisher's method) [default %default]",
+              help="specify meta-analysis model ('wz': weighted Z, 'mh': Mantel-Haenzel) [default %default]",
               metavar="string")
 )
 
@@ -313,7 +313,7 @@ outfile <- args$args[2]
 pheno.table.in <- opts$`pheno-table`
 case.hpo <- opts$`case-hpo`
 control.hpo <- opts$`control-hpo`
-corplot.out <- opts$`z-corplot`
+corplot.out <- opts$`or-corplot`
 model <- opts$model
 
 # # Dev parameters

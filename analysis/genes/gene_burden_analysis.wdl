@@ -217,7 +217,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3775f521f2eed66108eb2954b135c340b0d1b6de1cc23d5defc34feb2378faf1"
+    docker: "talkowski/rcnv@sha256:3f33790812f5d5a9c27104f437a1e1e01513b0bd89c199c08d94ec6b144533ae"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -232,8 +232,8 @@ task burden_test {
 
 # Run meta-analysis across metacohorts for a single phenotype
 task meta_analysis {
-  Array[Array[File]] stats_beds
-  Array[Array[File]] stats_bed_idxs
+  Array[File] stats_beds
+  Array[File] stats_bed_idxs
   String hpo
   File metacohort_list
   File metacohort_sample_table
@@ -282,6 +282,8 @@ task meta_analysis {
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt
       /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
+        --pheno-table ${metacohort_sample_table} \
+        --case-hpo ${hpo} \
         --or-corplot ${prefix}.${freq_code}.$CNV.gene_burden.or_corplot_grid.jpg \
         --model mh \
         --p-is-phred \
@@ -337,7 +339,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3775f521f2eed66108eb2954b135c340b0d1b6de1cc23d5defc34feb2378faf1"
+    docker: "talkowski/rcnv@sha256:3f33790812f5d5a9c27104f437a1e1e01513b0bd89c199c08d94ec6b144533ae"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
