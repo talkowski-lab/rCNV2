@@ -42,7 +42,7 @@ def process_pext_line(line, gene_field, pext_field, pan_tissue):
         val = str(annos[pext_field])
     # In raw pext file, nan corresponds to not expressed
     if val in 'NaN nan'.split():
-        val = 0
+        val = '0'
 
     return chrom, start, end, gene, val
 

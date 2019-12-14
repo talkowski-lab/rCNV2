@@ -84,7 +84,7 @@ task format_pext {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:ee72d7b02283be11db9f8642b75a71accc749de19344b067a7ffbf124cee16e5"
+    docker: "talkowski/rcnv@sha256:97eecfdf1659551105cb7b63a41707635d31f1910a2ae379e7899a102f06ec72"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 50 SSD"
@@ -115,7 +115,7 @@ task mergesort_bed {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:ee72d7b02283be11db9f8642b75a71accc749de19344b067a7ffbf124cee16e5"
+    docker: "talkowski/rcnv@sha256:97eecfdf1659551105cb7b63a41707635d31f1910a2ae379e7899a102f06ec72"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 50 SSD"
