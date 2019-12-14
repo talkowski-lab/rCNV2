@@ -286,7 +286,6 @@ task meta_analysis {
         --case-hpo ${hpo} \
         --or-corplot ${prefix}.${freq_code}.$CNV.gene_burden.or_corplot_grid.jpg \
         --model mh \
-        --p-is-phred \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
@@ -339,7 +338,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3f33790812f5d5a9c27104f437a1e1e01513b0bd89c199c08d94ec6b144533ae"
+    docker: "talkowski/rcnv@sha256:cb4e281f6a0d6b3a39e899371bac3d27553101df9996d2e8d1770a9c2e656801"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
