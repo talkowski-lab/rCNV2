@@ -52,6 +52,9 @@ def select_canonical_transcript(txs):
     # Choose longer translation, with transcript length as tiebreaker
     sizes = 'translation_length transcript_length'.split()
 
+    # Ensure sizes are numeric type, otherwise sorting breaks
+    txs.loc[:, sizes] = txs.loc[:, sizes].apply(pd.to_numeric)
+
     # 4) Longest non-protein-coding transcript
     translated = txs.loc[txs.transcript_type == 'protein_coding']
     if translated.shape[0] == 0:
@@ -62,15 +65,16 @@ def select_canonical_transcript(txs):
     if CCDS.shape[0] > 0:
         return CCDS.sort_values(sizes, ascending=False).iloc[0]
 
-    # 2) Longest Ensembl/Havana merged translation
+    # 2a) Longest known Ensembl/Havana merged translation
     ensembl_havana = translated.loc[
-        (translated.transcript_id == 'ensembl_havana_transcript')]
+        ((translated.transcript_source.isin('ensembl havana'.split())) \
+         & (translated.transcript_status == 'KNOWN'))]
     if ensembl_havana.shape[0] > 0:
         return ensembl_havana.sort_values(sizes, ascending=False).iloc[0]
 
-    # 2b) Longest Ensembl/Havana merged translation - "proj" prefix
+    # 2b) Longest Ensembl/Havana merged translation - any status
     ensembl_havana = translated.loc[
-        (translated.transcript_id == 'proj_ensembl_havana_transcript')]
+        (translated.transcript_source.isin('ensembl havana'.split()))]
     if ensembl_havana.shape[0] > 0:
         return ensembl_havana.sort_values(sizes, ascending=False).iloc[0]
 

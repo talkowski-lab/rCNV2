@@ -85,7 +85,7 @@ workflow gene_burden_analysis {
         metacohort_sample_table=metacohort_sample_table,
         freq_code="uCNV",
         meta_p_cutoff=p_cutoff,
-        uCNV_bucket=uCNV_bucket,
+        rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
     }
   }
@@ -217,7 +217,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:bf03ac7e38233b504f2ecb63a99c2106fae52a6e8bb5a8010a1319a5ba7ee1db"
+    docker: "talkowski/rcnv@sha256:3775f521f2eed66108eb2954b135c340b0d1b6de1cc23d5defc34feb2378faf1"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -337,7 +337,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0690bb2725ca42d713e99ed04e5544162dc6786d47004a63b205d23b74c946bb"
+    docker: "talkowski/rcnv@sha256:3775f521f2eed66108eb2954b135c340b0d1b6de1cc23d5defc34feb2378faf1"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

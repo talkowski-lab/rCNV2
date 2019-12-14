@@ -71,12 +71,17 @@ task format_pext {
   String contig
 
   command <<<
+    set -e
+    find / -name "$( basename ${pextfile} )" \
+    | xargs -I {} mv {} ./
+    find / -name "$( basename ${pext_idx} )" \
+    | xargs -I {} mv {} ./
     /opt/rCNV2/data_curation/gene/process_pext.py \
       --contig ${contig} \
       --pan-tissue \
       -o pext_data.${contig}.bed.gz \
       --bgzip \
-      ${pextfile}
+      $( basename ${pextfile} )
   >>>
 
   output {
@@ -84,7 +89,7 @@ task format_pext {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:97eecfdf1659551105cb7b63a41707635d31f1910a2ae379e7899a102f06ec72"
+    docker: "talkowski/rcnv@sha256:3775f521f2eed66108eb2954b135c340b0d1b6de1cc23d5defc34feb2378faf1"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 50 SSD"
@@ -100,6 +105,7 @@ task mergesort_bed {
   String upload_to_bucket
 
   command <<<
+    set -e
     zcat ${sep=" " beds} \
     | sort -Vk1,1 -k2,2n -k3,3n -Vk4,4 \
     | bgzip -c \
@@ -115,7 +121,7 @@ task mergesort_bed {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:97eecfdf1659551105cb7b63a41707635d31f1910a2ae379e7899a102f06ec72"
+    docker: "talkowski/rcnv@sha256:3775f521f2eed66108eb2954b135c340b0d1b6de1cc23d5defc34feb2378faf1"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 50 SSD"
