@@ -40,8 +40,9 @@ def process_pext_line(line, gene_field, pext_field, pan_tissue):
         val = str(nanmax(to_numeric(vals, errors='coerce')))
     else:
         val = str(annos[pext_field])
+    # In raw pext file, nan corresponds to not expressed
     if val in 'NaN nan'.split():
-        val = '.'
+        val = 0
 
     return chrom, start, end, gene, val
 

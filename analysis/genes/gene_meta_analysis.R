@@ -59,14 +59,11 @@ read.stats <- function(stats.in, prefix, case.n, control.n){
   stats <- read.table(stats.in, header=T, sep="\t", comment.char="")
   colnames(stats)[1] <- "chr"
   cols.to.keep <- c("chr", "start", "end", "gene", 
-                    "case_cnvs", "control_cnvs",
-                    "case_cnvs_weighted", "control_cnvs_weighted",
-                    "z_score", "phred_p")
+                    "case_alt", "control_alt", 
+                    "fisher_phred_p", "fisher_OR")
   stats <- stats[, which(colnames(stats) %in% cols.to.keep)]
-  stats$case_ref <- case.n - stats$case_cnvs
-  stats$control_ref <- control.n - stats$control_cnvs
-  stats$case_ref_weighted <- case.n - stats$case_cnvs_weighted
-  stats$control_ref_weighted <- control.n - stats$control_cnvs_weighted
+  stats$case_ref <- case.n - stats$case_alt
+  stats$control_ref <- control.n - stats$control_alt
   colnames(stats)[-(1:4)] <- paste(prefix, colnames(stats)[-(1:4)], sep=".")
   return(stats)
 }
@@ -98,8 +95,8 @@ dens.scatter <- function(x, y, pt.cex=1, parmar=rep(0.5, 4), add.cor=T){
 }
 
 
-# Scatterplot grid of Z-scores between cohorts
-z.corplot.grid <- function(stats.list, pt.cex=1){
+# Scatterplot grid of log odds ratios between cohorts
+or.corplot.grid <- function(stats.list, pt.cex=1){
   ncohorts <- length(stats.list)
   cohorts <- names(stats.list)
   par(mfrow=c(ncohorts, ncohorts))
@@ -132,11 +129,8 @@ z.corplot.grid <- function(stats.list, pt.cex=1){
         text(x=0.5, y=0.5, labels=bquote(italic(R)==1))
         # Otherwise, plot as normal
       }else{
-        paired.genes <- intersect(stats.list[[c]]$gene, stats.list[[r]]$gene)
-        dens.scatter(x=stats.list[[c]][which(stats.list[[c]]$gene %in% paired.genes),
-                                       grep("z_score", colnames(stats.list[[c]]), fixed=T)], 
-                     y=stats.list[[r]][which(stats.list[[c]]$gene %in% paired.genes),
-                                       grep("z_score", colnames(stats.list[[r]]), fixed=T)],
+        dens.scatter(x=log10(stats.list[[c]][, grep("fisher_OR", colnames(stats.list[[c]]), fixed=T)]), 
+                     y=log10(stats.list[[r]][, grep("fisher_OR", colnames(stats.list[[r]]), fixed=T)]),
                      parmar=parmar, pt.cex=pt.cex)
       }
       # Add headers & axes
@@ -149,12 +143,12 @@ z.corplot.grid <- function(stats.list, pt.cex=1){
       if(c==ncohorts){
         axis(4, labels=NA)
         axis(4, tick=F, line=-0.5, las=2)
-        mtext(4, line=2.25, text="Z-score", cex=0.8)
+        mtext(4, line=2.25, text=bquote(log[10](OR)), cex=0.8)
       }
       if(r==ncohorts){
         axis(1, labels=NA)
         axis(1, tick=F, line=-0.5)
-        mtext(1, line=2, text="Z-score" ,cex=0.8)
+        mtext(1, line=2, text=bquote(log[10](OR)) ,cex=0.8)
       }
     })
   })
@@ -293,8 +287,8 @@ option_list <- list(
   make_option(c("--control-hpo"), type="character", default='HEALTHY_CONTROL',
               help="HPO term to use for control samples [default %default]",
               metavar="string"),
-  make_option(c("--z-corplot"), type="character", default=NULL, 
-              help="output .jpg file for pairwise Z-score correlation plot [default %default]",
+  make_option(c("--or-corplot"), type="character", default=NULL, 
+              help="output .jpg file for pairwise odds ratio correlation plot [default %default]",
               metavar="path"),
   make_option(c("--model"), type="character", default="wz", 
               help="specify meta-analysis model ('wz': weighted Z, 'fisher': Fisher's method) [default %default]",
@@ -338,14 +332,14 @@ stats.list <- lapply(1:ncohorts, function(i){read.stats(cohort.info[i, 2], cohor
                                                         cohort.info[i, 3], cohort.info[i, 4])})
 names(stats.list) <- cohort.info[, 1]
 
-# # Plot correlations of Z-scores between cohorts, if optioned
-# if(!is.null(corplot.out)){
-#   jpeg(corplot.out, res=300, 
-#        height=300*(3.5+(ncohorts/2)),
-#        width=300*(4+(ncohorts/2)))
-#   z.corplot.grid(stats.list, pt.cex=0.25)
-#   dev.off()
-# }
+# Plot correlations of odds ratios between cohorts, if optioned
+if(!is.null(corplot.out)){
+  jpeg(corplot.out, res=300,
+       height=300*(3.5+(ncohorts/2)),
+       width=300*(4+(ncohorts/2)))
+  or.corplot.grid(stats.list, pt.cex=0.25)
+  dev.off()
+}
 
 # Conduct meta-analysis & write to file
 stats.merged <- combine.stats(stats.list)

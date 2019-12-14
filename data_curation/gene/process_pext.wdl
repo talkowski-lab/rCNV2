@@ -48,14 +48,17 @@ task tabix_pext {
 
   command <<<
     tabix -s 1 -b 2 -e 2 -S 1 ${pextfile}
+    pextfile_basename=$( basename ${pextfile} )
+    find / -name "$pextfile_basename".tbi \
+    | xargs -I {} mv {} ./
   >>>
 
   output {
-    File pext_idx = "${pextfile}.tbi"
+    File pext_idx = glob("*.tbi")[0]
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e86cc8899a1f5e74f24dd12d8ae2cc562de1f52846cd6de61e1579f699329abe"
+    docker: "talkowski/rcnv@sha256:ee72d7b02283be11db9f8642b75a71accc749de19344b067a7ffbf124cee16e5"
     preemptible: 1
   }
 }
@@ -81,7 +84,7 @@ task format_pext {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e86cc8899a1f5e74f24dd12d8ae2cc562de1f52846cd6de61e1579f699329abe"
+    docker: "talkowski/rcnv@sha256:ee72d7b02283be11db9f8642b75a71accc749de19344b067a7ffbf124cee16e5"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 50 SSD"
@@ -112,7 +115,7 @@ task mergesort_bed {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e86cc8899a1f5e74f24dd12d8ae2cc562de1f52846cd6de61e1579f699329abe"
+    docker: "talkowski/rcnv@sha256:ee72d7b02283be11db9f8642b75a71accc749de19344b067a7ffbf124cee16e5"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 50 SSD"

@@ -16,7 +16,7 @@ We extracted all canonical transcripts from protein-coding genes using `get_cano
 
 We also restricted all gene-based analyses to exons expressed in at least 20% of transcripts in at least one human tissue catalogued by the [Genotype-Tissue Expression (GTEx) Project](https://gtexportal.org/).  
 
-For this filter, we computed the per-exon max `pext` score across tissues as defined in [Cummings _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/10.1101/554444v1).  
+For this filter, we computed the per-exon max `pext` score as defined in [Cummings _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/10.1101/554444v1) across all available tissues.  
 
 Bases from exons with missing `pext` scores were ignored when calculating mean `pext` scores, and exons entirely missing `pext` scores were considered as passing.  
 

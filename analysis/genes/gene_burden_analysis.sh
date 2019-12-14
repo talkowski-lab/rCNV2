@@ -46,7 +46,7 @@ null_table="uCNV.gene_burden.all_null.fits.txt"
 pad_controls=50000
 weight_mode="weak"
 min_cds_ovr=0.1
-max_genes_per_case_cnv=5
+max_genes_per_cnv=5
 p_cutoff=0.000002848516
 
 # Count CNVs in cases and controls per phenotype, split by metacohort and CNV type
@@ -86,7 +86,7 @@ while read prefix hpo; do
         --pad-controls ${pad_controls} \
         --weight-mode ${weight_mode} \
         --min-cds-ovr ${min_cds_ovr} \
-        --max-genes ${max_genes_per_case_cnv} \
+        --max-genes ${max_genes_per_cnv} \
         -t $CNV \
         --hpo ${hpo} \
         --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
@@ -143,3 +143,75 @@ while read prefix hpo; do
   done < ${metacohort_list}
 done < refs/test_phenotypes.list
 
+
+# Run meta-analysis for each phenotype
+while read prefix hpo; do
+
+  # Get metadata for meta-analysis
+  mega_idx=$( head -n1 "${metacohort_sample_table}" \
+              | sed 's/\t/\n/g' \
+              | awk '{ if ($1=="mega") print NR }' )
+  ncase=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+           | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
+           | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+  nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
+           | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
+           | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+  descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+             | awk -v FS="\t" '{ print $2 }' )
+  title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
+
+  # Set HPO-specific parameters
+  descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+             | awk -v FS="\t" '{ print $2 }' )
+  zcat refs/gencode.v19.canonical.constrained.bed.gz \
+  | fgrep -wf genes/gene_lists/${prefix}.HPOdb.constrained.genes.list \
+  | cat <( echo -e "#chr\tstart\tend\tgene" ) - \
+  > ${prefix}.highlight_regions.bed
+
+  # Run meta-analysis for each CNV type
+  for CNV in DEL DUP CNV; do
+    # Perform meta-analysis
+    while read meta cohorts; do
+      echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
+    done < <( fgrep -v mega ${metacohort_list} ) \
+    > ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt
+    /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
+      --or-corplot ${prefix}.${freq_code}.$CNV.gene_burden.or_corplot_grid.jpg \
+      --model mh \
+      --p-is-phred \
+      ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
+      ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
+    bgzip -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
+    tabix -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed.gz
+
+    # Generate Manhattan & QQ plots
+    /opt/rCNV2/utils/plot_manhattan_qq.R \
+      --p-col-name "meta_phred_p" \
+      --p-is-phred \
+      --cutoff ${meta_p_cutoff} \
+      --highlight-bed "${prefix}.highlight_regions.bed" \
+      --highlight-name "Constrained genes associated with this phenotype" \
+      --label-prefix "$CNV" \
+      --title "$title" \
+      "${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed.gz" \
+      "${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis"
+  done
+
+  # Generate Miami & QQ plots
+  /opt/rCNV2/utils/plot_manhattan_qq.R \
+    --miami \
+    --p-col-name "meta_phred_p" \
+    --p-is-phred \
+    --cutoff ${meta_p_cutoff} \
+    --highlight-bed "${prefix}.highlight_regions.bed" \
+    --highlight-name "Constrained genes associated with this phenotype" \
+    --label-prefix "DUP" \
+    --highlight-bed-2 "${prefix}.highlight_regions.bed" \
+    --highlight-name-2 "Constrained genes associated with this phenotype" \
+    --label-prefix-2 "DEL" \
+    --title "$title" \
+    "${prefix}.${freq_code}.DUP.gene_burden.meta_analysis.stats.bed.gz" \
+    "${prefix}.${freq_code}.DEL.gene_burden.meta_analysis.stats.bed.gz" \
+    "${prefix}.${freq_code}.gene_burden.meta_analysis"
+done < refs/test_phenotypes.list

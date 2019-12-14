@@ -21,9 +21,9 @@ We further excluded genes if their canonical transcript met any of the following
 2. Less than 30% covered by segmental duplications and/or simple, low-complexity, or satellite repeats; and  
 3. Less than 30% covered by N-masked regions of the hg19 reference genome assembly.  
 
-We also excluded any exons expressed in <10% of transcripts on average across all tissues in GTEx (see [Cummings _et al._, _bioRxiv_ (2019)]](https://www.biorxiv.org/content/10.1101/554444v1) for details).
+We also excluded any exons expressed in <20% of transcripts across all tissues in GTEx (see [Cummings _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/10.1101/554444v1) for details).
 
-After all filtering, we retained 164,228 exons from 17,553 genes for these analyses.  
+After all filtering, we retained XXX exons from XXX genes for these analyses.  
 
 Unlike the [sliding window analysis](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/sliding_windows), we restricted CNVs in this analysis to ultra-rare frequencies, as this analysis was specifically interested in individual genes with highly penetrant phenotypic effects when deleted or duplicated.  
 
