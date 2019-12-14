@@ -1,7 +1,5 @@
 # Gene Curation  
 
-## Gene curation  
-
 We curated and annotated all protein-coding genes in the genome for association testing. This process is described below.  
 
 All commands executed to filter the CNV data as descrbed below are contained in `format_genes.sh`.    
@@ -16,11 +14,13 @@ We extracted all canonical transcripts from protein-coding genes using `get_cano
 
 ## Exon-level expression filtering  
 
-We also restricted all gene-based analyses to exons expressed in at least 10% of transcripts on average across human tissues.  
+We also restricted all gene-based analyses to exons expressed in at least 20% of transcripts in at least one human tissue catalogued by the [Genotype-Tissue Expression (GTEx) Project](https://gtexportal.org/).  
 
-For this filter, we computed the per-exon mean `pext` score as defined in [Cummings _et al._, _bioRxiv_ (2019)]](https://www.biorxiv.org/content/10.1101/554444v1).  
+For this filter, we computed the per-exon max `pext` score across tissues as defined in [Cummings _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/10.1101/554444v1).  
 
-Exons with missing `pext` scores were retained, and genes with no exons remaining after exon-level expression filtering were removed outright from all subsequent analyses.  
+Bases from exons with missing `pext` scores were ignored when calculating mean `pext` scores, and exons entirely missing `pext` scores were considered as passing.  
+
+Genes with no exons remaining after exon-level expression filtering were removed outright from all subsequent analyses.  
 
 ## Gene features  
 

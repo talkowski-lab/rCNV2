@@ -218,10 +218,14 @@ sweeting.correction <- function(meta.df, cc.sum=0.01){
 make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T){
   ncohorts <- length(cohorts)
   meta.df <- data.frame("cohort"=1:ncohorts,
-                        "control_ref"=as.numeric(stats.merged[row.idx, grep("control_ref", colnames(stats.merged), fixed=T)]),
-                        "case_ref"=as.numeric(stats.merged[row.idx, grep("case_ref", colnames(stats.merged), fixed=T)]),
-                        "control_alt"=as.numeric(stats.merged[row.idx, grep("control_cnvs", colnames(stats.merged), fixed=T)]),
-                        "case_alt"=as.numeric(stats.merged[row.idx, grep("case_cnvs", colnames(stats.merged), fixed=T)]),
+                        "control_ref"=as.numeric(stats.merged[row.idx, setdiff(grep("control_ref", colnames(stats.merged), fixed=T),
+                                                                               grep("_weighted", colnames(stats.merged), fixed=T))]),
+                        "case_ref"=as.numeric(stats.merged[row.idx, setdiff(grep("case_ref", colnames(stats.merged), fixed=T),
+                                                                            grep("_weighted", colnames(stats.merged), fixed=T))]),
+                        "control_alt"=as.numeric(stats.merged[row.idx, setdiff(grep("control_cnvs", colnames(stats.merged), fixed=T),
+                                                                               grep("_weighted", colnames(stats.merged), fixed=T))]),
+                        "case_alt"=as.numeric(stats.merged[row.idx, setdiff(grep("case_cnvs", colnames(stats.merged), fixed=T),
+                                                                            grep("_weighted", colnames(stats.merged), fixed=T))]),
                         "cohort_name"=cohorts)
   if(empirical.continuity==T){
     meta.df <- sweeting.correction(meta.df)
@@ -233,7 +237,7 @@ make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T)
 # Perform meta-analysis for a single window
 meta.single <- function(stats.merged, cohorts, row.idx, empirical.continuity=T){
   # If no CNVs are observed, return all NAs
-  if(sum(stats.merged[row.idx, grep("_cnvs_weighted", colnames(stats.merged), fixed=T)])>0){
+  if(sum(stats.merged[row.idx, grep("_cnvs", colnames(stats.merged), fixed=T)])>0){
     meta.df <- make.meta.df(stats.merged, cohorts, row.idx, empirical.continuity)
     # Meta-analysis
     if(model=="re"){
@@ -262,8 +266,8 @@ meta <- function(stats.merged, cohorts, model="re"){
   meta.stats <- t(sapply(1:nrow(stats.merged), function(i){
     meta.single(stats.merged, cohorts, i, model)
   }))
-  meta.res <- cbind(stats.merged[, 1:3], meta.stats)
-  colnames(meta.res) <- c("chr", "start", "end",
+  meta.res <- cbind(stats.merged[, 1:4], meta.stats)
+  colnames(meta.res) <- c("chr", "start", "end", "gene",
                           "meta_OR", "meta_OR_lower", "meta_OR_upper",
                           "meta_z", "meta_phred_p")
   return(meta.res)

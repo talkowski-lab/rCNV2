@@ -26,10 +26,17 @@ gsutil -m cp gs://rcnv_project/refs/GRCh37.*.bed.gz refs/
 gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
 
-# Test/dev parameters for simpler model (Fisher's exact) (seizures)
+# Test/dev parameters for simpler model 
+# Params for seizures
 hpo="HP:0001250"
 prefix="HP0001250"
 meta="meta2"
+# Params for NDDs
+hpo="HP:0012759"
+prefix="HP0012759"
+meta="meta1"
+
+# General params
 freq_code="rCNV"
 CNV="DEL"
 metacohort_list="refs/rCNV_metacohort_list.txt"
@@ -40,24 +47,7 @@ pad_controls=50000
 weight_mode="weak"
 min_cds_ovr=0.1
 max_genes_per_case_cnv=5
-p_cutoff=0.000002587992
-
-# Test/dev parameters for simpler model (Fisher's exact) (NDDs)
-hpo="HP:0012759"
-prefix="HP0012759"
-meta="meta1"
-freq_code="rCNV"
-CNV="DEL"
-metacohort_list="refs/rCNV_metacohort_list.txt"
-metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
-gtf="genes/gencode.v19.canonical.gtf.gz"
-null_table="HP0000118.uCNV.DEL.gene_burden.all_null_fits.txt"
-pad_controls=50000
-weight_mode="weak"
-min_cds_ovr=0.1
-max_genes_per_case_cnv=5
-p_cutoff=0.000002587992
-
+p_cutoff=0.000002848516
 
 # Count CNVs in cases and controls per phenotype, split by metacohort and CNV type
 # Iterate over phenotypes
@@ -97,7 +87,6 @@ while read prefix hpo; do
         --weight-mode ${weight_mode} \
         --min-cds-ovr ${min_cds_ovr} \
         --max-genes ${max_genes_per_case_cnv} \
-        --max-genes-in-cases-only \
         -t $CNV \
         --hpo ${hpo} \
         --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
@@ -123,7 +112,7 @@ while read prefix hpo; do
 
       # Generate Manhattan & QQ plots
       /opt/rCNV2/utils/plot_manhattan_qq.R \
-        --p-col-name "phred_p" \
+        --p-col-name "fisher_phred_p" \
         --p-is-phred \
         --max-phred-p 100 \
         --cutoff ${p_cutoff} \
@@ -137,7 +126,7 @@ while read prefix hpo; do
     # Generate Miami & QQ plots
     /opt/rCNV2/utils/plot_manhattan_qq.R \
       --miami \
-      --p-col-name "phred_p" \
+      --p-col-name "fisher_phred_p" \
       --p-is-phred \
       --max-phred-p 100 \
       --cutoff ${p_cutoff} \

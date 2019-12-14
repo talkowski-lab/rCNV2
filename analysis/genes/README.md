@@ -23,7 +23,7 @@ We further excluded genes if their canonical transcript met any of the following
 
 We also excluded any exons expressed in <10% of transcripts on average across all tissues in GTEx (see [Cummings _et al._, _bioRxiv_ (2019)]](https://www.biorxiv.org/content/10.1101/554444v1) for details).
 
-After all filtering, we retained 174,101 exons from 19,043 genes for these analyses.  
+After all filtering, we retained 164,228 exons from 17,553 genes for these analyses.  
 
 Unlike the [sliding window analysis](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/sliding_windows), we restricted CNVs in this analysis to ultra-rare frequencies, as this analysis was specifically interested in individual genes with highly penetrant phenotypic effects when deleted or duplicated.  
 

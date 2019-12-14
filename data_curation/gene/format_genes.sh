@@ -71,13 +71,14 @@ gsutil -m cp \
 tabix -s 1 -b 2 -e 2 -S 1 \
   all.possible.snvs.tx_annotated.022719.tsv.bgz
 /opt/rCNV2/data_curation/gene/process_pext.py \
+  --pan-tissue \
   all.possible.snvs.tx_annotated.022719.tsv.bgz \
 | sort -Vk1,1 -k2,2n -k3,3n \
 | bgzip -c \
 > gnomad.v2.1.1.pext.bed.gz
 tabix -f gnomad.v2.1.1.pext.bed.gz
 /opt/rCNV2/data_curation/gene/apply_pext_filter.py \
-  --min-pext 0.1 \
+  --min-pext 0.2 \
   -o gencode.v19.canonical.pext_filtered.gtf.gz \
   --bgzip \
   --lost-genes genes_lost_during_pext_filtering.genes.list \
@@ -124,6 +125,8 @@ done > gene_features.athena_tracklist.tsv
 # Copy canonical gene metadata to rCNV bucket (note: requires permissions)
 gsutil -m cp gencode.v19.canonical*.gz gs://rcnv_project/cleaned_data/genes/
 gsutil -m cp gencode.v19.canonical*genes.list \
+  gs://rcnv_project/cleaned_data/genes/gene_lists/
+gsutil -m cp genes_lost_during_pext_filtering.genes.list \
   gs://rcnv_project/cleaned_data/genes/gene_lists/
 
 

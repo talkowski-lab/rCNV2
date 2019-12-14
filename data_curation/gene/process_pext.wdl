@@ -16,11 +16,18 @@ workflow process_pext {
 
   Array[Array[String]] contigs = read_tsv(contiglist)
 
+  # Generate pext tabix index
+  call tabix_pext {
+    input:
+      pextfile=pext_gs_path
+  }
+
   # Iterate over contigs
   scatter ( contig in contigs ) {
     call format_pext {
       input:
         pextfile=pext_gs_path,
+        pext_idx=tabix_pext.pext_idx,
         contig=contig[0]
     }
   }
@@ -35,15 +42,35 @@ workflow process_pext {
 }
 
 
+# Generate tabix index for pext file
+task tabix_pext {
+  File pextfile
+
+  command <<<
+    tabix -s 1 -b 2 -e 2 -S 1 ${pextfile}
+  >>>
+
+  output {
+    File pext_idx = "${pextfile}.tbi"
+  }
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:e86cc8899a1f5e74f24dd12d8ae2cc562de1f52846cd6de61e1579f699329abe"
+    preemptible: 1
+  }
+}
+
+
 # Format pext data for a single chromosome
 task format_pext {
   File pextfile
+  File pext_idx
   String contig
 
   command <<<
-    tabix -s 1 -b 2 -e 2 -S 1 ${pextfile} 
     /opt/rCNV2/data_curation/gene/process_pext.py \
       --contig ${contig} \
+      --pan-tissue \
       -o pext_data.${contig}.bed.gz \
       --bgzip \
       ${pextfile}

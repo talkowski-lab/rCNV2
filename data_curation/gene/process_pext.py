@@ -10,6 +10,9 @@ Create single BED file of pext scores per base per gene
 """
 
 
+import json
+from pandas import to_numeric
+from numpy import nanmax
 import argparse
 from sys import stdout
 from os import path
@@ -18,7 +21,7 @@ import subprocess
 import gzip
 
 
-def process_pext_line(line, gene_field, pext_field):
+def process_pext_line(line, gene_field, pext_field, pan_tissue):
     """
     Extract single line from data in pext tsv and reformat as BED
     """
@@ -28,15 +31,16 @@ def process_pext_line(line, gene_field, pext_field):
     chrom = dat[0]
     start = int(dat[1])
     end = start + 1
+    annos = json.loads(dat[-1])[0]
+    gene = annos[gene_field]
 
-    gene = [s for s in dat[-1].split(',') if gene_field in s][0].split(':')[1]
-    for c in '[]{}"':
-        gene = gene.replace(c, '')
-
-    val = [s for s in dat[-1].split(',') if pext_field in s][0].split(':')[1]
-    for c in '[]{}"':
-        val = val.replace(c, '')
-    if val == 'NaN':
+    if pan_tissue:
+        ignore_fields = 'ensg csq symbol lof lof_flag'.split()
+        vals = [v for k, v in annos.items() if k not in ignore_fields]
+        val = str(nanmax(to_numeric(vals, errors='coerce')))
+    else:
+        val = str(annos[pext_field])
+    if val in 'NaN nan'.split():
         val = '.'
 
     return chrom, start, end, gene, val
@@ -57,6 +61,8 @@ def main():
     parser.add_argument('--pext-field', help='Field name in pext tsv to report as ' +
                         'pext value [default: "mean_proportion"]', 
                         default='mean_proportion')
+    parser.add_argument('--pan-tissue', action='store_true', help='Report max pext ' +
+                        'across all tissues. Ignores --pext-field. [Default: false]')
     parser.add_argument('--contig', help='Specify a single contig to process. ' +
                         '[default: process all autosomes]')
     parser.add_argument('-o', '--outbed', help='Path to output BED file. ' +
@@ -88,7 +94,8 @@ def main():
             processed = {}
             for line in pextfile.fetch(contig):
                 chrom, start, end, gene, val \
-                    = process_pext_line(line, args.gene_field, args.pext_field)
+                    = process_pext_line(line, args.gene_field, args.pext_field,
+                                        args.pan_tissue)
                 if gene not in processed.keys():
                     processed[gene] = [start]
                 else:

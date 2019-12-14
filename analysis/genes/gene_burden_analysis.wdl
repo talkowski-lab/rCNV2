@@ -33,7 +33,6 @@ workflow gene_burden_analysis {
         hpo=pheno[1],
         metacohort_list=metacohort_list,
         metacohort_sample_table=metacohort_sample_table,
-        null_table=merge_rCNV_nulls.null_fit_table,
         freq_code="rCNV",
         gtf=gtf,
         pad_controls=pad_controls,
@@ -51,7 +50,6 @@ workflow gene_burden_analysis {
         hpo=pheno[1],
         metacohort_list=metacohort_list,
         metacohort_sample_table=metacohort_sample_table,
-        null_table=merge_uCNV_nulls.null_fit_table,
         freq_code="uCNV",
         gtf=gtf,
         pad_controls=pad_controls,
@@ -155,7 +153,7 @@ task burden_test {
 
         # Generate Manhattan & QQ plots
         /opt/rCNV2/utils/plot_manhattan_qq.R \
-          --p-col-name "phred_p" \
+          --p-col-name "fisher_phred_p" \
           --p-is-phred \
           --max-phred-p 100 \
           --cutoff ${p_cutoff} \
@@ -169,7 +167,7 @@ task burden_test {
       # Generate Miami & QQ plots
       /opt/rCNV2/utils/plot_manhattan_qq.R \
         --miami \
-        --p-col-name "phred_p" \
+        --p-col-name "fisher_phred_p" \
         --p-is-phred \
         --max-phred-p 100 \
         --cutoff ${p_cutoff} \
@@ -195,7 +193,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:ba47749208bed2e7e7d03cba7bd66c926681889de7ac5549b234c1a0965cac68"
+    docker: "talkowski/rcnv@sha256:bf03ac7e38233b504f2ecb63a99c2106fae52a6e8bb5a8010a1319a5ba7ee1db"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
