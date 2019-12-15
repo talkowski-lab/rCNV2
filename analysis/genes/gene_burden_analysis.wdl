@@ -245,12 +245,13 @@ task meta_analysis {
   command <<<
     set -e
 
-    # Copy burden stats
+    # Copy burden stats & gene coordinates
     find / -name "*${prefix}.${freq_code}.*.gene_burden.stats.bed.gz*" \
     | xargs -I {} mv {} ./
-    # gsutil -m cp \
-    #   ${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/** \
-    #   ./
+    gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
+    mkdir refs/
+    gsutil -m cp ${rCNV_bucket}/refs/GRCh37.*.bed.gz refs/
+    gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
     # Get metadata for meta-analysis
     mega_idx=$( head -n1 "${metacohort_sample_table}" \
@@ -282,10 +283,9 @@ task meta_analysis {
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt
       /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
-        --pheno-table ${metacohort_sample_table} \
-        --case-hpo ${hpo} \
         --or-corplot ${prefix}.${freq_code}.$CNV.gene_burden.or_corplot_grid.jpg \
         --model mh \
+        --p-is-phred \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
@@ -338,7 +338,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:cb4e281f6a0d6b3a39e899371bac3d27553101df9996d2e8d1770a9c2e656801"
+    docker: "talkowski/rcnv@sha256:1fc2ae16caa447189e07170388c028371d5435c1ea389eff3e054233b47b877b"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

@@ -18,18 +18,28 @@ options(scipen=1000, stringsAsFactors=F)
 ###FUNCTIONS
 ############
 
+# Compute basic OR with adjustment for zero-inflation
+calc.or <- function(control_ref, control_alt, case_ref, case_alt, adj=0.5){
+  case.odds <- (case_alt + adj) / (case_ref + adj)
+  control.odds <- (control_alt + adj) / (control_ref + adj)
+  case.odds / control.odds
+}
+
+
 # Read an input file of association statistics
 read.stats <- function(stats.in, prefix, p.is.phred){
   # Read data & subset to necessary columns
   stats <- read.table(stats.in, header=T, sep="\t", comment.char="")
   colnames(stats)[1] <- "chr"
   cols.to.keep <- c("chr", "start", "end", "gene", "case_alt", "case_ref",
-                    "control_alt", "control_ref", "fisher_OR", "fisher_phred_p")
+                    "control_alt", "control_ref", "fisher_phred_p")
   stats <- stats[, which(colnames(stats) %in% cols.to.keep)]
   colnames(stats)[which(colnames(stats)=="fisher_phred_p")] <- "p_value"
   if(p.is.phred==T){
     stats$p_value <- 10^-stats$p_value
   }
+  stats$odds_ratio <- calc.or(stats$control_ref, stats$control_alt,
+                              stats$case_ref, stats$case_alt)
   colnames(stats)[-(1:4)] <- paste(prefix, colnames(stats)[-(1:4)], sep=".")
   return(stats)
 }
@@ -95,8 +105,8 @@ or.corplot.grid <- function(stats.list, pt.cex=1){
         text(x=0.5, y=0.5, labels=bquote(italic(R)==1))
         # Otherwise, plot as normal
       }else{
-        dens.scatter(x=log10(stats.list[[c]][, grep("fisher_OR", colnames(stats.list[[c]]), fixed=T)]), 
-                     y=log10(stats.list[[r]][, grep("fisher_OR", colnames(stats.list[[r]]), fixed=T)]),
+        dens.scatter(x=log10(stats.list[[c]][, grep("odds_ratio", colnames(stats.list[[c]]), fixed=T)]), 
+                     y=log10(stats.list[[r]][, grep("odds_ratio", colnames(stats.list[[r]]), fixed=T)]),
                      parmar=parmar, pt.cex=pt.cex)
       }
       # Add headers & axes
