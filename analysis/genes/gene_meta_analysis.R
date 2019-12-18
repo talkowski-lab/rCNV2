@@ -159,18 +159,27 @@ sweeting.correction <- function(meta.df, cc.sum=0.01){
   if(n.alt>0){
     nt <- n.alt
     R <- n.ref/n.alt
-    # Pooled odds ratio estimate of all non-zero studies
-    nonzero.studies <- which(apply(meta.df[, grep("_alt", colnames(meta.df), fixed=T)], 1, sum)>0)
+    # Pooled odds ratio estimate of all non-zero studies with at least one case sample
+    nonzero.studies <- intersect(which(apply(meta.df[, grep("_alt", colnames(meta.df), fixed=T)], 1, sum)>0),
+                                 which(apply(meta.df[, grep("case_", colnames(meta.df), fixed=T)], 1, sum)>0))
     nonzero.case.odds <- sum(meta.df$case_alt[nonzero.studies])/sum(meta.df$case_ref[nonzero.studies])
     nonzero.control.odds <- sum(meta.df$control_alt[nonzero.studies])/sum(meta.df$control_ref[nonzero.studies])
-    if(nonzero.control.odds>0){
-      ohat <- nonzero.case.odds/nonzero.control.odds
-      # Apply standard continuity correction of 0.5 to pooled estimate if no CNVs observed in controls  
+    if(!is.nan(nonzero.case.odds) & !is.nan(nonzero.control.odds)){
+      if(nonzero.control.odds>0){
+        ohat <- nonzero.case.odds/nonzero.control.odds
+        # Otherwise, apply standard continuity correction of 0.5 to pooled estimate if no CNVs observed in controls
+      }else{
+        nonzero.case.odds <- (sum(meta.df$case_alt[nonzero.studies])+0.5)/(sum(meta.df$case_ref[nonzero.studies])+0.5)
+        nonzero.control.odds <- (sum(meta.df$control_alt[nonzero.studies])+0.5)/(sum(meta.df$control_ref[nonzero.studies])+0.5)
+        ohat <- nonzero.case.odds/nonzero.control.odds
+      }
+      # Otherwise, apply standard continuity correction to pooled estimate of *all* studies
     }else{
-      nonzero.case.odds <- (sum(meta.df$case_alt[nonzero.studies])+0.5)/(sum(meta.df$case_ref[nonzero.studies])+0.5)
-      nonzero.control.odds <- (sum(meta.df$control_alt[nonzero.studies])+0.5)/(sum(meta.df$control_ref[nonzero.studies])+0.5)
+      nonzero.case.odds <- (sum(meta.df$case_alt)+0.5)/(sum(meta.df$case_ref)+0.5)
+      nonzero.control.odds <- (sum(meta.df$control_alt)+0.5)/(sum(meta.df$control_ref)+0.5)
       ohat <- nonzero.case.odds/nonzero.control.odds
     }
+    
     # Solve for kc & kt
     kc <- R/(R+ohat)
     kt <- ohat/(R+ohat)
@@ -189,7 +198,7 @@ sweeting.correction <- function(meta.df, cc.sum=0.01){
 }
 
 
-# Make meta-analysis data frame for a single window
+# Make meta-analysis data frame for a single gene
 make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T){
   ncohorts <- length(cohorts)
   meta.df <- data.frame("cohort"=1:ncohorts,
@@ -295,7 +304,7 @@ model <- opts$model
 p.is.phred <- opts$`p-is-phred`
 
 # # Dev parameters
-# infile <- "~/scratch/dec18_gene_burden/gene.meta_test.input.txt"
+# infile <- "~/scratch/dec18_gene_burden/gene.meta_test.input.txt2"
 # outfile <- "~/scratch/dec18_gene_burden/gene.meta_test.results.bed"
 # corplot.out <- "~/scratch/dec18_gene_burden/gene_corplot.test.jpg"
 # model <- "mh"
