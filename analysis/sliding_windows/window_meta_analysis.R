@@ -206,26 +206,37 @@ make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T)
 
 
 # Perform meta-analysis for a single window
-meta.single <- function(stats.merged, cohorts, row.idx, empirical.continuity=T){
+meta.single <- function(stats.merged, cohorts, row.idx, model="mh", empirical.continuity=T){
   # If no CNVs are observed, return all NAs
   if(sum(stats.merged[row.idx, grep("_alt", colnames(stats.merged), fixed=T)])>0){
     meta.df <- make.meta.df(stats.merged, cohorts, row.idx, empirical.continuity)
-    # Meta-analysis
-    if(model=="re"){
-      meta.res <- rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                          measure="OR", data=meta.df, random = ~ 1 | cohort, slab=cohort_name,
-                          add=0, drop00=F, correct=F,
-                          digits=5, control=list(maxiter=1000, stepadj=0.5))
-      as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
-                   meta.res$zval, -log10(meta.res$pval)))
-    }else if(model=="mh"){
-      meta.res <- rma.mh(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                         measure="OR", data=meta.df, slab=cohort_name,
-                         add=0, drop00=F, correct=F)
-      as.numeric(c(meta.res$b, meta.res$ci.lb, meta.res$ci.ub,
-                   meta.res$zval, -log10(meta.res$pval)))
-      
+    # If strictly zero case CNVs are observed, unable to estimate effect size
+    if(all(meta.df$case_alt==0)){
+      out.v <- c(rep(NA, 4), 0)
+    }else{
+      # Meta-analysis
+      if(model=="re"){
+        meta.res <- rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                            measure="OR", data=meta.df, random = ~ 1 | cohort, slab=cohort_name,
+                            add=0, drop00=F, correct=F,
+                            digits=5, control=list(maxiter=1000, stepadj=0.5))
+        out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
+                              meta.res$zval, -log10(meta.res$pval)))
+      }else if(model=="mh"){
+        meta.res <- rma.mh(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                           measure="OR", data=meta.df, slab=cohort_name,
+                           add=0, drop00=F, correct=F)
+        out.v <- as.numeric(c(meta.res$b, meta.res$ci.lb, meta.res$ci.ub,
+                              meta.res$MH, -log10(meta.res$MHp)))
+      }
+      # Force to p-values reflecting Ha : OR > 1
+      if(!is.na(out.v[1]) & !is.na(out.v[5])){
+        if(out.v[1] < 0){
+          out.v[5] <- 0
+        }
+      }
     }
+    return(out.v)
   }else{
     rep(NA, 5)
   }
@@ -235,7 +246,7 @@ meta.single <- function(stats.merged, cohorts, row.idx, empirical.continuity=T){
 # Wrapper function to perform a meta-analysis on all windows
 meta <- function(stats.merged, cohorts, model="re"){
   meta.stats <- t(sapply(1:nrow(stats.merged), function(i){
-    meta.single(stats.merged, cohorts, i, model)
+    meta.single(stats.merged, cohorts, i, model, empirical.continuity=T)
   }))
   keep.orig.cols <- c("chr", "start", "end", "n_nominal_cohorts")
   meta.res <- cbind(stats.merged[, which(colnames(stats.merged) %in% keep.orig.cols)],
@@ -243,6 +254,9 @@ meta <- function(stats.merged, cohorts, model="re"){
   colnames(meta.res) <- c("chr", "start", "end", "n_nominal_cohorts",
                           "meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper",
                           "meta_z", "meta_phred_p")
+  if(model=="mh"){
+    colnames(meta.res)[ncol(meta.res)-1] <- "CMH_chisq"
+  }
   return(meta.res)
 }
 

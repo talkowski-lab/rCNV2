@@ -323,11 +323,11 @@ task meta_analysis {
 
     # Copy results to output bucket
     gsutil -m cp *.gene_burden.meta_analysis.stats.bed.gz* \
-      "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/"
+      "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/stats/"
     gsutil -m cp *.gene_burden.or_corplot_grid.jpg \
-      "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/plots/"
+      "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/plots/"
     gsutil -m cp *.gene_burden.meta_analysis.*.png \
-      "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/plots/"
+      "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/plots/"
 
     # Must delocalize completion marker to prevent caching of final step
     echo "DONE" > completion.txt
@@ -338,7 +338,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:1fc2ae16caa447189e07170388c028371d5435c1ea389eff3e054233b47b877b"
+    docker: "talkowski/rcnv@sha256:f0f32ba12cfb70978afaec1137a3b8f27fb7bb6bcae1ac98d1c84fd6df5c4fbd"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

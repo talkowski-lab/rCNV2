@@ -50,6 +50,7 @@ max_genes_per_cnv=5
 p_cutoff=0.000002848516
 meta_p_cutoff=0.000002848516
 
+
 # Count CNVs in cases and controls per phenotype, split by metacohort and CNV type
 # Iterate over phenotypes
 while read prefix hpo; do

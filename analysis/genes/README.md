@@ -12,7 +12,7 @@ We executed a standardized procedure to conduct gene-based burden tests for each
 
 The steps of this procedure are described below:  
 
-### 1. Counting weighted ultra-rare CNVs per gene  
+### 1. Counting ultra-rare CNVs per gene  
 
 For each [metacohort](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/), we intersected [ultra-rare CNVs](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-ultra-rare-cnvs) against [canonical, autosomal, protein-coding genes](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene/) separately for cases and controls.  
 
@@ -25,7 +25,7 @@ We also excluded any exons expressed in <20% of transcripts across all tissues i
 
 After all filtering, we retained 170,422 exons from 17,263 genes for these analyses.  
 
-Unlike the [sliding window analysis](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/sliding_windows), we restricted CNVs in this analysis to ultra-rare frequencies, as this analysis was specifically interested in individual genes with highly penetrant phenotypic effects when deleted or duplicated.  
+Unlike the [sliding window analysis](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/sliding_windows), we restricted CNVs in this analysis to ultra-rare frequencies, as this analysis was specifically interested in highly penetrant individual genes.  
 
 We conducted this procedure a total of three times per phenotype group & metacohort: once each for deletions, duplications, and all CNVs (deletions + duplications).  
 
@@ -34,6 +34,97 @@ The code to perform this step is contained in `count_cnvs_per_gene.py`.
 For each CNV-gene pair, we computed the total fraction of exonic bases (CDS) from the gene overlapped by the CNV.  
 
 We considered a CNV to overlap a gene if it overlapped at least 10% of the coding sequence (CDS) from that gene.  
+
+### 2. Calculate burden statistics between cases & controls  
+
+Once CNVs were tallied in cases and controls for each gene, we next compared the ratios of CNV carriers between cases and controls using a one-sided Fisher's exact test.  
+
+The code to perform this step is contained in `gene_burden_test.R`.  
+
+#### Output files  
+
+For each combination of phenotype group, metacohort, and CNV type, the following files are generated:  
+
+1. `$metacohort.$hpo.rCNV.$CNV_type.gene_burden.stats.bed.gz`: a bgzipped BED file containing CNV counts and association statistics for each gene  
+2. `$metacohort.$hpo.rCNV.$CNV_type.gene_burden.manhattan.png`: a Manhattan plot of association statistics for each gene
+3. `$metacohort.$hpo.rCNV.$CNV_type.gene_burden.qq.png`: a QQ plot of observed P-values compared to expected P-values under a uniform null  
+4. `$metacohort.$hpo.rCNV.$CNV_type.gene_burden.manhattan_with_qq.png`: a two-panel composite plot combining plots `2` and `3`, above  
+
+Furthermore, for each pair of phenotype group & metacohort, two additional files are generated:  
+
+5. `$metacohort.$hpo.rCNV.gene_burden.miami.png`: a Miami plot of association statistics for each gene, with duplications above and deletions below the x-axis  
+6. `$metacohort.$hpo.rCNV.gene_burden.miami_with_qq.png`: a multi-panel composite plot of association statistics, combining a Miami plot with QQ plots for deletions and duplications separately  
+
+All `.png` plots are annotated with a set of loss-of-function constrained genes associated with each HPO code. See [the `gene curation/` subdirectory](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene#gene-set-definitions) for more details about these gene sets.  
+
+These files are stored in a protected Google Cloud bucket with one subdirectory per HPO group, here:  
+```
+$ gsutil ls gs://rcnv_project/analysis/gene_burden/
+
+gs://rcnv_project/analysis/gene_burden/HP0000118/
+gs://rcnv_project/analysis/gene_burden/HP0000152/
+gs://rcnv_project/analysis/gene_burden/HP0000707/
+gs://rcnv_project/analysis/gene_burden/HP0000708/
+gs://rcnv_project/analysis/gene_burden/HP0000717/
+gs://rcnv_project/analysis/gene_burden/HP0000729/
+gs://rcnv_project/analysis/gene_burden/HP0000752/
+gs://rcnv_project/analysis/gene_burden/HP0000924/
+gs://rcnv_project/analysis/gene_burden/HP0001197/
+gs://rcnv_project/analysis/gene_burden/HP0001250/
+gs://rcnv_project/analysis/gene_burden/HP0001507/
+gs://rcnv_project/analysis/gene_burden/HP0001626/
+gs://rcnv_project/analysis/gene_burden/HP0001627/
+gs://rcnv_project/analysis/gene_burden/HP0002011/
+gs://rcnv_project/analysis/gene_burden/HP0002597/
+gs://rcnv_project/analysis/gene_burden/HP0002715/
+gs://rcnv_project/analysis/gene_burden/HP0002960/
+gs://rcnv_project/analysis/gene_burden/HP0003011/
+gs://rcnv_project/analysis/gene_burden/HP0011446/
+gs://rcnv_project/analysis/gene_burden/HP0012443/
+gs://rcnv_project/analysis/gene_burden/HP0012638/
+gs://rcnv_project/analysis/gene_burden/HP0012639/
+gs://rcnv_project/analysis/gene_burden/HP0012759/
+gs://rcnv_project/analysis/gene_burden/HP0025031/
+gs://rcnv_project/analysis/gene_burden/HP0031466/
+gs://rcnv_project/analysis/gene_burden/HP0100022/
+gs://rcnv_project/analysis/gene_burden/HP0100545/
+gs://rcnv_project/analysis/gene_burden/HP0100753/
+gs://rcnv_project/analysis/gene_burden/HP0100852/
+gs://rcnv_project/analysis/gene_burden/UNKNOWN/
+```
+
+### 3. Combine association statistics across metacohorts  
+
+We combined CNV association statistics across metacohorts for each gene using the Mantel-Haenszel meta-analysis method for 2x2 contingency tables of count data.  
+
+The code to perform this step is contained in `gene_meta_analysis.R`.  
+
+Given that rare CNV counts per gene are (a) sparse and (b) zero-inflated, and furthermore that (c) the case & control sample sizes are unbalanced for most phenotype groups (_e.g._, frequently >10- to 100-fold more controls than cases), we implemented an empirical continuity correction as proposed by [Sweeting _et al._, _Stat. Med._, 2004.](https://onlinelibrary.wiley.com/doi/10.1002/sim.1761)  
+
+Each phenotype & CNV type were meta-analyzed separately for a total of three meta-analyses per phenotype.  
+
+#### Output files  
+
+[As described above for Step 2](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/genes#output-files), we generated the same combination of plots and statistics files for the meta-analyses results of each phenotype group.  
+
+These files are stored in the same location as the per-metacohort analysis results.  
+
+
+---  
+
+#### _A note on data curation_  
+
+The information presented on this page references various curated datasets.  
+
+The curation of these datasets is documented elsewhere in this repository.  
+
+Please see the README available in [the `data_curation/` subdirectory](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/).  
+
+
+---  
+
+# IGNORE THIS FOR NOW:  
+### Original weighting scheme  
 
 Finally, for each CNV, we distributed weights across all overlapping genes proportionally to the sum of the CDS overlapped per gene. We weighted CNV contributions to each gene in this manner to avoid large CNV segments pushing all genes within those regions to significance. In this analysis, we were principally interested in individual genes with strong, focal effects.  
 
@@ -73,51 +164,6 @@ Genes B, C, and D are all at least partially overlapped, but only Genes B and C 
 
 Thus, genes B, C, and D are each assigned a weight proportional to the fraction of their CDS overlapped by the CNV (CDS<sub>_i_</sub> / (1.0 + 1.0 + 0.5) =  CDS<sub>_i_</sub> / 2.5).  
 
-
-### 2. Calculate burden statistics between cases & controls  
-
-Once wighted CNVs were tallied in cases and controls for each window, we next compared the ratios of ultra-rare CNVs between cases and controls using the following procedure:  
-
-(Working idea for CNV burden test, as old distribution-based methods did not work)
-
-1. Count total # of weighted cnvs per gene ( case + control )  
-2. Adjust based on gene features (maybe not necessary?)  
-3. Proportion test of case:control (?) to get p-value  
-
-
-
-The code to perform this step is contained in `gene_burden_test.R`.  
-
-#### Output files  
-
-For each combination of phenotype group, metacohort, and CNV type, the following files are generated:  
-
-1. `$metacohort.$hpo.rCNV.$CNV_type.gene_burden.stats.bed.gz`: a bgzipped BED file containing CNV counts and association statistics for each gene  
-2. `$metacohort.$hpo.rCNV.$CNV_type.gene_burden.manhattan.png`: a Manhattan plot of association statistics for each gene
-3. `$metacohort.$hpo.rCNV.$CNV_type.gene_burden.qq.png`: a QQ plot of observed P-values compared to expected P-values under a uniform null  
-4. `$metacohort.$hpo.rCNV.$CNV_type.gene_burden.manhattan_with_qq.png`: a two-panel composite plot combining plots `2` and `3`, above  
-
-Furthermore, for each pair of phenotype group & metacohort, two additional files are generated:  
-5. `$metacohort.$hpo.rCNV.gene_burden.miami.png`: a Miami plot of association statistics for each gene, with duplications above and deletions below the x-axis  
-6. `$metacohort.$hpo.rCNV.gene_burden.miami_with_qq.png`: a multi-panel composite plot of association statistics, combining a Miami plot with QQ plots for deletions and duplications separately  
-
-All `.png` plots are annotated with genes that are both (_i_) reportedly associated with the HPO term per the HPO database and (_ii_) known to be constrained against rare loss-of-function variation (adapted from gnomAD v2.1.1; [Karczewski _et al._, _bioRxiv_, 2019](https://www.biorxiv.org/content/10.1101/531210v3)), for reference.  
-
-
----  
-
-#### _A note on data curation_  
-
-The information presented on this page references various curated datasets.  
-
-The curation of these datasets is documented elsewhere in this repository.  
-
-Please see the README available in [the `data_curation/` subdirectory](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/).  
-
-
----  
-
-## IGNORE THIS:  
 ### Alternative Weighting Scheme  
 
 For CNVs overlapping less than 1.0 total CDS, the CNV count was divided strictly proportionally among overlapped gene(s) according to their fraction of CDS overlapped.  
