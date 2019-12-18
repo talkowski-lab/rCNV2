@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens in sliding windows, genome-wide
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/5/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/6/plain-WDL/descriptor" as scattered_perm
 
 
 workflow sliding_window_analysis {
@@ -299,7 +299,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0690bb2725ca42d713e99ed04e5544162dc6786d47004a63b205d23b74c946bb"
+    docker: "talkowski/rcnv@sha256:4d13a3b1582af71ed6beb7d78eadd1be36426f05647d4abc219e93986eb9add2"
     preemptible: 1
     memory: "16 GB"
     disks: "local-disk 100 HDD"
@@ -428,7 +428,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0690bb2725ca42d713e99ed04e5544162dc6786d47004a63b205d23b74c946bb"
+    docker: "talkowski/rcnv@sha256:4d13a3b1582af71ed6beb7d78eadd1be36426f05647d4abc219e93986eb9add2"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -570,7 +570,7 @@ task refine_regions {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:6104e61757dd2ef0b5259cd07a71bf0b2972fb0e4e55027e9507aae87c49a920"
+    docker: "talkowski/rcnv@sha256:4d13a3b1582af71ed6beb7d78eadd1be36426f05647d4abc219e93986eb9add2"
     preemptible: 1
     memory: "16 GB"
     bootDiskSizeGb: "20"
@@ -603,7 +603,7 @@ task plot_region_summary {
   output {}
 
   runtime {
-    docker: "talkowski/rcnv@sha256:a3cdbdeab7f494a722402bda2939d9f525468fb8d843bc31f2d7618b3e9ea0bb"
+    docker: "talkowski/rcnv@sha256:4d13a3b1582af71ed6beb7d78eadd1be36426f05647d4abc219e93986eb9add2"
     preemptible: 1
   }
 }
