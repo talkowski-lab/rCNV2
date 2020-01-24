@@ -198,7 +198,7 @@ sweeting.correction <- function(meta.df, cc.sum=0.01){
 }
 
 
-# Make meta-analysis data frame for a single gene
+# Make meta-analysis data frame for a single window
 make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T){
   ncohorts <- length(cohorts)
   meta.df <- data.frame("cohort"=1:ncohorts,
@@ -214,8 +214,8 @@ make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T)
 }
 
 
-# Perform meta-analysis for a single gene
-meta.single <- function(stats.merged, cohorts, row.idx, model="mh", empirical.continuity=T){
+# Perform meta-analysis for a single window
+meta.single <- function(stats.merged, cohorts, row.idx, model="re", empirical.continuity=T){
   # If no CNVs are observed, return all NAs
   if(sum(stats.merged[row.idx, grep("_alt", colnames(stats.merged), fixed=T)])>0){
     meta.df <- make.meta.df(stats.merged, cohorts, row.idx, empirical.continuity)
@@ -252,7 +252,8 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="mh", empirical.co
 }
 
 
-# Wrapper function to perform a meta-analysis on all genes
+
+# Wrapper function to perform a meta-analysis on all windows
 meta <- function(stats.merged, cohorts, model="re"){
   meta.stats <- t(sapply(1:nrow(stats.merged), function(i){
     meta.single(stats.merged, cohorts, i, model, empirical.continuity=T)
@@ -283,7 +284,7 @@ option_list <- list(
   make_option(c("--or-corplot"), type="character", default=NULL, 
               help="output .jpg file for pairwise odds ratio correlation plot [default %default]",
               metavar="path"),
-  make_option(c("--model"), type="character", default="mh", 
+  make_option(c("--model"), type="character", default="re", 
               help="specify meta-analysis model ('re': random effects, 'mh': Mantel-Haenszel) [default %default]",
               metavar="string"),
   make_option(c("--p-is-phred"), action="store_true", default=FALSE, 

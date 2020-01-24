@@ -293,7 +293,7 @@ qq <- function (stats, cutoff=NULL, highlights=NULL,
     }
     
     if(is.null(cutoff)){
-      cutoff <- nominal/length(p)
+      cutoff <- 0.05/length(p)
     }
     
     expected <- -log10(expected)
@@ -323,7 +323,9 @@ qq <- function (stats, cutoff=NULL, highlights=NULL,
          xlim=c(0, 1.1 * max(expected)), ylim=range(c(0, 1.1 * ymax)))
     polygon(x=conf.int[, 1], y=conf.int[, 2], col="gray90", border=NA)
     abline(0, ab.end, col="gray50")
-    abline(h=log.cutoff, col="#D01C8B", lty=2)
+    if(!is.null(cutoff)){
+      abline(h=log.cutoff, col="#D01C8B", lty=2)
+    }
     
     if (print.stats == T){
       xpos.adjust <- 0.025

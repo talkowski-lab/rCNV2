@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens in sliding windows, genome-wide
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/7/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/9/plain-WDL/descriptor" as scattered_perm
 
 
 workflow sliding_window_analysis {
@@ -21,6 +21,7 @@ workflow sliding_window_analysis {
   Int pad_controls
   Float p_cutoff
   Int n_pheno_perms
+  String meta_model_prefix
   Float meta_or_cutoff
   Int meta_nominal_cohorts_cutoff
   Float credible_interval
@@ -59,20 +60,23 @@ workflow sliding_window_analysis {
         pad_controls=pad_controls,
         p_cutoff=p_cutoff,
         n_pheno_perms=n_pheno_perms,
+        meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
     }
   }
 
-  # Determine appropriate genome-wide P-value threshold for meta-analysis
-  call calc_meta_p_cutoff as rCNV_calc_meta_p_cutoff {
-    input:
-      phenotype_list=phenotype_list,
-      freq_code="rCNV",
-      n_pheno_perms=n_pheno_perms,
-      rCNV_bucket=rCNV_bucket,
-      dummy_completion_markers=rCNV_perm_test.completion_marker
-  }
+  # DEV NOTE: REBUILDING PERMUTATION ANALYSIS
+  
+  # # Determine appropriate genome-wide P-value threshold for meta-analysis
+  # call calc_meta_p_cutoff as rCNV_calc_meta_p_cutoff {
+  #   input:
+  #     phenotype_list=phenotype_list,
+  #     freq_code="rCNV",
+  #     n_pheno_perms=n_pheno_perms,
+  #     rCNV_bucket=rCNV_bucket,
+  #     dummy_completion_markers=rCNV_perm_test.completion_marker
+  # }
 
   # Perform meta-analysis of rCNV association statistics
   scatter ( pheno in phenotypes ) {
@@ -84,45 +88,47 @@ workflow sliding_window_analysis {
         metacohort_list=metacohort_list,
         metacohort_sample_table=metacohort_sample_table,
         freq_code="rCNV",
-        meta_p_cutoff=rCNV_calc_meta_p_cutoff.meta_p_cutoff,
+        meta_p_cutoff=p_cutoff,
+        meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
+        # meta_p_cutoff=rCNV_calc_meta_p_cutoff.meta_p_cutoff,
     }
   }
 
-  # Refine minimal credible regions
-  scatter ( cnv in ["DEL", "DUP"] ) {
-    call refine_regions as refine_rCNV_regions {
-      input:
-        completion_tokens=rCNV_meta_analysis.completion_token,
-        phenotype_list=phenotype_list,
-        metacohort_list=metacohort_list,
-        binned_genome=binned_genome,
-        freq_code="rCNV",
-        CNV=cnv,
-        meta_p_cutoff=rCNV_calc_meta_p_cutoff.meta_p_cutoff,
-        meta_or_cutoff=meta_or_cutoff,
-        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
-        credible_interval=credible_interval,
-        sig_window_pad=sig_window_pad,
-        refine_max_cnv_size=refine_max_cnv_size,
-        rCNV_bucket=rCNV_bucket
-    }
-  }
+  # # Refine minimal credible regions
+  # scatter ( cnv in ["DEL", "DUP"] ) {
+  #   call refine_regions as refine_rCNV_regions {
+  #     input:
+  #       completion_tokens=rCNV_meta_analysis.completion_token,
+  #       phenotype_list=phenotype_list,
+  #       metacohort_list=metacohort_list,
+  #       binned_genome=binned_genome,
+  #       freq_code="rCNV",
+  #       CNV=cnv,
+  #       meta_p_cutoff=rCNV_calc_meta_p_cutoff.meta_p_cutoff,
+  #       meta_or_cutoff=meta_or_cutoff,
+  #       meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+  #       credible_interval=credible_interval,
+  #       sig_window_pad=sig_window_pad,
+  #       refine_max_cnv_size=refine_max_cnv_size,
+  #       rCNV_bucket=rCNV_bucket
+  #   }
+  # }
 
-  # Plot summary metrics for final credible regions
-  call plot_region_summary as plot_rCNV_regions {
-    input:
-      freq_code="rCNV",
-      DEL_regions=refine_rCNV_regions.final_loci[0],
-      DUP_regions=refine_rCNV_regions.final_loci[1],
-      rCNV_bucket=rCNV_bucket
-  }
+  # # Plot summary metrics for final credible regions
+  # call plot_region_summary as plot_rCNV_regions {
+  #   input:
+  #     freq_code="rCNV",
+  #     DEL_regions=refine_rCNV_regions.final_loci[0],
+  #     DUP_regions=refine_rCNV_regions.final_loci[1],
+  #     rCNV_bucket=rCNV_bucket
+  # }
 
-  output {
-    Array[File] final_sig_regions = refine_rCNV_regions.final_loci
-    Array[File] final_sig_associations = refine_rCNV_regions.final_associations
-  }
+  # output {
+  #   Array[File] final_sig_regions = refine_rCNV_regions.final_loci
+  #   Array[File] final_sig_associations = refine_rCNV_regions.final_associations
+  # }
 }
 
 
@@ -244,7 +250,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0690bb2725ca42d713e99ed04e5544162dc6786d47004a63b205d23b74c946bb"
+    docker: "talkowski/rcnv@sha256:521201e9278520044a1a2f78a7a2a2afcfa4e4f0be77cd010e760b124778801f"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -299,7 +305,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:1f5837dffd6248bfc43b7acc5ababf49c8f9d9566c1e38c7b013f5932d7cca64"
+    docker: "talkowski/rcnv@sha256:521201e9278520044a1a2f78a7a2a2afcfa4e4f0be77cd010e760b124778801f"
     preemptible: 1
     memory: "16 GB"
     disks: "local-disk 100 HDD"
@@ -322,6 +328,7 @@ task meta_analysis {
   File metacohort_sample_table
   String freq_code
   Float meta_p_cutoff
+  String meta_model_prefix
   String rCNV_bucket
   String prefix
 
@@ -374,7 +381,7 @@ task meta_analysis {
       > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
       /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
         --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
-        --model mh \
+        --model ${meta_model_prefix} \
         --p-is-phred \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
@@ -428,7 +435,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:1f5837dffd6248bfc43b7acc5ababf49c8f9d9566c1e38c7b013f5932d7cca64"
+    docker: "talkowski/rcnv@sha256:521201e9278520044a1a2f78a7a2a2afcfa4e4f0be77cd010e760b124778801f"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -570,7 +577,7 @@ task refine_regions {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:1f5837dffd6248bfc43b7acc5ababf49c8f9d9566c1e38c7b013f5932d7cca64"
+    docker: "talkowski/rcnv@sha256:521201e9278520044a1a2f78a7a2a2afcfa4e4f0be77cd010e760b124778801f"
     preemptible: 1
     memory: "16 GB"
     bootDiskSizeGb: "20"
@@ -603,7 +610,7 @@ task plot_region_summary {
   output {}
 
   runtime {
-    docker: "talkowski/rcnv@sha256:1f5837dffd6248bfc43b7acc5ababf49c8f9d9566c1e38c7b013f5932d7cca64"
+    docker: "talkowski/rcnv@sha256:521201e9278520044a1a2f78a7a2a2afcfa4e4f0be77cd010e760b124778801f"
     preemptible: 1
   }
 }

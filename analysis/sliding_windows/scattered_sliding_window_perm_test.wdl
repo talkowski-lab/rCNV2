@@ -19,6 +19,7 @@ workflow scattered_sliding_window_perm_test {
   Int pad_controls
   Float p_cutoff
   Int n_pheno_perms
+  String meta_model_prefix
   String rCNV_bucket
   String prefix
 
@@ -33,6 +34,7 @@ workflow scattered_sliding_window_perm_test {
 	      bin_overlap=bin_overlap,
 	      pad_controls=pad_controls,
 	      p_cutoff=p_cutoff,
+        meta_model_prefix=meta_model_prefix,
 	      perm_idx=idx,
 	      rCNV_bucket=rCNV_bucket,
 	      prefix=prefix
@@ -55,6 +57,7 @@ task permuted_burden_test {
   Float bin_overlap
   Int pad_controls
   Float p_cutoff
+  String meta_model_prefix
   Int perm_idx
   String rCNV_bucket
   String prefix
@@ -149,7 +152,7 @@ task permuted_burden_test {
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
       /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
-        --model mh \
+        --model ${meta_model_prefix} \
         --p-is-phred \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
@@ -166,7 +169,7 @@ task permuted_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:1f5837dffd6248bfc43b7acc5ababf49c8f9d9566c1e38c7b013f5932d7cca64"
+    docker: "talkowski/rcnv@sha256:521201e9278520044a1a2f78a7a2a2afcfa4e4f0be77cd010e760b124778801f"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

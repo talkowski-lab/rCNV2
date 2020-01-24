@@ -38,6 +38,7 @@ binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
 p_cutoff=0.0000771724
 meta_p_cutoff=0.000001
+meta_model_prefix="re"
 bin_overlap=0.5
 pad_controls=50000
 
@@ -178,7 +179,7 @@ while read prefix hpo; do
     > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
     /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
       --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
-      --model mh \
+      --model ${meta_model_prefix} \
       --p-is-phred \
       ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
       ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
@@ -231,7 +232,8 @@ metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
 p_cutoff=0.0000771724
-n_pheno_perms=10
+n_pheno_perms=20
+meta_model_prefix="re"
 i=1
 bin_overlap=0.5
 pad_controls=50000
@@ -332,7 +334,7 @@ while read prefix hpo; do
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
       /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
-        --model mh \
+        --model ${meta_model_prefix} \
         --p-is-phred \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
@@ -357,11 +359,13 @@ while read prefix hpo; do
     perm_res/
   for CNV in DEL DUP; do
     for i in $( seq 1 ${n_pheno_perms} ); do
-      zcat perm_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
-      | grep -ve '^#' \
-      | awk '{ print $NF }' \
-      | cat <( echo "$prefix.$CNV.$i" ) - \
-      > perm_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.permuted_p_values.$i.txt
+      if [ -e perm_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz ]; then
+        zcat perm_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
+        | grep -ve '^#' \
+        | awk '{ print $NF }' \
+        | cat <( echo "$prefix.$CNV.$i" ) - \
+        > perm_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.permuted_p_values.$i.txt
+      fi
     done
   done
 done < ${phenotype_list}

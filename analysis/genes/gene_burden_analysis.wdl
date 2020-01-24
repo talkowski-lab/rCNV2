@@ -15,6 +15,7 @@ workflow gene_burden_analysis {
   File metacohort_sample_table
   File gtf
   Int pad_controls
+  String meta_model_prefix
   String weight_mode
   Float min_cds_ovr
   Int max_genes_per_cnv
@@ -239,6 +240,7 @@ task meta_analysis {
   File metacohort_sample_table
   String freq_code
   Float meta_p_cutoff
+  String meta_model_prefix
   String rCNV_bucket
   String prefix
 
@@ -284,7 +286,7 @@ task meta_analysis {
       > ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt
       /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
         --or-corplot ${prefix}.${freq_code}.$CNV.gene_burden.or_corplot_grid.jpg \
-        --model mh \
+        --model ${meta_model_prefix} \
         --p-is-phred \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
@@ -338,7 +340,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:1f5837dffd6248bfc43b7acc5ababf49c8f9d9566c1e38c7b013f5932d7cca64"
+    docker: "talkowski/rcnv@sha256:521201e9278520044a1a2f78a7a2a2afcfa4e4f0be77cd010e760b124778801f"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

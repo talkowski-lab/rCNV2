@@ -215,7 +215,7 @@ make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T)
 
 
 # Perform meta-analysis for a single window
-meta.single <- function(stats.merged, cohorts, row.idx, model="mh", empirical.continuity=T){
+meta.single <- function(stats.merged, cohorts, row.idx, model="re", empirical.continuity=T){
   # If no CNVs are observed, return all NAs
   if(sum(stats.merged[row.idx, grep("_alt", colnames(stats.merged), fixed=T)])>0){
     meta.df <- make.meta.df(stats.merged, cohorts, row.idx, empirical.continuity)
@@ -225,10 +225,19 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="mh", empirical.co
     }else{
       # Meta-analysis
       if(model=="re"){
-        meta.res <- rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                            measure="OR", data=meta.df, random = ~ 1 | cohort, slab=cohort_name,
-                            add=0, drop00=F, correct=F,
-                            digits=5, control=list(maxiter=1000, stepadj=0.5))
+        meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                                measure="OR", data=meta.df, random = ~ 1 | cohort, slab=cohort_name,
+                                add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
+                 error=function(e){
+                   print(paste(stats.merged[row.idx, 1], ":", 
+                               stats.merged[row.idx, 2], "-",
+                               stats.merged[row.idx, 3], 
+                               " failed to converge. Retrying with more iterations...",
+                               sep=""))
+                   rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                           measure="OR", data=meta.df, random = ~ 1 | cohort, slab=cohort_name,
+                           add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
+                 })
         out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
                               meta.res$zval, -log10(meta.res$pval)))
       }else if(model=="mh"){
@@ -284,7 +293,7 @@ option_list <- list(
   make_option(c("--or-corplot"), type="character", default=NULL, 
               help="output .jpg file for pairwise odds ratio correlation plot [default %default]",
               metavar="path"),
-  make_option(c("--model"), type="character", default="mh", 
+  make_option(c("--model"), type="character", default="re", 
               help="specify meta-analysis model ('re': random effects, 'mh': Mantel-Haenszel) [default %default]",
               metavar="string"),
   make_option(c("--p-is-phred"), action="store_true", default=FALSE, 
@@ -309,7 +318,6 @@ p.is.phred <- opts$`p-is-phred`
 # # infile <- "~/scratch/window_meta_dummy_input.ndd.txt"
 # outfile <- "~/scratch/window_meta_test_results.bed"
 # corplot.out <- "~/scratch/corplot.test.jpg"
-# # corplot.out <- "~/scratch/corplot.ndd.test.jpg"
 # model <- "mh"
 # p.is.phred <- T
 

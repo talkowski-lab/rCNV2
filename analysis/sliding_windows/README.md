@@ -92,11 +92,60 @@ gs://rcnv_project/analysis/sliding_windows/UNKNOWN/
 
 ### 3. Combine association statistics across metacohorts  
 
+We combined CNV association statistics across metacohorts for each sliding window using a random-effects meta-analysis.  
+
+The code to perform this step is contained in `window_meta_analysis.R`.  
+
+Given that rare CNV counts per window are (a) sparse and (b) zero-inflated, and furthermore that (c) the case & control sample sizes are unbalanced for most phenotype groups (_e.g._, frequently >10- to 100-fold more controls than cases), we implemented an empirical continuity correction as proposed by [Sweeting _et al._, _Stat. Med._, 2004.](https://onlinelibrary.wiley.com/doi/10.1002/sim.1761)  
+
+Each phenotype & CNV type were meta-analyzed separately for a total of three meta-analyses per phenotype.  
+
+#### Determining genome-wide significance threshold  
+
+We empirically determined a genome-wide significance threshold for each meta-analysis as follows:  
+
+1. Permute phenotype labels for all CNVs while matching on size (split by quantile) and CNV type (DEL/DUP);  
+2. Rerun all association tests (described above), including meta-analysis, for each phenotype & CNV combination; and  
+3. Compute the fraction of significant windows for a broad range of P-value thresholds
+
+Steps 1-3 were repeated 20 times for each CNV and phenotype.
+
+#### Output files  
+
+[As described above for Step 2](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/sliding_windows#output-files), we generated the same combination of plots and statistics files for the meta-analyses results of each phenotype group.  
+
+These files are stored in the same location as the per-metacohort analysis results.  
+
+### 4. Collapse associations across phenotypes & refine loci to minimal credible regions  
+
+Methods still a work in progress. See bottom of this page for most recent iteration of minimum credible region definition algorithm.  
+
+---  
+
+#### _A note on data curation_  
+
+The information presented on this page references various curated datasets.  
+
+The curation of these datasets is documented elsewhere in this repository.  
+
+Please see the README available in [the `data_curation/` subdirectory](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/).  
+
+---  
+
+---  
+
+
+# IGNORE THIS TEXT FOR NOW (DEPRECATED ALTERNATIVE METHODS)  
+
+### 3. Combine association statistics across metacohorts  
+
 We combined CNV association statistics across metacohorts for each sliding window using the Mantel-Haenszel meta-analysis method for 2x2 contingency tables of count data.  
 
 The code to perform this step is contained in `window_meta_analysis.R`.  
 
 Given that rare CNV counts per window are (a) sparse and (b) zero-inflated, and furthermore that (c) the case & control sample sizes are unbalanced for most phenotype groups (_e.g._, frequently >10- to 100-fold more controls than cases), we implemented an empirical continuity correction as proposed by [Sweeting _et al._, _Stat. Med._, 2004.](https://onlinelibrary.wiley.com/doi/10.1002/sim.1761)  
+
+Mantel-Haenszel meta-analysis with an empirical continuity correction is recommended for the meta-analysis of rare binary event data [Bhaumik _et al._, _J. Am. Stat. Assoc._](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3665366/).
 
 Each phenotype & CNV type were meta-analyzed separately for a total of three meta-analyses per phenotype.  
 
@@ -107,13 +156,8 @@ Following meta-analysis, individual windows were labeled as genome-wide signific
 
 _Note: a P<sub>meta</sub> threshold of 10<sup>-6</sup> was determined to correspond to a study-wide FDR of 1% via phenotype permutation analysis (not described here)_
 
-#### Output files  
 
-[As described above for Step 2](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/sliding_windows#output-files), we generated the same combination of plots and statistics files for the meta-analyses results of each phenotype group.  
 
-These files are stored in the same location as the per-metacohort analysis results.  
-
-### 4. Collapse associations across phenotypes & refine loci to minimal credible regions  
 
 Lastly, we collapsed all significant windows across phenotypes and refined them to discrete intervals.  
 
@@ -162,12 +206,3 @@ gs://rcnv_project/results/sliding_windows/rCNV.DUP.region_refinement.log
 ```
 
 
----  
-
-#### _A note on data curation_  
-
-The information presented on this page references various curated datasets.  
-
-The curation of these datasets is documented elsewhere in this repository.  
-
-Please see the README available in [the `data_curation/` subdirectory](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/).  
