@@ -225,7 +225,7 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="re", empirical.co
     }else{
       # Meta-analysis
       if(model=="re"){
-        meta.res <- tryCatch(rma.mv(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+        meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
                                 measure="OR", data=meta.df, random = ~ 1 | cohort, slab=cohort_name,
                                 add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
                  error=function(e){
@@ -234,7 +234,7 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="re", empirical.co
                                stats.merged[row.idx, 3], 
                                " failed to converge. Retrying with more iterations...",
                                sep=""))
-                   rma.mv(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                   rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
                            measure="OR", data=meta.df, random = ~ 1 | cohort, slab=cohort_name,
                            add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
                  })
