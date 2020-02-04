@@ -536,7 +536,7 @@ def meta_analysis(model, cohorts, n_control, n_case, n_control_alt, n_case_alt,
         oddsratio = float(res['meta_lnOR'])
         oddsratio_ci = [float(res['meta_lnOR_lower']), 
                         float(res['meta_lnOR_upper'])]
-        chisq = float(res['CMH_chisq'])
+        chisq = float(res.iloc[:, -2])
         if pval <= min_p \
         and oddsratio_ci[0] >= min_or_lower \
         and n_nom >= min_nominal:
@@ -1290,7 +1290,7 @@ def main():
     # Sort & name final MCRs
     all_mcrs = sorted(all_mcrs, key=lambda x: (int(x['chr']), int(x['start']), int(x['end'])))
     for i in range(0, k): 
-        all_mcrs[i]['id'] = '_'.join([args.prefix, 'min_credible_region', str(i + 1)])
+        all_mcrs[i]['id'] = '_'.join([args.prefix, 'min_credible_region', str(all_mcrs[i]['chr']), str(i + 1)])
 
     # Calculate final association statistics for minimal critical regions
     msg = '* Finished refining {:,} minimal credible regions from {:,} query regions. ' + \

@@ -198,7 +198,7 @@ sweeting.correction <- function(meta.df, cc.sum=0.01){
 }
 
 
-# Make meta-analysis data frame for a single window
+# Make meta-analysis data frame for a single gene
 make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T){
   ncohorts <- length(cohorts)
   meta.df <- data.frame("cohort"=1:ncohorts,
@@ -214,7 +214,7 @@ make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T)
 }
 
 
-# Perform meta-analysis for a single window
+# Perform meta-analysis for a single gene
 meta.single <- function(stats.merged, cohorts, row.idx, model="re", empirical.continuity=T){
   # If no CNVs are observed, return all NAs
   if(sum(stats.merged[row.idx, grep("_alt", colnames(stats.merged), fixed=T)])>0){
@@ -225,10 +225,17 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="re", empirical.co
     }else{
       # Meta-analysis
       if(model=="re"){
-        meta.res <- rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                            measure="OR", data=meta.df, random = ~ 1 | cohort, slab=cohort_name,
-                            add=0, drop00=F, correct=F,
-                            digits=5, control=list(maxiter=1000, stepadj=0.5))
+        meta.res <- tryCatch(rma.mv(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                                     measure="OR", data=meta.df, random = ~ 1 | cohort, slab=cohort_name,
+                                     add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
+                             error=function(e){
+                               print(paste(stats.merged[row.idx, 4], 
+                                           " failed to converge. Retrying with more iterations...",
+                                           sep=""))
+                               rma.mv(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                                       measure="OR", data=meta.df, random = ~ 1 | cohort, slab=cohort_name,
+                                       add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
+                             })
         out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
                               meta.res$zval, -log10(meta.res$pval)))
       }else if(model=="mh"){
@@ -252,8 +259,7 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="re", empirical.co
 }
 
 
-
-# Wrapper function to perform a meta-analysis on all windows
+# Wrapper function to perform a meta-analysis on all genes
 meta <- function(stats.merged, cohorts, model="re"){
   meta.stats <- t(sapply(1:nrow(stats.merged), function(i){
     meta.single(stats.merged, cohorts, i, model, empirical.continuity=T)

@@ -27,9 +27,14 @@ workflow sliding_window_analysis {
   Float credible_interval
   Int sig_window_pad
   Int refine_max_cnv_size
+  File autosomes
   String rCNV_bucket
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
+
+  Array[Array[String]] contigs = read_tsv(autosomes)
+
+  Array[String] cnv_types = ["DEL", "DUP"]
 
   # Scatter over phenotypes
   scatter ( pheno in phenotypes ) {
@@ -97,8 +102,8 @@ workflow sliding_window_analysis {
   }
 
   # Refine minimal credible regions
-  scatter ( cnv in ["DEL", "DUP"] ) {
-    call refine_regions as refine_rCNV_regions {
+  scatter ( cnv in cnv_types ) {
+    call prep_refinement {
       input:
         completion_tokens=rCNV_meta_analysis.completion_token,
         phenotype_list=phenotype_list,
@@ -109,27 +114,76 @@ workflow sliding_window_analysis {
         meta_p_cutoff=p_cutoff,
         meta_or_cutoff=meta_or_cutoff,
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+        sig_window_pad=sig_window_pad,
+        rCNV_bucket=rCNV_bucket
+    }
+  }
+  scatter ( contig in contigs ) {
+    # DEL
+    call refine_regions as refine_rCNV_regions_DEL {
+      input:
+        contig=contig[0],
+        regions_to_refine=prep_refinement.regions_to_refine[0],
+        metacohort_info_tsv=prep_refinement.metacohort_info_tsv[0],
+        pval_matrix=prep_refinement.pval_matrix[0],
+        labeled_windows=prep_refinement.labeled_windows[0],
+        freq_code="rCNV",
+        CNV="DEL",
+        meta_p_cutoff=p_cutoff,
+        meta_or_cutoff=meta_or_cutoff,
+        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         meta_model_prefix=meta_model_prefix,
         credible_interval=credible_interval,
-        sig_window_pad=sig_window_pad,
-        refine_max_cnv_size=refine_max_cnv_size,
-        rCNV_bucket=rCNV_bucket
-        # meta_p_cutoff=rCNV_calc_meta_p_cutoff.meta_p_cutoff,
+        refine_max_cnv_size=refine_max_cnv_size
+    # DUP
+    call refine_regions as refine_rCNV_regions_DUP {
+      input:
+        contig=contig[0],
+        regions_to_refine=prep_refinement.regions_to_refine[1],
+        metacohort_info_tsv=prep_refinement.metacohort_info_tsv[1],
+        pval_matrix=prep_refinement.pval_matrix[1],
+        labeled_windows=prep_refinement.labeled_windows[1],
+        freq_code="rCNV",
+        CNV="DUP",
+        meta_p_cutoff=p_cutoff,
+        meta_or_cutoff=meta_or_cutoff,
+        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+        meta_model_prefix=meta_model_prefix,
+        credible_interval=credible_interval,
+        refine_max_cnv_size=refine_max_cnv_size
     }
+  }
+  call merge_refinements as merge_refinements_DEL {
+    input:
+      loci=refine_rCNV_regions_DEL.loci,
+      associations=refine_rCNV_associations_DEL.associations,
+      logs=refine_rCNV_associations_DEL.logs,
+      freq_code="rCNV",
+      CNV="DEL",
+      rCNV_bucket=rCNV_bucket
+  }
+  call merge_refinements as merge_refinements_DUP {
+    input:
+      loci=refine_rCNV_regions_DUP.loci,
+      associations=refine_rCNV_associations_DUP.associations,
+      logs=refine_rCNV_associations_DUP.logs,
+      freq_code="rCNV",
+      CNV="DUP",
+      rCNV_bucket=rCNV_bucket
   }
 
   # Plot summary metrics for final credible regions
   call plot_region_summary as plot_rCNV_regions {
     input:
       freq_code="rCNV",
-      DEL_regions=refine_rCNV_regions.final_loci[0],
-      DUP_regions=refine_rCNV_regions.final_loci[1],
+      DEL_regions=merge_refinements_DEL.final_loci,
+      DUP_regions=merge_refinements_DUP.final_loci,
       rCNV_bucket=rCNV_bucket
   }
 
   output {
-    Array[File] final_sig_regions = refine_rCNV_regions.final_loci
-    Array[File] final_sig_associations = refine_rCNV_regions.final_associations
+    Array[File] final_sig_regions = [merge_refinements_DEL.final_loci, merge_refinements_DUP.final_loci]
+    Array[File] final_sig_associations = [merge_refinements_DEL.final_associations, merge_refinements_DUP.final_associations]
   }
 }
 
@@ -252,7 +306,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:44d9ed4679ba2ed87097211fcd70f127e9f8ab34b9192b13036a7c00152b18dd"
+    docker: "talkowski/rcnv@sha256:60bd18cbd7dff9d06215d08170075e1f8934d44b78defb695cd29e926cbb8923"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -307,7 +361,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:44d9ed4679ba2ed87097211fcd70f127e9f8ab34b9192b13036a7c00152b18dd"
+    docker: "talkowski/rcnv@sha256:60bd18cbd7dff9d06215d08170075e1f8934d44b78defb695cd29e926cbb8923"
     preemptible: 1
     memory: "16 GB"
     disks: "local-disk 100 HDD"
@@ -437,7 +491,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:44d9ed4679ba2ed87097211fcd70f127e9f8ab34b9192b13036a7c00152b18dd"
+    docker: "talkowski/rcnv@sha256:60bd18cbd7dff9d06215d08170075e1f8934d44b78defb695cd29e926cbb8923"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -445,8 +499,8 @@ task meta_analysis {
 }
 
 
-# Refine associated regions to minimal credible regions
-task refine_regions {
+# Prepare data for refinement
+task prep_refinement {
   Array[File] completion_tokens # Must delocalize something from meta-analysis step to prevent caching
   File phenotype_list
   File metacohort_list
@@ -456,10 +510,7 @@ task refine_regions {
   Float meta_p_cutoff
   Float meta_or_cutoff
   Int meta_nominal_cohorts_cutoff
-  String meta_model_prefix
-  Float credible_interval
   Int sig_window_pad
-  Int refine_max_cnv_size
   String rCNV_bucket
 
   command <<<
@@ -533,11 +584,58 @@ task refine_regions {
     | bgzip -c \
     > ${freq_code}.${CNV}.sig_regions_to_refine.bed.gz
 
-    # Refine associations within regions from above
+    # Prep input file
     while read meta; do
       echo -e "$meta\tcleaned_cnv/$meta.${freq_code}.bed.gz\tphenos/$meta.cleaned_phenos.txt"
     done < <( cut -f1 ${metacohort_list} | fgrep -v "mega" )\
     > window_refinement.${freq_code}_metacohort_info.tsv
+  >>>
+
+  output {
+    File regions_to_refine = "${freq_code}.${CNV}.sig_regions_to_refine.bed.gz"
+    File metacohort_info_tsv = "window_refinement.${freq_code}_metacohort_info.tsv"
+    File pval_matrix = "${CNV}.pval_matrix.bed.gz"
+    File labeled_windows = "${freq_code}.${CNV}.all_windows_labeled.bed.gz"
+  }
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:60bd18cbd7dff9d06215d08170075e1f8934d44b78defb695cd29e926cbb8923"
+    preemptible: 1
+    memory: "8 GB"
+    bootDiskSizeGb: "20"
+    disks: "local-disk 50 HDD"
+  }
+}
+
+
+# Refine associated regions to minimal credible regions
+task refine_regions {
+  String contig
+  File regions_to_refine
+  File metacohort_info_tsv
+  File pval_matrix
+  File labeled_windows
+  String freq_code
+  String CNV
+  Float meta_p_cutoff
+  Float meta_or_cutoff
+  Int meta_nominal_cohorts_cutoff
+  String meta_model_prefix
+  Float credible_interval
+  Int refine_max_cnv_size
+
+  command <<<
+    set -e
+
+    # Tabix input to single chromosome
+    tabix -f ${regions_to_refine}
+    tabix -h ${regions_to_refine} ${contig} | bgzip -c > regions_to_refine.bed.gz
+    tabix -f ${pval_matrix}
+    tabix -h ${pval_matrix} ${contig} | bgzip -c > pval_matrix.bed.gz
+    tabix -f ${labeled_windows}
+    tabix -h ${labeled_windows} ${contig} | bgzip -c > labeled_windows.bed.gz
+
+    # Perform refinement
     /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
       --cnv-type ${CNV} \
       --model ${meta_model_prefix} \
@@ -549,16 +647,60 @@ task refine_regions {
       --min-nominal ${meta_nominal_cohorts_cutoff} \
       --credible-interval ${credible_interval} \
       --prefix "${freq_code}_${CNV}" \
-      --log ${freq_code}.${CNV}.region_refinement.log \
-      ${freq_code}.${CNV}.sig_regions_to_refine.bed.gz \
-      window_refinement.${freq_code}_metacohort_info.tsv \
-      ${CNV}.pval_matrix.bed.gz \
-      ${freq_code}.${CNV}.all_windows_labeled.bed.gz \
-      ${freq_code}.${CNV}.final_regions.associations.bed \
-      ${freq_code}.${CNV}.final_regions.loci.bed
-    bgzip -f ${freq_code}.${CNV}.final_regions.associations.bed
-    bgzip -f ${freq_code}.${CNV}.final_regions.loci.bed
-    
+      --log ${freq_code}.${CNV}.region_refinement.${contig}.log \
+      regions_to_refine.bed.gz \
+      ${metacohort_info_tsv} \
+      pval_matrix.bed.gz \
+      labeled_windows.bed.gz \
+      ${freq_code}.${CNV}.final_regions.associations.${contig}.bed \
+      ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
+    bgzip -f ${freq_code}.${CNV}.final_regions.associations.${contig}.bed
+    bgzip -f ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
+  >>>
+
+  output {
+    File loci = "${freq_code}.${CNV}.final_regions.loci.${contig}.bed.gz"
+    File associations = "${freq_code}.${CNV}.final_regions.associations.${contig}.bed.gz"
+    File logfile = "${freq_code}.${CNV}.region_refinement.${contig}.log"
+  }
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:60bd18cbd7dff9d06215d08170075e1f8934d44b78defb695cd29e926cbb8923"
+    preemptible: 1
+    memory: "8 GB"
+    bootDiskSizeGb: "20"
+    disks: "local-disk 50 HDD"
+  }
+}
+
+
+# Merge refined loci across all chromosomes
+task merge_refinements {
+  Array[File] loci
+  Array[File] associations
+  Array[File] logs
+  String freq_code
+  String CNV
+  String rCNV_bucket
+
+  command <<<
+    set -e
+
+    # Merge loci
+    zcat ${loci[0]} | sed -n '1p' > header.tsv
+    zcat ${sep=" " loci} | fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n \
+    cat header.tsv - | bgzip -c \
+    > ${freq_code}.${CNV}.final_regions.loci.bed.gz
+
+    # Merge associations
+    zcat ${associations[0]} | sed -n '1p' > header.tsv
+    zcat ${sep=" " associations} | fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n -k7,7V \
+    cat header.tsv - | bgzip -c \
+    > ${freq_code}.${CNV}.final_regions.associations.bed.gz
+
+    # Merge logs
+    cat ${sep=" " logs} > ${freq_code}.${CNV}.region_refinement.log
+
     # Annotate final regions with genes
     gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
     /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
@@ -568,7 +710,9 @@ task refine_regions {
     bgzip -f ${freq_code}.${CNV}.final_regions.loci.bed
 
     # Copy results to output bucket
-    gsutil -m cp ${freq_code}.${CNV}.final_regions.*.bed.gz \
+    gsutil -m cp ${freq_code}.${CNV}.final_regions.loci.bed.gz \
+      "${rCNV_bucket}/results/sliding_windows/"
+    gsutil -m cp ${freq_code}.${CNV}.final_regions.associations.bed.gz \
       "${rCNV_bucket}/results/sliding_windows/"
     gsutil -m cp ${freq_code}.${CNV}.region_refinement.log \
       "${rCNV_bucket}/results/sliding_windows/"
@@ -577,15 +721,15 @@ task refine_regions {
   output {
     File final_loci = "${freq_code}.${CNV}.final_regions.loci.bed.gz"
     File final_associations = "${freq_code}.${CNV}.final_regions.associations.bed.gz"
-    File logfile = "${freq_code}.${CNV}.region_refinement.log"
+    File merged_logfile = "${freq_code}.${CNV}.region_refinement.log"
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:44d9ed4679ba2ed87097211fcd70f127e9f8ab34b9192b13036a7c00152b18dd"
+    docker: "talkowski/rcnv@sha256:60bd18cbd7dff9d06215d08170075e1f8934d44b78defb695cd29e926cbb8923"
     preemptible: 1
-    memory: "16 GB"
+    memory: "8 GB"
     bootDiskSizeGb: "20"
-    disks: "local-disk 100 HDD"
+    disks: "local-disk 50 HDD"
   }
 }
 
@@ -614,7 +758,7 @@ task plot_region_summary {
   output {}
 
   runtime {
-    docker: "talkowski/rcnv@sha256:44d9ed4679ba2ed87097211fcd70f127e9f8ab34b9192b13036a7c00152b18dd"
+    docker: "talkowski/rcnv@sha256:60bd18cbd7dff9d06215d08170075e1f8934d44b78defb695cd29e926cbb8923"
     preemptible: 1
   }
 }
