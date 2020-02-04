@@ -36,11 +36,13 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
-p_cutoff=0.0000771724
-meta_p_cutoff=0.000001
+p_cutoff=0.00000385862
+meta_p_cutoff=0.00000385862
 meta_model_prefix="re"
 bin_overlap=0.5
 pad_controls=50000
+
+
 
 
 # Count CNVs in cases and controls per phenotype, split by metacohort and CNV type
@@ -218,6 +220,28 @@ while read prefix hpo; do
 done < refs/test_phenotypes.list
 
 
+# Collapse all meta-analysis p-values into single matrix for visualizing calibration
+mkdir meta_res/
+while read prefix hpo; do
+  echo -e "$prefix\n\n"
+  gsutil -m cp \
+    "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/${prefix}.${freq_code}.*.sliding_window.meta_analysis.stats.bed.gz" \
+    meta_res/
+  for CNV in DEL DUP; do
+      if [ -e meta_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz ]; then
+        zcat meta_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz \
+        | grep -ve '^#' \
+        | awk '{ print $NF }' \
+        | cat <( echo "$prefix.$CNV" ) - \
+        > meta_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.p_values.txt
+      fi
+  done
+done < ${phenotype_list}
+paste meta_res/*.${freq_code}.$CNV.sliding_window.meta_analysis.p_values.txt \
+| gzip -c \
+> ${freq_code}.observed_pval_matrix.txt.gz
+
+
 
 
 # Run phenotype permutation to determine empirical FDR cutoff
@@ -231,7 +255,7 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
-p_cutoff=0.0000771724
+p_cutoff=0.00000385862
 n_pheno_perms=20
 meta_model_prefix="re"
 i=1
@@ -374,11 +398,13 @@ paste perm_res/*.sliding_window.meta_analysis.permuted_p_values.*.txt \
 > ${freq_code}.permuted_pval_matrix.txt.gz
 
 # Calculate empirical FDR
-/opt/rCNV2/analysis/sliding_windows/calc_empirical_fdr.R \
-  --plot ${freq_code}.FDR_permutation_results.png \
-  ${freq_code}.permuted_pval_matrix.txt.gz \
-  ${freq_code}.empirical_fdr_cutoffs.tsv
-
+for CNV in DEL DUP; do
+  /opt/rCNV2/analysis/sliding_windows/calc_empirical_fdr.R \
+    --cnv $CNV \
+    --plot ${freq_code}.FDR_permutation_results.png \
+    ${freq_code}.permuted_pval_matrix.txt.gz \
+    ${freq_code}.empirical_fdr_cutoffs.tsv
+done
 
 
 
@@ -391,9 +417,10 @@ phenotype_list="refs/test_phenotypes.list"
 metacohort_list="refs/rCNV_metacohort_list.txt"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
-meta_p_cutoff=0.000001
+meta_p_cutoff=0.00000385862
 meta_or_cutoff=2
 meta_nominal_cohorts_cutoff=2
+meta_model_prefix="re"
 sig_window_pad=1000000
 refine_max_cnv_size=3000000
 
@@ -483,6 +510,7 @@ done < <( cut -f1 ${metacohort_list} | fgrep -v "mega" )\
 for CNV in DEL DUP; do
   /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
     --cnv-type $CNV \
+    --model ${meta_model_prefix} \
     --min-p ${meta_p_cutoff} \
     --p-is-phred \
     --min-or-lower 0 \

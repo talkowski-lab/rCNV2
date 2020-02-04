@@ -48,22 +48,22 @@ workflow sliding_window_analysis {
         prefix=pheno[0]
     }
 
-    # Permute phenotypes to estimate empirical FDR
-    call scattered_perm.scattered_sliding_window_perm_test as rCNV_perm_test {
-      input:
-        hpo=pheno[1],
-        metacohort_list=metacohort_list,
-        metacohort_sample_table=metacohort_sample_table,
-        freq_code="rCNV",
-        binned_genome=binned_genome,
-        bin_overlap=bin_overlap,
-        pad_controls=pad_controls,
-        p_cutoff=p_cutoff,
-        n_pheno_perms=n_pheno_perms,
-        meta_model_prefix=meta_model_prefix,
-        rCNV_bucket=rCNV_bucket,
-        prefix=pheno[0]
-    }
+    # # Permute phenotypes to estimate empirical FDR
+    # call scattered_perm.scattered_sliding_window_perm_test as rCNV_perm_test {
+    #   input:
+    #     hpo=pheno[1],
+    #     metacohort_list=metacohort_list,
+    #     metacohort_sample_table=metacohort_sample_table,
+    #     freq_code="rCNV",
+    #     binned_genome=binned_genome,
+    #     bin_overlap=bin_overlap,
+    #     pad_controls=pad_controls,
+    #     p_cutoff=p_cutoff,
+    #     n_pheno_perms=n_pheno_perms,
+    #     meta_model_prefix=meta_model_prefix,
+    #     rCNV_bucket=rCNV_bucket,
+    #     prefix=pheno[0]
+    # }
   }
 
   # DEV NOTE: REBUILDING PERMUTATION ANALYSIS
@@ -96,39 +96,41 @@ workflow sliding_window_analysis {
     }
   }
 
-  # # Refine minimal credible regions
-  # scatter ( cnv in ["DEL", "DUP"] ) {
-  #   call refine_regions as refine_rCNV_regions {
-  #     input:
-  #       completion_tokens=rCNV_meta_analysis.completion_token,
-  #       phenotype_list=phenotype_list,
-  #       metacohort_list=metacohort_list,
-  #       binned_genome=binned_genome,
-  #       freq_code="rCNV",
-  #       CNV=cnv,
-  #       meta_p_cutoff=rCNV_calc_meta_p_cutoff.meta_p_cutoff,
-  #       meta_or_cutoff=meta_or_cutoff,
-  #       meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
-  #       credible_interval=credible_interval,
-  #       sig_window_pad=sig_window_pad,
-  #       refine_max_cnv_size=refine_max_cnv_size,
-  #       rCNV_bucket=rCNV_bucket
-  #   }
-  # }
+  # Refine minimal credible regions
+  scatter ( cnv in ["DEL", "DUP"] ) {
+    call refine_regions as refine_rCNV_regions {
+      input:
+        completion_tokens=rCNV_meta_analysis.completion_token,
+        phenotype_list=phenotype_list,
+        metacohort_list=metacohort_list,
+        binned_genome=binned_genome,
+        freq_code="rCNV",
+        CNV=cnv,
+        meta_p_cutoff=p_cutoff,
+        meta_or_cutoff=meta_or_cutoff,
+        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+        meta_model_prefix=meta_model_prefix,
+        credible_interval=credible_interval,
+        sig_window_pad=sig_window_pad,
+        refine_max_cnv_size=refine_max_cnv_size,
+        rCNV_bucket=rCNV_bucket
+        # meta_p_cutoff=rCNV_calc_meta_p_cutoff.meta_p_cutoff,
+    }
+  }
 
-  # # Plot summary metrics for final credible regions
-  # call plot_region_summary as plot_rCNV_regions {
-  #   input:
-  #     freq_code="rCNV",
-  #     DEL_regions=refine_rCNV_regions.final_loci[0],
-  #     DUP_regions=refine_rCNV_regions.final_loci[1],
-  #     rCNV_bucket=rCNV_bucket
-  # }
+  # Plot summary metrics for final credible regions
+  call plot_region_summary as plot_rCNV_regions {
+    input:
+      freq_code="rCNV",
+      DEL_regions=refine_rCNV_regions.final_loci[0],
+      DUP_regions=refine_rCNV_regions.final_loci[1],
+      rCNV_bucket=rCNV_bucket
+  }
 
-  # output {
-  #   Array[File] final_sig_regions = refine_rCNV_regions.final_loci
-  #   Array[File] final_sig_associations = refine_rCNV_regions.final_associations
-  # }
+  output {
+    Array[File] final_sig_regions = refine_rCNV_regions.final_loci
+    Array[File] final_sig_associations = refine_rCNV_regions.final_associations
+  }
 }
 
 
@@ -454,6 +456,7 @@ task refine_regions {
   Float meta_p_cutoff
   Float meta_or_cutoff
   Int meta_nominal_cohorts_cutoff
+  String meta_model_prefix
   Float credible_interval
   Int sig_window_pad
   Int refine_max_cnv_size
@@ -537,6 +540,7 @@ task refine_regions {
     > window_refinement.${freq_code}_metacohort_info.tsv
     /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
       --cnv-type ${CNV} \
+      --model ${meta_model_prefix} \
       --min-p ${meta_p_cutoff} \
       --p-is-phred \
       --min-or-lower 0 \

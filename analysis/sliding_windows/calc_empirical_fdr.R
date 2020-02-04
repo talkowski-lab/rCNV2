@@ -51,28 +51,39 @@ hit.fdr.target <- function(fdrv, cutoffs, target){
 }
 
 # Calculate P-value cutoffs per permutation corresponding to target FDRs for a matrix of p-values
-get.fdr.cutoffs <- function(fdr.mat, fdr.targets){
-  fdr.cutoffs <- sapply(fdr.targets, function(t){
-    apply(fdr.mat, 2, hit.fdr.target, cutoffs=cutoffs, target=t)
-  })
-  colnames(fdr.cutoffs) <- paste("FDR", fdr.targets, sep="_")
+get.fdr.cutoffs <- function(fdr.mat, fdr.target){
+  fdr.cutoffs <- as.data.frame(apply(fdr.mat, 2, hit.fdr.target, cutoffs=cutoffs, target=fdr.target))
+  colnames(fdr.cutoffs) <- "fdr.cutoff"
   return(fdr.cutoffs)
 }
 
 # Create cutoff table of all permutations
-make.cutoff.mat <- function(fdr.mat, hpos, fdr.targets){
+make.cutoff.mat <- function(fdr.mat, hpos, fdr.target){
   perm.hpos <- unlist(lapply(strsplit(colnames(fdr.mat), split=".", fixed=T), function(vals){vals[1]}))
   perm.n <- as.numeric(sapply(perm.hpos, function(hpo){hpos$n[which(hpos$hpo==hpo)]}))
+  case.frac <- perm.n / (perm.n + hpos$n[which(hpos$hpo=="HEALTHY_CONTROL")])
   perm.idx <- unlist(lapply(strsplit(colnames(fdr.mat), split=".", fixed=T), function(vals){vals[3]}))
-  fdr.res <- get.fdr.cutoffs(fdr.mat, fdr.targets)
+  fdr.res <- get.fdr.cutoffs(fdr.mat, fdr.target)
   cutoff.mat <- data.frame("hpo"=perm.hpos,
                            "perm"=perm.idx,
                            "n.samples"=perm.n,
+                           "case.frac"=case.frac,
                            fdr.res)
   rownames(cutoff.mat) <- NULL
   return(cutoff.mat)
 }
 
+# Calculate max cutoff for each phenotype
+get.max.cutoffs <- function(cutoff.mat){
+  max.df <- do.call("rbind", lapply(unique(cutoff.mat$hpo), function(hpo){
+    c(hpo,
+      head(cutoff.mat[which(cutoff.mat$hpo==hpo), 3:4], 1),
+      max(cutoff.mat$fdr.cutoff[which(cutoff.mat$hpo==hpo)], na.rm=T))
+  }))
+  colnames(max.df) <- c("hpo", "n.cases", "case.frac", "fdr.cutoff")
+  max.df[, -1] <- apply(max.df[, -1], 2, as.numeric)
+  return(as.data.frame(max.df))
+}
 
 # Plot FDR traces, annotated with cutoffs
 plot.fdrs <- function(fdr.mat, cutoffs, cutoff.table){
@@ -130,8 +141,8 @@ option_list <- list(
               help="max P-value cutoff to evaluate (Phred-scaled) [default %default]"),
   make_option(c("--cutoff-step"), type="numeric", default=0.05,
               help="P-value increments to evaluate (Phred-scaled) [default %default]"),
-  make_option(c("--fdr-targets"), type="character", default="0.1,0.05,0.01",
-              help="FDR targets to calculate (comma-delimited list) [default %default]"),
+  make_option(c("--fdr-target"), type="numeric", default=0.01,
+              help="FDR target [default %default]"),
   make_option(c("--plot"), type="character", default=NULL,
               help="path to .png of FDR calculations [default %default]")
 )
@@ -152,7 +163,7 @@ outfile <- args$args[3]
 cnvtype <- opts$cnv
 max.cutoff <- opts$`max-cutoff`
 cutoff.step <- opts$`cutoff-step`
-fdr.targets <- as.numeric(unlist(strsplit(opts$`fdr-targets`, split=",")))
+fdr.target <- opts$`fdr-target`
 plot.out <- opts$`plot`
 
 # # DEV PARAMETERS
@@ -162,7 +173,7 @@ plot.out <- opts$`plot`
 # cnvtype <- "DEL"
 # max.cutoff <- 20
 # cutoff.step <- 0.05
-# fdr.targets <- c(0.1, 0.05, 0.01)
+# fdr.target <- 0.01
 # plot.out <- "~/scratch/meta_cutoffs.test.png"
 
 # Load sample size info
@@ -175,24 +186,27 @@ cutoffs <- seq(0, max.cutoff, cutoff.step)
 fdr.mat <- load.fdrs(pvals.in, cutoffs, cnvtype)
 
 # Calculate p-value cutoffs for each permutation for each target
-cutoff.mat <- make.cutoff.mat(fdr.mat, hpos, fdr.targets)
+cutoff.mat <- make.cutoff.mat(fdr.mat, hpos, fdr.target)
 
-# Determine 99th percentile of FDRs per P-value cutoff
-fdr.cutoffs <- get.fdr.cutoffs(fdr.mat, fdr.targets)
+# Calculate max cutoff for each phenotype
+max.cutoffs <- get.max.cutoffs(cutoff.mat)
 
-# Format & write output file
-df.out <- data.frame("#fdr"=fdr.targets,
-                     "phred_p_cutoff"=fdr.cutoffs,
-                     "p_cutoff"=10^-fdr.cutoffs)
-write.table(df.out, outfile, sep="\t", quote=F, 
-            col.names=T, row.names=F)
-
-# Plot FDR traces, if optioned
-if(!is.null(plot.out)){
-  png(plot.out, res=300, height=4*300, width=6*300)
-  plot.fdrs(fdr.mat, cutoffs, df.out)
-  dev.off()
-}
+# # Determine 99th percentile of FDRs per P-value cutoff
+# fdr.cutoffs <- get.fdr.cutoffs(fdr.mat, fdr.targets)
+# 
+# # Format & write output file
+# df.out <- data.frame("#fdr"=fdr.targets,
+#                      "phred_p_cutoff"=fdr.cutoffs,
+#                      "p_cutoff"=10^-fdr.cutoffs)
+# write.table(df.out, outfile, sep="\t", quote=F, 
+#             col.names=T, row.names=F)
+# 
+# # Plot FDR traces, if optioned
+# if(!is.null(plot.out)){
+#   png(plot.out, res=300, height=4*300, width=6*300)
+#   plot.fdrs(fdr.mat, cutoffs, df.out)
+#   dev.off()
+# }
 
 
 

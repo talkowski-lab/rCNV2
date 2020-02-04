@@ -47,8 +47,8 @@ pad_controls=50000
 weight_mode="weak"
 min_cds_ovr=0.1
 max_genes_per_cnv=5
-p_cutoff=0.000002848516
-meta_p_cutoff=0.000002848516
+p_cutoff=0.000002896368
+meta_p_cutoff=0.000002896368
 meta_model_prefix="re"
 
 
