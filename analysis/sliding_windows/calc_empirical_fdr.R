@@ -66,64 +66,95 @@ make.cutoff.mat <- function(fdr.mat, hpos, fdr.target){
   fdr.res <- get.fdr.cutoffs(fdr.mat, fdr.target)
   cutoff.mat <- data.frame("hpo"=perm.hpos,
                            "perm"=perm.idx,
-                           "n.samples"=perm.n,
+                           "n.cases"=perm.n,
                            "case.frac"=case.frac,
                            fdr.res)
   rownames(cutoff.mat) <- NULL
   return(cutoff.mat)
 }
 
-# Calculate max cutoff for each phenotype
-get.max.cutoffs <- function(cutoff.mat){
-  max.df <- do.call("rbind", lapply(unique(cutoff.mat$hpo), function(hpo){
+# Calculate a statistic for permuted cutoffs for each phenotype
+get.cutoff.stat <- function(cutoff.mat, stat){
+  stat.df <- as.data.frame(do.call("rbind", lapply(unique(cutoff.mat$hpo), function(hpo){
+    if(stat=="max"){
+      x <- max(cutoff.mat$fdr.cutoff[which(cutoff.mat$hpo==hpo)], na.rm=T)
+    }else if(stat=="mean"){
+      x <- mean(cutoff.mat$fdr.cutoff[which(cutoff.mat$hpo==hpo)], na.rm=T)
+    }else if(stat=="median"){
+      x <- median(cutoff.mat$fdr.cutoff[which(cutoff.mat$hpo==hpo)], na.rm=T)
+    }else if(stat=="Q3"){
+      x <- quantile(cutoff.mat$fdr.cutoff[which(cutoff.mat$hpo==hpo)], probs=0.75, na.rm=T)
+    }
     c(hpo,
       head(cutoff.mat[which(cutoff.mat$hpo==hpo), 3:4], 1),
-      max(cutoff.mat$fdr.cutoff[which(cutoff.mat$hpo==hpo)], na.rm=T))
-  }))
-  colnames(max.df) <- c("hpo", "n.cases", "case.frac", "fdr.cutoff")
-  max.df[, -1] <- apply(max.df[, -1], 2, as.numeric)
-  return(as.data.frame(max.df))
+      unlist(x))
+  })))
+  colnames(stat.df) <- c("hpo", "n.cases", "case.frac", "fdr.cutoff")
+  stat.df[, -1] <- apply(stat.df[, -1], 2, as.numeric)
+  return(stat.df)
 }
 
-# Plot FDR traces, annotated with cutoffs
-plot.fdrs <- function(fdr.mat, cutoffs, cutoff.table){
-  # Get plot values
-  xmax <- 1.5*max(cutoff.table[, 2])
-  ymax <- 1.5*max(cutoff.table[, 1])
+# Fit exponential decay to a list of points
+fit.exp.decay <- function(x, y){
+  # Following example on https://rpubs.com/mengxu/exponential-model
   
-  # Prep plot area
-  par(mar=c(3, 3, 0.5, 0.5))
-  plot(x=c(0, xmax), y=c(0, ymax), type="n",
-       xaxt="n", yaxt="n", xlab="", ylab="")
+  train.df <- data.frame("x"=as.numeric(x), 
+                         "y"=as.numeric(y))
+  
+  # Estimate initial parameters
+  theta.0 <- 0.5 * min(train.df$y)
+  model.0 <- lm(log(y - theta.0) ~ x, data=train.df)
+  alpha.0 <- exp(coef(model.0)[1])
+  beta.0 <- coef(model.0)[2]
+  start <- list(alpha = alpha.0, beta = beta.0, theta = theta.0)
+  
+  # Re-fit the model with estimated starting parameters
+  return(nls(y ~ alpha * exp(beta * x) + theta, start = start, data=train.df))
+}
+
+# Calculate adjusted p-value cutoffs per HPO term
+get.adjusted.cutoffs <- function(cutoff.stat.df){
+  fit <- fit.exp.decay(cutoff.stat.df$n.cases, cutoff.stat.df$fdr.cutoff)
+  fit.df <- data.frame("x"=cutoff.stat.df$n.cases)
+  fit.df$y <- predict(fit, newdata=fit.df)
+  out.df <- as.data.frame(cbind(cutoff.stat.df$hpo, 10^-fit.df$y))
+  colnames(out.df) <- c("#hpo", "min_p")
+  return(out.df)
+}
+
+# Plot FDR, annotated with means and fitted curve
+plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target, floor=T){
+  phred.target <- -log10(fdr.target)
+  
+  # Prep plot area & add points
+  par(mar=c(3, 3, 2, 0.5))
+  plot(x=cutoff.mat$n.cases, y=cutoff.mat$fdr.cutoff, 
+       col="gray75", xaxt="n", yaxt="n", xlab="", ylab="")
+  abline(h=phred.target, lty=2)
+  points(x=cutoff.stat.df$n.cases, y=cutoff.stat.df$fdr.cutoff, pch=15)
+  
+  # Add trendline
+  fit <- fit.exp.decay(cutoff.stat.df$n.cases, cutoff.stat.df$fdr.cutoff)
+  fit.df <- data.frame("x"=round(quantile(0:par("usr")[2], probs=seq(0, 1, 0.005))))
+  fit.df$y <- predict(fit, newdata=fit.df)
+  if(floor==T){
+    fit.df$y[which(fit.df$y < phred.target)] <- phred.target
+  }
+  lines(fit.df$x, fit.df$y, col="red", lwd=3)
   
   # Add axes
   axis(1, labels=NA)
-  axis(1, tick=F, line=-0.5, cex.axis=0.85)
-  mtext(1, line=1.5, text=bquote(-log[10](italic(p))))
+  axis(1, at=axTicks(1), tick=F, line=-0.5, cex.axis=0.85, labels=axTicks(1)/1000)
+  mtext(1, line=1.5, text="Case samples (thousands)")
   axis(2, labels=NA)
-  axis(2, at=axTicks(2), tick=F, line=-0.5, las=2, cex.axis=0.85,
-       labels=paste(round(100*axTicks(2)), "%", sep=""))
-  mtext(2, line=1.8, text="FDR")
+  axis(2, at=axTicks(2), tick=F, line=-0.5, las=2, cex.axis=0.85)
+  mtext(2, line=1.5, text=bquote(-log[10](italic(P))))
+  mtext(3, line=0.1, text=stat, font=2)
   
-  # Add FDR traces
-  sapply(1:ncol(fdr.mat), function(k){
-    points(x=cutoffs, y=fdr.mat[, k], type="l",
-           col=adjustcolor("black", alpha=0.2))
-  })
-  
-  # Add optimized FDR cutoffs
-  textLab.ybuffer <- 0.05*(par("usr")[4] - par("usr")[3])
-  sapply(1:nrow(cutoff.table), function(i){
-    abline(h=cutoff.table[i, 1], col="red", lty=2)
-    points(x=cutoff.table[i, 2], y=cutoff.table[i, 1],
-           pch=19, col="red")
-    text(x=cutoff.table[i, 2], y=cutoff.table[i, 1] + textLab.ybuffer,
-         labels=paste("FDR = ", round(100*cutoff.table[i, 1], 2), "%\n",
-                      "-log10(P) = ", round(cutoff.table[i, 2], 2), sep=""),
-         col="red", pos=4)
-  })
-  
-  
+  # Add legend
+  legend("topright", pch=c(1, 15, NA, NA), lwd=c(1, 1, 3, 1), lty=c(NA, NA, 1, 2), 
+         col=c("gray75", "black", "red", "black"), legend=c("Permutation", stat, "Fit", "FDR Target"), 
+         cex=0.9)
 }
 
 
@@ -144,7 +175,7 @@ option_list <- list(
   make_option(c("--fdr-target"), type="numeric", default=0.01,
               help="FDR target [default %default]"),
   make_option(c("--plot"), type="character", default=NULL,
-              help="path to .png of FDR calculations [default %default]")
+              help="path to .png of FDR fit vs. permutations [default %default]")
 )
 
 # Get command-line arguments & options
@@ -173,7 +204,7 @@ plot.out <- opts$`plot`
 # cnvtype <- "DEL"
 # max.cutoff <- 20
 # cutoff.step <- 0.05
-# fdr.target <- 0.01
+# fdr.target <- 0.00000385862
 # plot.out <- "~/scratch/meta_cutoffs.test.png"
 
 # Load sample size info
@@ -188,26 +219,25 @@ fdr.mat <- load.fdrs(pvals.in, cutoffs, cnvtype)
 # Calculate p-value cutoffs for each permutation for each target
 cutoff.mat <- make.cutoff.mat(fdr.mat, hpos, fdr.target)
 
-# Calculate max cutoff for each phenotype
-max.cutoffs <- get.max.cutoffs(cutoff.mat)
+# Calculate various stats of cutoffs for each phenotype
+mean.cutoffs <- get.cutoff.stat(cutoff.mat, "mean")
+median.cutoffs <- get.cutoff.stat(cutoff.mat, "median")
+q3.cutoffs <- get.cutoff.stat(cutoff.mat, "Q3")
+max.cutoffs <- get.cutoff.stat(cutoff.mat, "max")
 
-# # Determine 99th percentile of FDRs per P-value cutoff
-# fdr.cutoffs <- get.fdr.cutoffs(fdr.mat, fdr.targets)
-# 
-# # Format & write output file
-# df.out <- data.frame("#fdr"=fdr.targets,
-#                      "phred_p_cutoff"=fdr.cutoffs,
-#                      "p_cutoff"=10^-fdr.cutoffs)
-# write.table(df.out, outfile, sep="\t", quote=F, 
-#             col.names=T, row.names=F)
-# 
-# # Plot FDR traces, if optioned
-# if(!is.null(plot.out)){
-#   png(plot.out, res=300, height=4*300, width=6*300)
-#   plot.fdrs(fdr.mat, cutoffs, df.out)
-#   dev.off()
-# }
+# Format & write output file
+df.out <- get.adjusted.cutoffs(mean.cutoffs)
+write.table(df.out, outfile, sep="\t", quote=F,
+            col.names=T, row.names=F)
 
-
-
+# Plot FDR data, if optioned
+if(!is.null(plot.out)){
+  png(plot.out, res=300, height=5*300, width=6*300)
+  par(mfrow=c(2, 2))
+  plot.fdrs(cutoff.mat, mean.cutoffs, "Mean", fdr.target, floor=F)
+  plot.fdrs(cutoff.mat, median.cutoffs, "Median", fdr.target, floor=F)
+  plot.fdrs(cutoff.mat, q3.cutoffs, "Third quartile", fdr.target, floor=F)
+  plot.fdrs(cutoff.mat, max.cutoffs, "Max", fdr.target, floor=F)
+  dev.off()
+}
 

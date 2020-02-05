@@ -161,6 +161,24 @@ def load_cohort_info(info_file, regions_bt, cnv_type):
     return cohort_info
 
 
+def load_p_cutoffs(p_cutoffs_in):
+    """
+    Read a dictionary of p-value cutoffs per phenotype
+    """
+
+    p_cutoffs = {}
+
+    with open(p_cutoffs_in) as tsvin:
+        reader = csv.reader(tsvin, delimiter='\t')
+        for hpo, cutoff in reader:
+            if hpo.startswith('#'):
+                continue
+            else:
+                p_cutoffs[hpo.replace('HP', 'HP:')] = float(cutoff)
+
+    return p_cutoffs
+
+
 def get_sentinel_window(sig_windows):
     """
     Parse list of dicts of window : [(hpo1, p1), (hpo2, p2)] tuples to find
@@ -635,7 +653,7 @@ def calc_credible_interval(cnvs_df, method='density', resolution=10000, cred=0.8
 
 
 def refine_sentinel(regions, rid, sig_df, sig_bt, pvals, cohorts, cnv_type, 
-                    control_hpo, min_p, min_or_lower, min_nominal, model,
+                    control_hpo, p_cutoffs, min_or_lower, min_nominal, model,
                     exclude_cnvs, logfile, max_size=10000000, min_case_cnvs=3, 
                     resolution=10000, cred=0.8, ci_method='density'):
     """
@@ -651,6 +669,7 @@ def refine_sentinel(regions, rid, sig_df, sig_bt, pvals, cohorts, cnv_type,
     sentinel = regions[rid]['sentinel']
     sent_wid = sentinel['window_id']
     sent_hpos = sentinel['all_hpos']
+    min_p = np.nanmax([p_cutoffs[hpo] for hpo in sent_hpos])
     region_hpos = regions[rid]['sig_hpos']
     sent_bt = pbt.BedTool.from_dataframe(sig_df[sig_df['id'].isin([sent_wid])].iloc[:, 0:3])
     sent_mid = (sent_bt[0].start + sent_bt[0].end) / 2
@@ -825,7 +844,7 @@ def get_cnvs_by_id(cohorts, ids):
 
 
 def update_pvalues(window_ids, pvals, sig_df, sig_bt, cohorts, exclude_cnvs, 
-                   exclude_cnv_bt, min_p, min_nominal, min_or_lower, model, 
+                   exclude_cnv_bt, p_cutoffs, min_nominal, min_or_lower, model, 
                    max_size, min_case_cnvs, control_hpo):
     """
     Recalculate p-values and significance matrix for significant hpos from provided windows
@@ -888,6 +907,9 @@ def update_pvalues(window_ids, pvals, sig_df, sig_bt, cohorts, exclude_cnvs,
                     n_control_alt = _count_cnvs_by_cohort(control_cnvs, cohorts)
                 else:
                     n_control_alt = [0] * len(cohorts)
+
+                # Get HPO-specific p-value cutoff
+                min_p = p_cutoffs[hpo]
 
                 # Automatically set p-value to 1 if not enough case CNVs are observed
                 # (This will cause this window/hpo pair to be skipped in secondary
@@ -1174,8 +1196,8 @@ def main():
                         default='CNV')
     parser.add_argument('--model', help='Meta-analysis model to use. [default: density]', 
                         default='mh', choices=['mh', 're'])
-    parser.add_argument('--min-p', help='P-value of significance threshold. ' + 
-                        '[default: 10e-8]', default=10e-8, type=float)
+    parser.add_argument('--p-cutoffs', help='.tsv of p-value cutoffs per phenotype. ' + 
+                        '[default: 10e-8 for all phenotypes]')
     parser.add_argument('--p-is-phred', help='Supplied P-values are Phred-scaled ' +
                         '(-log10[P]). [default: False]', default=False, 
                         action='store_true')
@@ -1245,6 +1267,10 @@ def main():
 
     # Load cohort info, including CNVs & HPOs
     cohorts = load_cohort_info(args.cohort_info, regions_bt, args.cnv_type)
+    if args.p_cutoffs is None:
+        p_cutoffs = {hpo : 1e-8 for hpo in pvals.columns[4:]}
+    else:
+        p_cutoffs = load_p_cutoffs(args.p_cutoffs)
 
     # Refine regions one at a time
     k = 0
@@ -1262,7 +1288,7 @@ def main():
             print('--Refining sentinel window #{0}'.format(str(i)), file=logfile)
             new_region = refine_sentinel(regions, rid, sig_df, sig_bt, pvals, 
                                          cohorts, args.cnv_type, args.control_hpo, 
-                                         args.min_p, args.min_or_lower, 
+                                         p_cutoffs, args.min_or_lower, 
                                          args.min_nominal, args.model, used_cnvs, 
                                          logfile, args.max_cnv_size, args.min_case_cnvs, 
                                          args.resolution, args.credible_interval, 
@@ -1276,7 +1302,7 @@ def main():
             # Update pvalues and significance for windows in current region
             wids_to_update = list(regions[rid]['sig_windows'].keys())
             update_pvalues(wids_to_update, pvals, sig_df, sig_bt, cohorts, 
-                           used_cnvs, used_cnv_bt, args.min_p, args.min_nominal, 
+                           used_cnvs, used_cnv_bt, p_cutoffs, args.min_nominal, 
                            args.retest_min_or_lower, args.model, args.max_cnv_size, 
                            args.min_case_cnvs, args.control_hpo)
             sig_windows = sig_df[sig_df.iloc[:, 4:].apply(any, axis=1)].iloc[:, 0:4]

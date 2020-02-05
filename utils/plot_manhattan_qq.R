@@ -427,8 +427,11 @@ option_list <- list(
   make_option(c("--highlight-name"), type="character", default="Highlighted regions", 
               help="name for highlighted regions in legend [default %default]",
               metavar="string"),
+  make_option(c("--cutoff-2"), type="numeric", default=NULL, 
+              help="P-value of significance threshold in second plot (--miami only) [default %default]",
+              metavar="numeric"),
   make_option(c("--highlight-bed-2"), type="character", default=NA, 
-              help="BED file of coordinates to highlight in second plot (--miami only) [default %default]",
+              help="BED file of coordinates to highlight in second plot (--miami only) [default: uses value passed as --cutoff]",
               metavar="BED"),
   make_option(c("--highlight-name-2"), type="character", default="Highlighted regions", 
               help="name for highlighted regions in legend of second plot (--miami only) [default %default]",
@@ -466,6 +469,10 @@ min.p <- 10^-(opts$`max-phred-p`)
 cutoff <- opts$cutoff
 highlight.in <- opts$`highlight-bed`
 highlight.name <- opts$`highlight-name`
+cutoff2 <- opts$`cutoff-2`
+if(is.null(cutoff2)){
+  cutoff2 <- cutoff
+}
 highlight2.in <- opts$`highlight-bed-2`
 highlight2.name <- opts$`highlight-name-2`
 lab.prefix <- opts$`label-prefix`
@@ -569,7 +576,7 @@ if(miami == F){
             highlight.name=highlight.name,
             lab.prefix=lab.prefix,
             ymax=-log10(global.p.min))
-  manhattan(stats2, cutoff, highlights=highlights2,
+  manhattan(stats2, cutoff2, highlights=highlights2,
             highlight.name=highlight2.name,
             lab.prefix=lab2.prefix,
             ymax=-log10(global.p.min),
@@ -603,13 +610,13 @@ if(miami == F){
      legend=F,
      ymax=-log10(global.p.min),
      label.cex=0.9*label.cex)
-  manhattan(stats2, cutoff, highlights=highlights2,
+  manhattan(stats2, cutoff2, highlights=highlights2,
             highlight.name=highlight2.name,
             lab.prefix=lab2.prefix,
             ymax=-log10(global.p.min),
             reflection=T,
             label.cex=label.cex)
-  qq(stats2, cutoff, highlights=highlights2,
+  qq(stats2, cutoff2, highlights=highlights2,
      highlight.name=highlight2.name,
      legend=F,
      ymax=-log10(global.p.min),

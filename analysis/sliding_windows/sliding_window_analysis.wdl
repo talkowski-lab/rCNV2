@@ -27,12 +27,12 @@ workflow sliding_window_analysis {
   Float credible_interval
   Int sig_window_pad
   Int refine_max_cnv_size
-  File autosomes
+  File contigfile
   String rCNV_bucket
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
 
-  Array[Array[String]] contigs = read_tsv(autosomes)
+  Array[Array[String]] contigs = read_tsv(contigfile)
 
   Array[String] cnv_types = ["DEL", "DUP"]
 
@@ -53,35 +53,37 @@ workflow sliding_window_analysis {
         prefix=pheno[0]
     }
 
-    # # Permute phenotypes to estimate empirical FDR
-    # call scattered_perm.scattered_sliding_window_perm_test as rCNV_perm_test {
-    #   input:
-    #     hpo=pheno[1],
-    #     metacohort_list=metacohort_list,
-    #     metacohort_sample_table=metacohort_sample_table,
-    #     freq_code="rCNV",
-    #     binned_genome=binned_genome,
-    #     bin_overlap=bin_overlap,
-    #     pad_controls=pad_controls,
-    #     p_cutoff=p_cutoff,
-    #     n_pheno_perms=n_pheno_perms,
-    #     meta_model_prefix=meta_model_prefix,
-    #     rCNV_bucket=rCNV_bucket,
-    #     prefix=pheno[0]
-    # }
+    # Permute phenotypes to estimate empirical FDR
+    call scattered_perm.scattered_sliding_window_perm_test as rCNV_perm_test {
+      input:
+        hpo=pheno[1],
+        metacohort_list=metacohort_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code="rCNV",
+        binned_genome=binned_genome,
+        bin_overlap=bin_overlap,
+        pad_controls=pad_controls,
+        p_cutoff=p_cutoff,
+        n_pheno_perms=n_pheno_perms,
+        meta_model_prefix=meta_model_prefix,
+        rCNV_bucket=rCNV_bucket,
+        prefix=pheno[0]
+    }
   }
-
-  # DEV NOTE: REBUILDING PERMUTATION ANALYSIS
   
-  # # Determine appropriate genome-wide P-value threshold for meta-analysis
-  # call calc_meta_p_cutoff as rCNV_calc_meta_p_cutoff {
-  #   input:
-  #     phenotype_list=phenotype_list,
-  #     freq_code="rCNV",
-  #     n_pheno_perms=n_pheno_perms,
-  #     rCNV_bucket=rCNV_bucket,
-  #     dummy_completion_markers=rCNV_perm_test.completion_marker
-  # }
+  # Determine appropriate genome-wide P-value thresholds for meta-analysis
+  scatter ( cnv in cnv_types ) {
+    call calc_meta_p_cutoff {
+      input:
+        phenotype_list=phenotype_list,
+        freq_code="rCNV",
+        CNV=cnv,
+        n_pheno_perms=n_pheno_perms,
+        fdr_target=p_cutoff,
+        rCNV_bucket=rCNV_bucket,
+        dummy_completion_markers=rCNV_perm_test.completion_marker
+    }
+  }
 
   # Perform meta-analysis of rCNV association statistics
   scatter ( pheno in phenotypes ) {
@@ -93,11 +95,10 @@ workflow sliding_window_analysis {
         metacohort_list=metacohort_list,
         metacohort_sample_table=metacohort_sample_table,
         freq_code="rCNV",
-        meta_p_cutoff=p_cutoff,
+        meta_p_cutoff_tables=calc_meta_p_cutoff.p_cutoff_table,
         meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
-        # meta_p_cutoff=rCNV_calc_meta_p_cutoff.meta_p_cutoff,
     }
   }
 
@@ -111,7 +112,7 @@ workflow sliding_window_analysis {
         binned_genome=binned_genome,
         freq_code="rCNV",
         CNV=cnv,
-        meta_p_cutoff=p_cutoff,
+        meta_p_cutoff_tables=calc_meta_p_cutoff.p_cutoff_table,
         meta_or_cutoff=meta_or_cutoff,
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         sig_window_pad=sig_window_pad,
@@ -129,12 +130,14 @@ workflow sliding_window_analysis {
         labeled_windows=prep_refinement.labeled_windows[0],
         freq_code="rCNV",
         CNV="DEL",
-        meta_p_cutoff=p_cutoff,
+        meta_p_cutoff_tables=calc_meta_p_cutoff.p_cutoff_table,
         meta_or_cutoff=meta_or_cutoff,
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         meta_model_prefix=meta_model_prefix,
         credible_interval=credible_interval,
-        refine_max_cnv_size=refine_max_cnv_size
+        refine_max_cnv_size=refine_max_cnv_size,
+        rCNV_bucket=rCNV_bucket
+    }
     # DUP
     call refine_regions as refine_rCNV_regions_DUP {
       input:
@@ -145,19 +148,20 @@ workflow sliding_window_analysis {
         labeled_windows=prep_refinement.labeled_windows[1],
         freq_code="rCNV",
         CNV="DUP",
-        meta_p_cutoff=p_cutoff,
+        meta_p_cutoff_tables=calc_meta_p_cutoff.p_cutoff_table,
         meta_or_cutoff=meta_or_cutoff,
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         meta_model_prefix=meta_model_prefix,
         credible_interval=credible_interval,
-        refine_max_cnv_size=refine_max_cnv_size
+        refine_max_cnv_size=refine_max_cnv_size,
+        rCNV_bucket=rCNV_bucket
     }
   }
   call merge_refinements as merge_refinements_DEL {
     input:
       loci=refine_rCNV_regions_DEL.loci,
-      associations=refine_rCNV_associations_DEL.associations,
-      logs=refine_rCNV_associations_DEL.logs,
+      associations=refine_rCNV_regions_DEL.associations,
+      logfiles=refine_rCNV_regions_DEL.logfile,
       freq_code="rCNV",
       CNV="DEL",
       rCNV_bucket=rCNV_bucket
@@ -165,8 +169,8 @@ workflow sliding_window_analysis {
   call merge_refinements as merge_refinements_DUP {
     input:
       loci=refine_rCNV_regions_DUP.loci,
-      associations=refine_rCNV_associations_DUP.associations,
-      logs=refine_rCNV_associations_DUP.logs,
+      associations=refine_rCNV_regions_DUP.associations,
+      logfiles=refine_rCNV_regions_DUP.logfile,
       freq_code="rCNV",
       CNV="DUP",
       rCNV_bucket=rCNV_bucket
@@ -227,7 +231,7 @@ task burden_test {
       title="$descrip (${hpo})\n$ncase cases vs $nctrl controls in '$meta' cohort"
 
       # Iterate over CNV types
-      for CNV in CNV DEL DUP; do
+      for CNV in DEL DUP; do
         # Set CNV-specific parameters
         case "$CNV" in
           DEL)
@@ -237,10 +241,6 @@ task burden_test {
           DUP)
             highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz
             highlight_title="Known DUP GDs (Owen 2018)"
-            ;;
-          *)
-            highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.bed.gz
-            highlight_title="Known GDs (Owen 2018)"
             ;;
         esac
 
@@ -306,7 +306,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:60bd18cbd7dff9d06215d08170075e1f8934d44b78defb695cd29e926cbb8923"
+    docker: "talkowski/rcnv@sha256:884e59e17422d4f9ab3fe57023ffcc6bf05b2a970dd090bfb2b4b7c203bdfe27"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -324,7 +324,9 @@ task burden_test {
 task calc_meta_p_cutoff {
   File phenotype_list
   String freq_code
+  String CNV
   Int n_pheno_perms
+  Float fdr_target
   String rCNV_bucket
   Array[File] dummy_completion_markers #Must delocalize something or Cromwell will bypass permutation test
 
@@ -336,32 +338,33 @@ task calc_meta_p_cutoff {
       gsutil -m cp \
         "${rCNV_bucket}/analysis/sliding_windows/$prefix/${freq_code}/permutations/**.stats.perm_*.bed.gz" \
         perm_res/
-      for CNV in DEL DUP; do
-        for i in $( seq 1 ${n_pheno_perms} ); do
-          zcat perm_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
-          | grep -ve '^#' \
-          | awk '{ print $NF }' \
-          | cat <( echo "$prefix.$CNV.$i" ) - \
-          > perm_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.permuted_p_values.$i.txt
-        done
+      for i in $( seq 1 ${n_pheno_perms} ); do
+        zcat perm_res/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
+        | grep -ve '^#' \
+        | awk '{ print $NF }' \
+        | cat <( echo "$prefix.${CNV}.$i" ) - \
+        > perm_res/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.permuted_p_values.$i.txt
       done
     done < ${phenotype_list}
     paste perm_res/*.sliding_window.meta_analysis.permuted_p_values.*.txt \
     | gzip -c \
-    > ${freq_code}.permuted_pval_matrix.txt.gz
+    > ${freq_code}.${CNV}.permuted_pval_matrix.txt.gz
 
     # Calculate empirical FDR
     /opt/rCNV2/analysis/sliding_windows/calc_empirical_fdr.R \
-      --plot ${freq_code}.FDR_permutation_results.png \
-      ${freq_code}.permuted_pval_matrix.txt.gz \
-      ${freq_code}.empirical_fdr_cutoffs.tsv
+      --cnv ${CNV} \
+      --fdr-target ${fdr_target} \
+      --plot ${freq_code}.${CNV}.FDR_permutation_results.png \
+      ${freq_code}.${CNV}.permuted_pval_matrix.txt.gz \
+      sliding_window.${freq_code}.${CNV}.empirical_fdr_cutoffs.tsv
 
-    tail -n1 ${freq_code}.empirical_fdr_cutoffs.tsv | cut -f3 \
-    > meta_p_cutoff.txt
+    # Copy cutoff table to output bucket
+    gsutil -m cp sliding_window.${freq_code}.${CNV}.empirical_fdr_cutoffs.tsv \
+      "${rCNV_bucket}/analysis/analysis_refs/"
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:60bd18cbd7dff9d06215d08170075e1f8934d44b78defb695cd29e926cbb8923"
+    docker: "talkowski/rcnv@sha256:884e59e17422d4f9ab3fe57023ffcc6bf05b2a970dd090bfb2b4b7c203bdfe27"
     preemptible: 1
     memory: "16 GB"
     disks: "local-disk 100 HDD"
@@ -369,8 +372,8 @@ task calc_meta_p_cutoff {
   }
 
   output {
-    File perm_results_plot = "${freq_code}.FDR_permutation_results.png"
-    Float meta_p_cutoff = read_float("meta_p_cutoff.txt")
+    File perm_results_plot = "${freq_code}.${CNV}.FDR_permutation_results.png"
+    File p_cutoff_table = read_float("sliding_window.${freq_code}.${CNV}.empirical_fdr_cutoffs.tsv")
   }  
 }
 
@@ -383,7 +386,7 @@ task meta_analysis {
   File metacohort_list
   File metacohort_sample_table
   String freq_code
-  Float meta_p_cutoff
+  Array[File] meta_p_cutoff_tables
   String meta_model_prefix
   String rCNV_bucket
   String prefix
@@ -391,8 +394,10 @@ task meta_analysis {
   command <<<
     set -e
 
-    # Copy burden stats
+    # Copy burden stats & p-value cutoff tables
     find / -name "*${prefix}.${freq_code}.*.sliding_window.stats.bed.gz*" \
+    | xargs -I {} mv {} ./
+    find / -name "*sliding_window.${freq_code}.*.empirical_fdr_cutoffs.tsv*" \
     | xargs -I {} mv {} ./
     # gsutil -m cp \
     #   ${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/** \
@@ -411,22 +416,24 @@ task meta_analysis {
     descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
                | awk -v FS="\t" '{ print $2 }' )
     title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
+    DEL_p_cutoff=$( awk -v hpo=${hpo} '{ if ($1==hpo) print $2 }' \
+                    sliding_window.${freq_code}.DEL.empirical_fdr_cutoffs.tsv )
+    DUP_p_cutoff=$( awk -v hpo=${hpo} '{ if ($1==hpo) print $2 }' \
+                    sliding_window.${freq_code}.DUP.empirical_fdr_cutoffs.tsv )
 
     # Run meta-analysis for each CNV type
-    for CNV in DEL DUP CNV; do
+    for CNV in DEL DUP; do
       # Set CNV-specific parameters
       case "$CNV" in
         DEL)
           highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz
           highlight_title="Known DEL GDs (Owen 2018)"
+          meta_p_cutoff=$DEL_p_cutoff
           ;;
         DUP)
           highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz
           highlight_title="Known DUP GDs (Owen 2018)"
-          ;;
-        *)
-          highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.bed.gz
-          highlight_title="Known GDs (Owen 2018)"
+          meta_p_cutoff=$DUP_p_cutoff
           ;;
       esac
 
@@ -448,7 +455,7 @@ task meta_analysis {
       /opt/rCNV2/utils/plot_manhattan_qq.R \
         --p-col-name "meta_phred_p" \
         --p-is-phred \
-        --cutoff ${meta_p_cutoff} \
+        --cutoff $meta_p_cutoff \
         --highlight-bed "$highlight_bed" \
         --highlight-name "$highlight_title" \
         --label-prefix "$CNV" \
@@ -462,10 +469,11 @@ task meta_analysis {
       --miami \
       --p-col-name "meta_phred_p" \
       --p-is-phred \
-      --cutoff ${meta_p_cutoff} \
+      --cutoff $DUP_p_cutoff \
       --highlight-bed /opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz \
       --highlight-name "Known DUP GDs (Owen 2018)" \
       --label-prefix "DUP" \
+      --cutoff-2 $DEL_p_cutoff \
       --highlight-bed-2 /opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz \
       --highlight-name-2 "Known DEL GDs (Owen 2018)" \
       --label-prefix-2 "DEL" \
@@ -491,7 +499,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:60bd18cbd7dff9d06215d08170075e1f8934d44b78defb695cd29e926cbb8923"
+    docker: "talkowski/rcnv@sha256:884e59e17422d4f9ab3fe57023ffcc6bf05b2a970dd090bfb2b4b7c203bdfe27"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -507,7 +515,7 @@ task prep_refinement {
   File binned_genome
   String freq_code
   String CNV
-  Float meta_p_cutoff
+  Array[File] meta_p_cutoff_tables
   Float meta_or_cutoff
   Int meta_nominal_cohorts_cutoff
   Int sig_window_pad
@@ -515,6 +523,10 @@ task prep_refinement {
 
   command <<<
     set -e
+
+    # Copy p-value cutoff tables
+    find / -name "*sliding_window.${freq_code}.*.empirical_fdr_cutoffs.tsv*" \
+    | xargs -I {} mv {} ./
 
     # Download all meta-analysis stats files and necessary data
     mkdir cleaned_cnv/
@@ -563,7 +575,7 @@ task prep_refinement {
     /opt/rCNV2/analysis/sliding_windows/get_significant_windows.R \
       --pvalues ${CNV}.pval_matrix.bed.gz \
       --p-is-phred \
-      --max-p ${meta_p_cutoff} \
+      --p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_fdr_cutoffs.tsv \
       --odds-ratios ${CNV}.lnOR_lower_matrix.bed.gz \
       --or-is-ln \
       --min-or ${meta_or_cutoff} \
@@ -599,7 +611,7 @@ task prep_refinement {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:60bd18cbd7dff9d06215d08170075e1f8934d44b78defb695cd29e926cbb8923"
+    docker: "talkowski/rcnv@sha256:884e59e17422d4f9ab3fe57023ffcc6bf05b2a970dd090bfb2b4b7c203bdfe27"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -617,15 +629,32 @@ task refine_regions {
   File labeled_windows
   String freq_code
   String CNV
-  Float meta_p_cutoff
+  Array[File] meta_p_cutoff_tables
   Float meta_or_cutoff
   Int meta_nominal_cohorts_cutoff
   String meta_model_prefix
   Float credible_interval
   Int refine_max_cnv_size
+  String rCNV_bucket
 
   command <<<
     set -e
+
+    # Copy p-value cutoff tables
+    find / -name "*sliding_window.${freq_code}.*.empirical_fdr_cutoffs.tsv*" \
+    | xargs -I {} mv {} ./
+
+    # Download all meta-analysis stats files and necessary data
+    mkdir cleaned_cnv/
+    gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
+    mkdir stats/
+    gsutil -m cp \
+      ${rCNV_bucket}/analysis/sliding_windows/**.${freq_code}.**.sliding_window.meta_analysis.stats.bed.gz \
+      stats/
+    mkdir refs/
+    gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
+    mkdir phenos/
+    gsutil -m cp gs://rcnv_project/cleaned_data/phenotypes/filtered/* phenos/
 
     # Tabix input to single chromosome
     tabix -f ${regions_to_refine}
@@ -636,24 +665,30 @@ task refine_regions {
     tabix -h ${labeled_windows} ${contig} | bgzip -c > labeled_windows.bed.gz
 
     # Perform refinement
-    /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
-      --cnv-type ${CNV} \
-      --model ${meta_model_prefix} \
-      --min-p ${meta_p_cutoff} \
-      --p-is-phred \
-      --min-or-lower 0 \
-      --retest-min-or-lower ${meta_or_cutoff} \
-      --max-cnv-size ${refine_max_cnv_size} \
-      --min-nominal ${meta_nominal_cohorts_cutoff} \
-      --credible-interval ${credible_interval} \
-      --prefix "${freq_code}_${CNV}" \
-      --log ${freq_code}.${CNV}.region_refinement.${contig}.log \
-      regions_to_refine.bed.gz \
-      ${metacohort_info_tsv} \
-      pval_matrix.bed.gz \
-      labeled_windows.bed.gz \
-      ${freq_code}.${CNV}.final_regions.associations.${contig}.bed \
-      ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
+    if [ $( zcat regions_to_refine.bed.gz | fgrep -v "#" | wc -l ) -gt 0 ]; then
+      /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
+        --cnv-type ${CNV} \
+        --model ${meta_model_prefix} \
+        --p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_fdr_cutoffs.tsv \
+        --p-is-phred \
+        --min-or-lower 0 \
+        --retest-min-or-lower ${meta_or_cutoff} \
+        --max-cnv-size ${refine_max_cnv_size} \
+        --min-nominal ${meta_nominal_cohorts_cutoff} \
+        --credible-interval ${credible_interval} \
+        --prefix "${freq_code}_${CNV}" \
+        --log ${freq_code}.${CNV}.region_refinement.${contig}.log \
+        regions_to_refine.bed.gz \
+        ${metacohort_info_tsv} \
+        pval_matrix.bed.gz \
+        labeled_windows.bed.gz \
+        ${freq_code}.${CNV}.final_regions.associations.${contig}.bed \
+        ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
+    else
+      touch ${freq_code}.${CNV}.final_regions.associations.${contig}.bed
+      touch ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
+      touch ${freq_code}.${CNV}.region_refinement.${contig}.log
+    fi
     bgzip -f ${freq_code}.${CNV}.final_regions.associations.${contig}.bed
     bgzip -f ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
   >>>
@@ -665,7 +700,7 @@ task refine_regions {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:60bd18cbd7dff9d06215d08170075e1f8934d44b78defb695cd29e926cbb8923"
+    docker: "talkowski/rcnv@sha256:884e59e17422d4f9ab3fe57023ffcc6bf05b2a970dd090bfb2b4b7c203bdfe27"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -678,7 +713,7 @@ task refine_regions {
 task merge_refinements {
   Array[File] loci
   Array[File] associations
-  Array[File] logs
+  Array[File] logfiles
   String freq_code
   String CNV
   String rCNV_bucket
@@ -689,17 +724,17 @@ task merge_refinements {
     # Merge loci
     zcat ${loci[0]} | sed -n '1p' > header.tsv
     zcat ${sep=" " loci} | fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n \
-    cat header.tsv - | bgzip -c \
+    | cat header.tsv - | bgzip -c \
     > ${freq_code}.${CNV}.final_regions.loci.bed.gz
 
     # Merge associations
     zcat ${associations[0]} | sed -n '1p' > header.tsv
     zcat ${sep=" " associations} | fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n -k7,7V \
-    cat header.tsv - | bgzip -c \
+    | cat header.tsv - | bgzip -c \
     > ${freq_code}.${CNV}.final_regions.associations.bed.gz
 
-    # Merge logs
-    cat ${sep=" " logs} > ${freq_code}.${CNV}.region_refinement.log
+    # Merge logfiles
+    cat ${sep=" " logfiles} > ${freq_code}.${CNV}.region_refinement.log
 
     # Annotate final regions with genes
     gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
@@ -725,7 +760,7 @@ task merge_refinements {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:60bd18cbd7dff9d06215d08170075e1f8934d44b78defb695cd29e926cbb8923"
+    docker: "talkowski/rcnv@sha256:884e59e17422d4f9ab3fe57023ffcc6bf05b2a970dd090bfb2b4b7c203bdfe27"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -758,7 +793,7 @@ task plot_region_summary {
   output {}
 
   runtime {
-    docker: "talkowski/rcnv@sha256:60bd18cbd7dff9d06215d08170075e1f8934d44b78defb695cd29e926cbb8923"
+    docker: "talkowski/rcnv@sha256:884e59e17422d4f9ab3fe57023ffcc6bf05b2a970dd090bfb2b4b7c203bdfe27"
     preemptible: 1
   }
 }

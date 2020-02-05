@@ -38,6 +38,15 @@ load.pvalues <- function(pvalues.in, bed, p.is.phred){
 }
 
 
+# Load .tsv of p-value cutoff matrix per HPO
+load.p.cutoffs <- function(p.cutoffs.in){
+  p.cutoffs <- read.table(p.cutoffs.in, header=T, sep="\t", comment.char="")
+  colnames(p.cutoffs) <- c("hpo", "max.p")
+  p.cutoffs$max.p <- as.numeric(p.cutoffs$max.p)
+  return(p.cutoffs)
+}
+
+
 # Load odds ratio matrix
 load.ors <- function(ors.in, bed, or.is.ln){
   ors <- load.bed(ors.in)
@@ -56,6 +65,18 @@ load.nomsig <- function(nomsig.in, bed){
   nomsig <- merge(nomsig, bed, all.x=F, all.y=T, 
                by=c("chr", "start", "end"), sort=F)
   return(nomsig)
+}
+
+
+# Identify significant windows based on p-value
+get.sig.pval.idxs <- function(pvalues, p.cutoffs){
+  vals <- lapply(4:ncol(pvalues), function(i){
+    hpo <- unlist(strsplit(colnames(pvalues)[i], split=".", fixed=T))[1]
+    max.p <- p.cutoffs$max.p[which(p.cutoffs$hpo == hpo)]
+    which(pvalues[, i] <= max.p)
+  })
+  names(vals) <- colnames(pvalues)[-c(1:3)]
+  return(vals)
 }
 
 
@@ -120,8 +141,8 @@ option_list <- list(
               help="matrix of p-values per window per phenotype. [default %default]"),
   make_option(c("--p-is-phred"), type="logical", default=F, action="store_true",
               help="supplied P-values are Phred-scaled (-log10[P]). [default %default]"),
-  make_option(c("--max-p"), type="numeric", default=0.05, 
-              help="maximum P-value to consider significant. [default %default]"),
+  make_option(c("--p-cutoffs"), default=NULL, 
+              help="tsv of maximum P-value to consider significant per phenotype. [default: 0.05 for all]"),
   make_option(c("--odds-ratios"), default=NULL, 
               help="matrix of odds ratios (or lower bounds) per window per phenotype. [default %default]"),
   make_option(c("--or-is-ln"), type="logical", default=F, action="store_true",
@@ -151,7 +172,7 @@ if(length(args$args) != 1){
 bed.in <- args$args[1]
 pvalues.in <- opts$pvalues
 p.is.phred <- opts$`p-is-phred`
-max.p <- opts$`max-p`
+p.cutoffs.in <- opts$`p-cutoffs`
 ors.in <- opts$`odds-ratios`
 or.is.ln <- opts$`or-is-ln`
 min.or <- opts$`min-or`
@@ -162,8 +183,8 @@ out.prefix <- opts$`out-prefix`
 # # DEV PARAMETERS:
 # bed.in <- "~/scratch/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 # pvalues.in <- "~/scratch/DEL.pval_matrix.bed.gz"
+# p.cutoffs.in <- "~/scratch/del_pval_cutoff_test.tsv"
 # p.is.phred <- T
-# max.p <- 0.000000629506182857198
 # ors.in <- "~/scratch/DEL.lnOR_lower_matrix.bed.gz"
 # or.is.ln <- T
 # min.or <- 2
@@ -177,7 +198,8 @@ bed <- load.bed(bed.in)
 # Load p-values and determine significant windows, if provided
 if(!is.null(pvalues.in)){
   pvalues <- load.pvalues(pvalues.in, bed, p.is.phred)
-  sig.pvals <- get.sig.idxs(pvalues, max.p, "le")
+  p.cutoffs <- load.p.cutoffs(p.cutoffs.in)
+  sig.pvals <- get.sig.pval.idxs(pvalues, p.cutoffs)
 }else{
   sig.pvals <- NULL
 }
