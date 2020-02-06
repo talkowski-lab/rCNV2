@@ -148,7 +148,7 @@ option_list <- list(
   make_option(c("--or-is-ln"), type="logical", default=F, action="store_true",
               help="supplied odds ratios are natural log-scaled. [default %default]"),
   make_option(c("--min-or"), type="numeric", default=1, 
-              help="minimum odds ratio to consider significant. [default %default]"),
+              help="minimum odds ratio to consider significant. Supply as unscaled OR (will be transformed if needed). [default %default]"),
   make_option(c("--nominal-counts"), default=NULL, 
               help="matrix of nominally significant cohorts per window per phenotype. [default %default]"),
   make_option(c("--min-nominal"), type="numeric", default=1, 
@@ -187,7 +187,7 @@ out.prefix <- opts$`out-prefix`
 # p.is.phred <- T
 # ors.in <- "~/scratch/DEL.lnOR_lower_matrix.bed.gz"
 # or.is.ln <- T
-# min.or <- 2
+# min.or <- 1.5
 # nomsig.in <- "~/scratch/DEL.nominal_cohort_counts.bed.gz"
 # min.nom <- 2
 # out.prefix <- "~/scratch/sig_bins.test."
@@ -206,6 +206,9 @@ if(!is.null(pvalues.in)){
 
 # Load odds ratios and determine significant windows, if provided
 if(!is.null(ors.in)){
+  if(or.is.ln==TRUE){
+    min.or <- log(min.or)
+  }
   ors <- load.ors(ors.in, bed, or.is.ln)
   sig.ors <- get.sig.idxs(ors, min.or, "ge")
 }else{

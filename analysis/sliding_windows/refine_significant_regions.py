@@ -1202,10 +1202,11 @@ def main():
                         '(-log10[P]). [default: False]', default=False, 
                         action='store_true')
     parser.add_argument('--min-or-lower', help='Minimum lower bound of 95% confidence ' + 
-                        'interval for odds ratio. [default: 0]', default=0, type=float)
+                        'interval for odds ratio. Supply as untransformed OR. [default: 1]', 
+                        default=1, type=float)
     parser.add_argument('--retest-min-or-lower', help='Minimum lower bound of 95% confidence ' + 
                         'interval for odds ratio used when evaluating secondary sentinels. ' + 
-                        '[default: 2]', default=2, type=float)
+                        'Supply as untransformed OR. [default: 1]', default=1, type=float)
     parser.add_argument('--max-cnv-size', help='Maximum size of CNVs to include when ' +
                         'attempting to refine minimal credible regions [default: 3Mb]', 
                         default=10000000, type=int)
@@ -1237,9 +1238,11 @@ def main():
 
     args = parser.parse_args()
 
-    # Reset args
+    # Postprocess args as necessary
     if args.prefix is None:
         args.prefix = args.cnv_type
+    min_or_lower = np.log(args.min_or_lower)
+    retest_min_or_lower = np.log(args.retest_min_or_lower)
 
     # Open connections to outfiles
     assocs_fout = open(args.associations_out, 'w')
@@ -1288,7 +1291,7 @@ def main():
             print('--Refining sentinel window #{0}'.format(str(i)), file=logfile)
             new_region = refine_sentinel(regions, rid, sig_df, sig_bt, pvals, 
                                          cohorts, args.cnv_type, args.control_hpo, 
-                                         p_cutoffs, args.min_or_lower, 
+                                         p_cutoffs, min_or_lower, 
                                          args.min_nominal, args.model, used_cnvs, 
                                          logfile, args.max_cnv_size, args.min_case_cnvs, 
                                          args.resolution, args.credible_interval, 
@@ -1303,7 +1306,7 @@ def main():
             wids_to_update = list(regions[rid]['sig_windows'].keys())
             update_pvalues(wids_to_update, pvals, sig_df, sig_bt, cohorts, 
                            used_cnvs, used_cnv_bt, p_cutoffs, args.min_nominal, 
-                           args.retest_min_or_lower, args.model, args.max_cnv_size, 
+                           retest_min_or_lower, args.model, args.max_cnv_size, 
                            args.min_case_cnvs, args.control_hpo)
             sig_windows = sig_df[sig_df.iloc[:, 4:].apply(any, axis=1)].iloc[:, 0:4]
             sig_bt = pbt.BedTool.from_dataframe(sig_windows)

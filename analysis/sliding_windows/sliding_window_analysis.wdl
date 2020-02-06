@@ -367,7 +367,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:cf77a0b11c44d82d132c30778952de73da10d20216558718237737e9c8956331"
+    docker: "talkowski/rcnv@sha256:f9e8b78c6aae8f386aa5961ffd0cffc094dd2795d7e1444aaad11656669c6107"
     preemptible: 1
     memory: "16 GB"
     disks: "local-disk 100 HDD"
@@ -419,9 +419,9 @@ task meta_analysis {
     descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
                | awk -v FS="\t" '{ print $2 }' )
     title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
-    DEL_p_cutoff=$( awk -v hpo=${hpo} '{ if ($1==hpo) print $2 }' \
+    DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
                     sliding_window.${freq_code}.DEL.empirical_fdr_cutoffs.tsv )
-    DUP_p_cutoff=$( awk -v hpo=${hpo} '{ if ($1==hpo) print $2 }' \
+    DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
                     sliding_window.${freq_code}.DUP.empirical_fdr_cutoffs.tsv )
 
     # Run meta-analysis for each CNV type
@@ -502,7 +502,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:cf77a0b11c44d82d132c30778952de73da10d20216558718237737e9c8956331"
+    docker: "talkowski/rcnv@sha256:f9e8b78c6aae8f386aa5961ffd0cffc094dd2795d7e1444aaad11656669c6107"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -614,7 +614,7 @@ task prep_refinement {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:cf77a0b11c44d82d132c30778952de73da10d20216558718237737e9c8956331"
+    docker: "talkowski/rcnv@sha256:f9e8b78c6aae8f386aa5961ffd0cffc094dd2795d7e1444aaad11656669c6107"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -703,7 +703,7 @@ task refine_regions {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:cf77a0b11c44d82d132c30778952de73da10d20216558718237737e9c8956331"
+    docker: "talkowski/rcnv@sha256:f9e8b78c6aae8f386aa5961ffd0cffc094dd2795d7e1444aaad11656669c6107"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -763,7 +763,7 @@ task merge_refinements {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:cf77a0b11c44d82d132c30778952de73da10d20216558718237737e9c8956331"
+    docker: "talkowski/rcnv@sha256:f9e8b78c6aae8f386aa5961ffd0cffc094dd2795d7e1444aaad11656669c6107"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -796,7 +796,7 @@ task plot_region_summary {
   output {}
 
   runtime {
-    docker: "talkowski/rcnv@sha256:cf77a0b11c44d82d132c30778952de73da10d20216558718237737e9c8956331"
+    docker: "talkowski/rcnv@sha256:f9e8b78c6aae8f386aa5961ffd0cffc094dd2795d7e1444aaad11656669c6107"
     preemptible: 1
   }
 }
