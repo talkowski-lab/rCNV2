@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens in sliding windows, genome-wide
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/10/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/13/plain-WDL/descriptor" as scattered_perm
 
 
 workflow sliding_window_analysis {
@@ -76,6 +76,7 @@ workflow sliding_window_analysis {
     call calc_meta_p_cutoff {
       input:
         phenotype_list=phenotype_list,
+        metacohort_sample_table=metacohort_sample_table,
         freq_code="rCNV",
         CNV=cnv,
         n_pheno_perms=n_pheno_perms,
@@ -306,7 +307,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:884e59e17422d4f9ab3fe57023ffcc6bf05b2a970dd090bfb2b4b7c203bdfe27"
+    docker: "talkowski/rcnv@sha256:cf77a0b11c44d82d132c30778952de73da10d20216558718237737e9c8956331"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -323,6 +324,7 @@ task burden_test {
 # Aggregate all genome-wide permutation results to determine empirical P-value cutoff
 task calc_meta_p_cutoff {
   File phenotype_list
+  File metacohort_sample_table
   String freq_code
   String CNV
   Int n_pheno_perms
@@ -356,6 +358,7 @@ task calc_meta_p_cutoff {
       --fdr-target ${fdr_target} \
       --plot ${freq_code}.${CNV}.FDR_permutation_results.png \
       ${freq_code}.${CNV}.permuted_pval_matrix.txt.gz \
+      ${metacohort_sample_table} \
       sliding_window.${freq_code}.${CNV}.empirical_fdr_cutoffs.tsv
 
     # Copy cutoff table to output bucket
@@ -364,7 +367,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:884e59e17422d4f9ab3fe57023ffcc6bf05b2a970dd090bfb2b4b7c203bdfe27"
+    docker: "talkowski/rcnv@sha256:cf77a0b11c44d82d132c30778952de73da10d20216558718237737e9c8956331"
     preemptible: 1
     memory: "16 GB"
     disks: "local-disk 100 HDD"
@@ -373,7 +376,7 @@ task calc_meta_p_cutoff {
 
   output {
     File perm_results_plot = "${freq_code}.${CNV}.FDR_permutation_results.png"
-    File p_cutoff_table = read_float("sliding_window.${freq_code}.${CNV}.empirical_fdr_cutoffs.tsv")
+    File p_cutoff_table = "sliding_window.${freq_code}.${CNV}.empirical_fdr_cutoffs.tsv"
   }  
 }
 
@@ -499,7 +502,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:884e59e17422d4f9ab3fe57023ffcc6bf05b2a970dd090bfb2b4b7c203bdfe27"
+    docker: "talkowski/rcnv@sha256:cf77a0b11c44d82d132c30778952de73da10d20216558718237737e9c8956331"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -611,7 +614,7 @@ task prep_refinement {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:884e59e17422d4f9ab3fe57023ffcc6bf05b2a970dd090bfb2b4b7c203bdfe27"
+    docker: "talkowski/rcnv@sha256:cf77a0b11c44d82d132c30778952de73da10d20216558718237737e9c8956331"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -700,7 +703,7 @@ task refine_regions {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:884e59e17422d4f9ab3fe57023ffcc6bf05b2a970dd090bfb2b4b7c203bdfe27"
+    docker: "talkowski/rcnv@sha256:cf77a0b11c44d82d132c30778952de73da10d20216558718237737e9c8956331"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -760,7 +763,7 @@ task merge_refinements {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:884e59e17422d4f9ab3fe57023ffcc6bf05b2a970dd090bfb2b4b7c203bdfe27"
+    docker: "talkowski/rcnv@sha256:cf77a0b11c44d82d132c30778952de73da10d20216558718237737e9c8956331"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -793,7 +796,7 @@ task plot_region_summary {
   output {}
 
   runtime {
-    docker: "talkowski/rcnv@sha256:884e59e17422d4f9ab3fe57023ffcc6bf05b2a970dd090bfb2b4b7c203bdfe27"
+    docker: "talkowski/rcnv@sha256:cf77a0b11c44d82d132c30778952de73da10d20216558718237737e9c8956331"
     preemptible: 1
   }
 }

@@ -117,7 +117,7 @@ get.adjusted.cutoffs <- function(cutoff.stat.df){
   fit <- fit.exp.decay(cutoff.stat.df$n.cases, cutoff.stat.df$fdr.cutoff)
   fit.df <- data.frame("x"=cutoff.stat.df$n.cases)
   fit.df$y <- predict(fit, newdata=fit.df)
-  out.df <- as.data.frame(cbind(cutoff.stat.df$hpo, 10^-fit.df$y))
+  out.df <- as.data.frame(cbind(unlist(cutoff.stat.df$hpo), unlist(10^-fit.df$y)))
   colnames(out.df) <- c("#hpo", "min_p")
   return(out.df)
 }
