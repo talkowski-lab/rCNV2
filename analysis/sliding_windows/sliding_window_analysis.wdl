@@ -614,7 +614,7 @@ task prep_refinement {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f9e8b78c6aae8f386aa5961ffd0cffc094dd2795d7e1444aaad11656669c6107"
+    docker: "talkowski/rcnv@sha256:847ac37359a135994867552c8d054865acec78746663e2863435aa2fa2d5a465"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -674,7 +674,7 @@ task refine_regions {
         --model ${meta_model_prefix} \
         --p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_fdr_cutoffs.tsv \
         --p-is-phred \
-        --min-or-lower 0 \
+        --min-or-lower ${meta_or_cutoff} \
         --retest-min-or-lower ${meta_or_cutoff} \
         --max-cnv-size ${refine_max_cnv_size} \
         --min-nominal ${meta_nominal_cohorts_cutoff} \
@@ -703,7 +703,7 @@ task refine_regions {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f9e8b78c6aae8f386aa5961ffd0cffc094dd2795d7e1444aaad11656669c6107"
+    docker: "talkowski/rcnv@sha256:847ac37359a135994867552c8d054865acec78746663e2863435aa2fa2d5a465"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -763,7 +763,7 @@ task merge_refinements {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f9e8b78c6aae8f386aa5961ffd0cffc094dd2795d7e1444aaad11656669c6107"
+    docker: "talkowski/rcnv@sha256:847ac37359a135994867552c8d054865acec78746663e2863435aa2fa2d5a465"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -793,10 +793,12 @@ task plot_region_summary {
     gsutil acl ch -u AllUsers:R gs://rcnv_project/public/*.jpg
   >>>
 
-  output {}
+  output {
+    File summary_plot = "${freq_code}.final_regions.multipanel_summary.jpg"
+  }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f9e8b78c6aae8f386aa5961ffd0cffc094dd2795d7e1444aaad11656669c6107"
+    docker: "talkowski/rcnv@sha256:847ac37359a135994867552c8d054865acec78746663e2863435aa2fa2d5a465"
     preemptible: 1
   }
 }

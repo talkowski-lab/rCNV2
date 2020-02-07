@@ -646,7 +646,7 @@ def calc_credible_interval(cnvs_df, method='density', resolution=10000, cred=0.8
         cred_cdf_max = q_tails[1] * np.nanmax(bin_cdf)
         bins_df = bins_bt.to_dataframe()
         bins_df['cdf'] = bin_cdf
-        cred_start = np.nanmax(bins_df[bins_df['cdf'] <= cred_cdf_min]['start'])
+        cred_start = nnp.nanmax(np.array(bins_df[bins_df['cdf'] <= cred_cdf_min]['start']))
         cred_end = np.nanmin(bins_df[bins_df['cdf'] >= cred_cdf_max]['end'])
 
     return cred_start, cred_end
@@ -1056,11 +1056,8 @@ def get_final_stats(mcrs, cohorts, orig_sig_df, orig_pvals, control_hpo, model):
             case_cnvs = filter_cnvs(best_w_bt, all_cnvs, hpos=[hpo])
             case_cnvs_df = case_cnvs.to_dataframe(names=cnv_df_names)
             n_case_alt = _count_cnvs_by_cohort(case_cnvs_df, cohorts.keys())
-            try:
-                oddsratio, or_ci, chisq, new_p, n_nom, sig \
-                    = meta_analysis(model, list(cohorts.keys()), n_control, n_case, n_control_alt, n_case_alt)
-            except:
-                import pdb; pdb.set_trace()
+            oddsratio, or_ci, chisq, new_p, n_nom, sig \
+                = meta_analysis(model, list(cohorts.keys()), n_control, n_case, n_control_alt, n_case_alt)
             hpo_sent_stats = {'chr' : mcr['chr'],
                               'start' : best_w_bt[0].start,
                               'end' : best_w_bt[0].end,

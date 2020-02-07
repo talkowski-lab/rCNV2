@@ -6,6 +6,8 @@ The code to reproduce these analyses is contained in `sliding_window_analysis.sh
 
 In practice, this analysis was parallelized on [FireCloud/Terra](https://terra.bio) using `sliding_window_analysis.wdl`.  
 
+---  
+
 ## TL;DR: Summary of sliding window results  
 
 Skipping ahead to the final outcome of this analysis, we identified a set of regions where [rCNVs](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs) are statistically associated with at least one of [30 disease phenotypes](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype#tldr-final-outcome-of-phenotype-curation) at genome-wide significance.  
@@ -13,6 +15,8 @@ Skipping ahead to the final outcome of this analysis, we identified a set of reg
 The details of this procedure are described below, but summary plots for the final results can be generated using `regions_summary.plot.R`, which includes the following multi-panel figure:  
 
 ![rCNV Region Summary Stats](https://storage.googleapis.com/rcnv_project/public/rCNV.final_regions.multipanel_summary.jpg)  
+
+---  
 
 ## Sliding window analysis procedure
 
@@ -22,15 +26,15 @@ The four steps of this procedure are described below:
 
 ### 1. Count rare CNVs per window  
 
-For each [metacohort](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/), we intersected rCNVs against [genome-wide sliding windows](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/binned_genome/) separately for cases and controls.  
+For each [metacohort](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/), we intersected [rCNVs](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs) against [genome-wide sliding windows](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/binned_genome/) separately for cases and controls.  
 
-We conducted this procedure a total of three times per phenotype group & metacohort: once each for deletions, duplications, and all CNVs (deletions + duplications).  
+We conducted this procedure twice per phenotype group & metacohort: once each for deletions and duplications.  
 
 The code to perform this step is contained in `count_cnvs_per_window.py`.  
 
 We required CNVs to overlap at least 50% of each window to be counted.  
 
-Finally, given that CNV breakpoint precision varies by locus, platform, and CNV calling algorithm, we systematically extended the breakpoints of each control CNV by +50kb. Note that CNV breakpoints in cases were **not** extended. We did this to conservatively protect against spurrious associations arising from control CNVs breakpoints being systematically underestimated compared to case breakpoints.  
+Finally, given that CNV breakpoint precision varies by locus, platform, and CNV calling algorithm, we systematically extended the breakpoints of each control CNV by +50kb. CNV breakpoints in cases were **not** extended. We did this to conservatively protect against spurrious associations arising from situations where control CNVs breakpoints might be underestimated compared to case breakpoints.  
 
 ### 2. Calculate burden statistics between cases & controls  
 
@@ -53,6 +57,8 @@ Furthermore, for each pair of phenotype group & metacohort, two additional files
 6. `$metacohort.$hpo.rCNV.sliding_window.miami_with_qq.png`: a multi-panel composite plot of association statistics, combining a Miami plot with QQ plots for deletions and duplications separately  
 
 All `.png` plots are annotated with 54 known genomic disorder loci (adapted from [Owen _et al._, _BMC Genomics_, 2018](https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-018-5292-7)), for reference.  
+
+All plots also feature a horizontal dashed line indicating Bonferroni-corrected significance threshold (P ≤ 3.86x10<sup>-6</sup>) for all non-overlapping 200kb windows tested.  
 
 These files are stored in a protected Google Cloud bucket with one subdirectory per HPO group, here:  
 ```
@@ -98,72 +104,49 @@ The code to perform this step is contained in `window_meta_analysis.R`.
 
 Given that rare CNV counts per window are (a) sparse and (b) zero-inflated, and furthermore that (c) the case & control sample sizes are unbalanced for most phenotype groups (_e.g._, frequently >10- to 100-fold more controls than cases), we implemented an empirical continuity correction as proposed by [Sweeting _et al._, _Stat. Med._, 2004.](https://onlinelibrary.wiley.com/doi/10.1002/sim.1761)  
 
-Each phenotype & CNV type were meta-analyzed separately for a total of three meta-analyses per phenotype.  
+Each phenotype & CNV type were meta-analyzed separately for a total of two meta-analyses per phenotype.  
 
 #### Determining genome-wide significance threshold  
 
-We empirically determined a genome-wide significance threshold for each meta-analysis as follows:  
+We next controlled false discovery rate (FDR) across all meta-analyses using a permutation-based approach.  
 
-1. Permute phenotype labels for all CNVs while matching on size (split by quantile) and CNV type (DEL/DUP);  
-2. Rerun all association tests (described above), including meta-analysis, for each phenotype & CNV combination; and  
-3. Compute the fraction of significant windows for a broad range of P-value thresholds
+Estimating the number of independent tests performed across all windows, phenotypes, and CNV types is difficult due to numerous necessary assumptions, such as the independence of samples between phenotypes, or the local correlation structure of CNV counts between neighboring windows, among others.    
 
-Steps 1-3 were repeated 20 times for each CNV and phenotype.
+Instead, we targeted an "genome-wide" significance threshold of P ≤ 3.86x10<sup>-6</sup>, which corresonds to a Bonferroni correction if applied to the number of non-overlapping 200kb windows tested in our analysis.  
+
+We empirically determined the P-value threshold for each CNV type and phenotype that matched our desired genome-wide FDR as follows:  
+
+1. permute phenotype labels for all CNVs while matching on size (split by quantile) and CNV type (DEL/DUP);  
+2. rerun all association tests (described above), including meta-analysis, for each phenotype & CNV combination;   
+3. compute the fraction of significant windows for a broad range of P-value thresholds (_e.g._, -log<sub>10</sub>(_P_) ~ [0, 20] ); and
+4. report the least significant P-value threshold that results in an empirical FDR ≤ 3.86x10<sup>-6</sup>.  
+
+Steps 1-3 were repeated 20 times for each CNV type and phenotype.  
+
+Following permutation, we computed the mean P-value threshold per phenotype and CNV type.  
+
+Finally, for each CNV type, we fit an exponential decay model of empirical P-value threshold versus total number of case samples, and used this model to assign a genome-wide P-value threshold per phenotype.  
 
 #### Output files  
 
 [As described above for Step 2](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/sliding_windows#output-files), we generated the same combination of plots and statistics files for the meta-analyses results of each phenotype group.  
 
+Unlike the plots from Step 2, the dashed lines from Step 3 correspond to empirically-derived genome-wide significance thresholds [as determined via permutation](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/sliding_windows#determining-genome-wide-significance-threshold).  
+
 These files are stored in the same location as the per-metacohort analysis results.  
 
 ### 4. Collapse associations across phenotypes & refine loci to minimal credible regions  
 
-Methods still a work in progress. See bottom of this page for most recent iteration of minimum credible region definition algorithm.  
-
----  
-
-#### _A note on data curation_  
-
-The information presented on this page references various curated datasets.  
-
-The curation of these datasets is documented elsewhere in this repository.  
-
-Please see the README available in [the `data_curation/` subdirectory](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/).  
-
----  
-
----  
-
-
-# IGNORE THIS TEXT FOR NOW (DEPRECATED ALTERNATIVE METHODS)  
-
-### 3. Combine association statistics across metacohorts  
-
-We combined CNV association statistics across metacohorts for each sliding window using the Mantel-Haenszel meta-analysis method for 2x2 contingency tables of count data.  
-
-The code to perform this step is contained in `window_meta_analysis.R`.  
-
-Given that rare CNV counts per window are (a) sparse and (b) zero-inflated, and furthermore that (c) the case & control sample sizes are unbalanced for most phenotype groups (_e.g._, frequently >10- to 100-fold more controls than cases), we implemented an empirical continuity correction as proposed by [Sweeting _et al._, _Stat. Med._, 2004.](https://onlinelibrary.wiley.com/doi/10.1002/sim.1761)  
-
-Mantel-Haenszel meta-analysis with an empirical continuity correction is recommended for the meta-analysis of rare binary event data [Bhaumik _et al._, _J. Am. Stat. Assoc._](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3665366/).
-
-Each phenotype & CNV type were meta-analyzed separately for a total of three meta-analyses per phenotype.  
-
-Following meta-analysis, individual windows were labeled as genome-wide significant if the met the following three criteria:
-1. _P_<sub>meta</sub> ≤ 10<sup>-6</sup>;  
-2. Lower bound of 95% confidence interval of odds ratio ≥ 2; and  
-3. Nominally significant in ≥ 2 metacohorts.  
-
-_Note: a P<sub>meta</sub> threshold of 10<sup>-6</sup> was determined to correspond to a study-wide FDR of 1% via phenotype permutation analysis (not described here)_
-
-
-
-
 Lastly, we collapsed all significant windows across phenotypes and refined them to discrete intervals.  
+
+In practice, we considered a window to be genome-wide significant if it met all three of the following criteria:  
+1. meta-analysis P exceeds the genome-wide significance threshold for that phenotype and CNV type; 
+2. nominally significant (P ≤ 0.05) in a one-sided Fisher's exact test for at least two metacohorts; and
+3. lower bound of 95% confidence interval of odds ratio from meta-analysis ≥ 2.  
 
 For each locus with a significant association between rCNVs and one or more phenotypes, we aimed to identify:  
 1. all statistically independent associations that were _individually_ genome-wide significant; and
-3. refine these associations to the minimal interval that contained the causal element(s) with 90% confidence (_i.e._, analogous to 90% credible sets from common variant GWAS).  
+3. refine these associations to the minimal interval that contained the causal element(s) with 90% confidence (_i.e._, analogous to 90% credible sets from GWAS).  
 
 This procedure is described below, and was performed separately for deletions and duplications using `refine_significant_regions.py`.  
 
@@ -174,9 +157,9 @@ Next, for each query region, we performed the following steps:
 2. Designated all phenotypes with at least one significant association in the region as the `sentinel phenotypes`.  
 3. Gathered all rCNVs overlapping the sentinel window in sentinel phenotypes & controls.  
 4. Ordered all case CNVs based on the smallest max breakpoint distance to middle of sentinel window.  
-5. Added case CNVs one at a time (in order) and ran a Mantel-Haenszel (M-H) meta-analysis with Sweeting correction against all control CNVs until the test reached P ≤ 10<sup>-6</sup> and at least two metacohorts had Fisher’s exact P ≤ 0.05.  
+5. Added case CNVs one at a time (in order) and rerun meta-analysis with Sweeting correction against all control CNVs until the window reached genome-wide signififance (using the criteria listed above).  
   * _Note: Step 5 was attempted first with CNVs covering at least 50% of the sentinel window, and restricted to case CNVs ≤ 3Mb in size. If genome-wide significance was not achieved for this smaller subset of case CNVs, the test was expanded to include all CNVs overlapping the sentinel window irrespective of size or fracion of the window overlapped._  
-6. When the M-H test reached significance, we defined the `minimal credible region` as the middle 90% of the CNV density for the minimal set of case CNVs required to achieve genome-wide significance for the sentinel window.  
+6. When the M-H test reached significance, we defined the `minimal credible region` as the middle 90% of the CNV density over the minimal set of case CNVs required to achieve genome-wide significance for the sentinel window.  
 7. Exclude all sentinel case CNVs and other case CNVs at least 50% covered by the minimal credible region from step 6.  
 8. Recompute all association statistics for each phenotype at every window within the query region after conditioning on the case CNVs excluded in step 7. Repeat steps 1-7 as needed until no more genome-wide significant windows exist within the query region.  
 
@@ -184,7 +167,7 @@ The output of this process was a set of minimal credible regions, where each cre
 1. 90% confident to contain the causal element(s) for that association, and 
 2. Statistically independent from all other minimal credible regions.  
 
-For each minimal credible region, we re-computed an odds ratio, 95% confidence interval, and P-value using an M-H meta-analysis with Sweeting correction for **all rCNVs that overlap the region**, not just those that overlapped the sentinel window. Thus, it was frequently the case that the estimated odds ratio or significance of the minimal credible region was reduced compared to the sentinel window, although the sentinel window was used to declare a genome-wide significant association at that locus.  
+For each minimal credible region, we re-computed an odds ratio, 95% confidence interval, and P-value using the same meta-analysis procedure for **all rCNVs that overlap the region**, not just those that overlapped the sentinel window. Thus, it was frequently the case that the estimated odds ratio or significance of the minimal credible region was reduced compared to the sentinel window, although the sentinel window was used to declare a genome-wide significant association at that locus.  
 
 #### Output files  
 
@@ -205,4 +188,13 @@ gs://rcnv_project/results/sliding_windows/rCNV.DUP.final_regions.associations.be
 gs://rcnv_project/results/sliding_windows/rCNV.DUP.region_refinement.log
 ```
 
+---  
+
+#### _A note on data curation_  
+
+The information presented on this page references various curated datasets.  
+
+The curation of these datasets is documented elsewhere in this repository.  
+
+Please see the README available in [the `data_curation/` subdirectory](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/).  
 
