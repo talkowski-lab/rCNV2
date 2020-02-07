@@ -57,10 +57,7 @@ def defragment_cnvs(cnvs, maxdist=0.25):
 
     def _clean_hit(cnv):
         orig = cnv[3].split('|')
-        try:
-            ostarts = [int(x.split('_')[-2]) for x in orig]
-        except:
-            import pdb; pdb.set_trace()
+        ostarts = [int(x.split('_')[-2]) for x in orig]
         oends = [int(x.split('_')[-1]) for x in orig]
 
         cnv.start = np.min(ostarts)
