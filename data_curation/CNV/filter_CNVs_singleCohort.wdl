@@ -140,7 +140,7 @@ task filter_cnvs_singleChrom {
       --nsamp ${N} \
       --maxfreq ${max_freq} \
       --recipoverlap 0.5 \
-      --dist 50000 \
+      --dist 100000 \
       --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
       --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
       --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \

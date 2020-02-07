@@ -43,8 +43,32 @@ Some datasets required manual curation prior to inclusion. Where necessary, thes
  * **Epi25k**: CNVs were filtered on ≥10 probes and ≥25kb. After CNV filtering, samples with >25 CNV calls were excluded as outliers.  
  * **SSC**: CNVs were filtered on pCNV ≤10<sup>-9</sup>, per recommendation of the authors.  
  * **SickKids**: CNVs were filtered on ≥25kb. After CNV filtering, samples with >80 CNV calls were excluded as outliers.
- * **TCGA**: CNVs were filtered on ≥10 probes and ≥25kb. Deletions were required to have a mean log<sub>2</sub> intensity ≤-1 and duplications were required to have a mean log<sub>2</sub> intensity of ≥0.5849625. After filtering, CNVs per sample were defragmented using `defragment_cnvs.py` with `--max-dist 0.25`.  
+ * **TCGA**: CNVs were filtered on ≥10 probes and ≥25kb. Deletions were required to have a mean log<sub>2</sub> intensity ≤-1 and duplications were required to have a mean log<sub>2</sub> intensity of ≥0.5849625.  
  * **UKBB**: CNVs were filtered on quality score ≥17 and CNV size ≥25kb. After CNV filtering, samples with >10 CNV calls were excluded as outliers as well as any samples with known malignant cancers or chromosomal disorders (e.g., Down's Syndrome or sex chromosome aneuploidies).  
+
+#### CNV defragmentation  
+
+Many array-based CNV calling algorithms infrequently result in fragmentation (i.e., over-segmentation) of large CNV calls.  
+
+For the purposes of this study, fragmentation of CNV calls has the potential to bias association tests, as single individuals might be counted multiple times for a given locus or gene.  
+
+Thus, we applied a standardized defragmentation step to raw CNV calls for all studies where this was possible.  
+
+Defragmentation was performed with `defragment_cnvs.py` using `--max-dist 0.25`, which merges CNVs of the same type found in the same sample if their breakpoints are within ±25% of the size of their corresponding original CNV calls.  
+
+For example, below is a 4.5Mb deletion reported as three deletion fragments in the `TCGA` cohort:
+
+| chrom | start | end | CNV type |  
+| ---: | ---: | ---: | :--- |
+| 10 | 54,387,162 | 54,542,011 | DEL |  
+| 10 | 54,544,685 | 55,877,827 | DEL |  
+| 10 | 55,883,144 | 58,906,151 | DEL |  
+
+Given that these three fragments are (i) all reported in the same sample and (ii) separated by just 2.7kb and 5.3kb, respectively, it is highly unlikely that these deletions are independent CNV events.  
+
+The defragmentation algorithm as applied to these data would merge these three deletion fragments into a single CNV spanning from `54387162` to `58906151`.  
+
+Studies unable to be defragmented due to inadequate sample-level information were: `Coe` (controls only), `Cooper`, `PGC`, and `TSAICG`.
 
 ### Raw CNV callset properties  
 

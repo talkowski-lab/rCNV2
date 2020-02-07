@@ -73,7 +73,7 @@ while read cohort N; do
     --nsamp $N \
     --maxfreq 0.01 \
     --recipoverlap 0.5 \
-    --dist 50000 \
+    --dist 100000 \
     --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
     --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
     --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
@@ -99,7 +99,7 @@ while read cohort N; do
     --nsamp $N \
     --maxfreq 0.0001 \
     --recipoverlap 0.5 \
-    --dist 50000 \
+    --dist 100000 \
     --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
     --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
     --blacklist refs/GRCh37.Nmask.bed.gz \
@@ -124,7 +124,7 @@ mkdir debug
   --nsamp 3591 \
   --maxfreq 0.01 \
   --recipoverlap 0.5 \
-  --dist 50000 \
+  --dist 100000 \
   --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
   --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
   --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
@@ -144,7 +144,7 @@ mkdir debug
 #   --nsamp 3591 \
 #   --maxfreq 0.01 \
 #   --recipoverlap 0.5 \
-#   --dist 50000 \
+#   --dist 100000 \
 #   --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
 #   --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
 #   --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
@@ -162,7 +162,7 @@ mkdir debug
   --nsamp 3591 \
   --maxfreq 0.0001 \
   --recipoverlap 0.5 \
-  --dist 50000 \
+  --dist 100000 \
   --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
   --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
   --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
@@ -185,7 +185,7 @@ mkdir debug
   --nsamp 41371 \
   --maxfreq 0.01 \
   --recipoverlap 0.5 \
-  --dist 50000 \
+  --dist 100000 \
   --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
   --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
   --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
