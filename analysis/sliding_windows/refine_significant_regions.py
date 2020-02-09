@@ -646,7 +646,7 @@ def calc_credible_interval(cnvs_df, method='density', resolution=10000, cred=0.8
         cred_cdf_max = q_tails[1] * np.nanmax(bin_cdf)
         bins_df = bins_bt.to_dataframe()
         bins_df['cdf'] = bin_cdf
-        cred_start = nnp.nanmax(np.array(bins_df[bins_df['cdf'] <= cred_cdf_min]['start']))
+        cred_start = np.nanmax(np.array(bins_df[bins_df['cdf'] <= cred_cdf_min]['start']))
         cred_end = np.nanmin(bins_df[bins_df['cdf'] >= cred_cdf_max]['end'])
 
     return cred_start, cred_end
