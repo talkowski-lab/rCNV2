@@ -600,14 +600,15 @@ def get_min_case_cnvs(case_cnvs, control_cnvs, cc_counts, min_p,
     # Increment case CNVs one at a time until significance
     k = 0
     sig = False
-    while sig is False:
-        k += 1
-        n_case_alt = _count_cnvs_by_cohort(case_cnvs.iloc[0:k, :], cohorts)
-        oddsratio, or_ci, chisq, new_p, n_nom, sig \
-            = meta_analysis(model, cohorts, n_control, n_case, n_control_alt, 
-                            n_case_alt, min_p, min_or_lower, min_nominal)
-        if k == sum_n_case_alt_max:
-            break
+    if sum_n_case_alt_max > 0:
+        while sig is False:
+            k += 1
+            n_case_alt = _count_cnvs_by_cohort(case_cnvs.iloc[0:k, :], cohorts)
+            oddsratio, or_ci, chisq, new_p, n_nom, sig \
+                = meta_analysis(model, cohorts, n_control, n_case, n_control_alt, 
+                                n_case_alt, min_p, min_or_lower, min_nominal)
+            if k == sum_n_case_alt_max:
+                break
     
     return k, sig
 
@@ -714,30 +715,32 @@ def refine_sentinel(regions, rid, sig_df, sig_bt, pvals, cohorts, cnv_type,
     
     # Pool and sort all CNVs across metacohorts for cases and controls
     case_cnvs_l = [x['case_cnvs'] for x in cnvs.values()]
-    case_cnvs = pd.concat([bt.to_dataframe() for bt in case_cnvs_l if len(bt) > 0], 
+    n_case_cnvs = np.sum([len(x) for x in case_cnvs_l])
+    if n_case_cnvs > 0:
+        case_cnvs = pd.concat([bt.to_dataframe() for bt in case_cnvs_l if len(bt) > 0], 
                               axis=0, ignore_index=True)
-    case_cnvs = sort_cnvs(case_cnvs, sent_mid)
+        case_cnvs = sort_cnvs(case_cnvs, sent_mid)
+    else:
+        case_cnvs = pd.DataFrame(columns='chrom start end cnv_id cnv phenos abs_min_dist'.split())
     control_cnvs_l = [x['control_cnvs'] for x in cnvs.values()]
     control_cnvs = pd.concat([bt.to_dataframe() for bt in control_cnvs_l if len(bt) > 0], 
                                  axis=0, ignore_index=True)
     control_cnvs = sort_cnvs(control_cnvs, sent_mid)
 
     # Print sentinel sample & CNV data
-    if len(case_cnvs) >= min_case_cnvs:
-        print('  * Effective case count: {:,}'.format(total_n_case), 
-              file=logfile)
-        print('  * Found {:,} qualifying case {}s'.format(len(case_cnvs), cnv_type), 
-              file=logfile)
-        print('  * Effective control count: {:,}'.format(total_n_control), 
-              file=logfile)
-        print('  * Found {:,} qualifying control {}s'.format(len(control_cnvs), cnv_type), 
-              file=logfile)
-    else:
-        exit('  * Error: not enough qualifying case CNVs detected.')
+    print('  * Effective case count: {:,}'.format(total_n_case), 
+          file=logfile)
+    print('  * Found {:,} qualifying case {}s'.format(len(case_cnvs), cnv_type), 
+          file=logfile)
+    print('  * Effective control count: {:,}'.format(total_n_control), 
+          file=logfile)
+    print('  * Found {:,} qualifying control {}s'.format(len(control_cnvs), cnv_type), 
+          file=logfile)
 
     # Get minimum set of case CNVs required for genome-wide significance
     k_case_cnvs, sig = get_min_case_cnvs(case_cnvs, control_cnvs, cc_counts, 
                                          min_p, min_or_lower, min_nominal, model)
+
     if sig:
         min_case_cnvs = case_cnvs.iloc[0:k_case_cnvs, :]
         min_case_cnv_ids = list(min_case_cnvs['cnv_id'].values.flatten())

@@ -533,15 +533,15 @@ task prep_refinement {
 
     # Download all meta-analysis stats files and necessary data
     mkdir cleaned_cnv/
-    gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
+    gsutil -m cp -r ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
     mkdir stats/
     gsutil -m cp \
       ${rCNV_bucket}/analysis/sliding_windows/**.${freq_code}.**.sliding_window.meta_analysis.stats.bed.gz \
       stats/
     mkdir refs/
-    gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
+    gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/* refs/
     mkdir phenos/
-    gsutil -m cp gs://rcnv_project/cleaned_data/phenotypes/filtered/* phenos/
+    gsutil -m cp ${rCNV_bucket}/cleaned_data/phenotypes/filtered/* phenos/
 
     # Iterate over phenotypes and make matrix of p-values, odds ratios (lower 95% CI), and nominal sig cohorts
     mkdir pvals/
@@ -649,15 +649,15 @@ task refine_regions {
 
     # Download all meta-analysis stats files and necessary data
     mkdir cleaned_cnv/
-    gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
+    gsutil -m cp -r ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
     mkdir stats/
     gsutil -m cp \
       ${rCNV_bucket}/analysis/sliding_windows/**.${freq_code}.**.sliding_window.meta_analysis.stats.bed.gz \
       stats/
     mkdir refs/
-    gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
+    gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/* refs/
     mkdir phenos/
-    gsutil -m cp gs://rcnv_project/cleaned_data/phenotypes/filtered/* phenos/
+    gsutil -m cp ${rCNV_bucket}/cleaned_data/phenotypes/filtered/* phenos/
 
     # Tabix input to single chromosome
     tabix -f ${regions_to_refine}
@@ -703,7 +703,7 @@ task refine_regions {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:5d151894ec3a02acd4310674821fed745fc04ece17b6578a8a7433644995aca1"
+    docker: "talkowski/rcnv@sha256:f1d1349898dd8aa3a2b387e541ae8d5751535cf401a8b502dcc0a45256f653b7"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -740,7 +740,7 @@ task merge_refinements {
     cat ${sep=" " logfiles} > ${freq_code}.${CNV}.region_refinement.log
 
     # Annotate final regions with genes
-    gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
+    gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes ./
     /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
       -o ${freq_code}.${CNV}.final_regions.loci.bed \
       ${freq_code}.${CNV}.final_regions.loci.bed.gz \
@@ -763,7 +763,7 @@ task merge_refinements {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:5d151894ec3a02acd4310674821fed745fc04ece17b6578a8a7433644995aca1"
+    docker: "talkowski/rcnv@sha256:f1d1349898dd8aa3a2b387e541ae8d5751535cf401a8b502dcc0a45256f653b7"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -789,8 +789,8 @@ task plot_region_summary {
       "${rCNV_bucket}/results/sliding_windows/plots/"
     gsutil -m cp \
       "${freq_code}.final_regions.multipanel_summary.jpg" \
-      gs://rcnv_project/public/
-    gsutil acl ch -u AllUsers:R gs://rcnv_project/public/*.jpg
+      ${rCNV_bucket}/public/
+    gsutil acl ch -u AllUsers:R ${rCNV_bucket}/public/*.jpg
   >>>
 
   output {
@@ -798,7 +798,7 @@ task plot_region_summary {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:5d151894ec3a02acd4310674821fed745fc04ece17b6578a8a7433644995aca1"
+    docker: "talkowski/rcnv@sha256:f1d1349898dd8aa3a2b387e541ae8d5751535cf401a8b502dcc0a45256f653b7"
     preemptible: 1
   }
 }
