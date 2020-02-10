@@ -42,11 +42,12 @@ CNV="DEL"
 metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 gtf="genes/gencode.v19.canonical.gtf.gz"
-null_table="uCNV.gene_burden.all_null.fits.txt"
-pad_controls=50000
-weight_mode="weak"
-min_cds_ovr=0.1
-max_genes_per_cnv=5
+# null_table="rCNV.gene_burden.all_null.fits.txt"
+pad_controls=0
+weight_mode="bayesian"
+min_cds_ovr_del=0.1
+min_cds_ovr_dup=1.0
+max_genes_per_cnv=100000
 p_cutoff=0.000002896368
 meta_p_cutoff=0.000002896368
 meta_model_prefix="re"
@@ -82,13 +83,22 @@ while read prefix hpo; do
     title="$descrip (${hpo})\n$ncase cases vs $nctrl controls in '$meta' cohort"
 
     # Iterate over CNV types
-    for CNV in CNV DEL DUP; do
+    for CNV in DEL DUP; do
+      # Set CNV-specific parameters
+      case "$CNV" in
+        DEL)
+          min_cds_ovr=${min_cds_ovr_del}
+          ;;
+        DUP)
+          min_cds_ovr=${min_cds_ovr_dup}
+          ;;
+
       echo $CNV
       # Count CNVs
       /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
         --pad-controls ${pad_controls} \
         --weight-mode ${weight_mode} \
-        --min-cds-ovr ${min_cds_ovr} \
+        --min-cds-ovr $min_cds_ovr \
         --max-genes ${max_genes_per_cnv} \
         -t $CNV \
         --hpo ${hpo} \
@@ -173,7 +183,7 @@ while read prefix hpo; do
   > ${prefix}.highlight_regions.bed
 
   # Run meta-analysis for each CNV type
-  for CNV in DEL DUP CNV; do
+  for CNV in DEL DUP; do
     # Perform meta-analysis
     while read meta cohorts; do
       echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"

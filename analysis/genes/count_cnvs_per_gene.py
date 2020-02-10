@@ -10,7 +10,10 @@ Count & weight CNVs overlapping genes
 """
 
 
-import pybedtools
+import pybedtools as pbt
+import numpy as np
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
 import argparse
 from sys import stdout
 from os import path
@@ -23,7 +26,7 @@ def process_cnvs(bedpath, pad_controls, case_hpo, control_hpo):
     Read CNVs & extend control CNV breakpoints by a specified distance
     """
 
-    cnvbt = pybedtools.BedTool(bedpath)
+    cnvbt = pbt.BedTool(bedpath)
 
     def _pad_control_cnv(feature, pad_controls, control_hpo):
         """
@@ -62,7 +65,7 @@ def process_gtf(gtf_in, bl_list, xcov=0.3):
     Read gtf, format entries, and compute various metadata
     """
 
-    gtfbt = pybedtools.BedTool(gtf_in)
+    gtfbt = pbt.BedTool(gtf_in)
 
     # Build lists of eligible gene names and transcript IDs
     genes, transcripts = [], []
@@ -167,7 +170,7 @@ def overlap_cnvs_exons(cnvbt, exonbt, cds_dict, weight_mode, min_cds_ovr, max_ge
         else:
             cnv_cds_sums[cnvid][gene] += ovrlen
 
-    # Calculate weighted counts per gene for each CNV
+    # Scale cds overlap as fraction of total gene per CNV
     cnv_weights = {}
     for cnvid in cnv_cds_sums.keys():
         if cnvid not in cnv_weights.keys():
@@ -176,13 +179,18 @@ def overlap_cnvs_exons(cnvbt, exonbt, cds_dict, weight_mode, min_cds_ovr, max_ge
             cds_ovr = ovrbp / cds_dict[gene]
             if cds_ovr >= min_cds_ovr:
                 cnv_weights[cnvid][gene] = cds_ovr
+
+    # Weight CNVs
+    for cnvid in cnv_cds_sums.keys():
         if len(cnv_weights[cnvid]) > 0:
             wsum = sum(cnv_weights[cnvid].values())
             if weight_mode == 'weak' \
             or wsum < 1:
-                cnv_weights[cnvid] = {gene: w / wsum for gene, w in cnv_weights[cnvid].items()}
+                cnv_weights[cnvid] = {gene: w / wsum for gene, w 
+                                      in cnv_weights[cnvid].items()}
             elif weight_mode == 'strong':
-                cnv_weights[cnvid] = {gene: w / (2 ** (wsum - 1)) for gene, w in cnv_weights[cnvid].items()}
+                cnv_weights[cnvid] = {gene: w / (2 ** (wsum - 1)) for gene, w 
+                                      in cnv_weights[cnvid].items()}
     
     # Exclude CNVs based on overlapping more than max_genes
     cnvs_to_exclude = [cid for cid in cnv_cds_sums.keys() \
@@ -201,6 +209,58 @@ def overlap_cnvs_exons(cnvbt, exonbt, cds_dict, weight_mode, min_cds_ovr, max_ge
                     weighted_counts[gene] += w
 
     return raw_counts, weighted_counts, cnv_weights
+
+
+def get_bayes_weights(case_cnvbt, case_cnv_weights, control_cnvbt, control_cnv_weights):
+    """
+    Compute weighted pseudocounts as a function of size & number of genes
+    """
+
+    # Prepare data
+    case_vals = [(1, x.length, np.sum(list(case_cnv_weights.get(x.name, {}).values())), x.name)
+                 for x in case_cnvbt]
+    control_vals = [(0, x.length, np.sum(list(control_cnv_weights.get(x.name, {}).values())), x.name)
+                 for x in control_cnvbt]
+    df = pd.DataFrame(case_vals + control_vals, columns='pheno size genes cnvid'.split())
+
+    # Fit logistic regression
+    x = df.loc[:, 'size genes'.split()]
+    y = df['pheno']
+    model = LogisticRegression(solver='saga', random_state=0, penalty='none').fit(x, y)
+    probs = pd.DataFrame(model.predict_proba(x), columns='p_control p_case'.split())
+    df = pd.concat([df, probs], axis=1)
+
+    # Apply pseudocount weights to genes for each CNV
+    for cnvid in case_cnv_weights.keys():
+        pcase = np.float(df.loc[df['cnvid'] == cnvid, 'p_case'])
+        pcount = 2 * (1 - pcase)
+        for gene, frac in case_cnv_weights[cnvid].items():
+            case_cnv_weights[cnvid][gene] = frac * pcount
+    for cnvid in control_cnv_weights.keys():
+        pcase = np.float(df.loc[df['cnvid'] == cnvid, 'p_case'])
+        pcount = 2 * pcase
+        for gene, frac in control_cnv_weights[cnvid].items():
+            control_cnv_weights[cnvid][gene] = frac * pcount
+
+    # Sum weights per gene
+    case_weights = {}
+    for cnv, weights in case_cnv_weights.items():
+        if len(weights) > 0:
+            for gene, w in weights.items():
+                if gene not in case_weights.keys():
+                    case_weights[gene] = w
+                else:
+                    case_weights[gene] += w
+    control_weights = {}
+    for cnv, weights in control_cnv_weights.items():
+        if len(weights) > 0:
+            for gene, w in weights.items():
+                if gene not in control_weights.keys():
+                    control_weights[gene] = w
+                else:
+                    control_weights[gene] += w
+
+    return case_weights, case_cnv_weights, control_weights, control_cnv_weights
 
 
 def make_output_table(outbed, txbt, genes, cds_dict, control_counts,
@@ -243,7 +303,7 @@ def write_annotated_cnvs(cnvbt, cnvs_out, case_cnv_weights, control_cnv_weights,
         else:
             cnv_dict = case_cnv_weights
         hits = cnv_dict.get(cnvid, {})
-        ngenes = len(hits)
+        ngenes = np.sum(list(hits.values()))
         genes = ';'.join(sorted(hits.keys()))
         outfields = cnv.fields + [str(ngenes), genes]
         cnvs_out.write('\t'.join(outfields) + '\n')
@@ -264,8 +324,8 @@ def main():
                         'breakpoints. [default: 0]',
                         type=float, default=0)
     parser.add_argument('--weight-mode', help='Specify behavior for distributing ' +
-                        'weight for multi-gene CNVs. [default: "strong"]',
-                        choices=['weak', 'strong'], default='strong')
+                        'weight for multi-gene CNVs. [default: "weak"]',
+                        choices=['weak', 'strong', 'bayesian'], default='weak')
     parser.add_argument('--min-cds-ovr', help='Minimum coding sequence overlap ' +
                         'to consider a CNV gene-overlapping. [default: 0.2]',
                         type=float, default=0.2)
@@ -295,6 +355,8 @@ def main():
                         'annotated with genes disrupted.')
     parser.add_argument('-z', '--bgzip', dest='bgzip', action='store_true',
                         help='Compress output BED with bgzip.')
+    parser.add_argument('--bgzip-cnvs-out', dest='bgzip_cnvs_out', action='store_true', 
+                        help='Compress --cnvs-out BED with bgzip.')
     parser.add_argument('-v', '--verbose', action='store_true', help='Print ' + 
                         'diagnostics.')
     
@@ -333,17 +395,22 @@ def main():
         print(msg.format(len(genes), 'gene symbols'))
 
     # Intersect CNVs with exons
-    case_cnvbt = cnvbt.filter(lambda x: args.control_hpo not in x[5].split(';'))
+    case_cnvbt = cnvbt.filter(lambda x: args.control_hpo not in x[5].split(';')).saveas()
     case_counts, case_weights, case_cnv_weights \
         = overlap_cnvs_exons(case_cnvbt, exonbt, cds_dict, args.weight_mode, 
                              args.min_cds_ovr, args.max_genes)
     max_genes_controls = args.max_genes
     if args.max_genes_in_cases_only:
         max_genes_controls = 20000
-    control_cnvbt = cnvbt.filter(lambda x: args.control_hpo in x[5].split(';'))
+    control_cnvbt = cnvbt.filter(lambda x: args.control_hpo in x[5].split(';')).saveas()
     control_counts, control_weights, control_cnv_weights \
         = overlap_cnvs_exons(control_cnvbt, exonbt, cds_dict, args.weight_mode, 
                              args.min_cds_ovr, max_genes_controls)
+
+    # Compute Bayesian weights, if optioned
+    if args.weight_mode == 'bayesian':
+        case_weights, case_cnv_weights, control_weights, control_cnv_weights \
+            = get_bayes_weights(case_cnvbt, case_cnv_weights, control_cnvbt, control_cnv_weights)
     
     # Format output main counts table and write to outfile
     make_output_table(outbed, txbt, genes, cds_dict, control_counts, 
@@ -360,6 +427,7 @@ def main():
             bgzip_cnvs_out = True
         else:
             cnvs_outpath = args.cnvs_out
+            bgzip_cnvs_out = args.bgzip_cnvs_out
         cnvs_out = open(cnvs_outpath, 'w')
         write_annotated_cnvs(cnvbt, cnvs_out, case_cnv_weights, 
                              control_cnv_weights, args.control_hpo)

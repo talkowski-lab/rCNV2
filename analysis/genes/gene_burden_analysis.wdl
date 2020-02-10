@@ -17,13 +17,14 @@ workflow gene_burden_analysis {
   Int pad_controls
   String meta_model_prefix
   String weight_mode
-  Float min_cds_ovr
+  Float min_cds_ovr_del
+  Float min_cds_ovr_dup
   Int max_genes_per_cnv
   Float p_cutoff
   String rCNV_bucket
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
-  Array[String] cnvs = ['DEL', 'DUP', 'CNV']
+  Array[String] cnvs = ['DEL', 'DUP']
 
 
   # Scatter over phenotypes
@@ -38,7 +39,8 @@ workflow gene_burden_analysis {
         gtf=gtf,
         pad_controls=pad_controls,
         weight_mode=weight_mode,
-        min_cds_ovr=min_cds_ovr,
+        min_cds_ovr_del=min_cds_ovr_del,
+        min_cds_ovr_dup=min_cds_ovr_dup,
         max_genes_per_cnv=max_genes_per_cnv,
         p_cutoff=p_cutoff,
         rCNV_bucket=rCNV_bucket,
@@ -55,7 +57,8 @@ workflow gene_burden_analysis {
         gtf=gtf,
         pad_controls=pad_controls,
         weight_mode=weight_mode,
-        min_cds_ovr=min_cds_ovr,
+        min_cds_ovr_del=min_cds_ovr_del,
+        min_cds_ovr_dup=min_cds_ovr_dup,
         max_genes_per_cnv=max_genes_per_cnv,
         p_cutoff=p_cutoff,
         rCNV_bucket=rCNV_bucket,
@@ -147,13 +150,22 @@ task burden_test {
       title="$descrip (${hpo})\n$ncase cases vs $nctrl controls in '$meta' cohort"
 
       # Iterate over CNV types
-      for CNV in CNV DEL DUP; do
+      for CNV in DEL DUP; do
+        # Set CNV-specific parameters
+        case "$CNV" in
+          DEL)
+            min_cds_ovr=${min_cds_ovr_del}
+            ;;
+          DUP)
+            min_cds_ovr=${min_cds_ovr_dup}
+            ;;
+
         echo $CNV
         # Count CNVs
         /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
           --pad-controls ${pad_controls} \
           --weight-mode ${weight_mode} \
-          --min-cds-ovr ${min_cds_ovr} \
+          --min-cds-ovr $min_cds_ovr \
           --max-genes ${max_genes_per_cnv} \
           -t $CNV \
           --hpo ${hpo} \
