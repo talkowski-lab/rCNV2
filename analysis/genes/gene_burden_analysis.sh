@@ -84,6 +84,8 @@ while read prefix hpo; do
 
     # Iterate over CNV types
     for CNV in DEL DUP; do
+      echo $CNV
+
       # Set CNV-specific parameters
       case "$CNV" in
         DEL)
@@ -92,8 +94,8 @@ while read prefix hpo; do
         DUP)
           min_cds_ovr=${min_cds_ovr_dup}
           ;;
+      esac
 
-      echo $CNV
       # Count CNVs
       /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
         --pad-controls ${pad_controls} \

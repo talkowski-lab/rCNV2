@@ -107,7 +107,8 @@ task burden_test {
   File gtf
   Int pad_controls
   String weight_mode
-  Float min_cds_ovr
+  Float min_cds_ovr_del
+  Float min_cds_ovr_dup
   Int max_genes_per_cnv
   Float p_cutoff
   String rCNV_bucket
@@ -151,6 +152,8 @@ task burden_test {
 
       # Iterate over CNV types
       for CNV in DEL DUP; do
+        echo $CNV
+
         # Set CNV-specific parameters
         case "$CNV" in
           DEL)
@@ -159,8 +162,8 @@ task burden_test {
           DUP)
             min_cds_ovr=${min_cds_ovr_dup}
             ;;
+        esac
 
-        echo $CNV
         # Count CNVs
         /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
           --pad-controls ${pad_controls} \
@@ -232,7 +235,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:884e59e17422d4f9ab3fe57023ffcc6bf05b2a970dd090bfb2b4b7c203bdfe27"
+    docker: "talkowski/rcnv@sha256:1010f661be1524fbf2a43a87598a82470e3c98bb9020f3efbe09bc4f3fa5879c"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -354,7 +357,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:884e59e17422d4f9ab3fe57023ffcc6bf05b2a970dd090bfb2b4b7c203bdfe27"
+    docker: "talkowski/rcnv@sha256:1010f661be1524fbf2a43a87598a82470e3c98bb9020f3efbe09bc4f3fa5879c"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

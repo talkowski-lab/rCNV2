@@ -226,7 +226,8 @@ def get_bayes_weights(case_cnvbt, case_cnv_weights, control_cnvbt, control_cnv_w
     # Fit logistic regression
     x = df.loc[:, 'size genes'.split()]
     y = df['pheno']
-    model = LogisticRegression(solver='saga', random_state=0, penalty='none').fit(x, y)
+    model = LogisticRegression(solver='saga', random_state=0, penalty='none',
+                               max_iter=10000).fit(x, y)
     probs = pd.DataFrame(model.predict_proba(x), columns='p_control p_case'.split())
     df = pd.concat([df, probs], axis=1)
 
@@ -408,7 +409,9 @@ def main():
                              args.min_cds_ovr, max_genes_controls)
 
     # Compute Bayesian weights, if optioned
-    if args.weight_mode == 'bayesian':
+    if args.weight_mode == 'bayesian' \
+    and len(case_cnv_weights) > 0 \
+    and len(control_cnv_weights) > 0:
         case_weights, case_cnv_weights, control_weights, control_cnv_weights \
             = get_bayes_weights(case_cnvbt, case_cnv_weights, control_cnvbt, control_cnv_weights)
     

@@ -309,12 +309,12 @@ weighted.suffix <- opts$`weighted-suffix`
 precision <- opts$precision
 
 # # DEV PARAMETERS (FOR BURDEN TESTING):
-# bed.in <- "~/scratch/gene_burden_test/counts/meta1.HP0012638.rCNV.DEL.gene_burden.counts.bed.gz"
-# outfile <- "~/scratch/gene_burden_test/test_gene_burden.stats.txt"
-# pheno.table.in <- "~/scratch/gene_burden_test/HPOs_by_metacohort.table.tsv"
+# bed.in <- "~/scratch/meta1.HP0012759.rCNV.DEL.gene_burden.counts.bed.gz"
+# outfile <- "~/scratch/test_gene_burden.stats.txt"
+# pheno.table.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
 # cohort.name <- "meta1"
 # cnv <- "DEL"
-# case.hpo <- "HP:0012638"
+# case.hpo <- "HP:0012759"
 # control.hpo <- "HEALTHY_CONTROL"
 # case.col.name <- "case_cnvs"
 # control.col.name <- "control_cnvs"
