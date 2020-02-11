@@ -18,6 +18,20 @@ options(scipen=1000, stringsAsFactors=F)
 ###FUNCTIONS
 ############
 
+
+# Extract sample counts from table
+get.sample.counts <- function(pheno.table.in, case.hpo, control.hpo){
+  ptab <- read.table(pheno.table.in, header=T, 
+                     sep="\t", comment.char="")
+  case.n <- ptab[which(ptab[, 1] == case.hpo),
+                 grep("meta", colnames(ptab), fixed=T)]
+  control.n <- ptab[which(ptab[, 1] == control.hpo),
+                    grep("meta", colnames(ptab), fixed=T)]
+  return(list("case.n"=as.vector(case.n),
+              "control.n"=as.vector(control.n)))
+}
+
+
 # Compute basic OR with adjustment for zero-inflation
 calc.or <- function(control_ref, control_alt, case_ref, case_alt, adj=0.5){
   case.odds <- (case_alt + adj) / (case_ref + adj)
@@ -27,20 +41,26 @@ calc.or <- function(control_ref, control_alt, case_ref, case_alt, adj=0.5){
 
 
 # Read an input file of association statistics
-read.stats <- function(stats.in, prefix, p.is.phred){
+read.stats <- function(stats.in, cohort.name, sample.counts){
+  # Get total sample counts
+  n.case <- as.numeric(sample.counts$case.n[which(names(sample.counts$case.n) == cohort.name)])
+  n.control <- as.numeric(sample.counts$control.n[which(names(sample.counts$control.n) == cohort.name)])
+  
   # Read data & subset to necessary columns
   stats <- read.table(stats.in, header=T, sep="\t", comment.char="")
   colnames(stats)[1] <- "chr"
-  cols.to.keep <- c("chr", "start", "end", "gene", "case_alt", "case_ref",
-                    "control_alt", "control_ref", "fisher_phred_p")
+  cols.to.keep <- c("chr", "start", "end", "gene", "case_cnvs_weighted", 
+                    "control_cnvs_weighted")
   stats <- stats[, which(colnames(stats) %in% cols.to.keep)]
-  colnames(stats)[which(colnames(stats)=="fisher_phred_p")] <- "p_value"
-  if(p.is.phred==T){
-    stats$p_value <- 10^-stats$p_value
-  }
+  colnames(stats)[which(colnames(stats) == "case_cnvs_weighted")] <- "case_alt"
+  colnames(stats)[which(colnames(stats) == "control_cnvs_weighted")] <- "control_alt"
+  
+  # Add weighted ref sample counts, and compute odds ratio
+  stats$case_ref <- n.case - stats$case_alt
+  stats$control_ref <- n.case - stats$control_alt
   stats$odds_ratio <- calc.or(stats$control_ref, stats$control_alt,
                               stats$case_ref, stats$case_alt)
-  colnames(stats)[-(1:4)] <- paste(prefix, colnames(stats)[-(1:4)], sep=".")
+  colnames(stats)[-(1:4)] <- paste(cohort.name, colnames(stats)[-(1:4)], sep=".")
   return(stats)
 }
 
@@ -140,11 +160,6 @@ combine.stats <- function(stats.list){
                     all=F, sort=F)
   }
   merged[, -c(1:4)] <- apply(merged[, -c(1:4)], 2, as.numeric)
-  # Count number of nominally significant individual cohorts
-  n_nom_sig <- apply(merged[, grep(".p_value", colnames(merged), fixed=T)],
-                     1, function(pvals){length(which(pvals<=0.05))})
-  merged$n_nominal_cohorts <- n_nom_sig
-  merged <- merged[, -grep(".p_value", colnames(merged), fixed=T)]
   return(merged)
 }
 
@@ -264,10 +279,10 @@ meta <- function(stats.merged, cohorts, model="re"){
   meta.stats <- t(sapply(1:nrow(stats.merged), function(i){
     meta.single(stats.merged, cohorts, i, model, empirical.continuity=T)
   }))
-  keep.orig.cols <- c("chr", "start", "end", "gene", "n_nominal_cohorts")
+  keep.orig.cols <- c("chr", "start", "end", "gene")
   meta.res <- cbind(stats.merged[, which(colnames(stats.merged) %in% keep.orig.cols)],
                     meta.stats)
-  colnames(meta.res) <- c("chr", "start", "end", "gene", "n_nominal_cohorts",
+  colnames(meta.res) <- c("chr", "start", "end", "gene",
                           "meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper",
                           "meta_z", "meta_phred_p")
   if(model=="mh"){
@@ -287,14 +302,21 @@ require(metafor, quietly=T)
 
 # List of command-line options
 option_list <- list(
+  make_option(c("--pheno-table"), type="character", default=NULL,
+              help="table with counts of samples per HPO term per cohort [default %default]",
+              metavar="file"),
+  make_option(c("--case-hpo"), type="character", default=NULL,
+              help="HPO term to use for case samples [default %default]",
+              metavar="string"),
+  make_option(c("--control-hpo"), type="character", default='HEALTHY_CONTROL',
+              help="HPO term to use for control samples [default %default]",
+              metavar="string"),
   make_option(c("--or-corplot"), type="character", default=NULL, 
               help="output .jpg file for pairwise odds ratio correlation plot [default %default]",
               metavar="path"),
   make_option(c("--model"), type="character", default="re", 
               help="specify meta-analysis model ('re': random effects, 'mh': Mantel-Haenszel) [default %default]",
-              metavar="string"),
-  make_option(c("--p-is-phred"), action="store_true", default=FALSE, 
-              help="provided P-values are Phred-scaled (-log10(P)) [default %default]")
+              metavar="string")
 )
 
 # Get command-line arguments & options
@@ -302,27 +324,42 @@ args <- parse_args(OptionParser(usage="%prog infile outfile",
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
+if(is.null(opts$`pheno-table`)){
+  stop("Must provide --pheno-table\n")
+}
+if(is.null(opts$`case-hpo`)){
+  stop("Must specify --case-hpo\n")
+}
 
 # Writes args & opts to variable
 infile <- args$args[1]
 outfile <- args$args[2]
+pheno.table.in <- opts$`pheno-table`
+case.hpo <- opts$`case-hpo`
+control.hpo <- opts$`control-hpo`
 corplot.out <- opts$`or-corplot`
 model <- opts$model
 p.is.phred <- opts$`p-is-phred`
 
+
 # # Dev parameters
-# infile <- "~/scratch/dec18_gene_burden/gene.meta_test.input.txt2"
-# outfile <- "~/scratch/dec18_gene_burden/gene.meta_test.results.bed"
-# corplot.out <- "~/scratch/dec18_gene_burden/gene_corplot.test.jpg"
-# model <- "mh"
-# p.is.phred <- T
+# infile <- "~/scratch/bayes_gene_meta.test.input.tsv"
+# outfile <- "~/scratch/bayes_gene_meta_test.results.bed"
+# pheno.table.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
+# case.hpo <- "HP:0012759"
+# control.hpo <- "HEALTHY_CONTROL"
+# corplot.out <- "~/scratch/bayes_gene_meta_test.gene_corplot.test.jpg"
+# model <- "re"
+
+# Extract sample counts
+sample.counts <- get.sample.counts(pheno.table.in, case.hpo, control.hpo)
 
 # Read list of cohorts to meta-analyze
 cohort.info <- read.table(infile, header=F, sep="\t")
 ncohorts <- nrow(cohort.info)
 stats.list <- lapply(1:ncohorts, function(i){read.stats(cohort.info[i, 2], 
                                                         cohort.info[i, 1],
-                                                        p.is.phred)})
+                                                        sample.counts)})
 names(stats.list) <- cohort.info[, 1]
 
 # Plot correlations of odds ratios between cohorts, if optioned

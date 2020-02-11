@@ -96,21 +96,9 @@ calc.or <- function(control.ref, case.ref, control.alt, case.alt,
 }
 
 
-# Conservatively adjust weighted CNV counts to lower bound of confidence interval
-adjust.counts <- function(counts, samples, ci=0.9){
-  # nz.idx <- which(counts>0)
-  # nz.counts <- counts[nz.idx]
-  sigma <- sd(counts)
-  ci.z <- qnorm((1-ci)/2, lower.tail=F)
-  ci.mod <- ci.z * (sigma / sqrt(samples))
-  sapply(counts - ci.mod, function(x){max(c(0, x))})
-}
-
-
 # Process an input bed file of CNVs
 import.bed <- function(bed.in, case.col.name, case.n, 
-                       control.col.name, control.n,
-                       adjust.weighted.counts=F){
+                       control.col.name, control.n){
   bed <- read.table(bed.in, sep="\t", header=T, comment.char="")
   
   case.col.idx <- which(colnames(bed)==case.col.name)
@@ -146,28 +134,31 @@ import.bed <- function(bed.in, case.col.name, case.n,
                      "case.CNV.w", "control.CNV.w")
   bed$case.ref <- case.n - bed$case.CNV
   bed$control.ref <- control.n - bed$control.CNV
+  bed$case.ref.w <- case.n - bed$case.CNV.w
+  bed$control.ref.w <- control.n - bed$control.CNV.w
   bed$case.CNV.freq <- bed$case.CNV / case.n
   bed$control.CNV.freq <- bed$control.CNV / control.n
-  if(adjust.weighted.counts==T){
-    bed$case.CNV.w.adj <- adjust.counts(bed$case.CNV.w, case.n)
-    bed$case.CNV.w.norm <- bed$case.CNV.w.adj / case.n
-    bed$control.CNV.w.adj <- adjust.counts(bed$control.CNV.w, control.n)
-    bed$control.CNV.w.norm <- bed$control.CNV.w.adj / control.n
-  }else{
-    bed$case.CNV.w.norm <- bed$case.CNV.w / case.n
-    bed$control.CNV.w.norm <- bed$control.CNV.w / control.n
-  }
+  bed$case.CNV.w.norm <- bed$case.CNV.w / case.n
+  bed$control.CNV.w.norm <- bed$control.CNV.w / control.n
   
   # Calculate odds ratio
   or.df <- as.data.frame(t(sapply(1:nrow(bed), function(i){
-    calc.or(control.ref=control.n-bed$control.CNV[i],
-            case.ref=case.n-bed$case.CNV[i],
+    calc.or(control.ref=bed$control.ref[i],
+            case.ref=bed$case.ref[i],
             control.alt=bed$control.CNV[i],
             case.alt=bed$case.CNV[i],
             conf=0.95, cc.sum=0.01)
   })))
   colnames(or.df) <- c("ln.OR", "ln.OR.lower", "ln.OR.upper")
-  bed <- cbind(bed, or.df)
+  or.df.w <- as.data.frame(t(sapply(1:nrow(bed), function(i){
+    calc.or(control.ref=bed$control.ref.w[i],
+            case.ref=bed$case.ref.w[i],
+            control.alt=bed$control.CNV.w[i],
+            case.alt=bed$case.CNV.w[i],
+            conf=0.95, cc.sum=0.01)
+  })))
+  colnames(or.df.w) <- c("ln.OR.w", "ln.OR.w.lower", "ln.OR.w.upper")
+  bed <- cbind(bed, or.df, or.df.w)
   
   return(bed)
 }

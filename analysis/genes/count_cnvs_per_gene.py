@@ -227,19 +227,22 @@ def get_bayes_weights(case_cnvbt, case_cnv_weights, control_cnvbt, control_cnv_w
     x = df.loc[:, 'size genes'.split()]
     y = df['pheno']
     model = LogisticRegression(solver='saga', random_state=0, penalty='none',
-                               max_iter=10000).fit(x, y)
+                               max_iter=1000).fit(x, y)
     probs = pd.DataFrame(model.predict_proba(x), columns='p_control p_case'.split())
     df = pd.concat([df, probs], axis=1)
 
     # Apply pseudocount weights to genes for each CNV
+    # Pseudocounts normalized to median = 1 independently for cases & controls
+    case_scalar = np.median(2 * (1 - df.loc[df['pheno'] == 1, 'p_case']))
     for cnvid in case_cnv_weights.keys():
         pcase = np.float(df.loc[df['cnvid'] == cnvid, 'p_case'])
-        pcount = 2 * (1 - pcase)
+        pcount = (2 * (1 - pcase)) / case_scalar
         for gene, frac in case_cnv_weights[cnvid].items():
             case_cnv_weights[cnvid][gene] = frac * pcount
+    control_scalar = np.median(2 * df.loc[df['pheno'] == 0, 'p_case'])
     for cnvid in control_cnv_weights.keys():
         pcase = np.float(df.loc[df['cnvid'] == cnvid, 'p_case'])
-        pcount = 2 * pcase
+        pcount = (2 * pcase) / control_scalar
         for gene, frac in control_cnv_weights[cnvid].items():
             control_cnv_weights[cnvid][gene] = frac * pcount
 

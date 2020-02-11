@@ -65,35 +65,35 @@ workflow gene_burden_analysis {
         prefix=pheno[0]
     }
 
-    # Step 2: run rCNV meta-analysis to combine association stats per metacohort
-    call meta_analysis as rCNV_meta_analysis {
-      input:
-        stats_beds=rCNV_burden_test.stats_beds,
-        stats_bed_idxs=rCNV_burden_test.stats_bed_idxs,
-        hpo=pheno[1],
-        metacohort_list=metacohort_list,
-        metacohort_sample_table=metacohort_sample_table,
-        freq_code="rCNV",
-        meta_p_cutoff=p_cutoff,
-        meta_model_prefix=meta_model_prefix,
-        rCNV_bucket=rCNV_bucket,
-        prefix=pheno[0]
-    }
+    # # Step 2: run rCNV meta-analysis to combine association stats per metacohort
+    # call meta_analysis as rCNV_meta_analysis {
+    #   input:
+    #     count_beds=rCNV_burden_test.count_beds,
+    #     count_bed_idxs=rCNV_burden_test.count_bed_idxs,
+    #     hpo=pheno[1],
+    #     metacohort_list=metacohort_list,
+    #     metacohort_sample_table=metacohort_sample_table,
+    #     freq_code="rCNV",
+    #     meta_p_cutoff=p_cutoff,
+    #     meta_model_prefix=meta_model_prefix,
+    #     rCNV_bucket=rCNV_bucket,
+    #     prefix=pheno[0]
+    # }
 
-    # Step 2: run uCNV meta-analysis to combine association stats per metacohort
-    call meta_analysis as uCNV_meta_analysis {
-      input:
-        stats_beds=uCNV_burden_test.stats_beds,
-        stats_bed_idxs=uCNV_burden_test.stats_bed_idxs,
-        hpo=pheno[1],
-        metacohort_list=metacohort_list,
-        metacohort_sample_table=metacohort_sample_table,
-        freq_code="uCNV",
-        meta_p_cutoff=p_cutoff,
-        meta_model_prefix=meta_model_prefix,
-        rCNV_bucket=rCNV_bucket,
-        prefix=pheno[0]
-    }
+    # # Step 2: run uCNV meta-analysis to combine association stats per metacohort
+    # call meta_analysis as uCNV_meta_analysis {
+    #   input:
+    #     count_beds=uCNV_burden_test.count_beds,
+    #     count_bed_idxs=uCNV_burden_test.count_bed_idxs,
+    #     hpo=pheno[1],
+    #     metacohort_list=metacohort_list,
+    #     metacohort_sample_table=metacohort_sample_table,
+    #     freq_code="uCNV",
+    #     meta_p_cutoff=p_cutoff,
+    #     meta_model_prefix=meta_model_prefix,
+    #     rCNV_bucket=rCNV_bucket,
+    #     prefix=pheno[0]
+    # }
   }
 }
 
@@ -182,76 +182,78 @@ task burden_test {
           ${gtf}
         tabix -f "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz"
 
-        # Perform burden test
-        /opt/rCNV2/analysis/genes/gene_burden_test.R \
-          --pheno-table ${metacohort_sample_table} \
-          --cohort-name $meta \
-          --cnv $CNV \
-          --case-hpo ${hpo} \
-          --bgzip \
-          "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
-          "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
-        tabix -f "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
+        # # Perform burden test
+        # /opt/rCNV2/analysis/genes/gene_burden_test.R \
+        #   --pheno-table ${metacohort_sample_table} \
+        #   --cohort-name $meta \
+        #   --cnv $CNV \
+        #   --case-hpo ${hpo} \
+        #   --bgzip \
+        #   "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
+        #   "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
+        # tabix -f "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
 
-        # Generate Manhattan & QQ plots
-        /opt/rCNV2/utils/plot_manhattan_qq.R \
-          --p-col-name "fisher_phred_p" \
-          --p-is-phred \
-          --max-phred-p 100 \
-          --cutoff ${p_cutoff} \
-          --highlight-bed "${prefix}.highlight_regions.bed" \
-          --highlight-name "Constrained genes associated with this phenotype" \
-          --title "$title" \
-          "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz" \
-          "$meta.${prefix}.${freq_code}.$CNV.gene_burden"
+        # # Generate Manhattan & QQ plots
+        # /opt/rCNV2/utils/plot_manhattan_qq.R \
+        #   --p-col-name "fisher_phred_p" \
+        #   --p-is-phred \
+        #   --max-phred-p 100 \
+        #   --cutoff ${p_cutoff} \
+        #   --highlight-bed "${prefix}.highlight_regions.bed" \
+        #   --highlight-name "Constrained genes associated with this phenotype" \
+        #   --title "$title" \
+        #   "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz" \
+        #   "$meta.${prefix}.${freq_code}.$CNV.gene_burden"
       done
 
       # Generate Miami & QQ plots
-      /opt/rCNV2/utils/plot_manhattan_qq.R \
-        --miami \
-        --p-col-name "fisher_phred_p" \
-        --p-is-phred \
-        --max-phred-p 100 \
-        --cutoff ${p_cutoff} \
-        --highlight-bed "${prefix}.highlight_regions.bed" \
-        --highlight-name "Constrained genes associated with this phenotype" \
-        --label-prefix "DUP" \
-        --highlight-bed-2 "${prefix}.highlight_regions.bed" \
-        --highlight-name-2 "Constrained genes associated with this phenotype" \
-        --label-prefix-2 "DEL" \
-        --title "$title" \
-        "$meta.${prefix}.${freq_code}.DUP.gene_burden.stats.bed.gz" \
-        "$meta.${prefix}.${freq_code}.DEL.gene_burden.stats.bed.gz" \
-        "$meta.${prefix}.${freq_code}.gene_burden"
+      # /opt/rCNV2/utils/plot_manhattan_qq.R \
+      #   --miami \
+      #   --p-col-name "fisher_phred_p" \
+      #   --p-is-phred \
+      #   --max-phred-p 100 \
+      #   --cutoff ${p_cutoff} \
+      #   --highlight-bed "${prefix}.highlight_regions.bed" \
+      #   --highlight-name "Constrained genes associated with this phenotype" \
+      #   --label-prefix "DUP" \
+      #   --highlight-bed-2 "${prefix}.highlight_regions.bed" \
+      #   --highlight-name-2 "Constrained genes associated with this phenotype" \
+      #   --label-prefix-2 "DEL" \
+      #   --title "$title" \
+      #   "$meta.${prefix}.${freq_code}.DUP.gene_burden.stats.bed.gz" \
+      #   "$meta.${prefix}.${freq_code}.DEL.gene_burden.stats.bed.gz" \
+      #   "$meta.${prefix}.${freq_code}.gene_burden"
     done < ${metacohort_list}
 
     # Copy results to output bucket
     gsutil -m cp *.gene_burden.counts.bed.gz* \
       "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/counts/"
-    gsutil -m cp *.gene_burden.stats.bed.gz* \
-      "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/stats/"
-    gsutil -m cp *.gene_burden.*.png \
-      "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/plots/"
+    # gsutil -m cp *.gene_burden.stats.bed.gz* \
+    #   "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/stats/"
+    # gsutil -m cp *.gene_burden.*.png \
+    #   "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/plots/"
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:1010f661be1524fbf2a43a87598a82470e3c98bb9020f3efbe09bc4f3fa5879c"
+    docker: "talkowski/rcnv@sha256:c6d25423cd54a71639a9a6dc8d2ac882c508f9b2687423d535647e7a3423c396"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
   }
 
   output {
-    Array[File] stats_beds = glob("*.gene_burden.stats.bed.gz")
-    Array[File] stats_bed_idxs = glob("*.gene_burden.stats.bed.gz.tbi")
+    # Array[File] stats_beds = glob("*.gene_burden.stats.bed.gz")
+    # Array[File] stats_bed_idxs = glob("*.gene_burden.stats.bed.gz.tbi")
+    Array[File] count_beds = glob("*.gene_burden.counts.bed.gz")
+    Array[File] count_bed_idxs = glob("*.gene_burden.counts.bed.gz.tbi")
   }
 }
 
 
 # Run meta-analysis across metacohorts for a single phenotype
 task meta_analysis {
-  Array[File] stats_beds
-  Array[File] stats_bed_idxs
+  Array[File] count_beds
+  Array[File] count_bed_idxs
   String hpo
   File metacohort_list
   File metacohort_sample_table
@@ -357,7 +359,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:1010f661be1524fbf2a43a87598a82470e3c98bb9020f3efbe09bc4f3fa5879c"
+    docker: "talkowski/rcnv@sha256:c6d25423cd54a71639a9a6dc8d2ac882c508f9b2687423d535647e7a3423c396"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
