@@ -300,7 +300,7 @@ weighted.suffix <- opts$`weighted-suffix`
 precision <- opts$precision
 
 # # DEV PARAMETERS (FOR BURDEN TESTING):
-# bed.in <- "~/scratch/meta1.HP0012759.rCNV.DEL.gene_burden.counts.bed.gz"
+# bed.in <- "~/scratch/bayes_gene_counts/meta1.HP0012759.rCNV.DEL.gene_burden.counts.bed.gz"
 # outfile <- "~/scratch/test_gene_burden.stats.txt"
 # pheno.table.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
 # cohort.name <- "meta1"
