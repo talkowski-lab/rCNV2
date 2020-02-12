@@ -57,7 +57,7 @@ read.stats <- function(stats.in, cohort.name, sample.counts){
   
   # Add weighted ref sample counts, and compute odds ratio
   stats$case_ref <- n.case - stats$case_alt
-  stats$control_ref <- n.case - stats$control_alt
+  stats$control_ref <- n.control - stats$control_alt
   stats$odds_ratio <- calc.or(stats$control_ref, stats$control_alt,
                               stats$case_ref, stats$case_alt)
   colnames(stats)[-(1:4)] <- paste(cohort.name, colnames(stats)[-(1:4)], sep=".")
@@ -342,12 +342,12 @@ model <- opts$model
 
 
 # # Dev parameters
-# infile <- "~/scratch/bayes_gene_meta.test.input.tsv2"
-# outfile <- "~/scratch/bayes_gene_meta_test.results.bed"
+# infile <- "~/scratch/HP0001507.rCNV.DEL.gene_burden.weighted_meta_analysis.input.txt"
+# outfile <- "~/scratch/HP0001507.rCNV.$CNV.gene_burden.weighted_meta_analysis.stats.bed"
 # pheno.table.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
-# case.hpo <- "UNKNOWN"
+# case.hpo <- "HP:0001507"
 # control.hpo <- "HEALTHY_CONTROL"
-# corplot.out <- "~/scratch/bayes_gene_meta_test.gene_corplot.test.jpg"
+# corplot.out <- "~/scratch/HP0001507.rCNV.DEL.gene_burden.weighted.or_corplot_grid.jpg"
 # model <- "re"
 
 # Extract sample counts

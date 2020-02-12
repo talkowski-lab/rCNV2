@@ -264,7 +264,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:9d5358ce77dd436d067dea901d9b1d19b575f635f9b09cacfe38ff84cce7e62a"
+    docker: "talkowski/rcnv@sha256:90840bcba5f6f5ef8ab183a4879d6eb25971845c79959386fca917cc0b155e11"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -280,7 +280,7 @@ task burden_test {
 
 
 # Run meta-analysis (both weighted and raw) across metacohorts for a single phenotype
-task meta_analysis_weighted {
+task meta_analysis {
   Array[File] count_beds
   Array[File] count_bed_idxs
   Array[File] stats_beds
@@ -299,6 +299,8 @@ task meta_analysis_weighted {
 
     # Copy burden counts & gene coordinates
     find / -name "*${prefix}.${freq_code}.*.gene_burden.counts.bed.gz*" \
+    | xargs -I {} mv {} ./
+    find / -name "*${prefix}.${freq_code}.*.gene_burden.stats.bed.gz*" \
     | xargs -I {} mv {} ./
     gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
     mkdir refs/
@@ -409,7 +411,7 @@ task meta_analysis_weighted {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:9d5358ce77dd436d067dea901d9b1d19b575f635f9b09cacfe38ff84cce7e62a"
+    docker: "talkowski/rcnv@sha256:90840bcba5f6f5ef8ab183a4879d6eb25971845c79959386fca917cc0b155e11"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

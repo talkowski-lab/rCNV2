@@ -118,6 +118,7 @@ get.adjusted.cutoffs <- function(cutoff.stat.df){
   fit.df <- data.frame("x"=cutoff.stat.df$n.cases)
   fit.df$y <- predict(fit, newdata=fit.df)
   out.df <- as.data.frame(cbind(unlist(cutoff.stat.df$hpo), unlist(10^-fit.df$y)))
+  out.df <- out.df[!duplicated(out.df), ]
   colnames(out.df) <- c("#hpo", "min_p")
   return(out.df)
 }
@@ -128,8 +129,10 @@ plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target, floor=T){
   
   # Prep plot area & add points
   par(mar=c(3, 3, 2, 0.5))
-  plot(x=cutoff.mat$n.cases, y=cutoff.mat$fdr.cutoff, 
-       col="gray75", xaxt="n", yaxt="n", xlab="", ylab="")
+  plot(x=c(0, max(cutoff.mat$n.cases)),
+       y=c(0, max(cutoff.mat$fdr.cutoff),
+           type="n", xaxt="n", yaxt="n", xlab="", ylab=""))
+  points(x=cutoff.mat$n.cases, y=cutoff.mat$fdr.cutoff, col="gray75")
   abline(h=phred.target, lty=2)
   points(x=cutoff.stat.df$n.cases, y=cutoff.stat.df$fdr.cutoff, pch=15)
   
@@ -226,8 +229,8 @@ q3.cutoffs <- get.cutoff.stat(cutoff.mat, "Q3")
 max.cutoffs <- get.cutoff.stat(cutoff.mat, "max")
 
 # Format & write output file
-df.out <- get.adjusted.cutoffs(mean.cutoffs)
-write.table(df.out, outfile, sep="\t", quote=F,
+df.out.mean <- get.adjusted.cutoffs(mean.cutoffs)
+write.table(df.out.mean, outfile, sep="\t", quote=F,
             col.names=T, row.names=F)
 
 # Plot FDR data, if optioned
