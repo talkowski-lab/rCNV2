@@ -55,11 +55,26 @@ read.stats <- function(stats.in, cohort.name, sample.counts){
   colnames(stats)[which(colnames(stats) == "case_cnvs_weighted")] <- "case_alt"
   colnames(stats)[which(colnames(stats) == "control_cnvs_weighted")] <- "control_alt"
   
-  # Add weighted ref sample counts, and compute odds ratio
+  # Add weighted ref sample counts
   stats$case_ref <- n.case - stats$case_alt
   stats$control_ref <- n.control - stats$control_alt
+  
+  # Never allow case/control alt/ref counts to be less than zero or larger than the total number of samples
+  # Dev note: this can occur due to over-weighting common control CNVs in extreme case:control imbalance
+  stats$case_alt[which(stats$case_alt < 0)] <- 0
+  stats$case_alt[which(stats$case_alt > n.case)] <- n.case
+  stats$control_alt[which(stats$control_alt < 0)] <- 0
+  stats$control_alt[which(stats$control_alt > n.control)] <- n.control
+  stats$case_ref[which(stats$case_ref < 0)] <- 0
+  stats$case_ref[which(stats$case_ref > n.case)] <- n.case
+  stats$control_ref[which(stats$control_ref < 0)] <- 0
+  stats$control_ref[which(stats$control_ref > n.control)] <- n.control
+  
+  # Compute odds ratio
   stats$odds_ratio <- calc.or(stats$control_ref, stats$control_alt,
                               stats$case_ref, stats$case_alt)
+  
+  # Return cleaned data frame
   colnames(stats)[-(1:4)] <- paste(cohort.name, colnames(stats)[-(1:4)], sep=".")
   return(stats)
 }
@@ -342,12 +357,12 @@ model <- opts$model
 
 
 # # Dev parameters
-# infile <- "~/scratch/HP0001507.rCNV.DEL.gene_burden.weighted_meta_analysis.input.txt"
-# outfile <- "~/scratch/HP0001507.rCNV.$CNV.gene_burden.weighted_meta_analysis.stats.bed"
+# infile <- "~/scratch/HP0000729.vCNV.DUP.gene_burden.weighted_meta_analysis.input.txt"
+# outfile <- "~/scratch/HP0000729.vCNV.DUP.gene_burden.weighted_meta_analysis.stats.bed"
 # pheno.table.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
-# case.hpo <- "HP:0001507"
+# case.hpo <- "HP:0000729"
 # control.hpo <- "HEALTHY_CONTROL"
-# corplot.out <- "~/scratch/HP0001507.rCNV.DEL.gene_burden.weighted.or_corplot_grid.jpg"
+# corplot.out <- "~/scratch/HP0000729.vCNV.DUP.gene_burden.weighted.or_corplot_grid.jpg"
 # model <- "re"
 
 # Extract sample counts
