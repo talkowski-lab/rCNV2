@@ -6,7 +6,7 @@
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Filter raw CNV data to rare and ultra-rare subsets for a single cohort
+# Filter raw CNV data to rare, very rare, and ultra rare subsets for a single cohort
 
 
 workflow filter_cnvs_singleCohort {
@@ -20,7 +20,7 @@ workflow filter_cnvs_singleCohort {
 
   # Scatter over contigs
   scatter ( contig in contigs ) {
-    # Generate rare and ultra-rare CNVs for each cohort per contig
+    # Generate rare, very rare, and ultra-rare CNVs for each cohort per contig
     call filter_cnvs_singleChrom as filter_rare {
       input:
         cohort=cohort,
@@ -30,6 +30,16 @@ workflow filter_cnvs_singleCohort {
         rCNV_bucket=rCNV_bucket,
         max_freq="0.01",
         CNV_suffix="rCNV"
+    }
+    call filter_cnvs_singleChrom as filter_veryrare {
+      input:
+        cohort=cohort,
+        N=sample_size,
+        raw_CNVs=raw_CNVs,
+        contig=contig[0],
+        rCNV_bucket=rCNV_bucket,
+        max_freq="0.001",
+        CNV_suffix="vCNV"
     }
     call filter_cnvs_singleChrom as filter_ultrarare {
       input:
@@ -50,6 +60,12 @@ workflow filter_cnvs_singleCohort {
       prefix="${cohort}.rCNV",
         output_bucket="${rCNV_bucket}/cleaned_data/cnv"
   }
+  call merge_beds as merge_veryrare {
+    input:
+      beds=filter_veryrare.filtered_cnvs,
+      prefix="${cohort}.vCNV",
+        output_bucket="${rCNV_bucket}/cleaned_data/cnv"
+  }
   call merge_beds as merge_ultrarare {
     input:
       beds=filter_ultrarare.filtered_cnvs,
@@ -60,16 +76,10 @@ workflow filter_cnvs_singleCohort {
   output {
     File rCNVs = merge_rare.merged_bed
     File rCNVs_idx = merge_rare.merged_bed_idx
-    # File case_rCNVs = merge_rare.merged_case_bed
-    # File case_rCNVs_idx = merge_rare.merged_case_bed_idx
-    # File control_rCNVs = merge_rare.merged_control_bed
-    # File control_rCNVs_idx = merge_rare.merged_control_bed_idx
+    File vCNVs = merge_veryrare.merged_bed
+    File vCNVs_idx = merge_veryrare.merged_bed_idx
     File uCNVs = merge_ultrarare.merged_bed
     File uCNVs_idx = merge_ultrarare.merged_bed_idx
-    # File case_uCNVs = merge_ultrarare.merged_case_bed
-    # File case_uCNVs_idx = merge_ultrarare.merged_case_bed_idx
-    # File control_uCNVs = merge_ultrarare.merged_control_bed
-    # File control_uCNVs_idx = merge_ultrarare.merged_control_bed_idx
   }
 }
 
@@ -156,7 +166,7 @@ task filter_cnvs_singleChrom {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f2fde8ddf20b69e25b48f19194b6d4a716132c5214f3b2a65854ebe0efc64da5"
+    docker: "talkowski/rcnv@sha256:9d5358ce77dd436d067dea901d9b1d19b575f635f9b09cacfe38ff84cce7e62a"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 200 SSD"
@@ -207,7 +217,7 @@ task merge_beds {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f2fde8ddf20b69e25b48f19194b6d4a716132c5214f3b2a65854ebe0efc64da5"
+    docker: "talkowski/rcnv@sha256:9d5358ce77dd436d067dea901d9b1d19b575f635f9b09cacfe38ff84cce7e62a"
     preemptible: 1
   }
 

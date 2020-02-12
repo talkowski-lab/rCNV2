@@ -87,7 +87,31 @@ while read cohort N; do
     cnv/$cohort.raw.bed.gz \
     rare_cnv_curated/$cohort.rCNV.bed.gz
 done < <( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f1-2 )
-    
+
+
+# Filter each cohort for very rare CNV callset
+mkdir veryrare_cnv_curated/
+while read cohort N; do
+  /opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
+    --minsize 100000 \
+    --maxsize 10000000 \
+    --nsamp $N \
+    --maxfreq 0.001 \
+    --recipoverlap 0.5 \
+    --dist 100000 \
+    --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
+    --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+    --blacklist refs/GRCh37.Nmask.bed.gz \
+    --xcov 0.3 \
+    --cohorts-list raw_CNVs.per_cohort.txt \
+    --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
+    --vcf refs/1000Genomes_phase3.sites.vcf.gz \
+    --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
+    --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
+    --bgzip \
+    cnv/$cohort.raw.bed.gz \
+    ultrarare_cnv_curated/$cohort.vCNV.bed.gz
+done < <( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f1-2 )
 
 
 # Filter each cohort for ultrarare CNV callset
@@ -111,91 +135,7 @@ while read cohort N; do
     --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
-    ultrarare_cnv_curated/$cohort.urCNV.bed.gz
+    ultrarare_cnv_curated/$cohort.uCNV.bed.gz
 done < <( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f1-2 )
 
-
-# Debugging code chunk: chr22 rCNVs for BCH cohort
-mkdir debug
-/opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
-  --chr 22 \
-  --minsize 100000 \
-  --maxsize 10000000 \
-  --nsamp 3591 \
-  --maxfreq 0.01 \
-  --recipoverlap 0.5 \
-  --dist 100000 \
-  --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
-  --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
-  --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
-  --xcov 0.3 \
-  --cohorts-list raw_CNVs.per_cohort.txt \
-  --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
-  --vcf refs/1000Genomes_phase3.sites.vcf.gz \
-  --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-  --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
-  --bgzip \
-  cnv/BCH.raw.bed.gz \
-  debug/BCH.rCNV.bed.gz
-# /opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
-#   --chr 22 \
-#   --minsize 100000 \
-#   --maxsize 10000000 \
-#   --nsamp 3591 \
-#   --maxfreq 0.01 \
-#   --recipoverlap 0.5 \
-#   --dist 100000 \
-#   --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
-#   --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
-#   --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
-#   --xcov 0.3 \
-#   --cohorts-list <( fgrep BCH raw_CNVs.per_cohort.txt ) \
-#   --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
-#   --bgzip \
-#   cnv/BCH.raw.bed.gz \
-#   debug/BCH.rCNV.bed.gz
-
-/opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
-  --chr 22 \
-  --minsize 100000 \
-  --maxsize 10000000 \
-  --nsamp 3591 \
-  --maxfreq 0.0001 \
-  --recipoverlap 0.5 \
-  --dist 100000 \
-  --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
-  --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
-  --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
-  --xcov 0.3 \
-  --cohorts-list raw_CNVs.per_cohort.txt \
-  --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
-  --vcf refs/1000Genomes_phase3.sites.vcf.gz \
-  --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-  --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
-  --bgzip \
-  cnv/BCH.raw.bed.gz \
-  debug/BCH.uCNV.bed.gz
-
-
-# Debugging code chunk: chr22 rCNVs for PGC cohort
-/opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
-  --chr 22 \
-  --minsize 100000 \
-  --maxsize 10000000 \
-  --nsamp 41371 \
-  --maxfreq 0.01 \
-  --recipoverlap 0.5 \
-  --dist 100000 \
-  --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
-  --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
-  --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
-  --xcov 0.3 \
-  --cohorts-list raw_CNVs.per_cohort.txt \
-  --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
-  --vcf refs/1000Genomes_phase3.sites.vcf.gz \
-  --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-  --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
-  --bgzip \
-  cnv/PGC.raw.bed.gz \
-  rare_cnv_curated/PGC.rCNV.bed.gz
 

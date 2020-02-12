@@ -135,60 +135,36 @@ awk -v OFS="\t" '{ print $0, "/raw_cnv/"$1".raw.bed.gz" }' \
   raw_cnv.stats.jpg
 
 
-# Collect and plot filtered rare CNV data
-awk -v OFS="\t" '{ print $0, "/cleaned_cnv/"$1".rCNV.bed.gz" }' \
-  /opt/rCNV2/refs/rCNV_sample_counts.txt \
-| fgrep -v "#" \
-> rare_cnv.input.txt
-/opt/rCNV2/data_curation/CNV/build_cnv_stats_table.py \
-  --tsv rare_cnv.stats.txt \
-  --html rare_cnv.stats.html.txt \
-  rare_cnv.input.txt
-/opt/rCNV2/data_curation/CNV/plot_cnv_stats_per_cohort.R \
-  rare_cnv.stats.txt \
-  rare_cnv.stats.jpg
+# Iterate over frequency classes
+for freq in rCNV vCNV uCNV; do
+  # Collect and plot filtered CNV data per cohort
+  awk -v OFS="\t" -v freq=${freq} \
+    '{ print $0, "/cleaned_cnv/"$1"."freq".bed.gz" }' \
+    /opt/rCNV2/refs/rCNV_sample_counts.txt \
+  | fgrep -v "#" \
+  > ${freq}.input.txt
+  /opt/rCNV2/data_curation/CNV/build_cnv_stats_table.py \
+    --tsv ${freq}.stats.txt \
+    --html ${freq}.stats.html.txt \
+    ${freq}.input.txt
+  /opt/rCNV2/data_curation/CNV/plot_cnv_stats_per_cohort.R \
+    ${freq}.stats.txt \
+    ${freq}.stats.jpg
 
-
-# Collect and plot filtered ultra-rare CNV data
-awk -v OFS="\t" '{ print $0, "/cleaned_cnv/"$1".uCNV.bed.gz" }' \
-  /opt/rCNV2/refs/rCNV_sample_counts.txt \
-| fgrep -v "#" \
-> ultrarare_cnv.input.txt
-/opt/rCNV2/data_curation/CNV/build_cnv_stats_table.py \
-  --tsv ultrarare_cnv.stats.txt \
-  --html ultrarare_cnv.stats.html.txt \
-  ultrarare_cnv.input.txt
-/opt/rCNV2/data_curation/CNV/plot_cnv_stats_per_cohort.R \
-  ultrarare_cnv.stats.txt \
-  ultrarare_cnv.stats.jpg
-
-
-# Collect and plot filtered rare CNV data per metacohort
-awk -v OFS="\t" '{ print $0, "/cleaned_cnv/"$1".rCNV.bed.gz" }' \
-  rCNV_metacohort_sample_counts.txt \
-| fgrep -v "#" \
-> rare_cnv.metacohorts.input.txt
-/opt/rCNV2/data_curation/CNV/build_cnv_stats_table.py \
-  --tsv rare_cnv.metacohort.stats.txt \
-  --html rare_cnv.metacohort.stats.html.txt \
-  rare_cnv.metacohorts.input.txt
-/opt/rCNV2/data_curation/CNV/plot_cnv_stats_per_cohort.R \
-  rare_cnv.metacohort.stats.txt \
-  rare_cnv.metacohort.stats.jpg
-
-
-# Collect and plot filtered ultra-rare CNV data per metacohort
-awk -v OFS="\t" '{ print $0, "/cleaned_cnv/"$1".uCNV.bed.gz" }' \
-  rCNV_metacohort_sample_counts.txt \
-| fgrep -v "#" \
-> ultrarare_cnv.metacohorts.input.txt
-/opt/rCNV2/data_curation/CNV/build_cnv_stats_table.py \
-  --tsv ultrarare_cnv.metacohort.stats.txt \
-  --html ultrarare_cnv.metacohort.stats.html.txt \
-  ultrarare_cnv.metacohorts.input.txt
-/opt/rCNV2/data_curation/CNV/plot_cnv_stats_per_cohort.R \
-  ultrarare_cnv.metacohort.stats.txt \
-  ultrarare_cnv.metacohort.stats.jpg
+  # Collect and plot filtered CNV data per metacohort
+  awk -v OFS="\t" -v freq=${freq} \
+    '{ print $0, "/cleaned_cnv/"$1"."freq".bed.gz" }' \
+    rCNV_metacohort_sample_counts.txt \
+  | fgrep -v "#" \
+  > ${freq}.metacohorts.input.txt
+  /opt/rCNV2/data_curation/CNV/build_cnv_stats_table.py \
+    --tsv ${freq}.metacohort.stats.txt \
+    --html ${freq}.metacohort.stats.html.txt \
+    ${freq}.metacohorts.input.txt
+  /opt/rCNV2/data_curation/CNV/plot_cnv_stats_per_cohort.R \
+    ${freq}.metacohort.stats.txt \
+    ${freq}.metacohort.stats.jpg
+done
 
 
 # Copy all plots to public bucket for viewing on README

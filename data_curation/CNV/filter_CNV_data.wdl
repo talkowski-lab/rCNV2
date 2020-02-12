@@ -6,9 +6,9 @@
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Filter raw CNV data to rare and ultra-rare subsets
+# Filter raw CNV data to rare, very rare, and ultra rare subsets
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:filter_cnvs_singleCohort/versions/47/plain-WDL/descriptor" as filter_single
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:filter_cnvs_singleCohort/versions/50/plain-WDL/descriptor" as filter_single
 
 
 workflow filter_CNV_data {
@@ -45,6 +45,14 @@ workflow filter_CNV_data {
         output_bucket="${rCNV_bucket}/cleaned_data/cnv",
         prefix="${metacohort[0]}.rCNV"
     }
+    call combine_subsets as combine_meta_vCNVs {
+      input:
+        beds=filter_cohort.vCNVs,
+        bed_idxs=filter_cohort.vCNVs_idx,
+        cohorts=metacohort[1],
+        output_bucket="${rCNV_bucket}/cleaned_data/cnv",
+        prefix="${metacohort[0]}.vCNV"
+    }
     call combine_subsets as combine_meta_uCNVs {
       input:
         beds=filter_cohort.uCNVs,
@@ -58,6 +66,8 @@ workflow filter_CNV_data {
   output {
     Array[File] rCNVs = filter_cohort.rCNVs
     Array[File] rCNVs_idx = filter_cohort.rCNVs_idx
+    Array[File] vCNVs = filter_cohort.vCNVs
+    Array[File] vCNVs_idx = filter_cohort.vCNVs_idx
     Array[File] uCNVs = filter_cohort.uCNVs
     Array[File] uCNVs_idx = filter_cohort.uCNVs_idx
   }
@@ -94,7 +104,7 @@ task combine_subsets {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f2fde8ddf20b69e25b48f19194b6d4a716132c5214f3b2a65854ebe0efc64da5"
+    docker: "talkowski/rcnv@sha256:9d5358ce77dd436d067dea901d9b1d19b575f635f9b09cacfe38ff84cce7e62a"
     preemptible: 1
   }
 

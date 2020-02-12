@@ -339,14 +339,13 @@ case.hpo <- opts$`case-hpo`
 control.hpo <- opts$`control-hpo`
 corplot.out <- opts$`or-corplot`
 model <- opts$model
-p.is.phred <- opts$`p-is-phred`
 
 
 # # Dev parameters
-# infile <- "~/scratch/bayes_gene_meta.test.input.tsv"
+# infile <- "~/scratch/bayes_gene_meta.test.input.tsv2"
 # outfile <- "~/scratch/bayes_gene_meta_test.results.bed"
 # pheno.table.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
-# case.hpo <- "HP:0012759"
+# case.hpo <- "UNKNOWN"
 # control.hpo <- "HEALTHY_CONTROL"
 # corplot.out <- "~/scratch/bayes_gene_meta_test.gene_corplot.test.jpg"
 # model <- "re"

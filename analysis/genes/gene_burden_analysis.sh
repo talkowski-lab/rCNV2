@@ -193,7 +193,7 @@ while read prefix hpo; do
     > ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt
     /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
       --pheno-table ${metacohort_sample_table} \
-      --case-hpo $hpo \
+      --case-hpo ${hpo} \
       --or-corplot ${prefix}.${freq_code}.$CNV.gene_burden.or_corplot_grid.jpg \
       --model ${meta_model_prefix} \
       ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \

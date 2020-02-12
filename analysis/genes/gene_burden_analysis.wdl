@@ -24,8 +24,6 @@ workflow gene_burden_analysis {
   String rCNV_bucket
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
-  Array[String] cnvs = ['DEL', 'DUP']
-
 
   # Scatter over phenotypes
   scatter ( pheno in phenotypes ) {
@@ -65,35 +63,35 @@ workflow gene_burden_analysis {
         prefix=pheno[0]
     }
 
-    # # Step 2: run rCNV meta-analysis to combine association stats per metacohort
-    # call meta_analysis as rCNV_meta_analysis {
-    #   input:
-    #     count_beds=rCNV_burden_test.count_beds,
-    #     count_bed_idxs=rCNV_burden_test.count_bed_idxs,
-    #     hpo=pheno[1],
-    #     metacohort_list=metacohort_list,
-    #     metacohort_sample_table=metacohort_sample_table,
-    #     freq_code="rCNV",
-    #     meta_p_cutoff=p_cutoff,
-    #     meta_model_prefix=meta_model_prefix,
-    #     rCNV_bucket=rCNV_bucket,
-    #     prefix=pheno[0]
-    # }
+    # Step 2: run rCNV meta-analysis to combine association stats per metacohort
+    call meta_analysis as rCNV_meta_analysis {
+      input:
+        count_beds=rCNV_burden_test.count_beds,
+        count_bed_idxs=rCNV_burden_test.count_bed_idxs,
+        hpo=pheno[1],
+        metacohort_list=metacohort_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code="rCNV",
+        meta_p_cutoff=p_cutoff,
+        meta_model_prefix=meta_model_prefix,
+        rCNV_bucket=rCNV_bucket,
+        prefix=pheno[0]
+    }
 
-    # # Step 2: run uCNV meta-analysis to combine association stats per metacohort
-    # call meta_analysis as uCNV_meta_analysis {
-    #   input:
-    #     count_beds=uCNV_burden_test.count_beds,
-    #     count_bed_idxs=uCNV_burden_test.count_bed_idxs,
-    #     hpo=pheno[1],
-    #     metacohort_list=metacohort_list,
-    #     metacohort_sample_table=metacohort_sample_table,
-    #     freq_code="uCNV",
-    #     meta_p_cutoff=p_cutoff,
-    #     meta_model_prefix=meta_model_prefix,
-    #     rCNV_bucket=rCNV_bucket,
-    #     prefix=pheno[0]
-    # }
+    # Step 2: run uCNV meta-analysis to combine association stats per metacohort
+    call meta_analysis as uCNV_meta_analysis {
+      input:
+        count_beds=uCNV_burden_test.count_beds,
+        count_bed_idxs=uCNV_burden_test.count_bed_idxs,
+        hpo=pheno[1],
+        metacohort_list=metacohort_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code="uCNV",
+        meta_p_cutoff=p_cutoff,
+        meta_model_prefix=meta_model_prefix,
+        rCNV_bucket=rCNV_bucket,
+        prefix=pheno[0]
+    }
   }
 }
 
@@ -235,7 +233,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:c6d25423cd54a71639a9a6dc8d2ac882c508f9b2687423d535647e7a3423c396"
+    docker: "talkowski/rcnv@sha256:9d5358ce77dd436d067dea901d9b1d19b575f635f9b09cacfe38ff84cce7e62a"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -266,8 +264,8 @@ task meta_analysis {
   command <<<
     set -e
 
-    # Copy burden stats & gene coordinates
-    find / -name "*${prefix}.${freq_code}.*.gene_burden.stats.bed.gz*" \
+    # Copy burden counts & gene coordinates
+    find / -name "*${prefix}.${freq_code}.*.gene_burden.counts.bed.gz*" \
     | xargs -I {} mv {} ./
     gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
     mkdir refs/
@@ -297,16 +295,17 @@ task meta_analysis {
     > ${prefix}.highlight_regions.bed
 
     # Run meta-analysis for each CNV type
-    for CNV in DEL DUP CNV; do
+    for CNV in DEL DUP; do
       # Perform meta-analysis
       while read meta cohorts; do
-        echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
+        echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz"
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt
       /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
+        --pheno-table ${metacohort_sample_table} \
+        --case-hpo ${hpo} \
         --or-corplot ${prefix}.${freq_code}.$CNV.gene_burden.or_corplot_grid.jpg \
         --model ${meta_model_prefix} \
-        --p-is-phred \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
@@ -359,7 +358,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:c6d25423cd54a71639a9a6dc8d2ac882c508f9b2687423d535647e7a3423c396"
+    docker: "talkowski/rcnv@sha256:9d5358ce77dd436d067dea901d9b1d19b575f635f9b09cacfe38ff84cce7e62a"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
