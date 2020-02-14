@@ -82,7 +82,8 @@ get.sig.pval.idxs <- function(pvalues, p.cutoffs){
 
 # Identify significant windows based on a numeric matrix
 get.sig.idxs <- function(x, cutoff, direction){
-  apply(x[, -c(1:3)], 2, function(vals){
+  lapply(4:ncol(x), function(i){
+    vals <- x[, i]
     if(direction=="ge"){
       which(vals>=cutoff)
     }else if(direction=="le"){
@@ -95,7 +96,7 @@ get.sig.idxs <- function(x, cutoff, direction){
 
 
 # Merge lists of significant window indexes
-merge.sig <- function(bed, sig.pvals, sig.ors, sig.nom){
+merge.sig <- function(bed, sig.pvals, sig.secondary.pvals, sig.ors, sig.nom){
   if(is.null(sig.pvals)){
     stop("merge.sig requires p-values to be supplied.")
   }
@@ -103,6 +104,9 @@ merge.sig <- function(bed, sig.pvals, sig.ors, sig.nom){
     sig <- 1:nrow(bed)
     if(!is.null(sig.pvals)){
       sig <- intersect(sig, sig.pvals[[i]])
+    }
+    if(!is.null(sig.secondary.pvals)){
+      sig <- intersect(sig, sig.secondary.pvals[[i]])
     }
     if(!is.null(sig.ors)){
       sig <- intersect(sig, sig.ors[[i]])
@@ -139,6 +143,8 @@ require(optparse, quietly=T)
 option_list <- list(
   make_option(c("--pvalues"), default=NULL, 
               help="matrix of p-values per window per phenotype. [default %default]"),
+  make_option(c("--secondary-pvalues"), default=NULL, 
+              help="matrix of secondary p-values per window per phenotype. [default %default]"),
   make_option(c("--p-is-phred"), type="logical", default=F, action="store_true",
               help="supplied P-values are Phred-scaled (-log10[P]). [default %default]"),
   make_option(c("--p-cutoffs"), default=NULL, 
@@ -147,6 +153,8 @@ option_list <- list(
               help="matrix of odds ratios (or lower bounds) per window per phenotype. [default %default]"),
   make_option(c("--or-is-ln"), type="logical", default=F, action="store_true",
               help="supplied odds ratios are natural log-scaled. [default %default]"),
+  make_option(c("--min-secondary-p"), type="numeric", default=1, 
+              help="minimum secondary P-value to consider significant. [default %default]"),
   make_option(c("--min-or"), type="numeric", default=1, 
               help="minimum odds ratio to consider significant. Supply as unscaled OR (will be transformed if needed). [default %default]"),
   make_option(c("--nominal-counts"), default=NULL, 
@@ -171,10 +179,12 @@ if(length(args$args) != 1){
 # Writes args & opts to vars
 bed.in <- args$args[1]
 pvalues.in <- opts$pvalues
+secondary.pvalues.in <- opts$`secondary-pvalues`
 p.is.phred <- opts$`p-is-phred`
 p.cutoffs.in <- opts$`p-cutoffs`
 ors.in <- opts$`odds-ratios`
 or.is.ln <- opts$`or-is-ln`
+min.secondary.p <- opts$`min-secondary-p`
 min.or <- opts$`min-or`
 nomsig.in <- opts$`nominal-counts`
 min.nom <- opts$`min-nominal`
@@ -183,13 +193,15 @@ out.prefix <- opts$`out-prefix`
 # # DEV PARAMETERS:
 # bed.in <- "~/scratch/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 # pvalues.in <- "~/scratch/DEL.pval_matrix.bed.gz"
+# secondary.pvalues.in <- "~/scratch/DEL.secondary_pval_matrix.bed.gz"
 # p.cutoffs.in <- "~/scratch/del_pval_cutoff_test.tsv"
 # p.is.phred <- T
 # ors.in <- "~/scratch/DEL.lnOR_lower_matrix.bed.gz"
 # or.is.ln <- T
-# min.or <- 1.5
+# min.secondary.p <- 0.05
+# min.or <- 1
 # nomsig.in <- "~/scratch/DEL.nominal_cohort_counts.bed.gz"
-# min.nom <- 2
+# min.nom <- 0
 # out.prefix <- "~/scratch/sig_bins.test."
 
 # Read windows
@@ -202,6 +214,16 @@ if(!is.null(pvalues.in)){
   sig.pvals <- get.sig.pval.idxs(pvalues, p.cutoffs)
 }else{
   sig.pvals <- NULL
+}
+
+# Load secondary p-values and determine significant windows, if provided
+if(!is.null(pvalues.in)){
+  secondary.pvalues <- load.pvalues(secondary.pvalues.in, bed, p.is.phred)
+  secondary.p.cutoffs <- p.cutoffs
+  secondary.p.cutoffs$max.p <- min.secondary.p
+  sig.secondary.pvals <- get.sig.pval.idxs(secondary.pvalues, secondary.p.cutoffs)
+}else{
+  sig.secondary.pvals <- NULL
 }
 
 # Load odds ratios and determine significant windows, if provided
@@ -224,7 +246,7 @@ if(!is.null(nomsig.in)){
 }
 
 # Determine final significant windows
-sig.merged <- merge.sig(bed, sig.pvals, sig.ors, sig.nom)
+sig.merged <- merge.sig(bed, sig.pvals, sig.secondary.pvals, sig.ors, sig.nom)
 bed.sigAnno <- mark.sig.windows(bed, sig.merged)
 bed.sigOnly <- bed[apply(bed.sigAnno[, -c(1:3)], 1, function(vals){any(vals)}), 1:3]
 

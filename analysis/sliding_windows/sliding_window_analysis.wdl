@@ -22,6 +22,7 @@ workflow sliding_window_analysis {
   Float p_cutoff
   Int n_pheno_perms
   String meta_model_prefix
+  Float meta_secondary_p_cutoff
   Float meta_or_cutoff
   Int meta_nominal_cohorts_cutoff
   Float credible_interval
@@ -181,88 +182,89 @@ workflow sliding_window_analysis {
     }
   }
 
-  # # Refine minimal credible regions
-  # scatter ( cnv in cnv_types ) {
-  #   call prep_refinement {
-  #     input:
-  #       completion_tokens=rCNV_meta_analysis.completion_token,
-  #       phenotype_list=phenotype_list,
-  #       metacohort_list=metacohort_list,
-  #       binned_genome=binned_genome,
-  #       freq_code="rCNV",
-  #       CNV=cnv,
-  #       meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
-  #       meta_or_cutoff=meta_or_cutoff,
-  #       meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
-  #       sig_window_pad=sig_window_pad,
-  #       rCNV_bucket=rCNV_bucket
-  #   }
-  # }
-  # scatter ( contig in contigs ) {
-  #   # DEL
-  #   call refine_regions as refine_rCNV_regions_DEL {
-  #     input:
-  #       contig=contig[0],
-  #       regions_to_refine=prep_refinement.regions_to_refine[0],
-  #       metacohort_info_tsv=prep_refinement.metacohort_info_tsv[0],
-  #       pval_matrix=prep_refinement.pval_matrix[0],
-  #       labeled_windows=prep_refinement.labeled_windows[0],
-  #       freq_code="rCNV",
-  #       CNV="DEL",
-  #       meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
-  #       meta_or_cutoff=meta_or_cutoff,
-  #       meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
-  #       meta_model_prefix=meta_model_prefix,
-  #       credible_interval=credible_interval,
-  #       refine_max_cnv_size=refine_max_cnv_size,
-  #       rCNV_bucket=rCNV_bucket
-  #   }
-  #   # DUP
-  #   call refine_regions as refine_rCNV_regions_DUP {
-  #     input:
-  #       contig=contig[0],
-  #       regions_to_refine=prep_refinement.regions_to_refine[1],
-  #       metacohort_info_tsv=prep_refinement.metacohort_info_tsv[1],
-  #       pval_matrix=prep_refinement.pval_matrix[1],
-  #       labeled_windows=prep_refinement.labeled_windows[1],
-  #       freq_code="rCNV",
-  #       CNV="DUP",
-  #       meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
-  #       meta_or_cutoff=meta_or_cutoff,
-  #       meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
-  #       meta_model_prefix=meta_model_prefix,
-  #       credible_interval=credible_interval,
-  #       refine_max_cnv_size=refine_max_cnv_size,
-  #       rCNV_bucket=rCNV_bucket
-  #   }
-  # }
-  # call merge_refinements as merge_refinements_DEL {
-  #   input:
-  #     loci=refine_rCNV_regions_DEL.loci,
-  #     associations=refine_rCNV_regions_DEL.associations,
-  #     logfiles=refine_rCNV_regions_DEL.logfile,
-  #     freq_code="rCNV",
-  #     CNV="DEL",
-  #     rCNV_bucket=rCNV_bucket
-  # }
-  # call merge_refinements as merge_refinements_DUP {
-  #   input:
-  #     loci=refine_rCNV_regions_DUP.loci,
-  #     associations=refine_rCNV_regions_DUP.associations,
-  #     logfiles=refine_rCNV_regions_DUP.logfile,
-  #     freq_code="rCNV",
-  #     CNV="DUP",
-  #     rCNV_bucket=rCNV_bucket
-  # }
+  # Refine minimal credible regions
+  scatter ( cnv in cnv_types ) {
+    call prep_refinement {
+      input:
+        completion_tokens=rCNV_meta_analysis.completion_token,
+        phenotype_list=phenotype_list,
+        metacohort_list=metacohort_list,
+        binned_genome=binned_genome,
+        freq_code="rCNV",
+        CNV=cnv,
+        meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+        meta_secondary_p_cutoff=meta_secondary_p_cutoff,
+        meta_or_cutoff=meta_or_cutoff,
+        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+        sig_window_pad=sig_window_pad,
+        rCNV_bucket=rCNV_bucket
+    }
+  }
+  scatter ( contig in contigs ) {
+    # DEL
+    call refine_regions as refine_rCNV_regions_DEL {
+      input:
+        contig=contig[0],
+        regions_to_refine=prep_refinement.regions_to_refine[0],
+        metacohort_info_tsv=prep_refinement.metacohort_info_tsv[0],
+        pval_matrix=prep_refinement.pval_matrix[0],
+        labeled_windows=prep_refinement.labeled_windows[0],
+        freq_code="rCNV",
+        CNV="DEL",
+        meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+        meta_or_cutoff=meta_or_cutoff,
+        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+        meta_model_prefix=meta_model_prefix,
+        credible_interval=credible_interval,
+        refine_max_cnv_size=refine_max_cnv_size,
+        rCNV_bucket=rCNV_bucket
+    }
+    # DUP
+    call refine_regions as refine_rCNV_regions_DUP {
+      input:
+        contig=contig[0],
+        regions_to_refine=prep_refinement.regions_to_refine[1],
+        metacohort_info_tsv=prep_refinement.metacohort_info_tsv[1],
+        pval_matrix=prep_refinement.pval_matrix[1],
+        labeled_windows=prep_refinement.labeled_windows[1],
+        freq_code="rCNV",
+        CNV="DUP",
+        meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+        meta_or_cutoff=meta_or_cutoff,
+        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+        meta_model_prefix=meta_model_prefix,
+        credible_interval=credible_interval,
+        refine_max_cnv_size=refine_max_cnv_size,
+        rCNV_bucket=rCNV_bucket
+    }
+  }
+  call merge_refinements as merge_refinements_DEL {
+    input:
+      loci=refine_rCNV_regions_DEL.loci,
+      associations=refine_rCNV_regions_DEL.associations,
+      logfiles=refine_rCNV_regions_DEL.logfile,
+      freq_code="rCNV",
+      CNV="DEL",
+      rCNV_bucket=rCNV_bucket
+  }
+  call merge_refinements as merge_refinements_DUP {
+    input:
+      loci=refine_rCNV_regions_DUP.loci,
+      associations=refine_rCNV_regions_DUP.associations,
+      logfiles=refine_rCNV_regions_DUP.logfile,
+      freq_code="rCNV",
+      CNV="DUP",
+      rCNV_bucket=rCNV_bucket
+  }
 
-  # # Plot summary metrics for final credible regions
-  # call plot_region_summary as plot_rCNV_regions {
-  #   input:
-  #     freq_code="rCNV",
-  #     DEL_regions=merge_refinements_DEL.final_loci,
-  #     DUP_regions=merge_refinements_DUP.final_loci,
-  #     rCNV_bucket=rCNV_bucket
-  # }
+  # Plot summary metrics for final credible regions
+  call plot_region_summary as plot_rCNV_regions {
+    input:
+      freq_code="rCNV",
+      DEL_regions=merge_refinements_DEL.final_loci,
+      DUP_regions=merge_refinements_DUP.final_loci,
+      rCNV_bucket=rCNV_bucket
+  }
 
   output {
     # Array[File] final_sig_regions = [merge_refinements_DEL.final_loci, merge_refinements_DUP.final_loci]
@@ -448,10 +450,12 @@ task calc_meta_p_cutoff {
     # Copy cutoff tables to output bucket
     gsutil -m cp sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}*tsv \
       "${rCNV_bucket}/analysis/analysis_refs/"
+    gsutil -m cp sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}_permutation_results.png \
+      "${rCNV_bucket}/analysis/sliding_windows/empirical_fdr_plots/"
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3f404f25d6821167744a6041b1159ece926d3720d0f33c75abbad1178775b242"
+    docker: "talkowski/rcnv@sha256:01175c8d4c0d1ca32ae57b35c85902e0eaee9427eaeca5b9f9b57c733267453c"
     preemptible: 1
     memory: "16 GB"
     disks: "local-disk 100 HDD"
@@ -485,7 +489,7 @@ task meta_analysis {
     # Copy burden stats & p-value cutoff tables
     find / -name "*${prefix}.${freq_code}.*.sliding_window.stats.bed.gz*" \
     | xargs -I {} mv {} ./
-    find / -name "*sliding_window.${freq_code}.*.empirical_genome_wide.hpo_cutoffs.tsv*" \
+    find / -name "*sliding_window.${freq_code}.*.empirical_genome_wide_pval.hpo_cutoffs.tsv*" \
     | xargs -I {} mv {} ./
     # gsutil -m cp \
     #   ${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/** \
@@ -505,9 +509,9 @@ task meta_analysis {
                | awk -v FS="\t" '{ print $2 }' )
     title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
     DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                    sliding_window.${freq_code}.DEL.empirical_genome_wide.hpo_cutoffs.tsv )
+                    sliding_window.${freq_code}.DEL.empirical_genome_wide_pval.hpo_cutoffs.tsv )
     DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                    sliding_window.${freq_code}.DUP.empirical_genome_wide.hpo_cutoffs.tsv )
+                    sliding_window.${freq_code}.DUP.empirical_genome_wide_pval.hpo_cutoffs.tsv )
 
     # Run meta-analysis for each CNV type
     for CNV in DEL DUP; do
@@ -587,7 +591,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3f404f25d6821167744a6041b1159ece926d3720d0f33c75abbad1178775b242"
+    docker: "talkowski/rcnv@sha256:01175c8d4c0d1ca32ae57b35c85902e0eaee9427eaeca5b9f9b57c733267453c"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -596,116 +600,133 @@ task meta_analysis {
 
 
 # Prepare data for refinement
-# task prep_refinement {
-#   Array[File] completion_tokens # Must delocalize something from meta-analysis step to prevent caching
-#   File phenotype_list
-#   File metacohort_list
-#   File binned_genome
-#   String freq_code
-#   String CNV
-#   Array[File] meta_p_cutoff_tables
-#   Float meta_or_cutoff
-#   Int meta_nominal_cohorts_cutoff
-#   Int sig_window_pad
-#   String rCNV_bucket
+task prep_refinement {
+  Array[File] completion_tokens # Must delocalize something from meta-analysis step to prevent caching
+  File phenotype_list
+  File metacohort_list
+  File binned_genome
+  String freq_code
+  String CNV
+  Array[File] meta_p_cutoff_tables
+  Float meta_secondary_p_cutoff
+  Float meta_or_cutoff
+  Int meta_nominal_cohorts_cutoff
+  Int sig_window_pad
+  String rCNV_bucket
 
-#   command <<<
-#     set -e
+  command <<<
+    set -e
 
-#     # Copy p-value cutoff tables
-#     find / -name "*sliding_window.${freq_code}.*.empirical_genome_wide.hpo_cutoffs.tsv*" \
-#     | xargs -I {} mv {} ./
+    # Copy p-value cutoff tables
+    find / -name "*sliding_window.${freq_code}.*.empirical_genome_wide_pval.hpo_cutoffs.tsv*" \
+    | xargs -I {} mv {} ./
 
-#     # Download all meta-analysis stats files and necessary data
-#     mkdir cleaned_cnv/
-#     gsutil -m cp -r ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
-#     mkdir stats/
-#     gsutil -m cp \
-#       ${rCNV_bucket}/analysis/sliding_windows/**.${freq_code}.**.sliding_window.meta_analysis.stats.bed.gz \
-#       stats/
-#     mkdir refs/
-#     gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/* refs/
-#     mkdir phenos/
-#     gsutil -m cp ${rCNV_bucket}/cleaned_data/phenotypes/filtered/* phenos/
+    # Download all meta-analysis stats files and necessary data
+    mkdir cleaned_cnv/
+    gsutil -m cp -r ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
+    mkdir stats/
+    gsutil -m cp \
+      ${rCNV_bucket}/analysis/sliding_windows/**.${freq_code}.**.sliding_window.meta_analysis.stats.bed.gz \
+      stats/
+    mkdir refs/
+    gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/* refs/
+    mkdir phenos/
+    gsutil -m cp ${rCNV_bucket}/cleaned_data/phenotypes/filtered/* phenos/
 
-#     # Iterate over phenotypes and make matrix of p-values, odds ratios (lower 95% CI), and nominal sig cohorts
-#     mkdir pvals/
-#     mkdir ors/
-#     mkdir nomsig/
-#     while read pheno hpo; do
-#       zcat stats/$pheno.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.bed.gz \
-#       | awk -v FS="\t" '{ if ($1 !~ "#") print $NF }' \
-#       | cat <( echo "$pheno.${CNV}" ) - \
-#       > pvals/$pheno.${CNV}.pvals.txt
-#       zcat stats/$pheno.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.bed.gz \
-#       | awk -v FS="\t" '{ if ($1 !~ "#") print $6 }' \
-#       | cat <( echo "$pheno.${CNV}" ) - \
-#       > ors/$pheno.${CNV}.lnOR_lower.txt
-#       zcat stats/$pheno.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.bed.gz \
-#       | awk -v FS="\t" '{ if ($1 !~ "#") print $4 }' \
-#       | cat <( echo "$pheno.${CNV}" ) - \
-#       > nomsig/$pheno.${CNV}.nomsig_counts.txt
-#     done < ${phenotype_list}
-#     paste <( zcat ${binned_genome} | cut -f1-3 ) \
-#           pvals/*.${CNV}.pvals.txt \
-#     | bgzip -c \
-#     > ${CNV}.pval_matrix.bed.gz
-#     paste <( zcat ${binned_genome} | cut -f1-3 ) \
-#           ors/*.${CNV}.lnOR_lower.txt \
-#     | bgzip -c \
-#     > ${CNV}.lnOR_lower_matrix.bed.gz
-#     paste <( zcat ${binned_genome} | cut -f1-3 ) \
-#           nomsig/*.${CNV}.nomsig_counts.txt \
-#     | bgzip -c \
-#     > ${CNV}.nominal_cohort_counts.bed.gz
+    # Iterate over phenotypes and make matrix of p-values, odds ratios (lower 95% CI), and nominal sig cohorts
+    mkdir pvals/
+    mkdir secondary_pvals/
+    mkdir ors/
+    mkdir nomsig/
+    while read pheno hpo; do
+      stats=stats/$pheno.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.bed.gz
+      p_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
+             | awk -v OFS="\t" '{ if ($1=="meta_phred_p") print NR }' )
+      secondary_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
+                       | awk -v OFS="\t" '{ if ($1=="meta_phred_p_secondary") print NR }' )
+      lnor_lower_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
+                        | awk -v OFS="\t" '{ if ($1=="meta_lnOR_lower") print NR }' )
+      nom_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
+                 | awk -v OFS="\t" '{ if ($1=="n_nominal_cohorts") print NR }' )
+      zcat $stats | awk -v FS="\t" -v idx=$p_idx '{ if ($1 !~ "#") print $(idx) }' \
+      | cat <( echo "$pheno.${CNV}" ) - \
+      > pvals/$pheno.${CNV}.pvals.txt
+      zcat $stats | awk -v FS="\t" -v idx=$secondary_idx '{ if ($1 !~ "#") print $(idx) }' \
+      | cat <( echo "$pheno.${CNV}" ) - \
+      > pvals/$pheno.${CNV}.secondary_pvals.txt
+      zcat $stats | awk -v FS="\t" -v idx=$lnor_lower_idx '{ if ($1 !~ "#") print $(idx) }' \
+      | cat <( echo "$pheno.${CNV}" ) - \
+      > ors/$pheno.${CNV}.lnOR_lower.txt
+      zcat $stats | awk -v FS="\t" -v idx=$nom_idx '{ if ($1 !~ "#") print $(idx) }' \
+      | cat <( echo "$pheno.${CNV}" ) - \
+      > nomsig/$pheno.${CNV}.nomsig_counts.txt
+    done < ${phenotype_list}
+    paste <( zcat ${binned_genome} | cut -f1-3 ) \
+          pvals/*.${CNV}.pvals.txt \
+    | bgzip -c \
+    > ${CNV}.pval_matrix.bed.gz
+    paste <( zcat ${binned_genome} | cut -f1-3 ) \
+          pvals/*.${CNV}.secondary_pvals.txt \
+    | bgzip -c \
+    > ${CNV}.secondary_pval_matrix.bed.gz
+    paste <( zcat ${binned_genome} | cut -f1-3 ) \
+          ors/*.${CNV}.lnOR_lower.txt \
+    | bgzip -c \
+    > ${CNV}.lnOR_lower_matrix.bed.gz
+    paste <( zcat ${binned_genome} | cut -f1-3 ) \
+          nomsig/*.${CNV}.nomsig_counts.txt \
+    | bgzip -c \
+    > ${CNV}.nominal_cohort_counts.bed.gz
 
-#     # Get matrix of window significance labels
-#     /opt/rCNV2/analysis/sliding_windows/get_significant_windows.R \
-#       --pvalues ${CNV}.pval_matrix.bed.gz \
-#       --p-is-phred \
-#       --p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide.hpo_cutoffs.tsv \
-#       --odds-ratios ${CNV}.lnOR_lower_matrix.bed.gz \
-#       --or-is-ln \
-#       --min-or ${meta_or_cutoff} \
-#       --nominal-counts ${CNV}.nominal_cohort_counts.bed.gz \
-#       --min-nominal ${meta_nominal_cohorts_cutoff} \
-#       --out-prefix ${freq_code}.${CNV}. \
-#       ${binned_genome}
-#     bgzip -f ${freq_code}.${CNV}.all_windows_labeled.bed
-#     bgzip -f ${freq_code}.${CNV}.significant_windows.bed
+    # Get matrix of window significance labels
+    /opt/rCNV2/analysis/sliding_windows/get_significant_windows.R \
+      --pvalues ${CNV}.pval_matrix.bed.gz \
+      --secondary-pvalues ${CNV}.secondary_pval_matrix.bed.gz \
+      --p-is-phred \
+      --p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv \
+      --odds-ratios ${CNV}.lnOR_lower_matrix.bed.gz \
+      --or-is-ln \
+      --min-secondary-p ${meta_secondary_p_cutoff} \
+      --min-or ${meta_or_cutoff} \
+      --nominal-counts ${CNV}.nominal_cohort_counts.bed.gz \
+      --min-nominal ${meta_nominal_cohorts_cutoff} \
+      --out-prefix ${freq_code}.${CNV}. \
+      ${binned_genome}
+    bgzip -f ${freq_code}.${CNV}.all_windows_labeled.bed
+    bgzip -f ${freq_code}.${CNV}.significant_windows.bed
 
-#     # Define regions to be refined (sig windows padded by $sig_window_pad and merged)
-#     zcat ${freq_code}.${CNV}.significant_windows.bed.gz \
-#     | fgrep -v "#" \
-#     | awk -v buf=${sig_window_pad} -v OFS="\t" '{ print $1, $2-buf, $3+buf }' \
-#     | awk -v OFS="\t" '{ if ($2<0) $2=0; print $1, $2, $3 }' \
-#     | sort -Vk1,1 -k2,2V -k3,3V \
-#     | bedtools merge -i - \
-#     | bgzip -c \
-#     > ${freq_code}.${CNV}.sig_regions_to_refine.bed.gz
+    # Define regions to be refined (sig windows padded by $sig_window_pad and merged)
+    zcat ${freq_code}.${CNV}.significant_windows.bed.gz \
+    | fgrep -v "#" \
+    | awk -v buf=${sig_window_pad} -v OFS="\t" '{ print $1, $2-buf, $3+buf }' \
+    | awk -v OFS="\t" '{ if ($2<0) $2=0; print $1, $2, $3 }' \
+    | sort -Vk1,1 -k2,2V -k3,3V \
+    | bedtools merge -i - \
+    | bgzip -c \
+    > ${freq_code}.${CNV}.sig_regions_to_refine.bed.gz
 
-#     # Prep input file
-#     while read meta; do
-#       echo -e "$meta\tcleaned_cnv/$meta.${freq_code}.bed.gz\tphenos/$meta.cleaned_phenos.txt"
-#     done < <( cut -f1 ${metacohort_list} | fgrep -v "mega" )\
-#     > window_refinement.${freq_code}_metacohort_info.tsv
-#   >>>
+    # Prep input file
+    while read meta; do
+      echo -e "$meta\tcleaned_cnv/$meta.${freq_code}.bed.gz\tphenos/$meta.cleaned_phenos.txt"
+    done < <( cut -f1 ${metacohort_list} | fgrep -v "mega" )\
+    > window_refinement.${freq_code}_metacohort_info.tsv
+  >>>
 
-#   output {
-#     File regions_to_refine = "${freq_code}.${CNV}.sig_regions_to_refine.bed.gz"
-#     File metacohort_info_tsv = "window_refinement.${freq_code}_metacohort_info.tsv"
-#     File pval_matrix = "${CNV}.pval_matrix.bed.gz"
-#     File labeled_windows = "${freq_code}.${CNV}.all_windows_labeled.bed.gz"
-#   }
+  output {
+    File regions_to_refine = "${freq_code}.${CNV}.sig_regions_to_refine.bed.gz"
+    File metacohort_info_tsv = "window_refinement.${freq_code}_metacohort_info.tsv"
+    File pval_matrix = "${CNV}.pval_matrix.bed.gz"
+    File labeled_windows = "${freq_code}.${CNV}.all_windows_labeled.bed.gz"
+  }
 
-#   runtime {
-#     docker: "talkowski/rcnv@sha256:f607e3f48dd1bf373311e572da9274ffc1cca512768fe05cec91494b39f6f654"
-#     preemptible: 1
-#     memory: "8 GB"
-#     bootDiskSizeGb: "20"
-#     disks: "local-disk 50 HDD"
-#   }
-# }
+  runtime {
+    docker: "talkowski/rcnv@sha256:f607e3f48dd1bf373311e572da9274ffc1cca512768fe05cec91494b39f6f654"
+    preemptible: 1
+    memory: "8 GB"
+    bootDiskSizeGb: "20"
+    disks: "local-disk 50 HDD"
+  }
+}
 
 
 # # Refine associated regions to minimal credible regions
@@ -758,7 +779,7 @@ task meta_analysis {
 #       /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
 #         --cnv-type ${CNV} \
 #         --model ${meta_model_prefix} \
-#         --p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide.hpo_cutoffs.tsv \
+#         --p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv \
 #         --p-is-phred \
 #         --min-or-lower ${meta_or_cutoff} \
 #         --retest-min-or-lower ${meta_or_cutoff} \

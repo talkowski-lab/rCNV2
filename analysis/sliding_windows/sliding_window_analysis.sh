@@ -272,26 +272,26 @@ done < refs/test_phenotypes.list
 
 # Gather all permutation results and compute FDR CDFs
 mkdir perm_res/
+p_val_column_name="meta_phred_p"
 while read prefix hpo; do
   echo -e "$prefix\n\n"
   gsutil -m cp \
-    "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/permutations/**.stats.perm_*.bed.gz" \
+    "${rCNV_bucket}/analysis/sliding_windows/$prefix/${freq_code}/permutations/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.perm_*.bed.gz" \
     perm_res/
-  for CNV in DEL DUP; do
-    for i in $( seq 1 ${n_pheno_perms} ); do
-      if [ -e perm_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz ]; then
-        zcat perm_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
-        | grep -ve '^#' \
-        | awk '{ print $NF }' \
-        | cat <( echo "$prefix.$CNV.$i" ) - \
-        > perm_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.permuted_p_values.$i.txt
-      fi
-    done
+  for i in $( seq 1 ${n_pheno_perms} ); do
+    p_idx=$( zcat perm_res/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
+             | sed -n '1p' | sed 's/\t/\n/g' | awk -v OFS="\t" '{ print $1, NR }' \
+             | fgrep -w ${p_val_column_name} | cut -f2 )
+    zcat perm_res/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
+    | grep -ve '^#' \
+    | awk -v p_idx=$p_idx '{ print $(p_idx) }' \
+    | cat <( echo "$prefix.${CNV}.$i" ) - \
+    > perm_res/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.permuted_p_values.$i.txt
   done
 done < ${phenotype_list}
 paste perm_res/*.sliding_window.meta_analysis.permuted_p_values.*.txt \
 | gzip -c \
-> ${freq_code}.permuted_pval_matrix.txt.gz
+> ${freq_code}.${CNV}.permuted_pval_matrix.txt.gz
 
 # Calculate empirical P-value cutoffs
 # Genome-wide
@@ -327,9 +327,9 @@ while read prefix hpo; do
              | awk -v FS="\t" '{ print $2 }' )
   title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
   DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                  sliding_window.${freq_code}.DEL.empirical_genome_wide.hpo_cutoffs.tsv )
+                  sliding_window.${freq_code}.DEL.empirical_genome_wide_pval.hpo_cutoffs.tsv )
   DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                  sliding_window.${freq_code}.DEL.empirical_genome_wide.hpo_cutoffs.tsv )
+                  sliding_window.${freq_code}.DEL.empirical_genome_wide_pval.hpo_cutoffs.tsv )
 
   # Run meta-analysis for each CNV type
   for CNV in DEL DUP; do
@@ -404,16 +404,25 @@ done < refs/test_phenotypes.list
 
 # Collapse all meta-analysis p-values into single matrix for visualizing calibration
 mkdir meta_res/
+# Download data
+while read prefix hpo; do
+  for CNV in DEL DUP; do
+    echo -e "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz"
+  done
+done < ${phenotype_list} \
+| gsutil -m cp -I meta_res/
+# Primary p-values
+p_val_column_name="meta_phred_p"
 while read prefix hpo; do
   echo -e "$prefix\n\n"
-  gsutil -m cp \
-    "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/${prefix}.${freq_code}.*.sliding_window.meta_analysis.stats.bed.gz" \
-    meta_res/
   for CNV in DEL DUP; do
-      if [ -e meta_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz ]; then
-        zcat meta_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz \
-        | grep -ve '^#' \
-        | awk '{ print $NF }' \
+      stats=meta_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz
+      if [ -e $stats ]; then
+        p_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
+                 | awk -v OFS="\t" '{ print $1, NR }' \
+                 | fgrep -w ${p_val_column_name} | cut -f2 )
+        zcat $stats | grep -ve '^#' \
+        | awk -v p_idx=$p_idx '{ print $(p_idx) }' \
         | cat <( echo "$prefix.$CNV" ) - \
         > meta_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.p_values.txt
       fi
@@ -422,6 +431,34 @@ done < ${phenotype_list}
 paste meta_res/*.${freq_code}.$CNV.sliding_window.meta_analysis.p_values.txt \
 | gzip -c \
 > ${freq_code}.observed_pval_matrix.txt.gz
+# Secondary p-values
+p_val_column_name="meta_phred_p_secondary"
+while read prefix hpo; do
+  echo -e "$prefix\n\n"
+  for CNV in DEL DUP; do
+      stats=meta_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz
+      if [ -e $stats ]; then
+        p_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
+                 | awk -v OFS="\t" '{ print $1, NR }' \
+                 | fgrep -w ${p_val_column_name} | cut -f2 )
+        zcat $stats | grep -ve '^#' \
+        | awk -v p_idx=$p_idx '{ print $(p_idx) }' \
+        | cat <( echo "$prefix.$CNV" ) - \
+        > meta_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.secondary_p_values.txt
+      fi
+  done
+done < ${phenotype_list}
+paste meta_res/*.${freq_code}.$CNV.sliding_window.meta_analysis.secondary_p_values.txt \
+| gzip -c \
+> ${freq_code}.observed_pval_matrix_secondary.txt.gz
+# Make a representative set of bins, for GD comparisons
+while read prefix hpo; do
+  zcat meta_res/$prefix.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed.gz \
+  | cut -f1-3 | bgzip -c \
+  > ${freq_code}.sliding_window.meta_analysis.bins.bed.gz
+done < <( head -n1 ${phenotype_list} )
+# DEV NOTE: these p-values can be visualized with plot_meta_analysis_p_values.R,
+#           which is currently just a code snippet referencing local filepaths
 
 
 
@@ -435,8 +472,8 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
 meta_p_cutoff=0.00000385862
-meta_or_cutoff=2
-meta_nominal_cohorts_cutoff=2
+meta_or_cutoff=1
+meta_nominal_cohorts_cutoff=0
 meta_model_prefix="re"
 sig_window_pad=1000000
 refine_max_cnv_size=3000000
@@ -455,19 +492,29 @@ gsutil -m cp ${rCNV_bucket}/cleaned_data/phenotypes/filtered/* phenos/
 
 # Iterate over phenotypes and make matrix of p-values, odds ratios (lower 95% CI), and nominal sig cohorts
 mkdir pvals/
+mkdir secondary_pvals/
 mkdir ors/
 mkdir nomsig/
 while read pheno hpo; do
-  zcat stats/$pheno.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.bed.gz \
-  | awk -v FS="\t" '{ if ($1 !~ "#") print $NF }' \
+  stats=stats/$pheno.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.bed.gz
+  p_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
+         | awk -v OFS="\t" '{ if ($1=="meta_phred_p") print NR }' )
+  secondary_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
+                   | awk -v OFS="\t" '{ if ($1=="meta_phred_p_secondary") print NR }' )
+  lnor_lower_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
+                    | awk -v OFS="\t" '{ if ($1=="meta_lnOR_lower") print NR }' )
+  nom_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
+             | awk -v OFS="\t" '{ if ($1=="n_nominal_cohorts") print NR }' )
+  zcat $stats | awk -v FS="\t" -v idx=$p_idx '{ if ($1 !~ "#") print $(idx) }' \
   | cat <( echo "$pheno.${CNV}" ) - \
   > pvals/$pheno.${CNV}.pvals.txt
-  zcat stats/$pheno.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.bed.gz \
-  | awk -v FS="\t" '{ if ($1 !~ "#") print $6 }' \
+  zcat $stats | awk -v FS="\t" -v idx=$secondary_idx '{ if ($1 !~ "#") print $(idx) }' \
+  | cat <( echo "$pheno.${CNV}" ) - \
+  > pvals/$pheno.${CNV}.secondary_pvals.txt
+  zcat $stats | awk -v FS="\t" -v idx=$lnor_lower_idx '{ if ($1 !~ "#") print $(idx) }' \
   | cat <( echo "$pheno.${CNV}" ) - \
   > ors/$pheno.${CNV}.lnOR_lower.txt
-  zcat stats/$pheno.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.bed.gz \
-  | awk -v FS="\t" '{ if ($1 !~ "#") print $4 }' \
+  zcat $stats | awk -v FS="\t" -v idx=$nom_idx '{ if ($1 !~ "#") print $(idx) }' \
   | cat <( echo "$pheno.${CNV}" ) - \
   > nomsig/$pheno.${CNV}.nomsig_counts.txt
 done < ${phenotype_list}
@@ -475,6 +522,10 @@ paste <( zcat ${binned_genome} | cut -f1-3 ) \
       pvals/*.${CNV}.pvals.txt \
 | bgzip -c \
 > ${CNV}.pval_matrix.bed.gz
+paste <( zcat ${binned_genome} | cut -f1-3 ) \
+      pvals/*.${CNV}.secondary_pvals.txt \
+| bgzip -c \
+> ${CNV}.secondary_pval_matrix.bed.gz
 paste <( zcat ${binned_genome} | cut -f1-3 ) \
       ors/*.${CNV}.lnOR_lower.txt \
 | bgzip -c \
@@ -487,10 +538,12 @@ paste <( zcat ${binned_genome} | cut -f1-3 ) \
 # Get matrix of window significance labels
 /opt/rCNV2/analysis/sliding_windows/get_significant_windows.R \
   --pvalues ${CNV}.pval_matrix.bed.gz \
+  --secondary-pvalues ${CNV}.secondary_pval_matrix.bed.gz \
   --p-is-phred \
-  --p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide.hpo_cutoffs.tsv \
+  --p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv \
   --odds-ratios ${CNV}.lnOR_lower_matrix.bed.gz \
   --or-is-ln \
+  --min-secondary-p ${meta_secondary_p_cutoff} \
   --min-or ${meta_or_cutoff} \
   --nominal-counts ${CNV}.nominal_cohort_counts.bed.gz \
   --min-nominal ${meta_nominal_cohorts_cutoff} \
@@ -522,7 +575,7 @@ for CNV in DEL DUP; do
     /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
       --cnv-type ${CNV} \
       --model ${meta_model_prefix} \
-      --hpo-p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide.hpo_cutoffs.tsv \
+      --hpo-p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv \
       --p-cutoff-ladder sliding_window.${freq_code}.${CNV}.empirical_genome_wide.ncase_cutoff_ladder.tsv \
       --p-is-phred \
       --min-or-lower ${meta_or_cutoff} \
