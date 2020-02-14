@@ -133,7 +133,8 @@ get.adjusted.cutoffs <- function(cutoff.stat.df, pred.n=NULL){
 }
 
 # Plot FDR, annotated with means and fitted curve
-plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target, title=NULL, floor=T){
+plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target, 
+                      model="exponential", title=NULL, floor=F){
   
   phred.target <- -log10(fdr.target)
   if(is.null(title)){
@@ -150,13 +151,15 @@ plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target, title=NULL, 
   points(x=cutoff.stat.df$n.cases, y=cutoff.stat.df$fdr.cutoff, pch=15)
   
   # Add trendline
-  fit <- fit.exp.decay(cutoff.stat.df$n.cases, cutoff.stat.df$fdr.cutoff)
-  fit.df <- data.frame("x"=round(quantile(0:par("usr")[2], probs=seq(0, 1, 0.005))))
-  fit.df$y <- predict(fit, newdata=fit.df)
-  if(floor==T){
-    fit.df$y[which(fit.df$y < phred.target)] <- phred.target
+  if(model=="exponential"){
+    fit <- fit.exp.decay(cutoff.stat.df$n.cases, cutoff.stat.df$fdr.cutoff)
+    fit.df <- data.frame("x"=round(quantile(0:par("usr")[2], probs=seq(0, 1, 0.005))))
+    fit.df$y <- predict(fit, newdata=fit.df)
+    if(floor==T){
+      fit.df$y[which(fit.df$y < phred.target)] <- phred.target
+    }
+    lines(fit.df$x, fit.df$y, col="red", lwd=3)
   }
-  lines(fit.df$x, fit.df$y, col="red", lwd=3)
   
   # Add axes
   axis(1, labels=NA)
@@ -217,7 +220,7 @@ plot.out <- opts$`plot`
 # pvals.in <- "~/scratch/rCNV.permuted_pval_matrix.txt.gz"
 # hpos.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
 # out.prefix <- "~/scratch/meta_cutoffs.test"
-# cnvtype <- "DEL"
+# cnvtype <- "DUP"
 # max.cutoff <- 20
 # cutoff.step <- 0.05
 # fdr.target <- 0.00000385862
@@ -258,10 +261,10 @@ write.table(df.out.ladder, outfile.ladder, sep="\t", quote=F,
 if(!is.null(plot.out)){
   # png(plot.out, res=300, height=5*300, width=6*300)
   # par(mfrow=c(2, 2))
-  # plot.fdrs(cutoff.mat, mean.cutoffs, "Mean", fdr.target, floor=F)
-  # plot.fdrs(cutoff.mat, median.cutoffs, "Median", fdr.target, floor=F)
-  # plot.fdrs(cutoff.mat, q3.cutoffs, "Third quartile", fdr.target, floor=F)
-  # plot.fdrs(cutoff.mat, max.cutoffs, "Max", fdr.target, floor=F)
+  # plot.fdrs(cutoff.mat, mean.cutoffs, "Mean", fdr.target)
+  # plot.fdrs(cutoff.mat, median.cutoffs, "Median", fdr.target)
+  # plot.fdrs(cutoff.mat, q3.cutoffs, "Third quartile", fdr.target)
+  # plot.fdrs(cutoff.mat, max.cutoffs, "Max", fdr.target)
   # dev.off()
   png(plot.out, res=300, height=4*300, width=5*300)
   plot.fdrs(cutoff.mat, mean.cutoffs, "Mean", fdr.target, 

@@ -212,6 +212,7 @@ workflow sliding_window_analysis {
         freq_code="rCNV",
         CNV="DEL",
         meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+        meta_secondary_p_cutoff=meta_secondary_p_cutoff,
         meta_or_cutoff=meta_or_cutoff,
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         meta_model_prefix=meta_model_prefix,
@@ -230,6 +231,7 @@ workflow sliding_window_analysis {
         freq_code="rCNV",
         CNV="DUP",
         meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+        meta_secondary_p_cutoff=meta_secondary_p_cutoff,
         meta_or_cutoff=meta_or_cutoff,
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         meta_model_prefix=meta_model_prefix,
@@ -267,8 +269,8 @@ workflow sliding_window_analysis {
   }
 
   output {
-    # Array[File] final_sig_regions = [merge_refinements_DEL.final_loci, merge_refinements_DUP.final_loci]
-    # Array[File] final_sig_associations = [merge_refinements_DEL.final_associations, merge_refinements_DUP.final_associations]
+    Array[File] final_sig_regions = [merge_refinements_DEL.final_loci, merge_refinements_DUP.final_loci]
+    Array[File] final_sig_associations = [merge_refinements_DEL.final_associations, merge_refinements_DUP.final_associations]
   }
 }
 
@@ -720,7 +722,7 @@ task prep_refinement {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f607e3f48dd1bf373311e572da9274ffc1cca512768fe05cec91494b39f6f654"
+    docker: "talkowski/rcnv@sha256:e0c7c3d285a39bb285f655b02747336d6497acd1bd5783d83ec93a53a1e9ea89"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -730,183 +732,188 @@ task prep_refinement {
 
 
 # # Refine associated regions to minimal credible regions
-# task refine_regions {
-#   String contig
-#   File regions_to_refine
-#   File metacohort_info_tsv
-#   File pval_matrix
-#   File labeled_windows
-#   String freq_code
-#   String CNV
-#   Array[File] meta_p_cutoff_tables
-#   Array[File] meta_p_ladder_cutoff_tables
-#   Float meta_or_cutoff
-#   Int meta_nominal_cohorts_cutoff
-#   String meta_model_prefix
-#   Float credible_interval
-#   Int refine_max_cnv_size
-#   String rCNV_bucket
+task refine_regions {
+  String contig
+  File regions_to_refine
+  File metacohort_info_tsv
+  File pval_matrix
+  File labeled_windows
+  String freq_code
+  String CNV
+  Array[File] meta_p_cutoff_tables
+  Array[File] meta_p_ladder_cutoff_tables
+  Float meta_secondary_p_cutoff
+  Float meta_or_cutoff
+  Int meta_nominal_cohorts_cutoff
+  String meta_model_prefix
+  Float credible_interval
+  Int refine_max_cnv_size
+  String rCNV_bucket
 
-#   command <<<
-#     set -e
+  command <<<
+    set -e
 
-#     # Copy p-value cutoff tables
-#     find / -name "*sliding_window.${freq_code}.*.empirical_genome_wide.*.tsv*" \
-#     | xargs -I {} mv {} ./
+    # Copy p-value cutoff tables
+    find / -name "*sliding_window.${freq_code}.*.empirical_genome_wide_pval.hpo_cutoffs.tsv" \
+    | xargs -I {} mv {} ./
+    find / -name "*sliding_window.${freq_code}.*.empirical_genome_wide_pval.ncase_cutoff_ladder.tsv" \
+    | xargs -I {} mv {} ./
 
-#     # Download all meta-analysis stats files and necessary data
-#     mkdir cleaned_cnv/
-#     gsutil -m cp -r ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
-#     mkdir stats/
-#     gsutil -m cp \
-#       ${rCNV_bucket}/analysis/sliding_windows/**.${freq_code}.**.sliding_window.meta_analysis.stats.bed.gz \
-#       stats/
-#     mkdir refs/
-#     gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/* refs/
-#     mkdir phenos/
-#     gsutil -m cp ${rCNV_bucket}/cleaned_data/phenotypes/filtered/* phenos/
+    # Download all meta-analysis stats files and necessary data
+    mkdir cleaned_cnv/
+    gsutil -m cp -r ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
+    mkdir stats/
+    gsutil -m cp \
+      ${rCNV_bucket}/analysis/sliding_windows/**.${freq_code}.**.sliding_window.meta_analysis.stats.bed.gz \
+      stats/
+    mkdir refs/
+    gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/* refs/
+    mkdir phenos/
+    gsutil -m cp ${rCNV_bucket}/cleaned_data/phenotypes/filtered/* phenos/
 
-#     # Tabix input to single chromosome
-#     tabix -f ${regions_to_refine}
-#     tabix -h ${regions_to_refine} ${contig} | bgzip -c > regions_to_refine.bed.gz
-#     tabix -f ${pval_matrix}
-#     tabix -h ${pval_matrix} ${contig} | bgzip -c > pval_matrix.bed.gz
-#     tabix -f ${labeled_windows}
-#     tabix -h ${labeled_windows} ${contig} | bgzip -c > labeled_windows.bed.gz
+    # Tabix input to single chromosome
+    tabix -f ${regions_to_refine}
+    tabix -h ${regions_to_refine} ${contig} | bgzip -c > regions_to_refine.bed.gz
+    tabix -f ${pval_matrix}
+    tabix -h ${pval_matrix} ${contig} | bgzip -c > pval_matrix.bed.gz
+    tabix -f ${labeled_windows}
+    tabix -h ${labeled_windows} ${contig} | bgzip -c > labeled_windows.bed.gz
 
-#     # Perform refinement
-#     if [ $( zcat regions_to_refine.bed.gz | fgrep -v "#" | wc -l ) -gt 0 ]; then
-#       /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
-#         --cnv-type ${CNV} \
-#         --model ${meta_model_prefix} \
-#         --p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv \
-#         --p-is-phred \
-#         --min-or-lower ${meta_or_cutoff} \
-#         --retest-min-or-lower ${meta_or_cutoff} \
-#         --max-cnv-size ${refine_max_cnv_size} \
-#         --min-nominal ${meta_nominal_cohorts_cutoff} \
-#         --credible-interval ${credible_interval} \
-#         --prefix "${freq_code}_${CNV}" \
-#         --log ${freq_code}.${CNV}.region_refinement.${contig}.log \
-#         regions_to_refine.bed.gz \
-#         ${metacohort_info_tsv} \
-#         pval_matrix.bed.gz \
-#         labeled_windows.bed.gz \
-#         ${freq_code}.${CNV}.final_regions.associations.${contig}.bed \
-#         ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
-#     else
-#       touch ${freq_code}.${CNV}.final_regions.associations.${contig}.bed
-#       touch ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
-#       touch ${freq_code}.${CNV}.region_refinement.${contig}.log
-#     fi
-#     bgzip -f ${freq_code}.${CNV}.final_regions.associations.${contig}.bed
-#     bgzip -f ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
-#   >>>
+    # Perform refinement
+    if [ $( zcat regions_to_refine.bed.gz | fgrep -v "#" | wc -l ) -gt 0 ]; then
+      /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
+        --cnv-type ${CNV} \
+        --model ${meta_model_prefix} \
+        --hpo-p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv \
+        --p-cutoff-ladder sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.ncase_cutoff_ladder.tsv \
+        --p-is-phred \
+        --secondary-p-cutoff ${meta_secondary_p_cutoff} \
+        --min-or-lower ${meta_or_cutoff} \
+        --retest-min-or-lower ${meta_or_cutoff} \
+        --max-cnv-size ${refine_max_cnv_size} \
+        --min-nominal ${meta_nominal_cohorts_cutoff} \
+        --credible-interval ${credible_interval} \
+        --prefix "${freq_code}_${CNV}" \
+        --log ${freq_code}.${CNV}.region_refinement.${contig}.log \
+        regions_to_refine.bed.gz \
+        ${metacohort_info_tsv} \
+        pval_matrix.bed.gz \
+        labeled_windows.bed.gz \
+        ${freq_code}.${CNV}.final_regions.associations.${contig}.bed \
+        ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
+    else
+      touch ${freq_code}.${CNV}.final_regions.associations.${contig}.bed
+      touch ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
+      touch ${freq_code}.${CNV}.region_refinement.${contig}.log
+    fi
+    bgzip -f ${freq_code}.${CNV}.final_regions.associations.${contig}.bed
+    bgzip -f ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
+  >>>
 
-#   output {
-#     File loci = "${freq_code}.${CNV}.final_regions.loci.${contig}.bed.gz"
-#     File associations = "${freq_code}.${CNV}.final_regions.associations.${contig}.bed.gz"
-#     File logfile = "${freq_code}.${CNV}.region_refinement.${contig}.log"
-#   }
+  output {
+    File loci = "${freq_code}.${CNV}.final_regions.loci.${contig}.bed.gz"
+    File associations = "${freq_code}.${CNV}.final_regions.associations.${contig}.bed.gz"
+    File logfile = "${freq_code}.${CNV}.region_refinement.${contig}.log"
+  }
 
-#   runtime {
-#     docker: "talkowski/rcnv@sha256:f607e3f48dd1bf373311e572da9274ffc1cca512768fe05cec91494b39f6f654"
-#     preemptible: 1
-#     memory: "8 GB"
-#     bootDiskSizeGb: "20"
-#     disks: "local-disk 50 HDD"
-#   }
-# }
-
-
-# # Merge refined loci across all chromosomes
-# task merge_refinements {
-#   Array[File] loci
-#   Array[File] associations
-#   Array[File] logfiles
-#   String freq_code
-#   String CNV
-#   String rCNV_bucket
-
-#   command <<<
-#     set -e
-
-#     # Merge loci
-#     zcat ${loci[0]} | sed -n '1p' > header.tsv
-#     zcat ${sep=" " loci} | fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n \
-#     | cat header.tsv - | bgzip -c \
-#     > ${freq_code}.${CNV}.final_regions.loci.bed.gz
-
-#     # Merge associations
-#     zcat ${associations[0]} | sed -n '1p' > header.tsv
-#     zcat ${sep=" " associations} | fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n -k7,7V \
-#     | cat header.tsv - | bgzip -c \
-#     > ${freq_code}.${CNV}.final_regions.associations.bed.gz
-
-#     # Merge logfiles
-#     cat ${sep=" " logfiles} > ${freq_code}.${CNV}.region_refinement.log
-
-#     # Annotate final regions with genes
-#     gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes ./
-#     /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
-#       -o ${freq_code}.${CNV}.final_regions.loci.bed \
-#       ${freq_code}.${CNV}.final_regions.loci.bed.gz \
-#       genes/gencode.v19.canonical.gtf.gz
-#     bgzip -f ${freq_code}.${CNV}.final_regions.loci.bed
-
-#     # Copy results to output bucket
-#     gsutil -m cp ${freq_code}.${CNV}.final_regions.loci.bed.gz \
-#       "${rCNV_bucket}/results/sliding_windows/"
-#     gsutil -m cp ${freq_code}.${CNV}.final_regions.associations.bed.gz \
-#       "${rCNV_bucket}/results/sliding_windows/"
-#     gsutil -m cp ${freq_code}.${CNV}.region_refinement.log \
-#       "${rCNV_bucket}/results/sliding_windows/"
-#   >>>
-
-#   output {
-#     File final_loci = "${freq_code}.${CNV}.final_regions.loci.bed.gz"
-#     File final_associations = "${freq_code}.${CNV}.final_regions.associations.bed.gz"
-#     File merged_logfile = "${freq_code}.${CNV}.region_refinement.log"
-#   }
-
-#   runtime {
-#     docker: "talkowski/rcnv@sha256:f607e3f48dd1bf373311e572da9274ffc1cca512768fe05cec91494b39f6f654"
-#     preemptible: 1
-#     memory: "8 GB"
-#     bootDiskSizeGb: "20"
-#     disks: "local-disk 50 HDD"
-#   }
-# }
+  runtime {
+    docker: "talkowski/rcnv@sha256:f607e3f48dd1bf373311e572da9274ffc1cca512768fe05cec91494b39f6f654"
+    preemptible: 1
+    memory: "8 GB"
+    bootDiskSizeGb: "20"
+    disks: "local-disk 50 HDD"
+  }
+}
 
 
-# task plot_region_summary {
-#   String freq_code
-#   File DEL_regions
-#   File DUP_regions
-#   String rCNV_bucket
+# Merge refined loci across all chromosomes
+task merge_refinements {
+  Array[File] loci
+  Array[File] associations
+  Array[File] logfiles
+  String freq_code
+  String CNV
+  String rCNV_bucket
 
-#   command <<<
-#     /opt/rCNV2/analysis/sliding_windows/regions_summary.plot.R \
-#       -o "${freq_code}.final_regions." \
-#       ${DEL_regions} \
-#       ${DUP_regions}
+  command <<<
+    set -e
 
-#     gsutil -m cp \
-#       ./*.jpg \
-#       "${rCNV_bucket}/results/sliding_windows/plots/"
-#     gsutil -m cp \
-#       "${freq_code}.final_regions.multipanel_summary.jpg" \
-#       ${rCNV_bucket}/public/
-#     gsutil acl ch -u AllUsers:R ${rCNV_bucket}/public/*.jpg
-#   >>>
+    # Merge loci
+    zcat ${loci[0]} | sed -n '1p' > header.tsv
+    zcat ${sep=" " loci} | fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n \
+    | cat header.tsv - | bgzip -c \
+    > ${freq_code}.${CNV}.final_regions.loci.bed.gz
 
-#   output {
-#     File summary_plot = "${freq_code}.final_regions.multipanel_summary.jpg"
-#   }
+    # Merge associations
+    zcat ${associations[0]} | sed -n '1p' > header.tsv
+    zcat ${sep=" " associations} | fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n -k7,7V \
+    | cat header.tsv - | bgzip -c \
+    > ${freq_code}.${CNV}.final_regions.associations.bed.gz
 
-#   runtime {
-#     docker: "talkowski/rcnv@sha256:f607e3f48dd1bf373311e572da9274ffc1cca512768fe05cec91494b39f6f654"
-#     preemptible: 1
-#   }
-# }
+    # Merge logfiles
+    cat ${sep=" " logfiles} > ${freq_code}.${CNV}.region_refinement.log
+
+    # Annotate final regions with genes
+    gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes ./
+    /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
+      -o ${freq_code}.${CNV}.final_regions.loci.bed \
+      ${freq_code}.${CNV}.final_regions.loci.bed.gz \
+      genes/gencode.v19.canonical.gtf.gz
+    bgzip -f ${freq_code}.${CNV}.final_regions.loci.bed
+
+    # Copy results to output bucket
+    gsutil -m cp ${freq_code}.${CNV}.final_regions.loci.bed.gz \
+      "${rCNV_bucket}/results/sliding_windows/"
+    gsutil -m cp ${freq_code}.${CNV}.final_regions.associations.bed.gz \
+      "${rCNV_bucket}/results/sliding_windows/"
+    gsutil -m cp ${freq_code}.${CNV}.region_refinement.log \
+      "${rCNV_bucket}/results/sliding_windows/"
+  >>>
+
+  output {
+    File final_loci = "${freq_code}.${CNV}.final_regions.loci.bed.gz"
+    File final_associations = "${freq_code}.${CNV}.final_regions.associations.bed.gz"
+    File merged_logfile = "${freq_code}.${CNV}.region_refinement.log"
+  }
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:f607e3f48dd1bf373311e572da9274ffc1cca512768fe05cec91494b39f6f654"
+    preemptible: 1
+    memory: "8 GB"
+    bootDiskSizeGb: "20"
+    disks: "local-disk 50 HDD"
+  }
+}
+
+
+task plot_region_summary {
+  String freq_code
+  File DEL_regions
+  File DUP_regions
+  String rCNV_bucket
+
+  command <<<
+    /opt/rCNV2/analysis/sliding_windows/regions_summary.plot.R \
+      -o "${freq_code}.final_regions." \
+      ${DEL_regions} \
+      ${DUP_regions}
+
+    gsutil -m cp \
+      ./*.jpg \
+      "${rCNV_bucket}/results/sliding_windows/plots/"
+    gsutil -m cp \
+      "${freq_code}.final_regions.multipanel_summary.jpg" \
+      ${rCNV_bucket}/public/
+    gsutil acl ch -u AllUsers:R ${rCNV_bucket}/public/*.jpg
+  >>>
+
+  output {
+    File summary_plot = "${freq_code}.final_regions.multipanel_summary.jpg"
+  }
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:f607e3f48dd1bf373311e572da9274ffc1cca512768fe05cec91494b39f6f654"
+    preemptible: 1
+  }
+}
 

@@ -576,8 +576,9 @@ for CNV in DEL DUP; do
       --cnv-type ${CNV} \
       --model ${meta_model_prefix} \
       --hpo-p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv \
-      --p-cutoff-ladder sliding_window.${freq_code}.${CNV}.empirical_genome_wide.ncase_cutoff_ladder.tsv \
+      --p-cutoff-ladder sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.ncase_cutoff_ladder.tsv \
       --p-is-phred \
+      --secondary-p-cutoff ${meta_secondary_p_cutoff} \
       --min-or-lower ${meta_or_cutoff} \
       --retest-min-or-lower ${meta_or_cutoff} \
       --max-cnv-size ${refine_max_cnv_size} \
