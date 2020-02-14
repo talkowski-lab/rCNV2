@@ -298,36 +298,10 @@ paste perm_res/*.sliding_window.meta_analysis.permuted_p_values.*.txt \
 fdr_table_suffix="empirical_genome_wide_pval"
 fdr_target=${p_cutoff}
 for CNV in DEL DUP; do
-  /opt/rCNV2/analysis/sliding_windows/calc_empirical_genome_wide.R \
+  /opt/rCNV2/analysis/sliding_windows/calc_empirical_fdr.R \
     --cnv ${CNV} \
     --fdr-target ${fdr_target} \
-    --plot ${freq_code}.${CNV}.${fdr_table_suffix}_permutation_results.png \
-    ${freq_code}.${CNV}.permuted_pval_matrix.txt.gz \
-    ${metacohort_sample_table} \
-    sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}
-done
-  
-# 1% FDR
-fdr_table_suffix="empirical_fdr_1pct_pval"
-fdr_target=0.01
-for CNV in DEL DUP; do
-  /opt/rCNV2/analysis/sliding_windows/calc_empirical_genome_wide.R \
-    --cnv ${CNV} \
-    --fdr-target ${fdr_target} \
-    --plot ${freq_code}.${CNV}.${fdr_table_suffix}_permutation_results.png \
-    ${freq_code}.${CNV}.permuted_pval_matrix.txt.gz \
-    ${metacohort_sample_table} \
-    sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}
-done
-  
-# 5% FDR
-fdr_table_suffix="empirical_genome_wide_pval"
-fdr_target=0.05
-for CNV in DEL DUP; do
-  /opt/rCNV2/analysis/sliding_windows/calc_empirical_genome_wide.R \
-    --cnv ${CNV} \
-    --fdr-target ${fdr_target} \
-    --plot ${freq_code}.${CNV}.${fdr_table_suffix}_permutation_results.png \
+    --plot sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}_permutation_results.png \
     ${freq_code}.${CNV}.permuted_pval_matrix.txt.gz \
     ${metacohort_sample_table} \
     sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}

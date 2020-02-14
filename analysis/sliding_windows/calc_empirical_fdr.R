@@ -109,7 +109,8 @@ fit.exp.decay <- function(x, y){
   start <- list(alpha = alpha.0, beta = beta.0, theta = theta.0)
   
   # Re-fit the model with estimated starting parameters
-  return(nls(y ~ alpha * exp(beta * x) + theta, start = start, data=train.df))
+  return(nls(y ~ alpha * exp(beta * x) + theta, start = start, data=train.df,
+             control=nls.control(maxiter=1000, warnOnly=T)))
 }
 
 # Calculate adjusted p-value cutoffs per HPO term
@@ -265,7 +266,7 @@ if(!is.null(plot.out)){
   png(plot.out, res=300, height=4*300, width=5*300)
   plot.fdrs(cutoff.mat, mean.cutoffs, "Mean", fdr.target, 
             title=paste(cnvtype, "Permutation Results for FDR =",
-                        format(fdr.target, scientific=T)),
+                        format(fdr.target, scientific=T, digits=3)),
             floor=F)
   dev.off()
 }
