@@ -1196,8 +1196,12 @@ def main():
                         default='CNV')
     parser.add_argument('--model', help='Meta-analysis model to use. [default: density]', 
                         default='mh', choices=['mh', 're'])
-    parser.add_argument('--p-cutoffs', help='.tsv of p-value cutoffs per phenotype. ' + 
+    parser.add_argument('--hpo-p-cutoffs', help='.tsv of p-value cutoffs per phenotype. ' + 
                         '[default: 10e-8 for all phenotypes]')
+    parser.add_argument('--p-cutoff-ladder', help='.tsv of p-value cutoffs for a ' + 
+                        'range of case counts. Effective case count for sentinel ' +
+                        'window will round down to nearest case sample size, if ' +
+                        'provided. [default: use P-values from --hpo-p-cutoffs]')
     parser.add_argument('--p-is-phred', help='Supplied P-values are Phred-scaled ' +
                         '(-log10[P]). [default: False]', default=False, 
                         action='store_true')
@@ -1270,10 +1274,17 @@ def main():
 
     # Load cohort info, including CNVs & HPOs
     cohorts = load_cohort_info(args.cohort_info, regions_bt, args.cnv_type)
-    if args.p_cutoffs is None:
-        p_cutoffs = {hpo : 1e-8 for hpo in pvals.columns[4:]}
+    if args.hpo_p_cutoffs is None:
+        hpo_p_cutoffs = {hpo : 1e-8 for hpo in pvals.columns[4:]}
     else:
-        p_cutoffs = load_p_cutoffs(args.p_cutoffs)
+        hpo_p_cutoffs = load_p_cutoffs(args.hpo_p_cutoffs)
+
+    # Load p-value cutoff ladder, if optioned
+    if args.p_cutoff_ladder is not None:
+        p_cutoff_ladder = pd.read_csv(args.p_cutoff_ladder, sep='\t', comment='#', 
+                                      names='n_cases min_p'.split())
+    else:
+        p_cutoff_ladder = None
 
     # Refine regions one at a time
     k = 0
@@ -1291,7 +1302,7 @@ def main():
             print('--Refining sentinel window #{0}'.format(str(i)), file=logfile)
             new_region = refine_sentinel(regions, rid, sig_df, sig_bt, pvals, 
                                          cohorts, args.cnv_type, args.control_hpo, 
-                                         p_cutoffs, min_or_lower, 
+                                         hpo_p_cutoffs, min_or_lower, 
                                          args.min_nominal, args.model, used_cnvs, 
                                          logfile, args.max_cnv_size, args.min_case_cnvs, 
                                          args.resolution, args.credible_interval, 
@@ -1305,7 +1316,7 @@ def main():
             # Update pvalues and significance for windows in current region
             wids_to_update = list(regions[rid]['sig_windows'].keys())
             update_pvalues(wids_to_update, pvals, sig_df, sig_bt, cohorts, 
-                           used_cnvs, used_cnv_bt, p_cutoffs, args.min_nominal, 
+                           used_cnvs, used_cnv_bt, hpo_p_cutoffs, args.min_nominal, 
                            retest_min_or_lower, args.model, args.max_cnv_size, 
                            args.min_case_cnvs, args.control_hpo)
             sig_windows = sig_df[sig_df.iloc[:, 4:].apply(any, axis=1)].iloc[:, 0:4]

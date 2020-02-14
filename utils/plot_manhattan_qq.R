@@ -216,8 +216,8 @@ manhattan <- function (df, cutoff=1e-08, highlights=NULL,
 qq <- function (stats, cutoff=NULL, highlights=NULL, 
                 highlight.color="#4EE69A",
                 highlight.name="Positive Controls",
-                print.stats=T, legend=T,
-                ymax=NULL, reflection=F,
+                print.stats=T, echo.lambdas=F,
+                legend=T, ymax=NULL, reflection=F,
                 label.cex=1){
   
   # Dummy function to plot N/A QQ for analyses with no cases
@@ -286,6 +286,12 @@ qq <- function (stats, cutoff=NULL, highlights=NULL,
       expected.hits <- ppoints(length(p[hits]))
       lambda.hits <- dchisq(median(p[hits]), df=1)/dchisq(median(expected.hits), df=1)
       lambda.ratio <- lambda.hits / lambda
+      if(echo.lambdas==T){
+        cat(paste(round(lambda, 4), "\t",
+                  round(lambda.hits, 4), "\t",
+                  round(lambda.ratio, 4), "\n",
+                  sep=""))
+      }
     }
     
     if(is.null(ymax)){
@@ -444,7 +450,11 @@ option_list <- list(
               metavar="string"),
   make_option(c("--title"), type="character", default=NULL, 
               help="title for composite Manhattan/Miami & QQ plot [default %default]",
-              metavar="string")
+              metavar="string"),
+  make_option(c("--echo-lambdas"), type="logical", default=F, action="store_true",
+              help="Print QQ lambdas to stdout [default %default]"),
+  make_option(c("--qq-only"), type="logical", default=F, action="store_true",
+              help="Only plot QQ [default %default]")
 )
 
 # Get command-line arguments & options
@@ -478,6 +488,8 @@ highlight2.name <- opts$`highlight-name-2`
 lab.prefix <- opts$`label-prefix`
 lab2.prefix <- opts$`label-prefix-2`
 title <- gsub("\\n", "\n", opts$title, fixed=T)
+echo.lambdas <- opts$`echo-lambdas`
+qq.only <- opts$`qq-only`
 
 # Checks for appropriate positional arguments, depending on mode
 if(miami == F){
@@ -515,15 +527,17 @@ if(miami == F){
   global.p.min <- min(c(stats$p, 10^-(-log10(cutoff) + 1)), na.rm=T)
   
   # Generate Manhattan plot
-  manhattan.png.out <- paste(out.prefix, "manhattan.png", sep=".")
-  cat(paste("Printing Manhattan plot to", manhattan.png.out, "\n"))
-  png(manhattan.png.out,
-      height=1000, width=1800, res=400)
-  manhattan(stats, cutoff, highlights=highlights,
-            highlight.name=highlight.name,
-            lab.prefix=lab.prefix,
-            ymax=-log10(global.p.min))
-  dev.off()
+  if(qq.only==F){
+    manhattan.png.out <- paste(out.prefix, "manhattan.png", sep=".")
+    cat(paste("Printing Manhattan plot to", manhattan.png.out, "\n"))
+    png(manhattan.png.out,
+        height=1000, width=1800, res=400)
+    manhattan(stats, cutoff, highlights=highlights,
+              highlight.name=highlight.name,
+              lab.prefix=lab.prefix,
+              ymax=-log10(global.p.min))
+    dev.off()
+  }
 
   # Generate QQ plot
   qq.png.out <- paste(out.prefix, "qq.png", sep=".")
@@ -532,34 +546,36 @@ if(miami == F){
       height=1000, width=1000, res=400)
   qq(stats, cutoff, highlights=highlights,
      highlight.name=highlight.name,
-     legend=F,
+     echo.lambdas=echo.lambdas, legend=F,
      ymax=-log10(global.p.min))
   dev.off()
   
   # Generate combo Manhattan & QQ plot
-  combo.png.out <- paste(out.prefix, "manhattan_with_qq.png", sep=".")
-  cat(paste("Printing combined Manhattan & QQ plots to", 
-            combo.png.out, "\n"))
-  if(is.null(title)){
-    png(combo.png.out,
-        height=1000, width=2800, res=400)
-    layout(matrix(c(1,2), nrow=1), widths=c(18, 10))
-  }else{
-    png(combo.png.out,
-        height=1200, width=2800, res=400)
-    layout(matrix(c(1,1,2,3), nrow=2, byrow=T), 
-           heights=c(2, 10), widths=c(18, 10))
-    title.panel(title)
+  if(qq.only==F){
+    combo.png.out <- paste(out.prefix, "manhattan_with_qq.png", sep=".")
+    cat(paste("Printing combined Manhattan & QQ plots to", 
+              combo.png.out, "\n"))
+    if(is.null(title)){
+      png(combo.png.out,
+          height=1000, width=2800, res=400)
+      layout(matrix(c(1,2), nrow=1), widths=c(18, 10))
+    }else{
+      png(combo.png.out,
+          height=1200, width=2800, res=400)
+      layout(matrix(c(1,1,2,3), nrow=2, byrow=T), 
+             heights=c(2, 10), widths=c(18, 10))
+      title.panel(title)
+    }
+    manhattan(stats, cutoff, highlights=highlights,
+              highlight.name=highlight.name,
+              lab.prefix=lab.prefix,
+              ymax=-log10(global.p.min))
+    qq(stats, cutoff, highlights=highlights,
+       highlight.name=highlight.name,
+       echo.lambdas=echo.lambdas, legend=F,
+       ymax=-log10(global.p.min))
+    dev.off()
   }
-  manhattan(stats, cutoff, highlights=highlights,
-            highlight.name=highlight.name,
-            lab.prefix=lab.prefix,
-            ymax=-log10(global.p.min))
-  qq(stats, cutoff, highlights=highlights,
-     highlight.name=highlight.name,
-     legend=F,
-     ymax=-log10(global.p.min))
-  dev.off()
 
 # Plotting protocol for Miami mode
 }else{
@@ -567,21 +583,23 @@ if(miami == F){
   global.p.min <- min(c(stats$p, stats2$p, 10^-(-log10(cutoff) + 1)), na.rm=T)
   
   # Generate Miami plot
-  miami.png.out <- paste(out.prefix, "miami.png", sep=".")
-  cat(paste("Printing Miami plot to", miami.png.out, "\n"))
-  png(miami.png.out,
-      height=1600, width=1800, res=400)
-  layout(matrix(1:2, nrow=2), heights=c(1, 0.88))
-  manhattan(stats, cutoff, highlights=highlights,
-            highlight.name=highlight.name,
-            lab.prefix=lab.prefix,
-            ymax=-log10(global.p.min))
-  manhattan(stats2, cutoff2, highlights=highlights2,
-            highlight.name=highlight2.name,
-            lab.prefix=lab2.prefix,
-            ymax=-log10(global.p.min),
-            reflection=T)
-  dev.off()
+  if(qq.only==F){
+    miami.png.out <- paste(out.prefix, "miami.png", sep=".")
+    cat(paste("Printing Miami plot to", miami.png.out, "\n"))
+    png(miami.png.out,
+        height=1600, width=1800, res=400)
+    layout(matrix(1:2, nrow=2), heights=c(1, 0.88))
+    manhattan(stats, cutoff, highlights=highlights,
+              highlight.name=highlight.name,
+              lab.prefix=lab.prefix,
+              ymax=-log10(global.p.min))
+    manhattan(stats2, cutoff2, highlights=highlights2,
+              highlight.name=highlight2.name,
+              lab.prefix=lab2.prefix,
+              ymax=-log10(global.p.min),
+              reflection=T)
+    dev.off()
+  }
   
   # Generate joint Miami plot with QQs
   combo.png.out <- paste(out.prefix, "miami_with_qq.png", sep=".")
@@ -607,7 +625,7 @@ if(miami == F){
             label.cex=label.cex)
   qq(stats, cutoff, highlights=highlights,
      highlight.name=highlight.name,
-     legend=F,
+     echo.lambdas=echo.lambdas, legend=F,
      ymax=-log10(global.p.min),
      label.cex=0.9*label.cex)
   manhattan(stats2, cutoff2, highlights=highlights2,
@@ -618,7 +636,7 @@ if(miami == F){
             label.cex=label.cex)
   qq(stats2, cutoff2, highlights=highlights2,
      highlight.name=highlight2.name,
-     legend=F,
+     echo.lambdas=echo.lambdas, legend=F,
      ymax=-log10(global.p.min),
      reflection=T,
      label.cex=0.9*label.cex)

@@ -112,6 +112,7 @@ while read prefix hpo; do
         --cutoff ${p_cutoff} \
         --highlight-bed "$highlight_bed" \
         --highlight-name "$highlight_title" \
+        --label-prefix "$CNV" \
         --title "$title" \
         "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz" \
         "$meta.${prefix}.${freq_code}.$CNV.sliding_window"
@@ -292,15 +293,44 @@ paste perm_res/*.sliding_window.meta_analysis.permuted_p_values.*.txt \
 | gzip -c \
 > ${freq_code}.permuted_pval_matrix.txt.gz
 
-# Calculate empirical FDR
+# Calculate empirical P-value cutoffs
+# Genome-wide
+fdr_table_suffix="empirical_genome_wide_pval"
+fdr_target=${p_cutoff}
 for CNV in DEL DUP; do
-  /opt/rCNV2/analysis/sliding_windows/calc_empirical_fdr.R \
+  /opt/rCNV2/analysis/sliding_windows/calc_empirical_genome_wide.R \
     --cnv ${CNV} \
     --fdr-target ${fdr_target} \
-    --plot ${freq_code}.${CNV}.FDR_permutation_results.png \
+    --plot ${freq_code}.${CNV}.${fdr_table_suffix}_permutation_results.png \
     ${freq_code}.${CNV}.permuted_pval_matrix.txt.gz \
     ${metacohort_sample_table} \
-    sliding_window.${freq_code}.${CNV}.empirical_fdr_cutoffs.tsv
+    sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}
+done
+  
+# 1% FDR
+fdr_table_suffix="empirical_fdr_1pct_pval"
+fdr_target=0.01
+for CNV in DEL DUP; do
+  /opt/rCNV2/analysis/sliding_windows/calc_empirical_genome_wide.R \
+    --cnv ${CNV} \
+    --fdr-target ${fdr_target} \
+    --plot ${freq_code}.${CNV}.${fdr_table_suffix}_permutation_results.png \
+    ${freq_code}.${CNV}.permuted_pval_matrix.txt.gz \
+    ${metacohort_sample_table} \
+    sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}
+done
+  
+# 5% FDR
+fdr_table_suffix="empirical_genome_wide_pval"
+fdr_target=0.05
+for CNV in DEL DUP; do
+  /opt/rCNV2/analysis/sliding_windows/calc_empirical_genome_wide.R \
+    --cnv ${CNV} \
+    --fdr-target ${fdr_target} \
+    --plot ${freq_code}.${CNV}.${fdr_table_suffix}_permutation_results.png \
+    ${freq_code}.${CNV}.permuted_pval_matrix.txt.gz \
+    ${metacohort_sample_table} \
+    sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}
 done
 
 
@@ -323,9 +353,9 @@ while read prefix hpo; do
              | awk -v FS="\t" '{ print $2 }' )
   title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
   DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                  sliding_window.${freq_code}.DEL.empirical_fdr_cutoffs.tsv )
+                  sliding_window.${freq_code}.DEL.empirical_genome_wide.hpo_cutoffs.tsv )
   DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                  sliding_window.${freq_code}.DUP.empirical_fdr_cutoffs.tsv )
+                  sliding_window.${freq_code}.DEL.empirical_genome_wide.hpo_cutoffs.tsv )
 
   # Run meta-analysis for each CNV type
   for CNV in DEL DUP; do
@@ -484,7 +514,7 @@ paste <( zcat ${binned_genome} | cut -f1-3 ) \
 /opt/rCNV2/analysis/sliding_windows/get_significant_windows.R \
   --pvalues ${CNV}.pval_matrix.bed.gz \
   --p-is-phred \
-  --p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_fdr_cutoffs.tsv \
+  --p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide.hpo_cutoffs.tsv \
   --odds-ratios ${CNV}.lnOR_lower_matrix.bed.gz \
   --or-is-ln \
   --min-or ${meta_or_cutoff} \
@@ -518,7 +548,8 @@ for CNV in DEL DUP; do
     /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
       --cnv-type ${CNV} \
       --model ${meta_model_prefix} \
-      --p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_fdr_cutoffs.tsv \
+      --hpo-p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide.hpo_cutoffs.tsv \
+      --p-cutoff-ladder sliding_window.${freq_code}.${CNV}.empirical_genome_wide.ncase_cutoff_ladder.tsv \
       --p-is-phred \
       --min-or-lower ${meta_or_cutoff} \
       --retest-min-or-lower ${meta_or_cutoff} \

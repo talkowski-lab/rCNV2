@@ -133,6 +133,7 @@ or.corplot.grid <- function(stats.list, pt.cex=1){
 
 # Merge a list of association statistics
 combine.stats <- function(stats.list){
+  # Merge all cohorts
   merged <- stats.list[[1]]
   for(i in 2:length(stats.list)){
     merged <- merge(merged, stats.list[[i]], 
@@ -140,12 +141,19 @@ combine.stats <- function(stats.list){
                     all=F, sort=F)
   }
   merged[, -c(1:3)] <- apply(merged[, -c(1:3)], 2, as.numeric)
+  
   # Count number of nominally significant individual cohorts
   n_nom_sig <- apply(merged[, grep(".p_value", colnames(merged), fixed=T)],
                      1, function(pvals){length(which(pvals<=0.05))})
   merged$n_nominal_cohorts <- n_nom_sig
+  
+  # Determine most significant cohort per row
+  merged$top_cohort <- unlist(apply(merged[, grep(".p_value", colnames(merged), fixed=T)], 1, 
+                                    function(pvals){
+                                      head(names(stats.list)[which(pvals == min(pvals, na.rm=T))], 1)
+                                    }))
   merged <- merged[, -grep(".p_value", colnames(merged), fixed=T)]
-  return(merged)
+  return(as.data.frame(merged))
 }
 
 
@@ -199,7 +207,12 @@ sweeting.correction <- function(meta.df, cc.sum=0.01){
 
 
 # Make meta-analysis data frame for a single window
-make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T){
+make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T, drop_top_cohort=F){
+  if(drop_top_cohort==T){
+    top_cohort <- stats.merged$top_cohort[row.idx]
+    cohorts <- cohorts[which(cohorts != top_cohort)]
+    stats.merged <- stats.merged[, grep(top_cohort, colnames(stats.merged), fixed=T, invert=T)]
+  }
   ncohorts <- length(cohorts)
   meta.df <- data.frame("cohort"=1:ncohorts,
                         "control_ref"=as.numeric(stats.merged[row.idx, grep("control_ref", colnames(stats.merged), fixed=T)]),
@@ -215,10 +228,10 @@ make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T)
 
 
 # Perform meta-analysis for a single window
-meta.single <- function(stats.merged, cohorts, row.idx, model="re", empirical.continuity=T){
+meta.single <- function(stats.merged, cohorts, row.idx, model="re", empirical.continuity=T, drop_top_cohort=F){
   # If no CNVs are observed, return all NAs
   if(sum(stats.merged[row.idx, grep("_alt", colnames(stats.merged), fixed=T)])>0){
-    meta.df <- make.meta.df(stats.merged, cohorts, row.idx, empirical.continuity)
+    meta.df <- make.meta.df(stats.merged, cohorts, row.idx, empirical.continuity, drop_top_cohort)
     # If strictly zero case CNVs are observed, unable to estimate effect size
     if(all(meta.df$case_alt==0)){
       out.v <- c(rep(NA, 4), 0)
@@ -226,18 +239,14 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="re", empirical.co
       # Meta-analysis
       if(model=="re"){
         meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                                measure="OR", data=meta.df, random = ~ 1 | cohort, slab=cohort_name,
-                                add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
-                 error=function(e){
-                   print(paste(stats.merged[row.idx, 1], ":", 
-                               stats.merged[row.idx, 2], "-",
-                               stats.merged[row.idx, 3], 
-                               " failed to converge. Retrying with more iterations...",
-                               sep=""))
-                   rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                           measure="OR", data=meta.df, random = ~ 1 | cohort, slab=cohort_name,
-                           add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
-                 })
+                                     measure="OR", data=meta.df, random = ~ 1 | cohort, slab=cohort_name,
+                                     add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
+                             error=function(e){
+                               print(paste("row", row.idx, "failed to converge. Retrying with more iterations...", sep=" "))
+                               rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                                       measure="OR", data=meta.df, random = ~ 1 | cohort, slab=cohort_name,
+                                       add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
+                             })
         out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
                               meta.res$zval, -log10(meta.res$pval)))
       }else if(model=="mh"){
@@ -261,21 +270,45 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="re", empirical.co
 }
 
 
+# Make meta-analysis lookup table to shorten time required to run full meta-analysis
+make.meta.lookup.table <- function(stats.merged, cohorts, model, empirical.continuity=T){
+  unique.counts.df <- unique(stats.merged[, sort(unique(c(grep("_ref", colnames(stats.merged), fixed=T),
+                                                          grep("_alt", colnames(stats.merged), fixed=T))))])
+  
+  unique.stats <- t(sapply(1:nrow(unique.counts.df), function(i){
+    meta.single(unique.counts.df, cohorts, i, model, empirical.continuity)
+  }))
+  
+  lookup.table <- cbind(unique.counts.df, unique.stats)
+  stat.colnames <- c("meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper", "meta_z", "meta_phred_p")
+  if(model=="mh"){
+    stat.colnames[length(stat.colnames)-1] <- "CMH_chisq"
+  }
+  colnames(lookup.table)[(ncol(lookup.table)-4):ncol(lookup.table)] <- stat.colnames
+  
+  return(lookup.table)
+}
+
+
 # Wrapper function to perform a meta-analysis on all windows
 meta <- function(stats.merged, cohorts, model="re"){
-  meta.stats <- t(sapply(1:nrow(stats.merged), function(i){
-    meta.single(stats.merged, cohorts, i, model, empirical.continuity=T)
-  }))
-  keep.orig.cols <- c("chr", "start", "end", "n_nominal_cohorts")
-  meta.res <- cbind(stats.merged[, which(colnames(stats.merged) %in% keep.orig.cols)],
-                    meta.stats)
-  colnames(meta.res) <- c("chr", "start", "end", "n_nominal_cohorts",
-                          "meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper",
-                          "meta_z", "meta_phred_p")
-  if(model=="mh"){
-    colnames(meta.res)[ncol(meta.res)-1] <- "CMH_chisq"
-  }
-  return(meta.res)
+  # Make meta-analysis lookup table
+  meta.lookup.table <- make.meta.lookup.table(stats.merged, cohorts, model, 
+                                              empirical.continuity=T)
+  
+  # Merge stats into full list
+  meta.res <- merge(stats.merged, meta.lookup.table, sort=F, all.x=T, all.y=F)
+  meta.res <- meta.res[with(meta.res, order(chr, start)), ]
+  
+  # Compute secondary P-value
+  meta.res$meta_phred_p_secondary <- sapply(1:nrow(meta.res), function(i){
+    meta.single(meta.res, cohorts, i, model, empirical.continuity=T, drop_top_cohort=T)[5]
+  })
+  
+  # Format output
+  return(as.data.frame(cbind(meta.res[, which(colnames(meta.res) %in% c("chr", "start", "end", 
+                                                                        "n_nominal_cohorts", "top_cohort"))],
+                             meta.res[, grep("meta_", colnames(meta.res), fixed=T)])))
 }
 
 
@@ -317,7 +350,7 @@ p.is.phred <- opts$`p-is-phred`
 # # infile <- "~/scratch/window_meta_dummy_input.ndd.txt"
 # outfile <- "~/scratch/window_meta_test_results.bed"
 # corplot.out <- "~/scratch/corplot.test.jpg"
-# model <- "mh"
+# model <- "re"
 # p.is.phred <- T
 
 # Read list of cohorts to meta-analyze

@@ -411,7 +411,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:aee8e09e763e168b58f6d8f5e5c6a876a159df40dc8fe5a18aaf06f743e99fa4"
+    docker: "talkowski/rcnv@sha256:0d25626d340a68933f598c0a5f3aa9078cf5f1c6b51ec42943e654c38d14e0c9"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

@@ -113,25 +113,37 @@ fit.exp.decay <- function(x, y){
 }
 
 # Calculate adjusted p-value cutoffs per HPO term
-get.adjusted.cutoffs <- function(cutoff.stat.df){
+get.adjusted.cutoffs <- function(cutoff.stat.df, pred.n=NULL){
   fit <- fit.exp.decay(cutoff.stat.df$n.cases, cutoff.stat.df$fdr.cutoff)
-  fit.df <- data.frame("x"=cutoff.stat.df$n.cases)
+  if(is.null(pred.n)){
+    pred.n <- cutoff.stat.df$n.cases
+    pred.labs <- unlist(cutoff.stat.df$hpo)
+    col1.name <- "#hpo"
+  }else{
+    pred.labs <- pred.n
+    col1.name <- "#n_cases"
+  }
+  fit.df <- data.frame("x"=pred.n)
   fit.df$y <- predict(fit, newdata=fit.df)
-  out.df <- as.data.frame(cbind(unlist(cutoff.stat.df$hpo), unlist(10^-fit.df$y)))
+  out.df <- as.data.frame(cbind(pred.labs, unlist(10^-fit.df$y)))
   out.df <- out.df[!duplicated(out.df), ]
-  colnames(out.df) <- c("#hpo", "min_p")
+  colnames(out.df) <- c(col1.name, "min_p")
   return(out.df)
 }
 
 # Plot FDR, annotated with means and fitted curve
-plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target, floor=T){
+plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target, title=NULL, floor=T){
+  
   phred.target <- -log10(fdr.target)
+  if(is.null(title)){
+    title <- stat
+  }
   
   # Prep plot area & add points
   par(mar=c(3, 3, 2, 0.5))
   plot(x=c(0, max(cutoff.mat$n.cases)),
-       y=c(0, max(cutoff.mat$fdr.cutoff),
-           type="n", xaxt="n", yaxt="n", xlab="", ylab=""))
+       y=c(0, max(cutoff.mat$fdr.cutoff)),
+           type="n", xaxt="n", yaxt="n", xlab="", ylab="")
   points(x=cutoff.mat$n.cases, y=cutoff.mat$fdr.cutoff, col="gray75")
   abline(h=phred.target, lty=2)
   points(x=cutoff.stat.df$n.cases, y=cutoff.stat.df$fdr.cutoff, pch=15)
@@ -152,7 +164,7 @@ plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target, floor=T){
   axis(2, labels=NA)
   axis(2, at=axTicks(2), tick=F, line=-0.5, las=2, cex.axis=0.85)
   mtext(2, line=1.5, text=bquote(-log[10](italic(P))))
-  mtext(3, line=0.1, text=stat, font=2)
+  mtext(3, line=0.1, text=title, font=2)
   
   # Add legend
   legend("topright", pch=c(1, 15, NA, NA), lwd=c(1, 1, 3, 1), lty=c(NA, NA, 1, 2), 
@@ -182,7 +194,7 @@ option_list <- list(
 )
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage="%prog pval_matrix hpo_table outfile",
+args <- parse_args(OptionParser(usage="%prog pval_matrix hpo_table out.prefix",
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
@@ -193,7 +205,7 @@ if(length(args$args) != 3){
 
 pvals.in <- args$args[1]
 hpos.in <- args$args[2]
-outfile <- args$args[3]
+out.prefix <- args$args[3]
 cnvtype <- opts$cnv
 max.cutoff <- opts$`max-cutoff`
 cutoff.step <- opts$`cutoff-step`
@@ -203,7 +215,7 @@ plot.out <- opts$`plot`
 # # DEV PARAMETERS
 # pvals.in <- "~/scratch/rCNV.permuted_pval_matrix.txt.gz"
 # hpos.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
-# outfile <- "~/scratch/meta_cutoffs.test.txt"
+# out.prefix <- "~/scratch/meta_cutoffs.test"
 # cnvtype <- "DEL"
 # max.cutoff <- 20
 # cutoff.step <- 0.05
@@ -228,19 +240,33 @@ median.cutoffs <- get.cutoff.stat(cutoff.mat, "median")
 q3.cutoffs <- get.cutoff.stat(cutoff.mat, "Q3")
 max.cutoffs <- get.cutoff.stat(cutoff.mat, "max")
 
-# Format & write output file
+# Format & write output file matched to HPOs
 df.out.mean <- get.adjusted.cutoffs(mean.cutoffs)
-write.table(df.out.mean, outfile, sep="\t", quote=F,
+outfile.hpos <- paste(out.prefix, ".hpo_cutoffs.tsv", sep="")
+write.table(df.out.mean, outfile.hpos, sep="\t", quote=F,
+            col.names=T, row.names=F)
+
+# Format & write output file against arbitrary sample size steps
+df.out.ladder <- get.adjusted.cutoffs(mean.cutoffs, 
+                                      pred.n=as.numeric(sapply(3:5, function(x){seq(1, 9.9, 0.1) * 10 ^ x})))
+outfile.ladder <- paste(out.prefix, ".ncase_cutoff_ladder.tsv", sep="")
+write.table(df.out.ladder, outfile.ladder, sep="\t", quote=F,
             col.names=T, row.names=F)
 
 # Plot FDR data, if optioned
 if(!is.null(plot.out)){
-  png(plot.out, res=300, height=5*300, width=6*300)
-  par(mfrow=c(2, 2))
-  plot.fdrs(cutoff.mat, mean.cutoffs, "Mean", fdr.target, floor=F)
-  plot.fdrs(cutoff.mat, median.cutoffs, "Median", fdr.target, floor=F)
-  plot.fdrs(cutoff.mat, q3.cutoffs, "Third quartile", fdr.target, floor=F)
-  plot.fdrs(cutoff.mat, max.cutoffs, "Max", fdr.target, floor=F)
+  # png(plot.out, res=300, height=5*300, width=6*300)
+  # par(mfrow=c(2, 2))
+  # plot.fdrs(cutoff.mat, mean.cutoffs, "Mean", fdr.target, floor=F)
+  # plot.fdrs(cutoff.mat, median.cutoffs, "Median", fdr.target, floor=F)
+  # plot.fdrs(cutoff.mat, q3.cutoffs, "Third quartile", fdr.target, floor=F)
+  # plot.fdrs(cutoff.mat, max.cutoffs, "Max", fdr.target, floor=F)
+  # dev.off()
+  png(plot.out, res=300, height=4*300, width=5*300)
+  plot.fdrs(cutoff.mat, mean.cutoffs, "Mean", fdr.target, 
+            title=paste(cnvtype, "Permutation Results for FDR =",
+                        format(fdr.target, scientific=T)),
+            floor=F)
   dev.off()
 }
 
