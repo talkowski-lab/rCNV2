@@ -212,6 +212,7 @@ workflow sliding_window_analysis {
         freq_code="rCNV",
         CNV="DEL",
         meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+        meta_p_ladder_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_ladder,
         meta_secondary_p_cutoff=meta_secondary_p_cutoff,
         meta_or_cutoff=meta_or_cutoff,
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
@@ -231,6 +232,7 @@ workflow sliding_window_analysis {
         freq_code="rCNV",
         CNV="DUP",
         meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+        meta_p_ladder_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_ladder,
         meta_secondary_p_cutoff=meta_secondary_p_cutoff,
         meta_or_cutoff=meta_or_cutoff,
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
@@ -817,7 +819,7 @@ task refine_regions {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f607e3f48dd1bf373311e572da9274ffc1cca512768fe05cec91494b39f6f654"
+    docker: "talkowski/rcnv@sha256:caaf44768dc13701026c761972685ca317788ccf2e749f4beffdb3823cd39d7c"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -877,7 +879,7 @@ task merge_refinements {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f607e3f48dd1bf373311e572da9274ffc1cca512768fe05cec91494b39f6f654"
+    docker: "talkowski/rcnv@sha256:caaf44768dc13701026c761972685ca317788ccf2e749f4beffdb3823cd39d7c"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -912,7 +914,7 @@ task plot_region_summary {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f607e3f48dd1bf373311e572da9274ffc1cca512768fe05cec91494b39f6f654"
+    docker: "talkowski/rcnv@sha256:caaf44768dc13701026c761972685ca317788ccf2e749f4beffdb3823cd39d7c"
     preemptible: 1
   }
 }
