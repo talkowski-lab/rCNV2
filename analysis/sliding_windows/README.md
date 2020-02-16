@@ -98,7 +98,9 @@ gs://rcnv_project/analysis/sliding_windows/UNKNOWN/
 
 ### 3. Combine association statistics across metacohorts  
 
-We combined CNV association statistics across metacohorts for each sliding window using a random-effects meta-analysis.  
+We combined CNV association statistics across metacohorts for each sliding window using a random-effects meta-analysis. The P-value from this model was designated as the "`primary`" P-value.  
+
+We also computed a "`secondary`" P-value, which was calculated from an identical random-effects meta-analysis model after excluding the single most significant metacohort per window.  
 
 The code to perform this step is contained in `window_meta_analysis.R`.  
 
@@ -114,18 +116,18 @@ Estimating the number of independent tests performed across all windows, phenoty
 
 Instead, we targeted an "genome-wide" significance threshold of P ≤ 3.86x10<sup>-6</sup>, which corresonds to a Bonferroni correction if applied to the number of non-overlapping 200kb windows tested in our analysis.  
 
-We empirically determined the P-value threshold for each CNV type and phenotype that matched our desired genome-wide FDR as follows:  
+We empirically determined the primary P-value threshold for each CNV type and phenotype that matched our desired genome-wide FDR as follows:  
 
 1. permute phenotype labels for all CNVs while matching on size (split by quantile) and CNV type (DEL/DUP);  
 2. rerun all association tests (described above), including meta-analysis, for each phenotype & CNV combination;   
-3. compute the fraction of significant windows for a broad range of P-value thresholds (_e.g._, -log<sub>10</sub>(_P_) ~ [0, 20] ); and
-4. report the least significant P-value threshold that results in an empirical FDR ≤ 3.86x10<sup>-6</sup>.  
+3. compute the fraction of significant windows for a broad range of primary P-value thresholds (_e.g._, -log<sub>10</sub>(_P_) ~ [0, 20] ); and
+4. report the least significant primary P-value threshold that results in an empirical FDR ≤ 3.86x10<sup>-6</sup>.  
 
-Steps 1-3 were repeated 20 times for each CNV type and phenotype.  
+Steps 1-3 were repeated 50 times for each CNV type and phenotype.  
 
-Following permutation, we computed the mean P-value threshold per phenotype and CNV type.  
+Following permutation, we computed the mean primary P-value threshold per phenotype and CNV type. We used this value to assess genome-wide significance of primary P-values for locus discovery.    
 
-Finally, for each CNV type, we fit an exponential decay model of empirical P-value threshold versus total number of case samples, and used this model to assign a genome-wide P-value threshold per phenotype.  
+Finally, for each CNV type, we fit an exponential decay model of empirical P-value threshold versus total number of case samples after excluding outlier permutations and HPO terms. We used this model to assign a genome-wide P-value threshold per phenotype for region refinement (_not_ discovery; see below).  
 
 #### Output files  
 
@@ -139,12 +141,13 @@ These files are stored in the same location as the per-metacohort analysis resul
 
 Lastly, we collapsed all significant windows across phenotypes and refined them to discrete intervals.  
 
-In practice, we considered a window to be genome-wide significant if it met all three of the following criteria:  
-1. meta-analysis P exceeds the genome-wide significance threshold for that phenotype and CNV type; 
-2. nominally significant (P ≤ 0.05) in a one-sided Fisher's exact test for at least two metacohorts; and
-3. lower bound of 95% confidence interval of odds ratio from meta-analysis ≥ 2.  
+In practice, we considered a window to be genome-wide significant if its primary P-value P exceeded the genome-wide significance threshold for that phenotype and CNV type, and it satisifed at least one of the following two criteria:
+1. Secondary P-value (as [described above](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/sliding_windows/#3-combine-association-statistics-across-metacohorts)) was also nominally significant (P < 0.05); and/or
+2. At least two metacohorts were nominally significant (P < 0.05) per Fisher's exact test.  
 
-For each locus with a significant association between rCNVs and one or more phenotypes, we aimed to identify:  
+Absent a true replication sample, these _post hoc_ filters were required to protect against Winner's Curse.  
+
+Next, for each locus with a significant association between rCNVs and one or more phenotypes, we aimed to identify:  
 1. all statistically independent associations that were _individually_ genome-wide significant; and
 3. refine these associations to the minimal interval that contained the causal element(s) with 90% confidence (_i.e._, analogous to 90% credible sets from GWAS).  
 

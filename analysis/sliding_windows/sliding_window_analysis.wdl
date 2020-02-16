@@ -104,52 +104,52 @@ workflow sliding_window_analysis {
         p_val_column_name="meta_phred_p_secondary"
     }
 
-    # 1% FDR, secondary
-    call calc_meta_p_cutoff as calc_fdr_1pct_cutoffs_secondary {
-      input:
-        phenotype_list=phenotype_list,
-        metacohort_sample_table=metacohort_sample_table,
-        freq_code="rCNV",
-        CNV=cnv,
-        n_pheno_perms=n_pheno_perms,
-        fdr_target=0.01,
-        rCNV_bucket=rCNV_bucket,
-        dummy_completion_markers=rCNV_perm_test.completion_marker,
-        fdr_table_suffix="empirical_fdr_1pct_pval_secondary",
-        p_val_column_name="meta_phred_p_secondary"
-    }
+  #   # 1% FDR, secondary
+  #   call calc_meta_p_cutoff as calc_fdr_1pct_cutoffs_secondary {
+  #     input:
+  #       phenotype_list=phenotype_list,
+  #       metacohort_sample_table=metacohort_sample_table,
+  #       freq_code="rCNV",
+  #       CNV=cnv,
+  #       n_pheno_perms=n_pheno_perms,
+  #       fdr_target=0.01,
+  #       rCNV_bucket=rCNV_bucket,
+  #       dummy_completion_markers=rCNV_perm_test.completion_marker,
+  #       fdr_table_suffix="empirical_fdr_1pct_pval_secondary",
+  #       p_val_column_name="meta_phred_p_secondary"
+  #   }
 
-    # 5% FDR, secondary
-    call calc_meta_p_cutoff as calc_fdr_5pct_cutoffs_secondary {
-      input:
-        phenotype_list=phenotype_list,
-        metacohort_sample_table=metacohort_sample_table,
-        freq_code="rCNV",
-        CNV=cnv,
-        n_pheno_perms=n_pheno_perms,
-        fdr_target=0.05,
-        rCNV_bucket=rCNV_bucket,
-        dummy_completion_markers=rCNV_perm_test.completion_marker,
-        fdr_table_suffix="empirical_fdr_5pct_pval_secondary",
-        p_val_column_name="meta_phred_p_secondary"
-    }
-  }
+  #   # 5% FDR, secondary
+  #   call calc_meta_p_cutoff as calc_fdr_5pct_cutoffs_secondary {
+  #     input:
+  #       phenotype_list=phenotype_list,
+  #       metacohort_sample_table=metacohort_sample_table,
+  #       freq_code="rCNV",
+  #       CNV=cnv,
+  #       n_pheno_perms=n_pheno_perms,
+  #       fdr_target=0.05,
+  #       rCNV_bucket=rCNV_bucket,
+  #       dummy_completion_markers=rCNV_perm_test.completion_marker,
+  #       fdr_table_suffix="empirical_fdr_5pct_pval_secondary",
+  #       p_val_column_name="meta_phred_p_secondary"
+  #   }
+  # }
 
-  # Perform meta-analysis of rCNV association statistics
-  scatter ( pheno in phenotypes ) {
-    call meta_analysis as rCNV_meta_analysis {
-      input:
-        stats_beds=rCNV_burden_test.stats_beds,
-        stats_bed_idxs=rCNV_burden_test.stats_bed_idxs,
-        hpo=pheno[1],
-        metacohort_list=metacohort_list,
-        metacohort_sample_table=metacohort_sample_table,
-        freq_code="rCNV",
-        meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
-        meta_model_prefix=meta_model_prefix,
-        rCNV_bucket=rCNV_bucket,
-        prefix=pheno[0]
-    }
+  # # Perform meta-analysis of rCNV association statistics
+  # scatter ( pheno in phenotypes ) {
+  #   call meta_analysis as rCNV_meta_analysis {
+  #     input:
+  #       stats_beds=rCNV_burden_test.stats_beds,
+  #       stats_bed_idxs=rCNV_burden_test.stats_bed_idxs,
+  #       hpo=pheno[1],
+  #       metacohort_list=metacohort_list,
+  #       metacohort_sample_table=metacohort_sample_table,
+  #       freq_code="rCNV",
+  #       meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+  #       meta_model_prefix=meta_model_prefix,
+  #       rCNV_bucket=rCNV_bucket,
+  #       prefix=pheno[0]
+  #   }
   }
 
   # Refine minimal credible regions
@@ -435,7 +435,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f760522f9f4ff208431b5655920aa47560db206682464016922653ed8e7968a7"
+    docker: "talkowski/rcnv@sha256:a96cc89624ac64474737d020ccba7484a406899e46268d5103a240f618d02b20"
     preemptible: 1
     memory: "32 GB"
     disks: "local-disk 275 HDD"
@@ -571,7 +571,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f760522f9f4ff208431b5655920aa47560db206682464016922653ed8e7968a7"
+    docker: "talkowski/rcnv@sha256:a96cc89624ac64474737d020ccba7484a406899e46268d5103a240f618d02b20"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -701,7 +701,7 @@ task prep_refinement {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f760522f9f4ff208431b5655920aa47560db206682464016922653ed8e7968a7"
+    docker: "talkowski/rcnv@sha256:a96cc89624ac64474737d020ccba7484a406899e46268d5103a240f618d02b20"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -797,7 +797,7 @@ task refine_regions {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f760522f9f4ff208431b5655920aa47560db206682464016922653ed8e7968a7"
+    docker: "talkowski/rcnv@sha256:a96cc89624ac64474737d020ccba7484a406899e46268d5103a240f618d02b20"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -857,7 +857,7 @@ task merge_refinements {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f760522f9f4ff208431b5655920aa47560db206682464016922653ed8e7968a7"
+    docker: "talkowski/rcnv@sha256:a96cc89624ac64474737d020ccba7484a406899e46268d5103a240f618d02b20"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -892,7 +892,7 @@ task plot_region_summary {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f760522f9f4ff208431b5655920aa47560db206682464016922653ed8e7968a7"
+    docker: "talkowski/rcnv@sha256:a96cc89624ac64474737d020ccba7484a406899e46268d5103a240f618d02b20"
     preemptible: 1
   }
 }
