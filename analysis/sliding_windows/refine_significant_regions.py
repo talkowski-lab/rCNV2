@@ -558,12 +558,12 @@ def meta_analysis(model, cohorts, n_control, n_case, n_control_alt, n_case_alt,
         chisq = float(res.iloc[:, -2])
         if secondary_or_nom:
             if pval <= min_p \
-                and oddsratio_ci[0] >= min_or_lower \
-                and ( secondary_pval <= min_secondary_p \
-                      or n_nom >= min_nominal ):
-                    sig = True
-                else:
-                    sig = False
+            and oddsratio_ci[0] >= min_or_lower \
+            and ( secondary_pval <= min_secondary_p \
+                  or n_nom >= min_nominal ):
+                sig = True
+            else:
+                sig = False
         else:    
             if pval <= min_p \
             and secondary_pval <= min_secondary_p \
@@ -703,9 +703,14 @@ def refine_sentinel(regions, rid, sig_df, sig_bt, pvals, cohorts, cnv_type,
 
     # Set p-value threshold according to number of cases
     min_p = np.nanmax([p_cutoffs[hpo] for hpo in sent_hpos])
-    if p_cutoff_ladder is not None:
-        min_p_ladder = np.nanmax(p_cutoff_ladder['min_p'][p_cutoff_ladder['n_cases'] <= total_n_case])
-        min_p = np.nanmax([min_p, min_p_ladder])
+
+    # If there are two or more sentinel HPOs, take the least strict P-value cutoff
+    # among all of the HPO-specific cutoffs and the overall exponential decay
+    # fit for smoothed P-value cutoff as a function of sample size
+    if len(sent_hpos) > 1:
+        if p_cutoff_ladder is not None:
+            min_p_ladder = np.nanmax(p_cutoff_ladder['min_p'][p_cutoff_ladder['n_cases'] <= total_n_case])     
+            min_p = np.nanmax([min_p, min_p_ladder])
         
 
     # Intersect region and sentinel window with CNVs from sentinel phenotype
@@ -1248,9 +1253,10 @@ def main():
                         'required to be nominally significant to report an independent ' +
                         'minimal credible region. [default: 1]', 
                         default=1, type=int)
-    parser.add_argument('--secondary-or-nominal', help='Allow windows to meet either ' +
-                        '--secondary-p-cutoff or --min-nominal, but do not require ' +
-                        'both. [default: require both]', default=False, action='store_true')
+    parser.add_argument('--secondary-or-nominal', dest='secondary_or_nom', 
+                        help='Allow windows to meet either --secondary-p-cutoff ' +
+                        'or --min-nominal, but do not require both. ' +
+                        '[default: require both]', default=False, action='store_true')
     parser.add_argument('--min-case-cnvs', help='Minimum count of CNVs required ' +
                         'per independent minimal credible region [default: 1]', 
                         default=1, type=int)

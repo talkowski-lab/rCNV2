@@ -771,6 +771,7 @@ task refine_regions {
         --retest-min-or-lower ${meta_or_cutoff} \
         --max-cnv-size ${refine_max_cnv_size} \
         --min-nominal ${meta_nominal_cohorts_cutoff} \
+        --secondary-or-nom \
         --credible-interval ${credible_interval} \
         --prefix "${freq_code}_${CNV}" \
         --log ${freq_code}.${CNV}.region_refinement.${contig}.log \
