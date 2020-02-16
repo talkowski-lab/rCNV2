@@ -89,36 +89,6 @@ workflow sliding_window_analysis {
         p_val_column_name="meta_phred_p"
     }
 
-    # 1% FDR, primary
-    call calc_meta_p_cutoff as calc_fdr_1pct_cutoffs {
-      input:
-        phenotype_list=phenotype_list,
-        metacohort_sample_table=metacohort_sample_table,
-        freq_code="rCNV",
-        CNV=cnv,
-        n_pheno_perms=n_pheno_perms,
-        fdr_target=0.01,
-        rCNV_bucket=rCNV_bucket,
-        dummy_completion_markers=rCNV_perm_test.completion_marker,
-        fdr_table_suffix="empirical_fdr_1pct_pval",
-        p_val_column_name="meta_phred_p"
-    }
-
-    # 5% FDR, primary
-    call calc_meta_p_cutoff as calc_fdr_5pct_cutoffs {
-      input:
-        phenotype_list=phenotype_list,
-        metacohort_sample_table=metacohort_sample_table,
-        freq_code="rCNV",
-        CNV=cnv,
-        n_pheno_perms=n_pheno_perms,
-        fdr_target=0.05,
-        rCNV_bucket=rCNV_bucket,
-        dummy_completion_markers=rCNV_perm_test.completion_marker,
-        fdr_table_suffix="empirical_fdr_5pct_pval",
-        p_val_column_name="meta_phred_p"
-    }
-
     # Genome-wide, secondary
     call calc_meta_p_cutoff as calc_genome_wide_cutoffs_secondary {
       input:
@@ -392,7 +362,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3f404f25d6821167744a6041b1159ece926d3720d0f33c75abbad1178775b242"
+    docker: "talkowski/rcnv@sha256:f760522f9f4ff208431b5655920aa47560db206682464016922653ed8e7968a7"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -420,10 +390,12 @@ task calc_meta_p_cutoff {
   String p_val_column_name
 
   command <<<
+    set -e 
+
     # Gather all permutation results and compute FDR CDFs
     mkdir perm_res/
     while read prefix hpo; do
-      echo -e "$prefix\n\n"
+      echo -e "\nSTARTING $prefix\n"
       gsutil -m cp \
         "${rCNV_bucket}/analysis/sliding_windows/$prefix/${freq_code}/permutations/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.perm_*.bed.gz" \
         perm_res/
@@ -437,12 +409,16 @@ task calc_meta_p_cutoff {
         | cat <( echo "$prefix.${CNV}.$i" ) - \
         > perm_res/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.permuted_p_values.$i.txt
       done
+      rm perm_res/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.perm_*.bed.gz
+      echo -e "\nFINISHED $prefix\n"
     done < ${phenotype_list}
+    echo -e "\nMAKING P-VALUE MATRIX\n"
     paste perm_res/*.sliding_window.meta_analysis.permuted_p_values.*.txt \
     | gzip -c \
     > ${freq_code}.${CNV}.permuted_pval_matrix.txt.gz
 
     # Analyze p-values and compute FDR
+    echo -e "\nANALYZING P-VALUE MATRIX\n"
     /opt/rCNV2/analysis/sliding_windows/calc_empirical_fdr.R \
       --cnv ${CNV} \
       --fdr-target ${fdr_target} \
@@ -459,11 +435,11 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:01175c8d4c0d1ca32ae57b35c85902e0eaee9427eaeca5b9f9b57c733267453c"
+    docker: "talkowski/rcnv@sha256:f760522f9f4ff208431b5655920aa47560db206682464016922653ed8e7968a7"
     preemptible: 1
-    memory: "16 GB"
-    disks: "local-disk 100 HDD"
-    bootDiskSizeGb: "20"
+    memory: "32 GB"
+    disks: "local-disk 275 HDD"
+    bootDiskSizeGb: "40"
   }
 
   output {
@@ -595,7 +571,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:01175c8d4c0d1ca32ae57b35c85902e0eaee9427eaeca5b9f9b57c733267453c"
+    docker: "talkowski/rcnv@sha256:f760522f9f4ff208431b5655920aa47560db206682464016922653ed8e7968a7"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -694,6 +670,7 @@ task prep_refinement {
       --min-or ${meta_or_cutoff} \
       --nominal-counts ${CNV}.nominal_cohort_counts.bed.gz \
       --min-nominal ${meta_nominal_cohorts_cutoff} \
+      --secondary-or-nom \
       --out-prefix ${freq_code}.${CNV}. \
       ${binned_genome}
     bgzip -f ${freq_code}.${CNV}.all_windows_labeled.bed
@@ -724,7 +701,7 @@ task prep_refinement {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e0c7c3d285a39bb285f655b02747336d6497acd1bd5783d83ec93a53a1e9ea89"
+    docker: "talkowski/rcnv@sha256:f760522f9f4ff208431b5655920aa47560db206682464016922653ed8e7968a7"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -819,7 +796,7 @@ task refine_regions {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:caaf44768dc13701026c761972685ca317788ccf2e749f4beffdb3823cd39d7c"
+    docker: "talkowski/rcnv@sha256:f760522f9f4ff208431b5655920aa47560db206682464016922653ed8e7968a7"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -879,7 +856,7 @@ task merge_refinements {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:caaf44768dc13701026c761972685ca317788ccf2e749f4beffdb3823cd39d7c"
+    docker: "talkowski/rcnv@sha256:f760522f9f4ff208431b5655920aa47560db206682464016922653ed8e7968a7"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -914,7 +891,7 @@ task plot_region_summary {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:caaf44768dc13701026c761972685ca317788ccf2e749f4beffdb3823cd39d7c"
+    docker: "talkowski/rcnv@sha256:f760522f9f4ff208431b5655920aa47560db206682464016922653ed8e7968a7"
     preemptible: 1
   }
 }

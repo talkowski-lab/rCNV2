@@ -153,7 +153,7 @@ metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
 p_cutoff=0.00000385862
-n_pheno_perms=20
+n_pheno_perms=50
 meta_model_prefix="re"
 i=1
 bin_overlap=0.5
@@ -274,7 +274,7 @@ done < refs/test_phenotypes.list
 mkdir perm_res/
 p_val_column_name="meta_phred_p"
 while read prefix hpo; do
-  echo -e "$prefix\n\n"
+  echo -e "\nSTARTING $prefix\n"
   gsutil -m cp \
     "${rCNV_bucket}/analysis/sliding_windows/$prefix/${freq_code}/permutations/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.perm_*.bed.gz" \
     perm_res/
@@ -288,7 +288,10 @@ while read prefix hpo; do
     | cat <( echo "$prefix.${CNV}.$i" ) - \
     > perm_res/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.permuted_p_values.$i.txt
   done
+  rm perm_res/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.perm_*.bed.gz
+  echo -e "\nFINISHED $prefix\n"
 done < ${phenotype_list}
+echo -e "\nMAKING P-VALUE MATRIX\n"
 paste perm_res/*.sliding_window.meta_analysis.permuted_p_values.*.txt \
 | gzip -c \
 > ${freq_code}.${CNV}.permuted_pval_matrix.txt.gz
@@ -297,15 +300,14 @@ paste perm_res/*.sliding_window.meta_analysis.permuted_p_values.*.txt \
 # Genome-wide
 fdr_table_suffix="empirical_genome_wide_pval"
 fdr_target=${p_cutoff}
-for CNV in DEL DUP; do
-  /opt/rCNV2/analysis/sliding_windows/calc_empirical_fdr.R \
-    --cnv ${CNV} \
-    --fdr-target ${fdr_target} \
-    --plot sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}_permutation_results.png \
-    ${freq_code}.${CNV}.permuted_pval_matrix.txt.gz \
-    ${metacohort_sample_table} \
-    sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}
-done
+echo -e "\nANALYZING P-VALUE MATRIX\n"
+/opt/rCNV2/analysis/sliding_windows/calc_empirical_fdr.R \
+  --cnv ${CNV} \
+  --fdr-target ${fdr_target} \
+  --plot sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}_permutation_results.png \
+  ${freq_code}.${CNV}.permuted_pval_matrix.txt.gz \
+  ${metacohort_sample_table} \
+  sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}
 
 
 
@@ -472,8 +474,9 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
 meta_p_cutoff=0.00000385862
+meta_secondary_p_cutoff=0.05
 meta_or_cutoff=1
-meta_nominal_cohorts_cutoff=0
+meta_nominal_cohorts_cutoff=2
 meta_model_prefix="re"
 sig_window_pad=1000000
 refine_max_cnv_size=3000000
@@ -547,6 +550,7 @@ paste <( zcat ${binned_genome} | cut -f1-3 ) \
   --min-or ${meta_or_cutoff} \
   --nominal-counts ${CNV}.nominal_cohort_counts.bed.gz \
   --min-nominal ${meta_nominal_cohorts_cutoff} \
+  --secondary-or-nom \
   --out-prefix ${freq_code}.${CNV}. \
   ${binned_genome}
 bgzip -f ${freq_code}.${CNV}.all_windows_labeled.bed

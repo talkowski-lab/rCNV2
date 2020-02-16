@@ -435,73 +435,73 @@ def sweeting_correction(n_control_ref, n_case_ref, n_control_alt, n_case_alt, cc
     return n_control_ref, n_case_ref, n_control_alt, n_case_alt
 
 
-def mh_test(cohorts, n_control, n_case, n_control_alt, n_case_alt,
-            min_p=1, min_or_lower=0, min_nominal=0, empirical_continuity=True, 
-            cc_sum=0.01):
-    """
-    Conduct Mantel-Haenszel meta-analysis
+# def mh_test(cohorts, n_control, n_case, n_control_alt, n_case_alt,
+#             min_p=1, min_or_lower=0, min_nominal=0, empirical_continuity=True, 
+#             cc_sum=0.01):
+#     """
+#     Conduct Mantel-Haenszel meta-analysis
 
-    Note: this function is deprecated in favor of calling exact same Rscript
-          with subprocess() to ensure mathematical consistency
-    """
+#     Note: this function is deprecated in favor of calling exact same Rscript
+#           with subprocess() to ensure mathematical consistency
+#     """
 
-    # Only run if any CNV carriers are observed
-    if sum(np.array(n_control_alt + n_case_alt)) > 0:
+#     # Only run if any CNV carriers are observed
+#     if sum(np.array(n_control_alt + n_case_alt)) > 0:
 
-        # Apply empirical continuity correction
-        n_control_ref = list(np.array(n_control) - np.array(n_control_alt))
-        n_case_ref = list(np.array(n_case) - np.array(n_case_alt))
-        if empirical_continuity :
-            n_control_ref, n_case_ref, n_control_alt, n_case_alt = \
-                sweeting_correction(n_control_ref, n_case_ref, n_control_alt, 
-                                    n_case_alt, cc_sum)
+#         # Apply empirical continuity correction
+#         n_control_ref = list(np.array(n_control) - np.array(n_control_alt))
+#         n_case_ref = list(np.array(n_case) - np.array(n_case_alt))
+#         if empirical_continuity :
+#             n_control_ref, n_case_ref, n_control_alt, n_case_alt = \
+#                 sweeting_correction(n_control_ref, n_case_ref, n_control_alt, 
+#                                     n_case_alt, cc_sum)
 
-        # Create list of 2x2 tables
-        cohort_idxs = list(range(0, len(cohorts)))
-        def _make_cont_table(idx):
-            tb = np.array([[n_control_ref[idx], n_case_ref[idx]], 
-                        [n_control_alt[idx], n_case_alt[idx]]])
-            return tb
-        meta_tabs = [_make_cont_table(i) for i in cohort_idxs]
+#         # Create list of 2x2 tables
+#         cohort_idxs = list(range(0, len(cohorts)))
+#         def _make_cont_table(idx):
+#             tb = np.array([[n_control_ref[idx], n_case_ref[idx]], 
+#                         [n_control_alt[idx], n_case_alt[idx]]])
+#             return tb
+#         meta_tabs = [_make_cont_table(i) for i in cohort_idxs]
 
-        # Compute number of cohorts at nominal significance
-        fisher_p = [sstats.fisher_exact(x, 'greater')[1] for x in meta_tabs]
-        n_nom = len([p for p in fisher_p if p <= 0.05])
+#         # Compute number of cohorts at nominal significance
+#         fisher_p = [sstats.fisher_exact(x, 'greater')[1] for x in meta_tabs]
+#         n_nom = len([p for p in fisher_p if p <= 0.05])
 
-        # Calculate odds ratio, chisq, and p-value
-        strat_tab = sm.stats.StratifiedTable(meta_tabs)
-        np.seterr(divide = 'ignore')
-        oddsratio = strat_tab.oddsratio_pooled
-        oddsratio_ci = strat_tab.oddsratio_pooled_confint()
-        chisq = strat_tab.test_null_odds().statistic
-        pval = strat_tab.test_null_odds().pvalue
-        if oddsratio < 1:
-            pval = 1 - pval
+#         # Calculate odds ratio, chisq, and p-value
+#         strat_tab = sm.stats.StratifiedTable(meta_tabs)
+#         np.seterr(divide = 'ignore')
+#         oddsratio = strat_tab.oddsratio_pooled
+#         oddsratio_ci = strat_tab.oddsratio_pooled_confint()
+#         chisq = strat_tab.test_null_odds().statistic
+#         pval = strat_tab.test_null_odds().pvalue
+#         if oddsratio < 1:
+#             pval = 1 - pval
 
-    else:
-        n_nom = 0
-        oddsratio = 1
-        oddsratio_ci = (np.NaN, np.NaN)
-        chisq = 0
-        pval = 1
+#     else:
+#         n_nom = 0
+#         oddsratio = 1
+#         oddsratio_ci = (np.NaN, np.NaN)
+#         chisq = 0
+#         pval = 1
 
-    # Make determination on overall test significance
-    if pval <= min_p \
-    and oddsratio_ci[0] >= min_or_lower \
-    and n_nom >= min_nominal:
-        sig = True
-    else:
-        sig = False
+#     # Make determination on overall test significance
+#     if pval <= min_p \
+#     and oddsratio_ci[0] >= min_or_lower \
+#     and n_nom >= min_nominal:
+#         sig = True
+#     else:
+#         sig = False
 
-    # # HELPFUL DEBUG:
-    # msg = '\t'.join([str(x) for x in [pval, oddsratio, oddsratio_ci[0], chisq, n_nom]])
+#     # # HELPFUL DEBUG:
+#     # msg = '\t'.join([str(x) for x in [pval, oddsratio, oddsratio_ci[0], chisq, n_nom]])
 
-    return oddsratio, oddsratio_ci, chisq, pval, n_nom, sig
+#     return oddsratio, oddsratio_ci, chisq, pval, n_nom, sig
 
 
 def meta_analysis(model, cohorts, n_control, n_case, n_control_alt, n_case_alt,
                   min_p=1, min_secondary_p=1, min_or_lower=0, min_nominal=0, 
-                  empirical_continuity=True, cc_sum=0.01):
+                  secondary_or_nom=False, empirical_continuity=True, cc_sum=0.01):
     """
     Perform random-effects or Mantel-Haenszel meta-analysis
 
@@ -556,13 +556,22 @@ def meta_analysis(model, cohorts, n_control, n_case, n_control_alt, n_case_alt,
         oddsratio_ci = [float(res['meta_lnOR_lower']), 
                         float(res['meta_lnOR_upper'])]
         chisq = float(res.iloc[:, -2])
-        if pval <= min_p \
-        and secondary_pval <= min_secondary_p \
-        and oddsratio_ci[0] >= min_or_lower \
-        and n_nom >= min_nominal:
-            sig = True
-        else:
-            sig = False
+        if secondary_or_nom:
+            if pval <= min_p \
+                and oddsratio_ci[0] >= min_or_lower \
+                and ( secondary_pval <= min_secondary_p \
+                      or n_nom >= min_nominal ):
+                    sig = True
+                else:
+                    sig = False
+        else:    
+            if pval <= min_p \
+            and secondary_pval <= min_secondary_p \
+            and oddsratio_ci[0] >= min_or_lower \
+            and n_nom >= min_nominal:
+                sig = True
+            else:
+                sig = False
 
     # # HELPFUL DEBUG:
     # msg = '\t'.join([str(x) for x in [pval, oddsratio, oddsratio_ci[0], chisq, n_nom]])
@@ -583,7 +592,7 @@ def _count_cnvs_by_cohort(cnvs, cohorts):
 
 
 def get_min_case_cnvs(case_cnvs, control_cnvs, cc_counts, min_p, min_secondary_p,
-                      min_or_lower, min_nominal, model):
+                      min_or_lower, min_nominal, secondary_or_nom, model):
     """
     Get minimum number of case CNVs required to achieve a significant result
     """
@@ -609,7 +618,7 @@ def get_min_case_cnvs(case_cnvs, control_cnvs, cc_counts, min_p, min_secondary_p
             oddsratio, or_ci, chisq, new_p, new_secondary_p, n_nom, sig \
                 = meta_analysis(model, cohorts, n_control, n_case, n_control_alt, 
                                 n_case_alt, min_p, min_secondary_p, min_or_lower, 
-                                min_nominal)
+                                min_nominal, secondary_or_nom)
             if k == sum_n_case_alt_max:
                 break
     
@@ -658,8 +667,9 @@ def calc_credible_interval(cnvs_df, method='density', resolution=10000, cred=0.8
 
 def refine_sentinel(regions, rid, sig_df, sig_bt, pvals, cohorts, cnv_type, 
                     control_hpo, p_cutoffs, p_cutoff_ladder, min_secondary_p,
-                    min_or_lower, min_nominal, model, exclude_cnvs, logfile, 
-                    max_size=10000000, min_case_cnvs=3, resolution=10000, cred=0.8, ci_method='density'):
+                    min_or_lower, min_nominal, secondary_or_nom, model, 
+                    exclude_cnvs, logfile, max_size=10000000, min_case_cnvs=3, 
+                    resolution=10000, cred=0.8, ci_method='density'):
     """
     Define minimum critical region for a single sentinel window
     """
@@ -692,10 +702,11 @@ def refine_sentinel(regions, rid, sig_df, sig_bt, pvals, cohorts, cnv_type,
     total_n_control = sum([x['n_control'] for x in cc_counts.values()])
 
     # Set p-value threshold according to number of cases
+    min_p = np.nanmax([p_cutoffs[hpo] for hpo in sent_hpos])
     if p_cutoff_ladder is not None:
-        min_p = np.nanmax(p_cutoff_ladder['min_p'][p_cutoff_ladder['n_cases'] <= total_n_case])
-    else:
-        min_p = np.nanmax([p_cutoffs[hpo] for hpo in sent_hpos])
+        min_p_ladder = np.nanmax(p_cutoff_ladder['min_p'][p_cutoff_ladder['n_cases'] <= total_n_case])
+        min_p = np.nanmax([min_p, min_p_ladder])
+        
 
     # Intersect region and sentinel window with CNVs from sentinel phenotype
     # Note: do *not* filter control CNVs on excluded CNVs or size
@@ -750,7 +761,7 @@ def refine_sentinel(regions, rid, sig_df, sig_bt, pvals, cohorts, cnv_type,
     # Get minimum set of case CNVs required for genome-wide significance
     k_case_cnvs, sig = get_min_case_cnvs(case_cnvs, control_cnvs, cc_counts, 
                                          min_p, min_secondary_p, min_or_lower, 
-                                         min_nominal, model)
+                                         min_nominal, secondary_or_nom, model)
 
     if sig:
         min_case_cnvs = case_cnvs.iloc[0:k_case_cnvs, :]
@@ -779,7 +790,8 @@ def refine_sentinel(regions, rid, sig_df, sig_bt, pvals, cohorts, cnv_type,
 
         k_case_cnvs, sig = get_min_case_cnvs(all_case_cnvs, all_control_cnvs, 
                                              cc_counts, min_p, min_secondary_p, 
-                                             min_or_lower, min_nominal, model)
+                                             min_or_lower, min_nominal, 
+                                             secondary_or_nom, model)
         if sig:
             min_case_cnvs = all_case_cnvs.iloc[0:k_case_cnvs, :]
             min_case_cnv_ids = list(min_case_cnvs['cnv_id'].values.flatten())
@@ -858,8 +870,9 @@ def get_cnvs_by_id(cohorts, ids):
 
 
 def update_pvalues(window_ids, pvals, sig_df, sig_bt, cohorts, exclude_cnvs, 
-                   exclude_cnv_bt, p_cutoffs, min_secondary_p, min_nominal, 
-                   min_or_lower, model, max_size, min_case_cnvs, control_hpo):
+                   exclude_cnv_bt, p_cutoffs, min_secondary_p, min_or_lower, 
+                   min_nominal, secondary_or_nom, model, max_size, min_case_cnvs, 
+                   control_hpo):
     """
     Recalculate p-values and significance matrix for significant hpos from provided windows
     """
@@ -937,7 +950,8 @@ def update_pvalues(window_ids, pvals, sig_df, sig_bt, cohorts, exclude_cnvs,
                     oddsratio, or_ci, chisq, new_p, new_secondary_p, n_nom, sig \
                         = meta_analysis(model, list(cohorts.keys()), n_control, 
                                         n_case, n_control_alt, n_case_alt, min_p, 
-                                        min_secondary_p, min_or_lower, min_nominal)
+                                        min_secondary_p, min_or_lower, min_nominal, 
+                                        secondary_or_nom)
                     new_pvals.append(new_p)
 
                     # Update significance label if HPO is no longer significant
@@ -1071,7 +1085,8 @@ def get_final_stats(mcrs, cohorts, orig_sig_df, orig_pvals, control_hpo, model):
             case_cnvs_df = case_cnvs.to_dataframe(names=cnv_df_names)
             n_case_alt = _count_cnvs_by_cohort(case_cnvs_df, cohorts.keys())
             oddsratio, or_ci, chisq, new_p, new_secondary_p, n_nom, sig \
-                = meta_analysis(model, list(cohorts.keys()), n_control, n_case, n_control_alt, n_case_alt)
+                = meta_analysis(model, list(cohorts.keys()), n_control, n_case, 
+                                n_control_alt, n_case_alt)
             hpo_sent_stats = {'chr' : mcr['chr'],
                               'start' : best_w_bt[0].start,
                               'end' : best_w_bt[0].end,
@@ -1090,7 +1105,8 @@ def get_final_stats(mcrs, cohorts, orig_sig_df, orig_pvals, control_hpo, model):
             mcr_case_cnvs_df = mcr_case_cnvs.to_dataframe(names=cnv_df_names)
             mcr_n_case_alt = _count_cnvs_by_cohort(mcr_case_cnvs_df, cohorts.keys())
             mcr_oddsratio, mcr_or_ci, mcr_chisq, mcr_pval, mcr_secondary_pval, mcr_n_nom, mcr_sig \
-                = meta_analysis(model, list(cohorts.keys()), n_control, n_case, mcr_n_control_alt, mcr_n_case_alt)
+                = meta_analysis(model, list(cohorts.keys()), n_control, n_case, 
+                                mcr_n_control_alt, mcr_n_case_alt)
             hpo_mcr_stats = {'oddsratio' : mcr_oddsratio,
                              'or_ci' : mcr_or_ci, 
                              'pvalue' : mcr_pval}
@@ -1112,7 +1128,8 @@ def get_final_stats(mcrs, cohorts, orig_sig_df, orig_pvals, control_hpo, model):
         mcr_case_cnvs_df = mcr_case_cnvs.to_dataframe(names=cnv_df_names)
         mcr_n_case_alt = _count_cnvs_by_cohort(mcr_case_cnvs_df, cohorts.keys())
         mcr_oddsratio, mcr_or_ci, mcr_chisq, mcr_pval, mcr_secondary_pval, mcr_n_nom, mcr_sig \
-            = meta_analysis(model, list(cohorts.keys()), n_control, n_case, mcr_n_control_alt, mcr_n_case_alt)
+            = meta_analysis(model, list(cohorts.keys()), n_control, n_case, 
+                            mcr_n_control_alt, mcr_n_case_alt)
 
         # Add pooled stats to MCR stats dict
         mcr_stats[mcr_id]['pooled_oddsratio'] = mcr_oddsratio
@@ -1231,6 +1248,9 @@ def main():
                         'required to be nominally significant to report an independent ' +
                         'minimal credible region. [default: 1]', 
                         default=1, type=int)
+    parser.add_argument('--secondary-or-nominal', help='Allow windows to meet either ' +
+                        '--secondary-p-cutoff or --min-nominal, but do not require ' +
+                        'both. [default: require both]', default=False, action='store_true')
     parser.add_argument('--min-case-cnvs', help='Minimum count of CNVs required ' +
                         'per independent minimal credible region [default: 1]', 
                         default=1, type=int)
@@ -1317,8 +1337,9 @@ def main():
                                          cohorts, args.cnv_type, args.control_hpo, 
                                          hpo_p_cutoffs, p_cutoff_ladder, 
                                          args.secondary_p_cutoff, min_or_lower, 
-                                         args.min_nominal, args.model, used_cnvs, 
-                                         logfile, args.max_cnv_size, args.min_case_cnvs, 
+                                         args.min_nominal, args.secondary_or_nom,
+                                         args.model, used_cnvs, logfile, 
+                                         args.max_cnv_size, args.min_case_cnvs, 
                                          args.resolution, args.credible_interval, 
                                          args.ci_method)
             all_mcrs.append(new_region)
@@ -1330,8 +1351,9 @@ def main():
             # Update pvalues and significance for windows in current region
             wids_to_update = list(regions[rid]['sig_windows'].keys())
             update_pvalues(wids_to_update, pvals, sig_df, sig_bt, cohorts, 
-                           used_cnvs, used_cnv_bt, hpo_p_cutoffs, args.secondary_p_cutoff, 
-                           args.min_nominal, retest_min_or_lower, args.model, 
+                           used_cnvs, used_cnv_bt, hpo_p_cutoffs, 
+                           args.secondary_p_cutoff, retest_min_or_lower, 
+                           args.min_nominal, args.secondary_or_nom, args.model, 
                            args.max_cnv_size, args.min_case_cnvs, args.control_hpo)
             sig_windows = sig_df[sig_df.iloc[:, 4:].apply(any, axis=1)].iloc[:, 0:4]
             sig_bt = pbt.BedTool.from_dataframe(sig_windows)

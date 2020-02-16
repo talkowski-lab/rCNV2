@@ -82,7 +82,7 @@ get.cutoff.stat <- function(cutoff.mat, stat){
       x <- mean(cutoff.mat$fdr.cutoff[which(cutoff.mat$hpo==hpo)], na.rm=T)
     }else if(stat=="median"){
       x <- median(cutoff.mat$fdr.cutoff[which(cutoff.mat$hpo==hpo)], na.rm=T)
-    }else if(stat=="Q3"){
+    }else if(stat=="q3"){
       x <- quantile(cutoff.mat$fdr.cutoff[which(cutoff.mat$hpo==hpo)], probs=0.75, na.rm=T)
     }
     c(hpo,
@@ -114,11 +114,37 @@ fit.exp.decay <- function(x, y){
 }
 
 # Calculate adjusted p-value cutoffs per HPO term
-get.adjusted.cutoffs <- function(cutoff.stat.df, pred.n=NULL){
+get.adjusted.cutoffs <- function(cutoff.mat, stat, pred.n=NULL, exclude.outliers=T){
+  # Determine outlier permutations and phenotypes, if optioned
+  if(exclude.outliers==T){
+    # Find individual outlier permutations (matched on hpo)
+    outlier.perms <- unlist(lapply(unique(cutoff.mat$hpo), function(hpo){
+      vals <- cutoff.mat$fdr.cutoff[which(cutoff.mat$hpo==hpo)]
+      vals.quants <- quantile(vals, probs=c(0.25, 0.75), na.rm=T)
+      vals.iqr <- vals.quants[2] - vals.quants[1]
+      outlier.cutoffs <- c(vals.quants[1] - (1.5 * vals.iqr),
+                           vals.quants[2] + (1.5 * vals.iqr))
+      which(cutoff.mat$hpo==hpo & (cutoff.mat$fdr.cutoff < outlier.cutoffs[1] | cutoff.mat$fdr.cutoff > outlier.cutoffs[2]))
+    }))
+    # Find outlier phenotypes
+    cutoff.stat.df.noOutliers <- get.cutoff.stat(cutoff.mat[-outlier.perms, ], stat)
+    stat.quants <- quantile(cutoff.stat.df.noOutliers$fdr.cutoff, probs=c(0.25, 0.75), na.rm=T)
+    stat.iqr <- stat.quants[2] - stat.quants[1]
+    outlier.cutoffs <- c(stat.quants[1] - (1.5 * stat.iqr),
+                         stat.quants[2] + (1.5 * stat.iqr))
+    outlier.hpos <- unlist(cutoff.stat.df.noOutliers$hpo[which(cutoff.stat.df.noOutliers$fdr.cutoff < outlier.cutoffs[1] 
+                                                        | cutoff.stat.df.noOutliers$fdr.cutoff > outlier.cutoffs[2])])
+    # Combine indexes to exclude
+    outlier.exclude.idxs <- unique(c(outlier.perms, which(cutoff.mat$hpo %in% outlier.hpos)))
+    cutoff.stat.df <- get.cutoff.stat(cutoff.mat[-outlier.exclude.idxs, ], stat)
+  }else{
+    cutoff.stat.df <- get.cutoff.stat(cutoff.mat, stat)
+  }
+  
   fit <- fit.exp.decay(cutoff.stat.df$n.cases, cutoff.stat.df$fdr.cutoff)
   if(is.null(pred.n)){
-    pred.n <- cutoff.stat.df$n.cases
-    pred.labs <- unlist(cutoff.stat.df$hpo)
+    pred.labs <- unlist(unique(cutoff.mat$hpo))
+    pred.n <- sapply(pred.labs, function(hpo){head(cutoff.mat$n.cases[which(cutoff.mat$hpo==hpo)], 1)})
     col1.name <- "#hpo"
   }else{
     pred.labs <- pred.n
@@ -129,7 +155,7 @@ get.adjusted.cutoffs <- function(cutoff.stat.df, pred.n=NULL){
   out.df <- as.data.frame(cbind(pred.labs, unlist(10^-fit.df$y)))
   out.df <- out.df[!duplicated(out.df), ]
   colnames(out.df) <- c(col1.name, "min_p")
-  return(out.df)
+  return(list("df"=out.df, "fit"=fit))
 }
 
 # Plot FDR, annotated with means and fitted curve
@@ -141,18 +167,17 @@ plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target,
     title <- stat
   }
   
-  # Prep plot area & add points
+  # Prep plot area & add points for raw permutations
   par(mar=c(3, 3, 2, 0.5))
   plot(x=c(0, max(cutoff.mat$n.cases)),
        y=c(0, max(cutoff.mat$fdr.cutoff)),
            type="n", xaxt="n", yaxt="n", xlab="", ylab="")
   points(x=cutoff.mat$n.cases, y=cutoff.mat$fdr.cutoff, col="gray75")
   abline(h=phred.target, lty=2)
-  points(x=cutoff.stat.df$n.cases, y=cutoff.stat.df$fdr.cutoff, pch=15)
   
   # Add trendline
   if(model=="exponential"){
-    fit <- fit.exp.decay(cutoff.stat.df$n.cases, cutoff.stat.df$fdr.cutoff)
+    fit <- get.adjusted.cutoffs(cutoff.mat, tolower(stat), exclude.outliers=T)$fit
     fit.df <- data.frame("x"=round(quantile(0:par("usr")[2], probs=seq(0, 1, 0.005))))
     fit.df$y <- predict(fit, newdata=fit.df)
     if(floor==T){
@@ -160,6 +185,9 @@ plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target,
     }
     lines(fit.df$x, fit.df$y, col="red", lwd=3)
   }
+  
+  # Add group means
+  points(x=cutoff.stat.df$n.cases, y=cutoff.stat.df$fdr.cutoff, pch=15)
   
   # Add axes
   axis(1, labels=NA)
@@ -171,9 +199,9 @@ plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target,
   mtext(3, line=0.1, text=title, font=2)
   
   # Add legend
-  legend("topright", pch=c(1, 15, NA, NA), lwd=c(1, 1, 3, 1), lty=c(NA, NA, 1, 2), 
-         col=c("gray75", "black", "red", "black"), legend=c("Permutation", stat, "Fit", "FDR Target"), 
-         cex=0.9)
+  legend("topright", pch=c(1, 15, NA, NA), lwd=c(1, 1, 3, 1), lty=c(NA, NA, 1, 1), 
+         col=c("gray75", "black", "red", "black"), cex=0.9, 
+         legend=c("Permutation", stat, "Exponential Fit", "FDR Target"))
 }
 
 
@@ -217,7 +245,7 @@ fdr.target <- opts$`fdr-target`
 plot.out <- opts$`plot`
 
 # # DEV PARAMETERS
-# pvals.in <- "~/scratch/rCNV.permuted_pval_matrix.txt.gz"
+# pvals.in <- "~/scratch/rCNV.DUP.permuted_pval_matrix.txt.gz"
 # hpos.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
 # out.prefix <- "~/scratch/meta_cutoffs.test"
 # cnvtype <- "DUP"
@@ -241,18 +269,23 @@ cutoff.mat <- make.cutoff.mat(fdr.mat, hpos, fdr.target)
 # Calculate various stats of cutoffs for each phenotype
 mean.cutoffs <- get.cutoff.stat(cutoff.mat, "mean")
 median.cutoffs <- get.cutoff.stat(cutoff.mat, "median")
-q3.cutoffs <- get.cutoff.stat(cutoff.mat, "Q3")
+q3.cutoffs <- get.cutoff.stat(cutoff.mat, "q3")
 max.cutoffs <- get.cutoff.stat(cutoff.mat, "max")
 
 # Format & write output file matched to HPOs
-df.out.mean <- get.adjusted.cutoffs(mean.cutoffs)
+# df.out.mean <- get.adjusted.cutoffs(cutoff.mat, "mean", exclude.outliers=F)$df
+# df.out.mean.noOutliers <- get.adjusted.cutoffs(cutoff.mat, "mean", exclude.outliers=T)$df
+df.out.empirical.mean <- data.frame(unlist(as.character(mean.cutoffs$hpo)),
+                                    as.numeric(10^-mean.cutoffs$fdr.cutoff))
+colnames(df.out.empirical.mean) <- c("#hpo", "min_p")
 outfile.hpos <- paste(out.prefix, ".hpo_cutoffs.tsv", sep="")
-write.table(df.out.mean, outfile.hpos, sep="\t", quote=F,
+write.table(df.out.empirical.mean, outfile.hpos, sep="\t", quote=F,
             col.names=T, row.names=F)
 
 # Format & write output file against arbitrary sample size steps
-df.out.ladder <- get.adjusted.cutoffs(mean.cutoffs, 
-                                      pred.n=as.numeric(sapply(3:5, function(x){seq(1, 9.9, 0.1) * 10 ^ x})))
+df.out.ladder <- get.adjusted.cutoffs(cutoff.mat, "mean", 
+                                      pred.n=as.numeric(sapply(3:5, function(x){seq(1, 9.9, 0.1) * 10 ^ x})),
+                                      exclude.outliers=T)$df
 outfile.ladder <- paste(out.prefix, ".ncase_cutoff_ladder.tsv", sep="")
 write.table(df.out.ladder, outfile.ladder, sep="\t", quote=F,
             col.names=T, row.names=F)

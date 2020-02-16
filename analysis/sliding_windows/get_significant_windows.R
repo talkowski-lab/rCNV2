@@ -96,23 +96,33 @@ get.sig.idxs <- function(x, cutoff, direction){
 
 
 # Merge lists of significant window indexes
-merge.sig <- function(bed, sig.pvals, sig.secondary.pvals, sig.ors, sig.nom){
+merge.sig <- function(bed, sig.pvals, sig.secondary.pvals, sig.ors, sig.nom, secondary.or.nom=F){
   if(is.null(sig.pvals)){
     stop("merge.sig requires p-values to be supplied.")
+  }
+  if(secondary.or.nom==T){
+    sig.sec.or.nom <- lapply(1:length(sig.secondary.pvals), function(x){
+      sort(unique(c(sig.secondary.pvals[[x]], sig.nom[[x]])))
+    })
+    names(sig.sec.or.nom) <- names(sig.pvals)
   }
   sig.all <- lapply(1:length(sig.pvals), function(i){
     sig <- 1:nrow(bed)
     if(!is.null(sig.pvals)){
       sig <- intersect(sig, sig.pvals[[i]])
     }
-    if(!is.null(sig.secondary.pvals)){
-      sig <- intersect(sig, sig.secondary.pvals[[i]])
-    }
     if(!is.null(sig.ors)){
       sig <- intersect(sig, sig.ors[[i]])
     }
-    if(!is.null(sig.nom)){
-      sig <- intersect(sig, sig.nom[[i]])
+    if(secondary.or.nom==F){
+      if(!is.null(sig.secondary.pvals)){
+        sig <- intersect(sig, sig.secondary.pvals[[i]])
+      }
+      if(!is.null(sig.nom)){
+        sig <- intersect(sig, sig.nom[[i]])
+      }
+    }else{
+      sig <- intersect(sig, sig.sec.or.nom[[i]])
     }
   })
   names(sig.all) <- names(sig.pvals)
@@ -161,6 +171,8 @@ option_list <- list(
               help="matrix of nominally significant cohorts per window per phenotype. [default %default]"),
   make_option(c("--min-nominal"), type="numeric", default=1, 
               help="minimum number of nominal cohorts to consider significant. [default %default]"),
+  make_option(c("--secondary-or-nom"), type="logical", default=F, action="store_true",
+              help="include windows that meet either secondary P-value or min. nominal significant cohort count. [default %default]"),
   make_option(c("-o", "--out-prefix"), type="character", default="./significant_windows.",
               help="prefix for writing out all results. [default %default]", metavar="path")
 )
@@ -188,20 +200,22 @@ min.secondary.p <- opts$`min-secondary-p`
 min.or <- opts$`min-or`
 nomsig.in <- opts$`nominal-counts`
 min.nom <- opts$`min-nominal`
+secondary.or.nom <- opts$`secondary-or-nom`
 out.prefix <- opts$`out-prefix`
 
 # # DEV PARAMETERS:
 # bed.in <- "~/scratch/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
-# pvalues.in <- "~/scratch/DEL.pval_matrix.bed.gz"
-# secondary.pvalues.in <- "~/scratch/DEL.secondary_pval_matrix.bed.gz"
-# p.cutoffs.in <- "~/scratch/del_pval_cutoff_test.tsv"
+# pvalues.in <- "~/scratch/DUP.pval_matrix.bed.gz"
+# secondary.pvalues.in <- "~/scratch/DUP.secondary_pval_matrix.bed.gz"
+# p.cutoffs.in <- "~/scratch/sliding_window.rCNV.DUP.empirical_genome_wide_pval.hpo_cutoffs.tsv"
 # p.is.phred <- T
-# ors.in <- "~/scratch/DEL.lnOR_lower_matrix.bed.gz"
+# ors.in <- "~/scratch/DUP.lnOR_lower_matrix.bed.gz"
 # or.is.ln <- T
 # min.secondary.p <- 0.05
 # min.or <- 1
-# nomsig.in <- "~/scratch/DEL.nominal_cohort_counts.bed.gz"
-# min.nom <- 0
+# nomsig.in <- "~/scratch/DUP.nominal_cohort_counts.bed.gz"
+# min.nom <- 2
+# secondary.or.nom <- T
 # out.prefix <- "~/scratch/sig_bins.test."
 
 # Read windows
@@ -246,7 +260,7 @@ if(!is.null(nomsig.in)){
 }
 
 # Determine final significant windows
-sig.merged <- merge.sig(bed, sig.pvals, sig.secondary.pvals, sig.ors, sig.nom)
+sig.merged <- merge.sig(bed, sig.pvals, sig.secondary.pvals, sig.ors, sig.nom, secondary.or.nom)
 bed.sigAnno <- mark.sig.windows(bed, sig.merged)
 bed.sigOnly <- bed[apply(bed.sigAnno[, -c(1:3)], 1, function(vals){any(vals)}), 1:3]
 
