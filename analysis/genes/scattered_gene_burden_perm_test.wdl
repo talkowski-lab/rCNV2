@@ -6,17 +6,20 @@
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Permutation subroutine for case-control CNV burden testing of sliding windows
+# Permutation subroutine for case-control CNV burden testing of genes
 
 
-workflow scattered_sliding_window_perm_test {
+workflow scattered_gene_burden_perm_test {
   String hpo
   File metacohort_list
   File metacohort_sample_table
   String freq_code
-  File binned_genome
-  Float bin_overlap
+  File gtf
   Int pad_controls
+  String weight_mode
+  Float min_cds_ovr_del
+  Float min_cds_ovr_dup
+  Int max_genes_per_cnv
   Float p_cutoff
   Int n_pheno_perms
   String meta_model_prefix
@@ -30,9 +33,12 @@ workflow scattered_sliding_window_perm_test {
 	      metacohort_list=metacohort_list,
 	      metacohort_sample_table=metacohort_sample_table,
 	      freq_code=freq_code,
-	      binned_genome=binned_genome,
-	      bin_overlap=bin_overlap,
-	      pad_controls=pad_controls,
+        gtf=gtf,
+        pad_controls=pad_controls,
+        weight_mode=weight_mode,
+        min_cds_ovr_del=min_cds_ovr_del,
+        min_cds_ovr_dup=min_cds_ovr_dup,
+        max_genes_per_cnv=max_genes_per_cnv,
 	      p_cutoff=p_cutoff,
         meta_model_prefix=meta_model_prefix,
 	      perm_idx=idx,
@@ -53,9 +59,12 @@ task permuted_burden_test {
   File metacohort_list
   File metacohort_sample_table
   String freq_code
-  File binned_genome
-  Float bin_overlap
+  File gtf
   Int pad_controls
+  String weight_mode
+  Float min_cds_ovr_del
+  Float min_cds_ovr_dup
+  Int max_genes_per_cnv
   Float p_cutoff
   String meta_model_prefix
   Int perm_idx
@@ -116,6 +125,17 @@ task permuted_burden_test {
 
     # Iterate over CNV types
     for CNV in DEL DUP; do
+
+      # Set CNV-specific parameters
+      case "$CNV" in
+        DEL)
+          min_cds_ovr=${min_cds_ovr_del}
+          ;;
+        DUP)
+          min_cds_ovr=${min_cds_ovr_dup}
+          ;;
+      esac
+
       # Perform association test for each metacohort
       while read meta cohorts; do
 
@@ -124,45 +144,53 @@ task permuted_burden_test {
         cnv_bed="shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz"
 
         # Count CNVs
-        /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
-          --fraction ${bin_overlap} \
+        /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
           --pad-controls ${pad_controls} \
+          --weight-mode ${weight_mode} \
+          --min-cds-ovr $min_cds_ovr \
+          --max-genes ${max_genes_per_cnv} \
           -t $CNV \
           --hpo ${hpo} \
+          --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
+          --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+          --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
           -z \
-          -o "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
+          --verbose \
+          -o "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
           $cnv_bed \
-          ${binned_genome}
+          ${gtf}
+        tabix -f "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz"
 
         # Perform burden test
-        /opt/rCNV2/analysis/sliding_windows/window_burden_test.R \
+        /opt/rCNV2/analysis/genes/gene_burden_test.R \
           --pheno-table ${metacohort_sample_table} \
           --cohort-name $meta \
+          --cnv $CNV \
           --case-hpo ${hpo} \
           --bgzip \
-          "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz" \
-          "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
-          tabix -f "$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+          "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
+          "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
+        tabix -f "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
 
       done < <( fgrep -v "mega" ${metacohort_list} )
 
       # Perform meta-analysis
       while read meta cohorts; do
-        echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
+        echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
       done < <( fgrep -v mega ${metacohort_list} ) \
-      > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
-      /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
+      > ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt
+      /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
         --model ${meta_model_prefix} \
         --p-is-phred \
-        ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
-        ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
-      bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
-      tabix -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz
+        ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
+        ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.perm_$i.bed
+      bgzip -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.perm_$i.bed
+      tabix -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.perm_$i.bed.gz
 
       # Copy results to output bucket
       gsutil cp \
-        ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
-        "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/permutations/"
+        ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.perm_$i.bed.gz \
+        "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/permutations/"
 
     done
     echo "Done" > complete.txt

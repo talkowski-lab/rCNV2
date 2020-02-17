@@ -36,7 +36,7 @@ function track_header {
 
 
 # Format each metacohort as a separate track, but store them in the same file
-for freq in rCNV uCNV; do
+for freq in rCNV vCNV uCNV; do
   for CNV in DEL DUP; do
     case $CNV in
       DEL)

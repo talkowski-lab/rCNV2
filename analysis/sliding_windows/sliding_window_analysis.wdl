@@ -135,21 +135,21 @@ workflow sliding_window_analysis {
   #   }
   # }
 
-  # # Perform meta-analysis of rCNV association statistics
-  # scatter ( pheno in phenotypes ) {
-  #   call meta_analysis as rCNV_meta_analysis {
-  #     input:
-  #       stats_beds=rCNV_burden_test.stats_beds,
-  #       stats_bed_idxs=rCNV_burden_test.stats_bed_idxs,
-  #       hpo=pheno[1],
-  #       metacohort_list=metacohort_list,
-  #       metacohort_sample_table=metacohort_sample_table,
-  #       freq_code="rCNV",
-  #       meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
-  #       meta_model_prefix=meta_model_prefix,
-  #       rCNV_bucket=rCNV_bucket,
-  #       prefix=pheno[0]
-  #   }
+  # Perform meta-analysis of rCNV association statistics
+  scatter ( pheno in phenotypes ) {
+    call meta_analysis as rCNV_meta_analysis {
+      input:
+        stats_beds=rCNV_burden_test.stats_beds,
+        stats_bed_idxs=rCNV_burden_test.stats_bed_idxs,
+        hpo=pheno[1],
+        metacohort_list=metacohort_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code="rCNV",
+        meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+        meta_model_prefix=meta_model_prefix,
+        rCNV_bucket=rCNV_bucket,
+        prefix=pheno[0]
+    }
   }
 
   # Refine minimal credible regions
