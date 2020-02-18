@@ -9,6 +9,9 @@
 # Analysis of case-control CNV burdens per gene
 
 
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_gene_burden_perm_test/versions/1/plain-WDL/descriptor" as scattered_perm
+
+
 workflow gene_burden_analysis {
   File phenotype_list
   File metacohort_list
@@ -87,28 +90,26 @@ workflow gene_burden_analysis {
         p_val_column_name="meta_phred_p"
     }
 
-    # # Genome-wide, secondary
-    # call calc_meta_p_cutoff as calc_genome_wide_cutoffs_secondary {
-    #   input:
-    #     phenotype_list=phenotype_list,
-    #     metacohort_sample_table=metacohort_sample_table,
-    #     freq_code="rCNV",
-    #     CNV=cnv,
-    #     n_pheno_perms=n_pheno_perms,
-    #     fdr_target=p_cutoff,
-    #     rCNV_bucket=rCNV_bucket,
-    #     dummy_completion_markers=rCNV_perm_test.completion_marker,
-    #     fdr_table_suffix="empirical_genome_wide_pval_secondary",
-    #     p_val_column_name="meta_phred_p_secondary"
-    # }
+    # Genome-wide, secondary
+    call calc_meta_p_cutoff as calc_genome_wide_cutoffs_secondary {
+      input:
+        phenotype_list=phenotype_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code="rCNV",
+        CNV=cnv,
+        n_pheno_perms=n_pheno_perms,
+        fdr_target=p_cutoff,
+        rCNV_bucket=rCNV_bucket,
+        dummy_completion_markers=rCNV_perm_test.completion_marker,
+        fdr_table_suffix="empirical_genome_wide_pval_secondary",
+        p_val_column_name="meta_phred_p_secondary"
+    }
   }
 
   # Perform meta-analysis of rCNV association statistics
   scatter ( pheno in phenotypes ) {
     call meta_analysis as rCNV_meta_analysis {
       input:
-        count_beds=rCNV_burden_test.count_beds,
-        count_bed_idxs=rCNV_burden_test.count_bed_idxs,
         stats_beds=rCNV_burden_test.stats_beds,
         stats_bed_idxs=rCNV_burden_test.stats_bed_idxs,
         hpo=pheno[1],
@@ -121,6 +122,8 @@ workflow gene_burden_analysis {
         prefix=pheno[0]
     }
   }
+
+  output {}
 }
 
 
@@ -227,6 +230,7 @@ task burden_test {
           --cutoff ${p_cutoff} \
           --highlight-bed "${prefix}.highlight_regions.bed" \
           --highlight-name "Constrained genes associated with this phenotype" \
+          --label-preix $CNV \
           --title "$title" \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz" \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden"
@@ -261,7 +265,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:90840bcba5f6f5ef8ab183a4879d6eb25971845c79959386fca917cc0b155e11"
+    docker: "talkowski/rcnv@sha256:47695a0d57921f3ca1bae209f2d51ef8854ab02041689f77c38bb67e32fd8533"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -335,7 +339,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:a96cc89624ac64474737d020ccba7484a406899e46268d5103a240f618d02b20"
+    docker: "talkowski/rcnv@sha256:47695a0d57921f3ca1bae209f2d51ef8854ab02041689f77c38bb67e32fd8533"
     preemptible: 1
     memory: "32 GB"
     disks: "local-disk 275 HDD"
@@ -351,8 +355,6 @@ task calc_meta_p_cutoff {
 
 # Run meta-analysis (both weighted and raw) across metacohorts for a single phenotype
 task meta_analysis {
-  Array[File] count_beds
-  Array[File] count_bed_idxs
   Array[File] stats_beds
   Array[File] stats_bed_idxs
   String hpo
@@ -368,8 +370,6 @@ task meta_analysis {
     set -e
 
     # Copy burden counts & gene coordinates
-    find / -name "*${prefix}.${freq_code}.*.gene_burden.counts.bed.gz*" \
-    | xargs -I {} mv {} ./
     find / -name "*${prefix}.${freq_code}.*.gene_burden.stats.bed.gz*" \
     | xargs -I {} mv {} ./
     gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
@@ -462,7 +462,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0d25626d340a68933f598c0a5f3aa9078cf5f1c6b51ec42943e654c38d14e0c9"
+    docker: "talkowski/rcnv@sha256:47695a0d57921f3ca1bae209f2d51ef8854ab02041689f77c38bb67e32fd8533"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

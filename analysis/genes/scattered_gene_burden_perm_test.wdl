@@ -26,26 +26,26 @@ workflow scattered_gene_burden_perm_test {
   String rCNV_bucket
   String prefix
 
-	scatter ( idx in range(n_pheno_perms) ) {
-	  call permuted_burden_test as rCNV_perm_test {
-	    input:
-	      hpo=hpo,
-	      metacohort_list=metacohort_list,
-	      metacohort_sample_table=metacohort_sample_table,
-	      freq_code=freq_code,
+  scatter ( idx in range(n_pheno_perms) ) {
+    call permuted_burden_test as rCNV_perm_test {
+      input:
+        hpo=hpo,
+        metacohort_list=metacohort_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code=freq_code,
         gtf=gtf,
         pad_controls=pad_controls,
         weight_mode=weight_mode,
         min_cds_ovr_del=min_cds_ovr_del,
         min_cds_ovr_dup=min_cds_ovr_dup,
         max_genes_per_cnv=max_genes_per_cnv,
-	      p_cutoff=p_cutoff,
+        p_cutoff=p_cutoff,
         meta_model_prefix=meta_model_prefix,
-	      perm_idx=idx,
-	      rCNV_bucket=rCNV_bucket,
-	      prefix=prefix
-	  }
-	}
+        perm_idx=idx,
+        rCNV_bucket=rCNV_bucket,
+        prefix=prefix
+    }
+  }
 
   output {
     File completion_marker = rCNV_perm_test.completion_marker[0]
@@ -197,7 +197,7 @@ task permuted_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3f404f25d6821167744a6041b1159ece926d3720d0f33c75abbad1178775b242"
+    docker: "talkowski/rcnv@sha256:47695a0d57921f3ca1bae209f2d51ef8854ab02041689f77c38bb67e32fd8533"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
