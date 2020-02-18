@@ -403,7 +403,6 @@ while read prefix hpo; do
     "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/plots/"
 done < refs/test_phenotypes.list
 
-
 # Collapse all meta-analysis p-values into single matrix for visualizing calibration
 mkdir meta_res/
 # Download data
@@ -459,7 +458,7 @@ while read prefix hpo; do
   | cut -f1-3 | bgzip -c \
   > ${freq_code}.sliding_window.meta_analysis.bins.bed.gz
 done < <( head -n1 ${phenotype_list} )
-# DEV NOTE: these p-values can be visualized with plot_meta_analysis_p_values.R,
+# DEV NOTE: these p-values can be visualized with plot_sliding_window_meta_analysis_p_values.R,
 #           which is currently just a code snippet referencing local filepaths
 
 

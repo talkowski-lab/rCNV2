@@ -76,9 +76,13 @@ task permuted_burden_test {
 
     i=$(( ${perm_idx} + 1 ))
 
-    # Copy CNV data
+    # Copy CNV data and analysis refs
     mkdir cleaned_cnv/
-    gsutil -m cp ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
+    gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
+    gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
+    mkdir refs/
+    gsutil -m cp ${rCNV_bucket}/refs/GRCh37.*.bed.gz refs/
+    gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
     # Shuffle phenotypes for each metacohort CNV dataset, and restrict CNVs from
     # phenotype of relevance
@@ -197,7 +201,7 @@ task permuted_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:47695a0d57921f3ca1bae209f2d51ef8854ab02041689f77c38bb67e32fd8533"
+    docker: "talkowski/rcnv@sha256:65e68e0db79a963e71751d4a9555765cbd7a42aa69d02f44a922e32dfdcd5c00"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
