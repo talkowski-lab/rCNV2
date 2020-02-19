@@ -38,9 +38,11 @@ meta="meta1"
 # General params
 freq_code="rCNV"
 CNV="DEL"
+phenotype_list="refs/test_phenotypes.list"
 metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 gtf="genes/gencode.v19.canonical.gtf.gz"
+rCNV_bucket="gs://rcnv_project"
 pad_controls=0
 weight_mode="weak"
 min_cds_ovr_del=0.1

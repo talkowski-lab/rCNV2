@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens per gene
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_gene_burden_perm_test/versions/3/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_gene_burden_perm_test/versions/4/plain-WDL/descriptor" as scattered_perm
 
 
 workflow gene_burden_analysis {
@@ -289,7 +289,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:65e68e0db79a963e71751d4a9555765cbd7a42aa69d02f44a922e32dfdcd5c00"
+    docker: "talkowski/rcnv@sha256:e218d978db38fba6c8ed9b17ad4d9d9820d73dbbc52e22b28d23f76fade15ab1"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -359,7 +359,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:1701ccd0b0a1bfce7f179441945ba09d43a070aac9147f0c27223c790d4cb24c"
+    docker: "talkowski/rcnv@sha256:e218d978db38fba6c8ed9b17ad4d9d9820d73dbbc52e22b28d23f76fade15ab1"
     preemptible: 1
     memory: "32 GB"
     disks: "local-disk 275 HDD"
@@ -500,7 +500,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:1701ccd0b0a1bfce7f179441945ba09d43a070aac9147f0c27223c790d4cb24c"
+    docker: "talkowski/rcnv@sha256:e218d978db38fba6c8ed9b17ad4d9d9820d73dbbc52e22b28d23f76fade15ab1"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -632,7 +632,7 @@ task prep_refinement {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:1701ccd0b0a1bfce7f179441945ba09d43a070aac9147f0c27223c790d4cb24c"
+    docker: "talkowski/rcnv@sha256:e218d978db38fba6c8ed9b17ad4d9d9820d73dbbc52e22b28d23f76fade15ab1"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"

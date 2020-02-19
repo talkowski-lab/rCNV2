@@ -201,7 +201,7 @@ task permuted_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:65e68e0db79a963e71751d4a9555765cbd7a42aa69d02f44a922e32dfdcd5c00"
+    docker: "talkowski/rcnv@sha256:e218d978db38fba6c8ed9b17ad4d9d9820d73dbbc52e22b28d23f76fade15ab1"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
