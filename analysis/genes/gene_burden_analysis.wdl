@@ -26,6 +26,8 @@ workflow gene_burden_analysis {
   Int max_genes_per_cnv
   Float p_cutoff
   Float meta_secondary_p_cutoff
+  Float meta_or_cutoff
+  Int meta_nominal_cohorts_cutoff
   Int sig_gene_pad
   String rCNV_bucket
 
@@ -278,8 +280,8 @@ task burden_test {
     done < ${metacohort_list}
 
     # Copy results to output bucket
-    gsutil -m cp *.gene_burden.counts.bed.gz* \
-      "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/counts/"
+    # gsutil -m cp *.gene_burden.counts.bed.gz* \
+    #   "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/counts/"
     gsutil -m cp *.gene_burden.stats.bed.gz* \
       "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/stats/"
     gsutil -m cp *.gene_burden.*.png \
@@ -296,8 +298,8 @@ task burden_test {
   output {
     Array[File] stats_beds = glob("*.gene_burden.stats.bed.gz")
     Array[File] stats_bed_idxs = glob("*.gene_burden.stats.bed.gz.tbi")
-    Array[File] count_beds = glob("*.gene_burden.counts.bed.gz")
-    Array[File] count_bed_idxs = glob("*.gene_burden.counts.bed.gz.tbi")
+    # Array[File] count_beds = glob("*.gene_burden.counts.bed.gz")
+    # Array[File] count_bed_idxs = glob("*.gene_burden.counts.bed.gz.tbi")
   }
 }
 
@@ -321,7 +323,6 @@ task calc_meta_p_cutoff {
     # Gather all permutation results and compute FDR CDFs
     mkdir perm_res/
     while read prefix hpo; do
-      echo -e "\nSTARTING $prefix\n"
       gsutil -m cp \
         "${rCNV_bucket}/analysis/gene_burden/$prefix/${freq_code}/permutations/$prefix.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.perm_*.bed.gz" \
         perm_res/
@@ -336,15 +337,12 @@ task calc_meta_p_cutoff {
         > perm_res/$prefix.${freq_code}.${CNV}.gene_burden.meta_analysis.permuted_p_values.$i.txt
       done
       rm perm_res/$prefix.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.perm_*.bed.gz
-      echo -e "\nFINISHED $prefix\n"
     done < ${phenotype_list}
-    echo -e "\nMAKING P-VALUE MATRIX\n"
     paste perm_res/*.gene_burden.meta_analysis.permuted_p_values.*.txt \
     | gzip -c \
     > ${freq_code}.${CNV}.permuted_pval_matrix.txt.gz
 
     # Analyze p-values and compute FDR
-    echo -e "\nANALYZING P-VALUE MATRIX\n"
     /opt/rCNV2/analysis/sliding_windows/calc_empirical_fdr.R \
       --cnv ${CNV} \
       --fdr-target ${fdr_target} \
@@ -361,7 +359,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:65e68e0db79a963e71751d4a9555765cbd7a42aa69d02f44a922e32dfdcd5c00"
+    docker: "talkowski/rcnv@sha256:1701ccd0b0a1bfce7f179441945ba09d43a070aac9147f0c27223c790d4cb24c"
     preemptible: 1
     memory: "32 GB"
     disks: "local-disk 275 HDD"
@@ -502,7 +500,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:65e68e0db79a963e71751d4a9555765cbd7a42aa69d02f44a922e32dfdcd5c00"
+    docker: "talkowski/rcnv@sha256:1701ccd0b0a1bfce7f179441945ba09d43a070aac9147f0c27223c790d4cb24c"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -529,7 +527,7 @@ task prep_refinement {
     set -e
 
     # Copy p-value cutoff tables
-    find / -name "*sliding_window.${freq_code}.*.empirical_genome_wide_pval.hpo_cutoffs.tsv*" \
+    find / -name "*gene_burden.${freq_code}.*.empirical_genome_wide_pval.hpo_cutoffs.tsv*" \
     | xargs -I {} mv {} ./
 
     # Download all meta-analysis stats files and necessary data
@@ -634,12 +632,11 @@ task prep_refinement {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:a96cc89624ac64474737d020ccba7484a406899e46268d5103a240f618d02b20"
+    docker: "talkowski/rcnv@sha256:1701ccd0b0a1bfce7f179441945ba09d43a070aac9147f0c27223c790d4cb24c"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
     disks: "local-disk 50 HDD"
   }
 }
-
 

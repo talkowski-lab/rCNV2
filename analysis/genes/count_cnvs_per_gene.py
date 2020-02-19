@@ -179,6 +179,9 @@ def overlap_cnvs_exons(cnvbt, exonbt, cds_dict, weight_mode, min_cds_ovr, max_ge
             cds_ovr = ovrbp / cds_dict[gene]
             if cds_ovr >= min_cds_ovr:
                 cnv_weights[cnvid][gene] = cds_ovr
+            # If overlap is less than required, remove cnv from cnvs_per_gene
+            else:
+                cnvs_per_gene[gene] = [c for c in cnvs_per_gene[gene] if c != cnvid]
 
     # Weight CNVs
     for cnvid in cnv_cds_sums.keys():

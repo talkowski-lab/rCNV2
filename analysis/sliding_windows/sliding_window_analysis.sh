@@ -571,33 +571,52 @@ while read meta; do
 done < <( cut -f1 ${metacohort_list} | fgrep -v "mega" )\
 > window_refinement.${freq_code}_metacohort_info.tsv
 
-
 # Refine associations within regions from above
 for CNV in DEL DUP; do
+  # Dev parameters (do not copy to WDL)
+  regions_to_refine=${freq_code}.${CNV}.sig_regions_to_refine.bed.gz
+  pval_matrix=${CNV}.pval_matrix.bed.gz
+  labeled_windows=${freq_code}.${CNV}.all_windows_labeled.bed.gz
+
   for contig in $( seq 1 22 ); do
-    /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
-      --cnv-type ${CNV} \
-      --model ${meta_model_prefix} \
-      --hpo-p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv \
-      --p-cutoff-ladder sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.ncase_cutoff_ladder.tsv \
-      --p-is-phred \
-      --secondary-p-cutoff ${meta_secondary_p_cutoff} \
-      --min-or-lower ${meta_or_cutoff} \
-      --retest-min-or-lower ${meta_or_cutoff} \
-      --max-cnv-size ${refine_max_cnv_size} \
-      --min-nominal ${meta_nominal_cohorts_cutoff} \
-      --secondary-or-nom \
-      --credible-interval ${credible_interval} \
-      --prefix "${freq_code}_${CNV}" \
-      --log ${freq_code}.${CNV}.region_refinement.${contig}.log \
-      regions_to_refine.bed.gz \
-      ${metacohort_info_tsv} \
-      pval_matrix.bed.gz \
-      labeled_windows.bed.gz \
-      ${freq_code}.${CNV}.final_regions.associations.${contig}.bed \
-      ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
-    bgzip -f ${freq_code}.$CNV.final_regions.associations.${contig}.bed
-    bgzip -f ${freq_code}.$CNV.final_regions.loci.${contig}.bed
+    # Tabix input to single chromosome
+    tabix -f ${regions_to_refine}
+    tabix -h ${regions_to_refine} ${contig} | bgzip -c > regions_to_refine.bed.gz
+    tabix -f ${pval_matrix}
+    tabix -h ${pval_matrix} ${contig} | bgzip -c > pval_matrix.bed.gz
+    tabix -f ${labeled_windows}
+    tabix -h ${labeled_windows} ${contig} | bgzip -c > labeled_windows.bed.gz
+    
+    # Perform refinement
+    if [ $( zcat regions_to_refine.bed.gz | fgrep -v "#" | wc -l ) -gt 0 ]; then
+      /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
+        --cnv-type ${CNV} \
+        --model ${meta_model_prefix} \
+        --hpo-p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv \
+        --p-cutoff-ladder sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.ncase_cutoff_ladder.tsv \
+        --p-is-phred \
+        --secondary-p-cutoff ${meta_secondary_p_cutoff} \
+        --min-or-lower ${meta_or_cutoff} \
+        --retest-min-or-lower ${meta_or_cutoff} \
+        --max-cnv-size ${refine_max_cnv_size} \
+        --min-nominal ${meta_nominal_cohorts_cutoff} \
+        --secondary-or-nom \
+        --credible-interval ${credible_interval} \
+        --prefix "${freq_code}_${CNV}" \
+        --log ${freq_code}.${CNV}.region_refinement.${contig}.log \
+        regions_to_refine.bed.gz \
+        ${metacohort_info_tsv} \
+        pval_matrix.bed.gz \
+        labeled_windows.bed.gz \
+        ${freq_code}.${CNV}.final_regions.associations.${contig}.bed \
+        ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
+    else
+      touch ${freq_code}.${CNV}.final_regions.associations.${contig}.bed
+      touch ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
+      touch ${freq_code}.${CNV}.region_refinement.${contig}.log
+    fi
+    bgzip -f ${freq_code}.${CNV}.final_regions.associations.${contig}.bed
+    bgzip -f ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
   done
 done
 

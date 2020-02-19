@@ -38,24 +38,23 @@ meta="meta1"
 # General params
 freq_code="rCNV"
 CNV="DEL"
-phenotype_list="refs/test_phenotypes.list"
 metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
-rCNV_bucket="gs://rcnv_project"
 gtf="genes/gencode.v19.canonical.gtf.gz"
 pad_controls=0
 weight_mode="weak"
 min_cds_ovr_del=0.1
-min_cds_ovr_dup=1.0
+min_cds_ovr_dup=0.5
 max_genes_per_cnv=20000
 p_cutoff=0.000002896368
+n_pheno_perms=50
 meta_model_prefix="re"
+i=1
 
 
 # Count CNVs in cases and controls per phenotype, split by metacohort and CNV type
 # Iterate over phenotypes
-while read prefix hpo; do
-
+while read pheno hpo; do
   # Set HPO-specific parameters
   descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
              | awk -v FS="\t" '{ print $2 }' )
@@ -156,48 +155,12 @@ while read prefix hpo; do
       "$meta.${prefix}.${freq_code}.DEL.gene_burden.stats.bed.gz" \
       "$meta.${prefix}.${freq_code}.gene_burden"
   done < ${metacohort_list}
-done < refs/test_phenotypes.list
+done < ${phenotype_list}
 
 
 
 
-# Run phenotype permutation to determine empirical FDR cutoff
-# Test/dev parameters
-# Params for seizures
-hpo="HP:0001250"
-prefix="HP0001250"
-meta="meta2"
-# Params for NDDs
-hpo="HP:0012759"
-prefix="HP0012759"
-meta="meta1"
-# General params
-freq_code="rCNV"
-CNV="DEL"
-metacohort_list="refs/rCNV_metacohort_list.txt"
-metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
-gtf="genes/gencode.v19.canonical.gtf.gz"
-pad_controls=0
-weight_mode="weak"
-min_cds_ovr_del=0.1
-min_cds_ovr_dup=1.0
-max_genes_per_cnv=20000
-p_cutoff=0.000002896368
-n_pheno_perms=50
-meta_model_prefix="re"
-i=1
-
-# Copy all filtered CNV data, sliding windows, and other references 
-# from the project Google Bucket (note: requires permissions)
-gcloud auth login
-mkdir cleaned_cnv/
-gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
-gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
-mkdir refs/
-gsutil -m cp ${rCNV_bucket}/refs/GRCh37.*.bed.gz refs/
-gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
-
-# Count CNVs in cases and controls per phenotype, split by metacohort and CNV type
+# Permute CNVs in cases and controls per phenotype, split by metacohort and CNV type
 # Iterate over phenotypes
 while read prefix hpo; do
   for i in $( seq 1 ${n_pheno_perms} ); do
@@ -310,12 +273,11 @@ while read prefix hpo; do
       tabix -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.perm_$i.bed.gz
 
   done
-done < refs/test_phenotypes.list
+done < ${phenotype_list}
 
 # Gather all permutation results and compute FDR CDFs
 mkdir perm_res/
 while read prefix hpo; do
-  echo -e "\nSTARTING $prefix\n"
   gsutil -m cp \
     "${rCNV_bucket}/analysis/gene_burden/$prefix/${freq_code}/permutations/$prefix.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.perm_*.bed.gz" \
     perm_res/
@@ -330,15 +292,12 @@ while read prefix hpo; do
     > perm_res/$prefix.${freq_code}.${CNV}.gene_burden.meta_analysis.permuted_p_values.$i.txt
   done
   rm perm_res/$prefix.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.perm_*.bed.gz
-  echo -e "\nFINISHED $prefix\n"
 done < ${phenotype_list}
-echo -e "\nMAKING P-VALUE MATRIX\n"
 paste perm_res/*.gene_burden.meta_analysis.permuted_p_values.*.txt \
 | gzip -c \
 > ${freq_code}.${CNV}.permuted_pval_matrix.txt.gz
 
 # Analyze p-values and compute FDR
-echo -e "\nANALYZING P-VALUE MATRIX\n"
 /opt/rCNV2/analysis/sliding_windows/calc_empirical_fdr.R \
   --cnv ${CNV} \
   --fdr-target ${fdr_target} \
@@ -604,5 +563,82 @@ while read meta; do
   echo -e "$meta\tcleaned_cnv/$meta.${freq_code}.bed.gz\tphenos/$meta.cleaned_phenos.txt"
 done < <( cut -f1 ${metacohort_list} | fgrep -v "mega" )\
 > gene_refinement.${freq_code}_metacohort_info.tsv
+
+# Refine associations within genes from above
+# Test/dev parameters
+freq_code="rCNV"
+CNV="DEL"
+contig=17
+phenotype_list="refs/test_phenotypes.list"
+metacohort_list="refs/rCNV_metacohort_list.txt"
+metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
+metacohort_info_tsv="gene_refinement.${freq_code}_metacohort_info.tsv"
+rCNV_bucket="gs://rcnv_project"
+gtf="genes/gencode.v19.canonical.gtf.gz"
+meta_p_cutoff=0.000002896368
+meta_secondary_p_cutoff=0.05
+meta_or_cutoff=1
+meta_nominal_cohorts_cutoff=2
+meta_model_prefix="re"
+pad_controls=0
+min_cds_ovr=0.1
+sig_gene_pad=1000000
+refine_max_cnv_size=3000000
+genes_to_refine=${freq_code}.${CNV}.sig_genes_to_refine.bed.gz
+pval_matrix=${CNV}.pval_matrix.bed.gz
+labeled_genes=${freq_code}.${CNV}.all_genes_labeled.bed.gz
+
+for CNV in DEL DUP; do
+
+  for contig in $( seq 1 22 ); do
+    # Tabix input to single chromosome
+    tabix -f ${genes_to_refine}
+    tabix -h ${genes_to_refine} ${contig} | bgzip -c > genes_to_refine.bed.gz
+    tabix -f ${pval_matrix}
+    tabix -h ${pval_matrix} ${contig} | bgzip -c > pval_matrix.bed.gz
+    tabix -f ${labeled_genes}
+    tabix -h ${labeled_genes} ${contig} | bgzip -c > labeled_genes.bed.gz
+    tabix -f ${gtf}
+    tabix -h ${gtf} ${contig} | gzip -c > ${contig}.gtf.gz
+
+    # Perform refinement
+    if [ $( zcat genes_to_refine.bed.gz | fgrep -v "#" | wc -l ) -gt 0 ]; then
+      /opt/rCNV2/analysis/genes/refine_significant_genes.py \
+        --cnv-type ${CNV} \
+        --pad-controls ${pad_controls} \
+        --min-cds-ovr ${min_cds_ovr} \
+        --max-genes ${max_genes_per_cnv} \
+        --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
+        --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+        --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
+        --model ${meta_model_prefix} \
+        --hpo-p-cutoffs sliding_gene.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv \
+        --p-cutoff-ladder sliding_gene.${freq_code}.${CNV}.empirical_genome_wide_pval.ncase_cutoff_ladder.tsv \
+        --p-is-phred \
+        --secondary-p-cutoff ${meta_secondary_p_cutoff} \
+        --min-or-lower ${meta_or_cutoff} \
+        --retest-min-or-lower ${meta_or_cutoff} \
+        --max-cnv-size ${refine_max_cnv_size} \
+        --min-nominal ${meta_nominal_cohorts_cutoff} \
+        --secondary-or-nom \
+        --prefix "${freq_code}_${CNV}" \
+        --log ${freq_code}.${CNV}.gene_refinement.${contig}.log \
+        genes_to_refine.bed.gz \
+        ${contig}.gtf.gz \
+        ${metacohort_info_tsv} \
+        pval_matrix.bed.gz \
+        labeled_genes.bed.gz \
+        ${freq_code}.${CNV}.final_genes.associations.${contig}.bed \
+        ${freq_code}.${CNV}.final_genes.loci.${contig}.bed
+    else
+      touch ${freq_code}.${CNV}.final_genes.associations.${contig}.bed
+      touch ${freq_code}.${CNV}.final_genes.loci.${contig}.bed
+      touch ${freq_code}.${CNV}.gene_refinement.${contig}.log
+    fi
+    bgzip -f ${freq_code}.${CNV}.final_genes.associations.${contig}.bed
+    bgzip -f ${freq_code}.${CNV}.final_genes.loci.${contig}.bed
+  done
+done
+
 
 
