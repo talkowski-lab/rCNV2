@@ -359,7 +359,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e218d978db38fba6c8ed9b17ad4d9d9820d73dbbc52e22b28d23f76fade15ab1"
+    docker: "talkowski/rcnv@sha256:89bf370a55c031dcebf0884324c8352d289946908a4fe0430e50d2bf9de2d6e1"
     preemptible: 1
     memory: "32 GB"
     disks: "local-disk 275 HDD"
@@ -500,7 +500,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e218d978db38fba6c8ed9b17ad4d9d9820d73dbbc52e22b28d23f76fade15ab1"
+    docker: "talkowski/rcnv@sha256:89bf370a55c031dcebf0884324c8352d289946908a4fe0430e50d2bf9de2d6e1"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -607,15 +607,11 @@ task prep_refinement {
     bgzip -f ${freq_code}.${CNV}.all_genes_labeled.bed
     bgzip -f ${freq_code}.${CNV}.significant_genes.bed
 
-    # Define regions to be refined (sig genes padded by $sig_gene_pad and merged)
-    zcat ${freq_code}.${CNV}.significant_genes.bed.gz \
-    | fgrep -v "#" \
-    | awk -v buf=${sig_gene_pad} -v OFS="\t" '{ print $1, $2-buf, $3+buf, $4 }' \
-    | awk -v OFS="\t" '{ if ($2<0) $2=0; print $1, $2, $3, $4 }' \
-    | sort -Vk1,1 -k2,2V -k3,3V \
-    | bedtools merge -c 4 -o distinct -i - \
-    | bgzip -c \
-    > ${freq_code}.${CNV}.sig_genes_to_refine.bed.gz
+    # Cluster blocks of significant genes to be refined
+    /opt/rCNV2/analysis/genes/cluster_gene_blocks.py \
+      --bgzip \
+      --outfile ${freq_code}.${CNV}.sig_gene_blocks_to_refine.bed.gz \
+      ${freq_code}.${CNV}.all_genes_labeled.bed.gz
 
     # Prep input file for locus refinement
     while read meta; do
@@ -625,14 +621,15 @@ task prep_refinement {
   >>>
 
   output {
-    File genes_to_refine = "${freq_code}.${CNV}.sig_genes_to_refine.bed.gz"
+    File genes_to_refine = "${freq_code}.${CNV}.sig_gene_blocks_to_refine.bed.gz"
     File metacohort_info_tsv = "gene_refinement.${freq_code}_metacohort_info.tsv"
     File pval_matrix = "${CNV}.pval_matrix.bed.gz"
     File labeled_genes = "${freq_code}.${CNV}.all_genes_labeled.bed.gz"
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e218d978db38fba6c8ed9b17ad4d9d9820d73dbbc52e22b28d23f76fade15ab1"
+    # TODO: update docker
+    # docker: "talkowski/rcnv@sha256:89bf370a55c031dcebf0884324c8352d289946908a4fe0430e50d2bf9de2d6e1"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"

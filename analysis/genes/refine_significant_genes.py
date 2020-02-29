@@ -15,7 +15,12 @@ import gzip
 import pandas as pd
 import pybedtools as pbt
 import csv
+from operator import itemgetter
 import numpy as np
+import tempfile
+import subprocess
+from math import sqrt
+from scipy.stats import norm
 import argparse
 from sys import stdout
 
@@ -95,9 +100,60 @@ def load_pvalues(pvalues_bed, sig_genes, cnv_type, p_is_phred=False):
             if pval < best_p:
                 best_p = pval
                 best_hpo = hpo
+        sig_genes[gene]['best_p'] = best_p
         sig_genes[gene]['best_hpo'] = best_hpo
 
     return pvals_df, sig_genes
+
+
+def load_gene_blocks(blocks_in, sig_genes, prefix):
+    """
+    Load BED file of significant gene blocks to refine, and annotate with HPOs & pvalues
+    """
+
+    blocks = {}
+
+    if path.splitext(blocks_in)[1] in '.gz .bgz .bgzip'.split():
+        fin = gzip.open(blocks_in, 'rt')
+    else:
+        fin = open(blocks_in)
+
+    i = 0
+    reader = csv.reader(fin, delimiter='\t')
+    for chrom, start, end, genes in reader:
+        i += 1
+        block_id = '_'.join([prefix, 'gene_block', str(i)])
+        genes = genes.split(',')
+
+        # Determine sentinel gene & stats
+        best_p = 1
+        best_hpo = None
+        sent_hpos = None
+        sent_gene = None
+        equal_sent_genes = []
+        for gene in genes:
+            hpo_gene = sig_genes[gene]['best_hpo']
+            p_gene = sig_genes[gene]['pvals'][hpo_gene]
+            if p_gene < best_p:
+                best_p = p_gene
+                best_hpo = hpo_gene
+                sent_hpos = sig_genes[gene]['sig_hpos']
+                sent_gene = gene
+            elif p_gene == best_p:
+                equal_sent_genes.append(gene)
+
+        all_hpos = [g for l in [sig_genes[gene]['sig_hpos'] for gene in genes] for g in l]
+
+        blocks[block_id] = {'chrom' : chrom, 'start' : start, 'end' : end, 
+                            'genes' : genes,
+                            'sent_gene' : sent_gene,
+                            'equal_sent_genes' : equal_sent_genes,
+                            'sent_best_p' : best_p,
+                            'sent_best_hpo' : best_hpo,
+                            'sent_hpos' : sent_hpos,
+                            'block_hpos' : sorted(list(set(all_hpos)))}
+
+    return blocks
 
 
 def process_gtf(gtf_in, sig_genes, bl_list, logfile, xcov=0.3):
@@ -180,13 +236,18 @@ def process_gtf(gtf_in, sig_genes, bl_list, logfile, xcov=0.3):
     txbt = gtfbt.filter(lambda x: x.fields[2] == 'transcript').saveas()
     exonbt = gtfbt.filter(lambda x: x.fields[2] == 'exon').saveas()
 
+    # Add coordinate info to sig_genes
+    for gene in sig_genes.keys():
+        sig_genes[gene]['txbt'] = txbt.filter(lambda x: x.attrs['gene_name'] == gene).saveas()
+        sig_genes[gene]['exonbt'] = exonbt.filter(lambda x: x.attrs['gene_name'] == gene).saveas()
+
     # Report results of loaded genes
     msg = '  * Loaded {:,} {}'
     print(msg.format(len(txbt), 'transcripts'), file=logfile)
     print(msg.format(len(exonbt), 'exons'), file=logfile)
     print(msg.format(len(genes), 'gene symbols') + '\n', file=logfile)
 
-    return gtfbt, txbt, exonbt, genes, transcripts, cds_dict
+    return gtfbt, txbt, exonbt, genes, transcripts, cds_dict, sig_genes
 
 
 def overlap_cnvs_exons(cnvbt, exonbt, cds_dict, min_cds_ovr, max_genes):
@@ -236,8 +297,6 @@ def overlap_cnvs_exons(cnvbt, exonbt, cds_dict, min_cds_ovr, max_genes):
                 else:
                     genes_per_cnv[cnvid].append(gene)
 
-    import pdb; pdb.set_trace()
-
     # Exclude CNVs based on overlapping more than max_genes
     cnvs_to_exclude = [cid for cid, genes in genes_per_cnv.items() \
                        if len(genes) > max_genes]
@@ -284,7 +343,9 @@ def load_cnvs(cnv_bed, cnv_type, exonbt, cds_dict, min_cds_ovr, max_genes,
     genes_per_cnv, cnvs_per_gene = overlap_cnvs_exons(cnvs, exonbt, cds_dict, 
                                                       min_cds_ovr, max_genes)
 
-    return cnvs, genes_per_cnv, cnvs_per_gene
+    cnv_hpos = { c.name : c[5].split(';') for c in cnvs }
+
+    return cnvs, genes_per_cnv, cnvs_per_gene, cnv_hpos
 
 
 def load_hpos(hpo_file):
@@ -314,13 +375,14 @@ def load_cohort_info(info_file, cnv_type, exonbt, cds_dict, min_cds_ovr,
         reader = csv.reader(fin, delimiter='\t')
 
         for cohort, cnv_bed, hpo_file in reader:
-            cnvs, genes_per_cnv, cnvs_per_gene \
+            cnvs, genes_per_cnv, cnvs_per_gene, cnv_hpos \
                 = load_cnvs(cnv_bed, cnv_type, exonbt, cds_dict, min_cds_ovr, 
                             max_genes, control_hpo, cohort, pad_controls)
             hpos = load_hpos(hpo_file)
             cohort_info[cohort] = {'cnvs' : cnvs,
                                    'genes_per_cnv' : genes_per_cnv,
                                    'cnvs_per_gene' : cnvs_per_gene,
+                                   'cnv_hpos' : cnv_hpos,
                                    'hpos' : hpos}
 
     return cohort_info
@@ -344,6 +406,275 @@ def load_p_cutoffs(p_cutoffs_in):
     return p_cutoffs
 
 
+def print_block_info(blocks, blockid, sig_genes, logfile):
+    """
+    Print basic gene block info prior to refinement
+    """
+
+    print('Beginning refinement of {0}...'.format(blockid), file=logfile)
+
+    binfo = blocks[blockid]
+    ngenes = len(binfo['genes'])
+    if ngenes == 1:
+        ven = 'gene'
+    else:
+        ven = 'genes'
+    block_size = int(binfo['end']) - int(binfo['start'])
+    n_hpos = len(binfo['block_hpos'])
+    genes_w_pvals = [(gene, sig_genes[gene]['best_p']) for gene in binfo['genes']]
+    sorted_genes = sorted(genes_w_pvals, key=itemgetter(1))
+    genes_w_pvals_fmt = ', '.join(['{} ({:.2E})'.format(g, p) for g, p in sorted_genes])
+    
+    msg = '  * Block of {:,} significant {} spanning {:,} kb ({}:{:,}-{:,})'
+    print(msg.format(ngenes, ven, int(round(block_size / 1000)), binfo['chrom'],
+                     int(binfo['start']), int(binfo['end'])), file=logfile)
+
+    msg = '  * Associated with {:,} phenotypes ({})'
+    print(msg.format(n_hpos, ', '.join(binfo['block_hpos'])), file=logfile)
+
+    msg = '  * Significant genes (ordered by best P-value): {}'
+    print(msg.format(genes_w_pvals_fmt), file=logfile)
+
+
+def get_cohort_cnvs(cohorts, in_genes, ex_genes, in_hpos, cnvs_to_ignore=[]):
+    """
+    Get list of CNVs per metacohort meeting the following criteria
+    1. CNV is not in cnvs_to_ignore
+    2. CNV has phenotype in in_hpos
+    3. CNV hits in_genes
+    4. CNV _does not hit_ ex_genes
+    """
+
+    cohort_cnvs = {m : [] for m in cohorts.keys()}
+    
+    for cohort in cohorts.keys():
+        for cnv, cnvgenes in cohorts[cohort]['genes_per_cnv'].items():
+            if cnv not in cnvs_to_ignore \
+            and len([h for h in cohorts[cohort]['cnv_hpos'][cnv] if h in in_hpos]) > 0 \
+            and len([g for g in cnvgenes if g in in_genes]) > 0 \
+            and len([g for g in cnvgenes if g in ex_genes]) == 0:
+                cohort_cnvs[cohort].append(cnv)
+
+    return cohort_cnvs
+
+
+def get_cc_counts(cohorts, case_hpos, control_hpos):
+    """
+    Parses per-cohort sample phenotypes to count effective cases and controls
+    """
+
+    def _count_samples(samples, hpos):
+        k = 0
+        for sample in samples:
+            for hpo in sample:
+                if hpo in hpos:
+                    k += 1
+                    break
+        return k
+
+    cc_counts = {}
+
+    for cohort in cohorts.items():
+        n_case = _count_samples(cohort[1]['hpos'], case_hpos)
+        n_control = _count_samples(cohort[1]['hpos'], control_hpos)
+        cc_counts[cohort[0]] = {'n_case' : n_case,
+                                'n_control' : n_control}
+
+    return cc_counts
+
+
+def meta_analysis(model, cohorts, cnv_dict, n_sample_dict):
+    """
+    Perform random-effects or Mantel-Haenszel meta-analysis
+
+    Wraps subprocess.call() to the Rscript used for discovery meta-analysis
+    This is necessary to ensure mathematical consistency
+    """
+
+    # Compute case/control alts
+    n_control = [d['n_control'] for d in n_sample_dict.values()]
+    n_case = [d['n_case'] for d in n_sample_dict.values()]
+    n_control_alt = [d['n_control'] for d in cnv_dict.values()]
+    n_case_alt = [d['n_case'] for d in cnv_dict.values()]
+    n_case_ref = list(np.array(n_case) - np.array(n_case_alt))
+    n_control_ref = list(np.array(n_control) - np.array(n_control_alt))
+    
+    cohort_idxs = list(range(0, len(cohorts)))
+
+    # Wraps Rscript call in context of temporary directory for easy cleanup
+    colnames = '#chr start end gene case_alt case_ref control_alt control_ref fisher_phred_p'
+    in_header = '\t'.join(colnames.split())
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Writes input files for meta-analysis script
+        m_fn = tmpdir + '/meta.in.tsv'
+        m_fin = open(m_fn, 'w')    
+        for i in cohort_idxs:
+            tmp_fn = '{}/{}.tmp'.format(tmpdir, cohorts[i])
+            tmp_fin = open(tmp_fn, 'w')
+            tmp_fin.write(in_header + '\n')
+            counts = [n_case_alt[i], n_case_ref[i], 
+                      n_control_alt[i], n_control_ref[i]]
+            dummy = '1 1 2 dummy'.split() + [str(x) for x in counts] + ['1']
+            tmp_fin.write('\t'.join(dummy) + '\n')
+            tmp_fin.close()
+            m_fin.write('{}\t{}\n'.format(cohorts[i], tmp_fn))
+        m_fin.close()
+
+        # Calls Rscript
+        script = '/'.join([path.dirname(path.realpath(__file__)),
+                           'gene_meta_analysis.R'])
+        m_fo = tmpdir + '/meta.out.tsv'
+        cstr = '{} --model {} --p-is-phred {} {}'
+        subprocess.call(cstr.format(script, model, m_fn, m_fo), shell=True)
+
+        # Read results back into python
+        res = pd.read_csv(m_fo, delim_whitespace=True)
+        pval = 10 ** -float(res['meta_phred_p'])
+        oddsratio = float(res['meta_lnOR'])
+        oddsratio_ci = [float(res['meta_lnOR_lower']), 
+                        float(res['meta_lnOR_upper'])]
+        oddsratio_se = ((oddsratio_ci[1] - oddsratio_ci[0]) / 2) / 1.96
+        chisq = float(res.iloc[:, -2])
+
+    return oddsratio, oddsratio_ci, oddsratio_se, chisq, pval
+
+
+def compare_geneset_oddsratios(cred_genes, other_genes, cred_hpos, cohorts, 
+                               meta_model, control_hpo):
+    """
+    Compare odds ratios of cred_genes vs other_genes for cred_hpos
+    """
+
+    # Get case CNVs specific to cred genes and to other genes
+    cred_case_cnvs = get_cohort_cnvs(cohorts, cred_genes, other_genes, cred_hpos)
+    other_case_cnvs = get_cohort_cnvs(cohorts, other_genes, cred_genes, cred_hpos)
+
+    # # Get case CNVs that hit (but not specific to) cred genes and to other genes
+    # cred_case_cnvs = get_cohort_cnvs(cohorts, cred_genes, [], cred_hpos)
+    # other_case_cnvs = get_cohort_cnvs(cohorts, other_genes, [], cred_hpos)
+
+    # Get control CNVs that are specific to cred genes and to other genes
+    cred_control_cnvs = get_cohort_cnvs(cohorts, cred_genes, other_genes, [control_hpo])
+    other_control_cnvs = get_cohort_cnvs(cohorts, other_genes, cred_genes, [control_hpo])
+
+    # # Get control CNVs that hit (but not specific to) cred genes and other genes
+    # cred_control_cnvs = get_cohort_cnvs(cohorts, cred_genes, [], [control_hpo])
+    # other_control_cnvs = get_cohort_cnvs(cohorts, other_genes, [], [control_hpo])
+
+    # Summarize CNV counts
+    cred_cnvs = {}
+    other_cnvs = {}
+    for cohort in cohorts.keys():
+        cred_cnvs[cohort] = {'n_case' : len(cred_case_cnvs[cohort]),
+                             'n_control' : len(cred_control_cnvs[cohort])}
+        other_cnvs[cohort] = {'n_case' : len(other_case_cnvs[cohort]),
+                              'n_control' : len(other_control_cnvs[cohort])}
+
+    # Get effective number of cases and controls per cohort
+    cc_counts = get_cc_counts(cohorts, cred_hpos, [control_hpo])
+
+    # Compute meta-analysis odds ratios
+    cred_or, cred_or_ci, cred_or_se, cred_chisq, cred_p \
+        = meta_analysis(meta_model, list(cohorts.keys()), cred_cnvs, cc_counts)
+    other_or, other_or_ci, other_or_se, other_chisq, other_p \
+        = meta_analysis(meta_model, list(cohorts.keys()), other_cnvs, cc_counts)
+
+    # Compare ORs and compute p-value
+    diff = cred_or - other_or
+    pooled_se = sqrt((cred_or_se ** 2) + (other_or_se ** 2))
+    diff_z = diff / pooled_se
+    diff_p = norm.sf(diff_z)
+
+    if not np.isnan(cred_or):
+        import pdb; pdb.set_trace()
+
+    return cred_or, cred_or_se, other_or, other_or_se, diff_z, diff_p
+
+
+def compare_oddsratio_vs_null(cred_genes, other_genes, cred_hpos, cohorts, 
+                               meta_model, control_hpo):
+    """
+    Compare odds ratios of CNVs specific to cred_genes vs other_genes for cred_hpos
+    """
+
+    # Get case & control CNVs specific to cred genes
+    cred_case_cnvs = get_cohort_cnvs(cohorts, cred_genes, other_genes, cred_hpos)
+    cred_control_cnvs = get_cohort_cnvs(cohorts, cred_genes, other_genes, [control_hpo])
+
+    # Summarize CNV counts
+    cred_cnvs = {}
+    for cohort in cohorts.keys():
+        cred_cnvs[cohort] = {'n_case' : len(cred_case_cnvs[cohort]),
+                             'n_control' : len(cred_control_cnvs[cohort])}
+
+    # Get effective number of cases and controls per cohort
+    cc_counts = get_cc_counts(cohorts, cred_hpos, [control_hpo])
+
+    # Compute meta-analysis odds ratios
+    cred_or, cred_or_ci, cred_or_se, cred_chisq, cred_p \
+        = meta_analysis(meta_model, list(cohorts.keys()), cred_cnvs, cc_counts)
+
+    return cred_or, cred_or_se, cred_chisq, cred_p
+
+
+def refine_block(binfo, blockid, sig_genes, cohorts, meta_model, compare, 
+                 control_hpo, logfile):
+    """
+    Wrapper function to conduct all refinement steps for a single block
+    """
+
+    # Order genes by best p-value
+    genes_w_pvals = [(gene, sig_genes[gene]['best_p']) for gene in binfo['genes']]
+    sorted_genes = sorted(genes_w_pvals, key=itemgetter(1))
+    genes = [g for g, p in sorted_genes]
+    ngenes = len(genes)
+
+    # Add genes to credible set one at a time until OR is significant after Bonf. 
+    # correction for number of tests performed
+    p = 1
+    k = 1
+    threshold = 0.05
+    while p >= threshold / k and k < ngenes:
+        # Define genes in & out of credible set and other metadata
+        cred_genes = genes[0:k]
+        other_genes = genes[k:ngenes]
+        # cred_hpos = [sig_genes[g]['sig_hpos'] for g in cred_genes]
+        # cred_hpos = list(set([h for l in cred_hpos for h in l]))
+        cred_hpos = binfo['block_hpos']
+
+        # Compare OR of cred_genes vs other_genes for cred_hpos
+        if compare == 'other':
+            cred_or, cred_or_se, other_or, other_or_se, diff_z, p \
+                = compare_geneset_oddsratios(cred_genes, other_genes, cred_hpos, 
+                                             cohorts, meta_model, control_hpo)
+
+            # Print logging results:
+            msg = '  * Evaluating {:,}-gene credible set (OR = {:.2} ± {:.2}) vs. ' + \
+                  'other {} genes (OR = {:.2} ± {:.2}): Z = {:.2}, P = {:.2E}'
+            print(msg.format(len(cred_genes), cred_or, cred_or_se, len(other_genes),
+                             other_or, other_or_se, diff_z, p), file=logfile)
+        # Otherwise, compare OR of cred_genes vs null of OR = 1
+        elif compare == 'null':
+            cred_or, cred_or_se, chisq, p \
+                = compare_oddsratio_vs_null(cred_genes, other_genes, cred_hpos, 
+                                            cohorts, meta_model, control_hpo)
+
+            # Print logging results:
+            msg = '  * Evaluating {:,}-gene credible set (OR = {:.2} ± {:.2}) vs. ' + \
+                  'null (OR = 1): R-E meta chisq = {:.2}, P = {:.2E}'
+            print(msg.format(len(cred_genes), cred_or, cred_or_se, chisq, p), file=logfile)
+
+        if np.isnan(p):
+            p = 1
+
+        k += 1
+
+    if k < ngenes:
+        print('Success!\n', file=logfile)
+    else:
+        print('Unable to prune any genes...\n', file=logfile)
+
+
 def main():
     """
     Main block
@@ -353,7 +684,7 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('genes', help='BED file of blocks of genes to refine.')
+    parser.add_argument('blocks', help='BED file of blocks of genes to refine.')
     parser.add_argument('gtf', help='GTF of genes to consider.')
     parser.add_argument('cohort_info', help='Three-column TSV file specifying ' +
                         'cohort name, path to CNV BED file, and path to sample-' +
@@ -386,6 +717,9 @@ def main():
                         default=0.3)
     parser.add_argument('--model', help='Meta-analysis model to use. [default: "re"]', 
                         default='re', choices=['mh', 're'])
+    parser.add_argument('--comparison', dest='compare', help='Comparison to perform ' +
+                        'for refinement. [default: compare to other genes]', 
+                        default='other', choices=['other', 'null'])
     parser.add_argument('--hpo-p-cutoffs', help='.tsv of p-value cutoffs per phenotype. ' + 
                         '[default: 10e-8 for all phenotypes]')
     parser.add_argument('--p-cutoff-ladder', help='.tsv of p-value cutoffs for a ' + 
@@ -431,7 +765,9 @@ def main():
 
     # Postprocess args as necessary
     if args.prefix is None:
-        args.prefix = args.cnv_type
+        prefix = args.cnv_type
+    else:
+        prefix = args.prefix
     min_or_lower = np.log(args.min_or_lower)
     retest_min_or_lower = np.log(args.retest_min_or_lower)
 
@@ -452,8 +788,14 @@ def main():
     orig_pvals_df = pvals_df.copy(deep=True)
     orig_sig_df = sig_df.copy(deep=True)
 
+    # Load gene blocks to be refined
+    blocks = load_gene_blocks(args.blocks, sig_genes, prefix)
+
+    msg = 'Identified {:,} gene blocks to be refined.\n'
+    print(msg.format(len(blocks)), file=logfile)
+
     # Extract relevant data for significant genes from input GTF
-    gtfbt, txbt, exonbt, genes, transcripts, cds_dict \
+    gtfbt, txbt, exonbt, genes, transcripts, cds_dict, sig_genes \
         = process_gtf(args.gtf, sig_genes, args.blacklist, logfile, args.xcov)
 
     # Load cohort info, including CNVs & HPOs
@@ -472,8 +814,18 @@ def main():
     else:
         p_cutoff_ladder = None
 
-    import pdb; pdb.set_trace()
+    # Refine blocks one at a time
+    final_blocks = {}
+    used_cnvs = []
+    used_cnv_bt = None
+    for blockid in blocks.keys():
+        print_block_info(blocks, blockid, sig_genes, logfile)
+        new_block = refine_block(blocks[blockid], blockid, sig_genes, cohorts,
+                                 args.model, args.compare, args.control_hpo, 
+                                 logfile)
 
+    # Clean up & flush buffer
+    logfile.close()
 
 
 if __name__ == '__main__':

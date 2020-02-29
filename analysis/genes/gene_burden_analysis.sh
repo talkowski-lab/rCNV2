@@ -550,15 +550,11 @@ paste <( zcat all_genes.bed.gz | cut -f1-4 ) \
 bgzip -f ${freq_code}.${CNV}.all_genes_labeled.bed
 bgzip -f ${freq_code}.${CNV}.significant_genes.bed
 
-# Define regions to be refined (sig genes padded by $sig_gene_pad and merged)
-zcat ${freq_code}.${CNV}.significant_genes.bed.gz \
-| fgrep -v "#" \
-| awk -v buf=${sig_gene_pad} -v OFS="\t" '{ print $1, $2-buf, $3+buf, $4 }' \
-| awk -v OFS="\t" '{ if ($2<0) $2=0; print $1, $2, $3, $4 }' \
-| sort -Vk1,1 -k2,2V -k3,3V \
-| bedtools merge -c 4 -o distinct -i - \
-| bgzip -c \
-> ${freq_code}.${CNV}.sig_genes_to_refine.bed.gz
+# Cluster blocks of significant genes to be refined
+/opt/rCNV2/analysis/genes/cluster_gene_blocks.py \
+  --bgzip \
+  --outfile ${freq_code}.${CNV}.sig_gene_blocks_to_refine.bed.gz \
+  ${freq_code}.${CNV}.all_genes_labeled.bed.gz
 
 # Prep input file for locus refinement
 while read meta; do
@@ -571,6 +567,9 @@ done < <( cut -f1 ${metacohort_list} | fgrep -v "mega" )\
 freq_code="rCNV"
 CNV="DEL"
 contig=17
+min_cds_ovr_del=0.1
+min_cds_ovr_dup=0.5
+max_genes_per_cnv=20000
 phenotype_list="refs/test_phenotypes.list"
 metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
@@ -589,6 +588,9 @@ refine_max_cnv_size=3000000
 genes_to_refine=${freq_code}.${CNV}.sig_genes_to_refine.bed.gz
 pval_matrix=${CNV}.pval_matrix.bed.gz
 labeled_genes=${freq_code}.${CNV}.all_genes_labeled.bed.gz
+
+mkdir phenos/
+gsutil -m cp ${rCNV_bucket}/cleaned_data/phenotypes/filtered/* phenos/
 
 for CNV in DEL DUP; do
 
@@ -614,8 +616,8 @@ for CNV in DEL DUP; do
         --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
         --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
         --model ${meta_model_prefix} \
-        --hpo-p-cutoffs sliding_gene.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv \
-        --p-cutoff-ladder sliding_gene.${freq_code}.${CNV}.empirical_genome_wide_pval.ncase_cutoff_ladder.tsv \
+        --hpo-p-cutoffs gene_burden.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv \
+        --p-cutoff-ladder gene_burden.${freq_code}.${CNV}.empirical_genome_wide_pval.ncase_cutoff_ladder.tsv \
         --p-is-phred \
         --secondary-p-cutoff ${meta_secondary_p_cutoff} \
         --min-or-lower ${meta_or_cutoff} \
