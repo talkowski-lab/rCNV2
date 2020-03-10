@@ -37,9 +37,13 @@ workflow get_gene_metadata {
         contig=contig[0],
         rCNV_bucket=rCNV_bucket
     }
-    call join_data
+    call join_data {
+      input:
+        genomic_metadata=get_genomic_data.metadata_table,
+        expression_metadata=get_expression_data.metadata_table,
+        prefix="${gtf_prefix}.merged_features.${contig[0]}"
+    }
   }
-
 
   # Concatenate across contigs & upload to rCNV bucket
   call cat_metadata as merge_genomic_data {
@@ -50,7 +54,7 @@ workflow get_gene_metadata {
       eigen_prefix="genomic_eigenfeature",
       rCNV_bucket=rCNV_bucket
   }
-    call cat_metadata as merge_expression_data {
+  call cat_metadata as merge_expression_data {
     input:
       data_shards=get_expression_data.metadata_table,
       eigenfeatures_min_var_exp=eigenfeatures_min_var_exp,
@@ -58,13 +62,23 @@ workflow get_gene_metadata {
       eigen_prefix="expression_eigenfeature",
       rCNV_bucket=rCNV_bucket
   }
+  call cat_metadata as merge_joined_data {
+    input:
+      data_shards=join_data.metadata_table,
+      eigenfeatures_min_var_exp=eigenfeatures_min_var_exp,
+      prefix="${gtf_prefix}.all_features",
+      eigen_prefix="joined_eigenfeature",
+      rCNV_bucket=rCNV_bucket
+  }
 
-
+  # Outputs
   output {
     File genes_genomic_metadata = merge_genomic_data.merged_data
     File genes_genomic_eigen_metadata = merge_genomic_data.merged_data_eigen
     File genes_expression_metadata = merge_expression_data.merged_data
     File genes_expression_eigen_metadata = merge_expression_data.merged_data_eigen
+    File genes_joined_metadata = merge_joined_data.merged_data
+    File genes_joined_eigen_metadata = merge_joined_data.merged_data_eigen
   }
 }
 
@@ -113,7 +127,7 @@ task get_genomic_data {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:81988e01f9d7e212cb1dabc1ed5a836e91e30077a9b663a315801bd0e78f8b80"
+    docker: "talkowski/rcnv@sha256:5239898782e9936bf377373935fce5829907f68276b35e196204ba3f4615496e"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"
@@ -121,13 +135,13 @@ task get_genomic_data {
   }
 
   output {
-   File metadata_table = "${prefix}.genomic_features.bed.gz"
+   File metadata_table = "${prefix}.genomic_features.${contig}.bed.gz"
   }
 }
 
 
 # Collect expression metadata for all genes from a single contig
-task get_genomic_data {
+task get_expression_data {
   File gtf
   String prefix
   String contig
@@ -156,7 +170,7 @@ task get_genomic_data {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:81988e01f9d7e212cb1dabc1ed5a836e91e30077a9b663a315801bd0e78f8b80"
+    docker: "talkowski/rcnv@sha256:5239898782e9936bf377373935fce5829907f68276b35e196204ba3f4615496e"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"
@@ -165,6 +179,35 @@ task get_genomic_data {
 
   output {
    File metadata_table = "${prefix}.expression_features.${contig}.bed.gz"
+  }
+}
+
+
+# Join metadata for multiple conditions
+task join_data {
+  File genomic_metadata
+  File expression_metadata
+  String prefix
+
+  command <<<
+    set -e
+
+    /opt/rCNV2/data_curation/gene/join_gene_metadata.R \
+      ${genomic_metadata} \
+      ${expression_metadata} \
+    | bgzip -c \
+    > ${prefix}.bed.gz
+  >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:5239898782e9936bf377373935fce5829907f68276b35e196204ba3f4615496e"
+    preemptible: 1
+    disks: "local-disk 50 SSD"
+    bootDiskSizeGb: "20"
+  }
+
+  output {
+    File metadata_table = "${prefix}.bed.gz"
   }
 }
 
@@ -202,11 +245,11 @@ task cat_metadata {
 
     gsutil -m cp \
       ${prefix}*bed.gz \
-      ${rCNV_bucket}/cleaned_data/genes/
+      ${rCNV_bucket}/cleaned_data/genes/metadata/
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:81988e01f9d7e212cb1dabc1ed5a836e91e30077a9b663a315801bd0e78f8b80"
+    docker: "talkowski/rcnv@sha256:5239898782e9936bf377373935fce5829907f68276b35e196204ba3f4615496e"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"

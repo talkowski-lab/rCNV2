@@ -151,6 +151,11 @@ done > gene_features.athena_tracklist.tsv
 wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
 wget http://genic-intolerance.org/data/GenicIntolerance_v3_12Mar16.txt
 # Add: promoter CpG count, promoter conservation, average exon conservation, EDS
+/opt/rCNV2/data_curation/gene/get_gene_features.py \
+  --get-constraint \
+  --ref-fasta Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz \
+  --bgzip \
+  gencode.v19.canonical.pext_filtered.gtf.gz
 
 
 # Join all per-gene metadata

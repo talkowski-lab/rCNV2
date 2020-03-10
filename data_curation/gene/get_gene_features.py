@@ -149,18 +149,21 @@ def get_tx_stats(genes, txbt, max_dist=1000000):
         gene_name = tx.attrs['gene_name']
         txlen = tx.length
         txcoords = '\t'.join([tx.chrom, str(tx.start), str(tx.end)]) + '\n'
+        txstrand = tx.strand
         dists = get_neighbor_dists(tx, txdf)
         mindist = max([np.nanmin(dists), 1])
         n_nearby = len([i for i in dists if i <= max_dist])
         if gene_name not in tx_stats.keys():
             tx_stats[gene_name] = {'tx_coords' : txcoords,
                                    'tx_len' : [txlen],
+                                   'tx_strand' : txstrand,
                                    'nearest_gene' : mindist,
                                    'genes_within_1mb' : n_nearby}
         else:
             tx_stats[gene_name]['tx_coords'] \
                 = tx_stats[gene_name]['tx_coords'] + txcoords
             tx_stats[gene_name]['tx_len'].append(txlen)
+            tx_stats[gene_name]['tx_strand'].append(txstrand)
             tx_stats[gene_name]['nearest_gene'].append(mindist)
             tx_stats[gene_name]['genes_within_1mb'].append(n_nearby)
 
@@ -284,7 +287,7 @@ def get_chrom_pos_stats(genes, tx_stats, chrom_stats):
     return chrom_pos_stats
 
 
-def calc_gc(chrom, start, end, ref_fasta):
+def calc_gc(chrom, start, end, ref_fasta, cpg=False):
     """
     Calculate GC content of an interval
     Dev note: ran into tmp file memory issues with pybedtools nucleotide_content()
@@ -294,7 +297,12 @@ def calc_gc(chrom, start, end, ref_fasta):
           .replace('\n', '').upper().replace('N', '')
     n_gc = seq.count('G') + seq.count('G')
 
-    return n_gc / len(seq)
+    if cpg:
+        n_cpg = seq.count('CG')
+        return n_gc / len(seq), n_cpg
+
+    else:
+        return n_gc / len(seq)
 
 
 def get_genomic_features(genes, txbt, exonbt, tx_stats, min_intron_size=4, 
@@ -487,6 +495,36 @@ def get_expression_features(genes, ensg_ids, gtex_medians, gtex_mads):
     return header, expression_features
 
 
+def get_constraint_features(genes, ensg_ids, tx_stats, ref_fasta, 
+                            promoter_size=1000):
+    """
+    Collect various evolutionary constraint features per gene
+    """
+
+    cfeats_tmp = {g : [] for g in genes}
+
+    # Compile feature headers for output file
+    header_cols = 'promoter_gc_pct promoter_cpg_count'
+    header_cols = header_cols.split()
+
+    # Get CG pct and CpG count for gene promoters
+    for gene in genes:
+        chrom = tx_stats[gene]['tx_coords'][0].chrom
+        if tx_stats[gene]['tx_strand'] == '+':
+            prom_end = tx_stats[gene]['tx_coords'][0].start
+            prom_start = int(np.nanmax([prom_end - 1000, 0]))
+        else:
+            prom_start = tx_stats[gene]['tx_coords'][0].stop
+            prom_end = prom_start + 1000
+        prom_gc, prom_cpg = calc_gc(chrom, prom_start, prom_end, ref_fasta, cpg=True)
+        cfeats_tmp.append(prom_gc)
+        cfeats_tmp.append(prom_cpg)
+
+        import pdb; pdb.set_trace()
+
+
+
+
 
 def write_outbed(outbed, header, genes, txbt, tx_stats, genomic_features,
                  expression_features):
@@ -531,10 +569,13 @@ def main():
                         'features. [default: False]')
     parser.add_argument('--get-expression', action='store_true', help='Collect ' +
                         'gene expression features. [default: False]')
+    parser.add_argument('--get-constraint', action='store_true', help='Collect ' +
+                        'evolutionary constraint features. [default: False]')
     parser.add_argument('--centro-telo-bed', help='BED file indicating ' + 
                         'centromere & telomere positions per chromosome.')
     parser.add_argument('--ref-fasta', help='Reference fasta file. Only necessary ' +
-                        'to compute GC content if --get-genomic is specified.')
+                        'to compute GC content if --get-genomic is specified, and ' +
+                        'promoter stats if --get-constraint is specified.')
     parser.add_argument('--gtex-medians', help='GTEx gene X tissue expression medians. ' +
                         'Only used if --get-expression is specified.')
     parser.add_argument('--gtex-mads', help='GTEx gene X tissue expression MADs. ' +
@@ -594,6 +635,13 @@ def main():
         outbed_header = outbed_header + '\t' + header_add
     else:
         expression_features = None
+
+    # Get constraint stats, if optioned
+    if args.get_constraint:
+        header_add, constraint_features = \
+            get_constraint_features(genes, ensg_ids, tx_stats, args.ref_fasta)
+    else:
+        constraint_features = None
 
     # Format output table of features
     write_outbed(outbed, outbed_header, genes, txbt, tx_stats, genomic_features,

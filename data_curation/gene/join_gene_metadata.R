@@ -49,6 +49,7 @@ mdat.list <- lapply(mdat.list.in, load.meta)
 mdat <- join.mdats(mdat.list)
 
 # Write out merged metadata file
+colnames(mdat)[1] <- paste("#", colnames(mdat)[1], sep="")
 write.table(mdat, stdout(), col.names=T, row.names=F,
             sep="\t", quote=F)
 
