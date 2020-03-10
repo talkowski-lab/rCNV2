@@ -153,6 +153,14 @@ wget http://genic-intolerance.org/data/GenicIntolerance_v3_12Mar16.txt
 # Add: promoter CpG count, promoter conservation, average exon conservation, EDS
 
 
+# Join all per-gene metadata
+/opt/rCNV2/data_curation/gene/join_gene_metadata.R \
+  gencode.v19.canonical.pext_filtered.genomic_features.bed.gz \
+  gencode.v19.canonical.pext_filtered.expression_features.bed.gz \
+| bgzip -c \
+> gencode.v19.canonical.pext_filtered.all_features.bed.gz
+
+
 # Copy canonical gene metadata to rCNV bucket (note: requires permissions)
 gsutil -m cp gencode.v19.canonical*.gz gs://rcnv_project/cleaned_data/genes/
 gsutil -m cp gencode.v19.canonical*genes.list \
