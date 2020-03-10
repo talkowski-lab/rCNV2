@@ -110,7 +110,7 @@ Each phenotype & CNV type were meta-analyzed separately for a total of two meta-
 
 #### Determining genome-wide significance threshold  
 
-We next controlled false discovery rate (FDR) across all meta-analyses using a permutation-based approach.  
+We next controlled false discovery rate (FDR) across all sliding window meta-analyses using a permutation-based approach.  
 
 Estimating the number of independent tests performed across all windows, phenotypes, and CNV types is difficult due to numerous necessary assumptions, such as the independence of samples between phenotypes, or the local correlation structure of CNV counts between neighboring windows, among others.    
 

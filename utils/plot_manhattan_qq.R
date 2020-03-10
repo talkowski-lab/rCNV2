@@ -433,6 +433,9 @@ option_list <- list(
   make_option(c("--highlight-name"), type="character", default="Highlighted regions", 
               help="name for highlighted regions in legend [default %default]",
               metavar="string"),
+  make_option(c("--highlight-color"), type="character", default="#4EE69A", 
+              help="color for highlighted regions [default %default]",
+              metavar="string"),
   make_option(c("--cutoff-2"), type="numeric", default=NULL, 
               help="P-value of significance threshold in second plot (--miami only) [default %default]",
               metavar="numeric"),
@@ -441,6 +444,9 @@ option_list <- list(
               metavar="BED"),
   make_option(c("--highlight-name-2"), type="character", default="Highlighted regions", 
               help="name for highlighted regions in legend of second plot (--miami only) [default %default]",
+              metavar="string"),
+  make_option(c("--highlight-color-2"), type="character", default="#4EE69A", 
+              help="color for highlighted regions of second plot [default %default]",
               metavar="string"),
   make_option(c("--label-prefix"), type="character", default=NULL, 
               help="prefix to append to some labels [default %default]",
@@ -479,12 +485,14 @@ min.p <- 10^-(opts$`max-phred-p`)
 cutoff <- opts$cutoff
 highlight.in <- opts$`highlight-bed`
 highlight.name <- opts$`highlight-name`
+highlight.color <- opts$`highlight-color`
 cutoff2 <- opts$`cutoff-2`
 if(is.null(cutoff2)){
   cutoff2 <- cutoff
 }
 highlight2.in <- opts$`highlight-bed-2`
 highlight2.name <- opts$`highlight-name-2`
+highlight2.color <- opts$`highlight-color-2`
 lab.prefix <- opts$`label-prefix`
 lab2.prefix <- opts$`label-prefix-2`
 title <- gsub("\\n", "\n", opts$title, fixed=T)
@@ -534,6 +542,7 @@ if(miami == F){
         height=1000, width=1800, res=400)
     manhattan(stats, cutoff, highlights=highlights,
               highlight.name=highlight.name,
+              highlight.color=highlight.color,
               lab.prefix=lab.prefix,
               ymax=-log10(global.p.min))
     dev.off()
@@ -546,6 +555,7 @@ if(miami == F){
       height=1000, width=1000, res=400)
   qq(stats, cutoff, highlights=highlights,
      highlight.name=highlight.name,
+     highlight.color=highlight.color,
      echo.lambdas=echo.lambdas, legend=F,
      ymax=-log10(global.p.min))
   dev.off()
@@ -568,10 +578,12 @@ if(miami == F){
     }
     manhattan(stats, cutoff, highlights=highlights,
               highlight.name=highlight.name,
+              highlight.color=highlight.color,
               lab.prefix=lab.prefix,
               ymax=-log10(global.p.min))
     qq(stats, cutoff, highlights=highlights,
        highlight.name=highlight.name,
+       highlight.color=highlight.color,
        echo.lambdas=echo.lambdas, legend=F,
        ymax=-log10(global.p.min))
     dev.off()
@@ -591,10 +603,12 @@ if(miami == F){
     layout(matrix(1:2, nrow=2), heights=c(1, 0.88))
     manhattan(stats, cutoff, highlights=highlights,
               highlight.name=highlight.name,
+              highlight.color=highlight.color,
               lab.prefix=lab.prefix,
               ymax=-log10(global.p.min))
     manhattan(stats2, cutoff2, highlights=highlights2,
               highlight.name=highlight2.name,
+              highlight.color=highlight2.color,
               lab.prefix=lab2.prefix,
               ymax=-log10(global.p.min),
               reflection=T)
@@ -620,22 +634,26 @@ if(miami == F){
   label.cex <- 0.75
   manhattan(stats, cutoff, highlights=highlights,
             highlight.name=highlight.name,
+            highlight.color=highlight.color,
             lab.prefix=lab.prefix,
             ymax=-log10(global.p.min),
             label.cex=label.cex)
   qq(stats, cutoff, highlights=highlights,
      highlight.name=highlight.name,
+     highlight.color=highlight.color,
      echo.lambdas=echo.lambdas, legend=F,
      ymax=-log10(global.p.min),
      label.cex=0.9*label.cex)
   manhattan(stats2, cutoff2, highlights=highlights2,
             highlight.name=highlight2.name,
+            highlight.color=highlight2.color,
             lab.prefix=lab2.prefix,
             ymax=-log10(global.p.min),
             reflection=T,
             label.cex=label.cex)
   qq(stats2, cutoff2, highlights=highlights2,
      highlight.name=highlight2.name,
+     highlight.color=highlight2.color,
      echo.lambdas=echo.lambdas, legend=F,
      ymax=-log10(global.p.min),
      reflection=T,

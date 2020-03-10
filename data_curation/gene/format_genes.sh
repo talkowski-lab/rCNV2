@@ -101,6 +101,21 @@ zcat gencode.v19.canonical.tsv.gz \
 > gencode.v19.canonical.pext_filtered.tsv.gz
 
 
+# Preprocess GTEx expression matrix to compute summaries
+wget https://storage.googleapis.com/gtex_analysis_v7/rna_seq_data/GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct.gz
+wget https://storage.googleapis.com/gtex_analysis_v7/annotations/GTEx_v7_Annotations_SampleAttributesDS.txt
+mkdir gtex_stats/
+/opt/rCNV2/data_curation/gene/preprocess_GTEx.py \
+  --gzip \
+  --prefix gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats \
+  gencode.v19.canonical.pext_filtered.tsv.gz \
+  GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct.gz \
+  GTEx_v7_Annotations_SampleAttributesDS.txt
+# Copy precomputed GTEx summary data to rCNV bucket (note: requires permissions)
+gsutil -m cp -r gtex_stats \
+  gs://rcnv_project/cleaned_data/genes/annotations/
+
+
 # Gather per-gene metadata (genomic)
 # Note: this is parallelized in FireCloud with get_gene_metadata.wdl
 wget ftp://ftp.ensembl.org/pub/grch37/current/fasta/homo_sapiens/dna/Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz
@@ -122,6 +137,22 @@ done > gene_features.athena_tracklist.tsv
   gencode.v19.canonical.pext_filtered.gtf.gz
 
 
+# Gather per-gene metadata (expression)
+/opt/rCNV2/data_curation/gene/get_gene_features.py \
+  --get-expression \
+  --gtex-medians gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
+  --gtex-mads gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.mad.tsv.gz \
+  --outbed gencode.v19.canonical.pext_filtered.expression_features.bed.gz \
+  --bgzip \
+  gencode.v19.canonical.pext_filtered.gtf.gz
+
+
+# Gather per-gene constraint metadata
+wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
+wget http://genic-intolerance.org/data/GenicIntolerance_v3_12Mar16.txt
+# Add: promoter CpG count, promoter conservation, average exon conservation, EDS
+
+
 # Copy canonical gene metadata to rCNV bucket (note: requires permissions)
 gsutil -m cp gencode.v19.canonical*.gz gs://rcnv_project/cleaned_data/genes/
 gsutil -m cp gencode.v19.canonical*genes.list \
@@ -131,7 +162,7 @@ gsutil -m cp genes_lost_during_pext_filtering.genes.list \
 
 
 # Generate BED file of pLoF constrained genes from gnomAD
-wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
+# wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
 pli_idx=$( zcat gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
            | head -n1 | sed 's/\t/\n/g' \
            | awk '{ if ($1=="pLI") print NR }' )

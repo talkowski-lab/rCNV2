@@ -1,0 +1,447 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+# Copyright (c) 2020 Ryan L. Collins <rlcollins@g.harvard.edu> 
+# and the Talkowski Laboratory
+# Distributed under terms of the MIT license.
+
+"""
+Identify, cluster, and fine-map all significant gene associations per HPO
+"""
+
+
+from os import path
+import gzip
+import csv
+import pybedtools as pbt
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import scale
+from statsmodels.genmod.generalized_linear_model import GLM
+from statsmodels.genmod import families
+from functools import reduce
+from scipy.stats import norm
+import argparse
+from sys import stdout
+
+
+def format_stat(x, is_phred=False, na_val=0):
+    """
+    Helper function to format & convert p-values as needed
+    """
+
+    if x == 'NA':
+        return float(na_val)
+    else:
+        if is_phred:
+            return 10 ** -float(x)
+        else:
+            return float(x)
+
+
+def is_gene_sig(primary_p, secondary_p, n_nominal, primary_p_cutoff, 
+                secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
+                secondary_or_nominal=True):
+    """
+    Checks if a gene should be considered exome-wide significant
+    """
+
+    if primary_p >= primary_p_cutoff:
+        return False
+    else:
+        secondary = (secondary_p < secondary_p_cutoff)
+        n_nom = (n_nominal >= n_nominal_cutoff)
+        if secondary_or_nominal:
+            if not any([secondary, n_nom]):
+                return False
+        elif not all([secondary, n_nom]):
+            return False
+
+    return True
+
+
+def ci2se(ci):
+    """
+    Converts a tuple of (lower, upper) confidence interval bounds to standard error
+    """
+
+    ci = sorted(ci)
+
+    return (ci[1] - ci[0]) / (2 * 1.96)
+
+
+def finemap(gene_priors, gene_info, null_variance=0.42 ** 2):
+    """
+    Fine-maps a set of genes given their prior probability and effect size estimates
+    Inputs:
+        gene_priors : dict of genes with prior probabilities
+        gene_info : dict of gene association stats as processed by process_hpo()
+        null_se : float, variance of OR estimates under the null. By default,
+                  this value is set to a 5% chance that ORs are > 2, as suggested
+                  by Wakefield 2009
+    Returns two objects:
+    
+    """
+
+    genes = list(gene_priors.keys())
+
+    if len(genes) == 1:
+        finemap_res = {genes[0] : {'ABF' : None, 'PIP' : 1}}
+    else:
+        finemap_res = {}
+
+        # Compute ABF per gene
+        for gene in genes:
+            # From Wakefield, 2009
+            theta = gene_info[gene]['lnOR']
+            se = ci2se((gene_info[gene]['lnOR_upper'], gene_info[gene]['lnOR_lower']))
+            V = se ** 2
+            zsq = (theta ** 2) / V
+            W = null_variance
+            ABF = np.sqrt((V+W) / V) * np.exp((-zsq / 2) * (W / (V+W)))
+
+            # Wakefield 2009 formulates BF relative to H0. We need to invert to 
+            # obtain evidence & posterior for H1 (i.e., true non-zero effect)
+            ABF = 1 / ABF
+
+            finemap_res[gene] = {'ABF' : ABF}
+
+        # Compute PIP per gene as fraction of total BF, adjusted for prior probs
+        # As per Mahajan 2018 (T2D fine-mapping paper, Nat. Genet.)
+        posteriors = {}
+        for gene in genes:
+            posteriors[gene] = finemap_res[gene]['ABF'] * gene_priors[gene]
+        posterior_sum = np.sum(list(posteriors.values()))
+        for gene in genes:
+            finemap_res[gene]['PIP'] = posteriors[gene] / posterior_sum
+
+    return finemap_res
+
+
+def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True, 
+                block_merge_dist=1000000, block_prefix='gene_block', 
+                null_variance=0.42 ** 2):
+    """
+    Loads & processes all necessary data for a single phenotype
+    Returns a dict with the following entries:
+        sig_genes : dict of sig genes, with each entry corresponding to stats
+                    for a single significant gene
+        blocks : pbt.BedTool of clustered significant genes to be fine-mapped
+    """
+
+    hpo_info = {'sig_genes' : {},
+                'blocks' : {}}
+    se_by_chrom = {}
+
+    if path.splitext(stats_in)[1] in '.gz .bgz .bgzip'.split():
+        reader = csv.reader(gzip.open(stats_in, 'rt'), delimiter='\t')
+    else:
+        reader = csv.reader(open(stats_in), delimiter='\t')
+
+    # Parse data for each gene
+    for chrom, start, end, gene, n_nominal, top_cohort, lnOR, lnOR_lower, \
+        lnOR_upper, zscore, primary_p, secondary_p in reader:
+
+        # Skip header line
+        if chrom.startswith('#'):
+            continue
+
+        # Clean up gene data
+        primary_p = format_stat(primary_p, p_is_phred, 1)
+        secondary_p = format_stat(secondary_p, p_is_phred, 1)
+        n_nominal = int(n_nominal)
+        lnOR = format_stat(lnOR)
+        lnOR_lower = format_stat(lnOR_lower)
+        lnOR_upper = format_stat(lnOR_upper)
+
+        # Store gene association stats if significant
+        if is_gene_sig(primary_p, secondary_p, n_nominal, primary_p_cutoff):
+            gene_bt = pbt.BedTool('\t'.join([chrom, start, end, gene]), from_string=True)
+            gene_stats = {'lnOR' : lnOR, 
+                          'lnOR_lower' : lnOR_lower,
+                          'lnOR_upper' : lnOR_upper, 
+                          'zscore' : format_stat(zscore),
+                          'primary_p' : primary_p, 'secondary_p' : secondary_p,
+                          'n_nominal' : n_nominal, 'gene_bt' : gene_bt}
+            hpo_info['sig_genes'][gene] = gene_stats
+
+    if len(hpo_info['sig_genes']) > 0:
+        # Cluster significant genes into blocks to be fine-mapped
+        gene_bts = [g['gene_bt'] for g in hpo_info['sig_genes'].values()]
+        if len(gene_bts) > 1:
+            genes_bt = gene_bts[0].cat(*gene_bts[1:], postmerge=False).sort()
+        else:
+            genes_bt = gene_bts[0]
+        blocks =  genes_bt.merge(d=block_merge_dist, c=4, o='distinct')
+
+        # Perform initial genetic fine-mapping of each block with flat prior
+        k = 0
+        for block in blocks:
+            k += 1
+            block_id = '_'.join([hpo, block_prefix, str(k)])
+            genes = block[3].split(',')
+            gene_priors = {gene : 1 / len(genes) for gene in genes}
+            finemap_res = finemap(gene_priors, hpo_info['sig_genes'], null_variance)
+            hpo_info['blocks'][block_id] = {'coords' : block,
+                                            'finemap_res' : finemap_res}
+
+    return hpo_info
+
+
+def load_all_hpos(statslist):
+    """
+    Wrapper function to process each HPO with process_hpo()
+    Returns a dict with one entry per HPO
+    """
+
+    hpo_data = {}
+
+    with open(statslist) as infile:
+        reader = csv.reader(infile, delimiter='\t')
+        for hpo, stats_in, pval, in reader:
+            primary_p_cutoff = float(pval)
+            hpo_data[hpo] = process_hpo(hpo, stats_in, primary_p_cutoff)
+
+    return hpo_data
+
+
+def make_sig_genes_df(hpo_data, naive=False):
+    """
+    Makes pd.DataFrame of all significant genes, HPOs, ABFs, and PIPs
+    """
+
+    sig_df = pd.DataFrame(columns='HPO gene ABF PIP'.split())
+
+    for hpo in hpo_data.keys():
+        for block in hpo_data[hpo]['blocks'].values():
+            for gene, stats in block['finemap_res'].items():
+                if not naive:
+                    ABF = stats['ABF']
+                    PIP = stats['PIP']
+                else:
+                    ABF = np.nan
+                    PIP = 1 / len(block['finemap_res'].keys())
+                sig_df = sig_df.append(pd.Series([hpo, gene, ABF, PIP],
+                                                 index=sig_df.columns), ignore_index=True)
+
+    return sig_df.sort_values('PIP', ascending=False)
+
+
+def rmse(pairs):
+    """
+    Compute root mean-squared error for a list of tuples
+    """
+
+    mse = [(a - b) ** 2 for a, b in pairs]
+    
+    return np.sqrt(np.sum(mse) / len(pairs))
+
+
+def functional_finemap(hpo_data, gene_features_in, null_variance=0.42 ** 2, 
+                       converge_rmse=10e-6, quiet=False):
+    """
+    Conduct E-M optimized functional fine-mapping for all gene blocks & HPOs
+    Two returns:
+        - pd.DataFrame of all genes with their HPOs, ABFs, and PIPs
+        - statsmodels.iolib.table.SimpleTable of final logit coefficients
+    """
+
+    if not quiet:
+        msg = '\nStarting fine-mapping with null variance (W) = {:.5}\n' + \
+              '  Iter.\tPIP RMSE\tCoeff. RMSE'
+        print(msg.format(null_variance))
+
+    # Re-fine-map each block with specified null variance (for BMA)
+    for hpo in hpo_data.keys():
+        for block_id, block_data in hpo_data[hpo]['blocks'].items():
+            genes = list(block_data['finemap_res'].keys())
+            gene_priors = {gene : 1 / len(genes) for gene in genes}
+            updated_finemap_res = finemap(gene_priors, hpo_data[hpo]['sig_genes'], 
+                                          null_variance)
+            hpo_data[hpo]['blocks'][block_id]['finemap_res'] = updated_finemap_res
+
+    # Load gene features, standardize, and subset to genes present in any gene block
+    features = pd.read_csv(gene_features_in, delimiter='\t')
+    for colname in '#chr chr start end'.split():
+        if colname in features.columns:
+            features.drop(labels=colname, axis=1, inplace=True)
+    sig_df = make_sig_genes_df(hpo_data)
+    features.iloc[:, 1:] = scale(features.iloc[:, 1:])
+    features = features.loc[features.gene.isin(sig_df.gene), :]
+
+    # Iterate until convergence
+    coeffs = [0 for x in features.columns.tolist()[1:]]
+    k = 0
+    rmse_PIP, rmse_coeffs = 100, 100
+    while rmse_PIP >= converge_rmse or rmse_coeffs >= converge_rmse:
+        k += 1
+        # Join sig_df with features for logistic regression
+        logit_df = sig_df.loc[:, 'gene PIP'.split()].merge(features, how='left', 
+                                                           on='gene')
+        logit_df.drop(labels='gene', axis=1, inplace=True)
+
+        # Fit logit GLM & predict new priors
+        logit = GLM(logit_df.PIP, logit_df.drop(labels='PIP', axis=1),
+                    family=families.Binomial()).fit()
+        pred_priors = logit.predict(features.drop(labels='gene', axis=1))
+        new_priors = features.gene.to_frame().join(pred_priors.to_frame(name='prior'))
+        
+        # Re-finemap all blocks with new priors
+        for hpo in hpo_data.keys():
+            for block_id, block_data in hpo_data[hpo]['blocks'].items():
+                genes = list(block_data['finemap_res'].keys())
+                gene_priors = {gene : new_priors[new_priors.gene == gene].iloc[0]['prior'] \
+                               for gene in genes}
+                # Normalize new priors within each block such that sum(priors) = 1
+                sum_priors = np.sum(list(gene_priors.values()))
+                gene_priors = {g : p / sum_priors for g, p in gene_priors.items()}
+                new_finemap_res = finemap(gene_priors, hpo_data[hpo]['sig_genes'],
+                                          null_variance)
+                hpo_data[hpo]['blocks'][block_id]['finemap_res'] = new_finemap_res
+
+        # Compute RMSE for PIPs and coefficients
+        new_sig_df = make_sig_genes_df(hpo_data)
+        PIPs_oldnew = sig_df.merge(new_sig_df, on='HPO gene'.split(), 
+                                   suffixes=('_old', '_new'))\
+                            .loc[:, 'PIP_old PIP_new'.split()]\
+                            .to_records(index=False).tolist()
+        rmse_PIP = rmse(PIPs_oldnew)
+        new_coeffs = logit.params.to_list()
+        coeffs_oldnew = tuple(zip(coeffs, new_coeffs))
+        rmse_coeffs = rmse(coeffs_oldnew)
+
+        # Update coeffs and sig_df
+        coeffs = new_coeffs
+        sig_df = new_sig_df
+
+        # Print iteration info
+        if not quiet:
+            print('  {:,}\t{:.2E}\t{:.2E}'.format(k, rmse_PIP, rmse_coeffs))
+
+    # Report completion
+    print('Converged after {:,} iterations'.format(k))
+
+    return sig_df.sort_values('PIP', ascending=False), logit.summary().tables[1]
+
+
+def bmavg(sig_dfs, outfile):
+    """
+    Average ABFs and PIPs for all genes across models (list of sig_dfs)
+    """
+
+    sig_genes = sig_dfs[0].loc[:, 'HPO gene'.split()].to_records(index=False).tolist()
+    sig_df = pd.DataFrame(columns=sig_dfs[0].columns)
+
+    for hpo, gene in sig_genes:
+        ABFs = [df.loc[(df.HPO == hpo) & (df.gene == gene), :].iloc[0]['ABF'] \
+                for df in sig_dfs]
+        PIPs = [df.loc[(df.HPO == hpo) & (df.gene == gene), :].iloc[0]['PIP'] \
+                for df in sig_dfs]
+        sig_df = sig_df.append(pd.Series([hpo, gene, np.nanmean(ABFs), 
+                                          np.nanmean(PIPs)], index=sig_df.columns),
+                               ignore_index=True)
+
+    sig_df.sort_values('PIP', ascending=False).rename(columns={'HPO' : '#HPO'}).\
+           to_csv(outfile, sep='\t', index=False, na_rep='NA')
+    outfile.close()
+
+
+def coeff_avg(coeff_tables, outfile):
+    """
+    Average logit coefficients across all models & write as tsv
+    Input: list of statsmodels.iolib.table.SimpleTable
+    """
+
+    cols = 'feature coeff stderr zscore pvalue lower upper'.split()
+
+    def ct2df(ct, k):
+        df = pd.read_html(ct.as_html(), header=0)[0]
+        fmtcols = ' '.join([cols[0]] + [x + '_{0}' for x in cols[1:]])
+        df.columns = fmtcols.format(k).split()
+        return df
+
+    ct_dfs = [ct2df(ct, k+1) for k, ct in enumerate(coeff_tables)]
+
+    merged_df = reduce(lambda left, right: pd.merge(left, right, on='feature'), 
+                       ct_dfs)
+    avg_df = pd.DataFrame(merged_df.feature, columns=['feature'])
+    for col in cols[1:]:
+        subdf = merged_df.loc[:, [x for x in merged_df.columns if col in x]]
+        avg_df[col] = subdf.mean(axis=1)
+    
+    # Recompute P-values according to averaged Z-score
+    avg_df['pvalue'] = [2 * norm.sf(abs(z)) for z in avg_df.zscore]
+
+    avg_df.rename(columns={'feature' : '#feature'}).\
+           to_csv(outfile, sep='\t', index=False, na_rep='NA')
+    outfile.close()
+
+
+def main():
+    """
+    Command-line main block
+    """
+
+    # Parse command line arguments and options
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('statslist', help='tsv of metadata per phenotype. Three ' +
+                        'required columns: HPO, path to meta-analysis stats, ' +
+                        'and primary P-value cutoff.')
+    parser.add_argument('gene_features', help='tsv of gene features to use ' +
+                        'for functional fine-mapping. First column = gene name. ' +
+                        'All other columns must be numeric features. Optionally, ' + 
+                        'first three columns can be BED-like, and will be dropped.')
+    parser.add_argument('-o', '--outfile', default='stdout', help='Output tsv of ' +
+                        'final fine-mapping results for all genes and phenotypes.')
+    parser.add_argument('--naive-outfile', help='Output tsv of naive results ' +
+                        'before fine-mapping for all genes and phenotypes.')
+    parser.add_argument('--genetic-outfile', help='Output tsv of genetics-only ' +
+                        'fine-mapping results for all genes and phenotypes.')
+    parser.add_argument('--coeffs-out', help='Output tsv of logit coefficients ' +
+                        'from fine-mapping model.')
+    args = parser.parse_args()
+
+    # Open connections to output files
+    if args.outfile in 'stdout - /dev/stdout'.split():
+        outfile = stdout
+    else:
+        outfile = open(args.outfile, 'w')
+    if args.coeffs_out is not None:
+        coeffs_out = open(args.coeffs_out, 'w')
+    else:
+        coeffs_out = None
+
+    # Process data per hpo
+    hpo_data = load_all_hpos(args.statslist)
+
+    # Write naive and/or genetics-only fine-mapping results (for ROC comparisons)
+    if args.naive_outfile is not None:
+        naive_outfile = open(args.naive_outfile, 'w')
+        make_sig_genes_df(hpo_data, naive=True).rename(columns={'HPO' : '#HPO'}).\
+            to_csv(naive_outfile, sep='\t', index=False, na_rep='NA')
+        naive_outfile.close()
+
+    if args.genetic_outfile is not None:
+        genetic_outfile = open(args.genetic_outfile, 'w')
+        make_sig_genes_df(hpo_data).rename(columns={'HPO' : '#HPO'}).\
+            to_csv(genetic_outfile, sep='\t', index=False, na_rep='NA')
+        genetic_outfile.close()
+
+    # Perform functional fine-mapping with Bayesian model averaging
+    Wsq = [(i / 10) ** 2 for i in range(2, 11, 2)]
+    finemap_res = [functional_finemap(hpo_data, args.gene_features, w) 
+                   for w in Wsq]
+    
+    # Average models across Wsq priors and write to --outfile
+    bms = [x[0] for x in finemap_res]
+    bmavg(bms, outfile)
+
+    # If optioned, average logit coefficients across models and write to --coeffs-out
+    coeff_tables = [x[1] for x in finemap_res]
+    coeff_avg(coeff_tables, coeffs_out)
+
+
+if __name__ == '__main__':
+    main()

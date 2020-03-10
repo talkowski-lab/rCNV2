@@ -30,15 +30,18 @@ def process_gtf(gtf_in):
 
     gtfbt = pbt.BedTool(gtf_in)
 
-    # Build lists of eligible gene names and transcript IDs
-    genes, transcripts = [], []
+    # Build lists of eligible gene names and ensembl IDs
+    genes, ensg_ids, transcripts = [], [], []
 
     for f in gtfbt:
         if f.fields[2] == 'transcript':
             gname = f.attrs['gene_name']
+            ensg_id = f.attrs['gene_id']
             tname = f.attrs['transcript_id']
             if gname not in genes:
                 genes.append(gname)
+            if ensg_id not in ensg_ids:
+                ensg_ids.append(ensg_id)
             if tname not in transcripts:
                 transcripts.append(tname)
 
@@ -74,7 +77,7 @@ def process_gtf(gtf_in):
     txbt = gtfbt.filter(lambda x: x.fields[2] == 'transcript').saveas()
     exonbt = gtfbt.filter(lambda x: x.fields[2] == 'exon').saveas()
 
-    return gtfbt, txbt, exonbt, genes, transcripts
+    return gtfbt, txbt, exonbt, genes, ensg_ids, transcripts
 
 
 def load_cens_tels(chrom_stats_bed):
@@ -383,7 +386,110 @@ def get_genomic_features(genes, txbt, exonbt, tx_stats, min_intron_size=4,
     return header, genomic_features
 
 
-def write_outbed(outbed, header, genes, txbt, tx_stats, genomic_features):
+def calc_gtex_stats(gtex_matrix):
+    """
+    Compute summary stats for every gene from a GTEx expression matrix
+    """
+
+    def _summstats(vals):
+        """
+        Return array of summary statistics for a single gene
+        """
+        return np.array([np.nanmin(vals),
+                         np.nanquantile(vals, q=0.25),
+                         np.nanmean(vals),
+                         np.nanquantile(vals, q=0.75),
+                         np.nanmax(vals),
+                         np.nanstd(vals),
+                         ((10 ** vals) - 1 > 1).sum()])
+
+    xstats = gtex_matrix.iloc[:, 1:].apply(_summstats, axis=1)
+    xstats_df = pd.DataFrame(np.vstack(np.array(xstats)),
+                             columns='min q1 mean q3 max sd gt0'.split())
+
+    return pd.concat([gtex_matrix.loc[:, 'gene'], xstats_df], axis=1)
+
+
+def load_gtex(gtex_matrix):
+    """
+    Read & clean GTEx expression matrix of gene X tissue, and compute summary stats
+    """
+
+    gtex = pd.read_csv(gtex_matrix, sep='\t')
+    gtex.rename(columns={'#gene' : 'gene'}, inplace=True)
+    
+    # Drop tissues with NaN values for all genes
+    nonnan_cols = gtex.iloc[:, 1:].apply(lambda vals: not all(np.isnan(vals)))
+    gtex = gtex.loc[:, ['gene'] + gtex.columns[1:][nonnan_cols].tolist()]
+
+    # Handle duplicate gene symbols by summing their untransformed values
+    # Note: assumes all expression values have been log10(TPM + 1) transformed
+    # (this is done by default in preprocess_GTEx.py)
+    dups = [g for g, c in gtex.gene.value_counts().to_dict().items() if c > 1]
+    if len(dups) > 0:
+        for gene in dups:
+            expr_sum = gtex.loc[gtex.gene == gene, gtex.columns[1:]].\
+                           apply(lambda vals: np.log10(np.nansum((10 ** vals) - 1) + 1))
+            newrow = pd.Series([gene] + expr_sum.tolist(), index=gtex.columns)
+            gtex = gtex.loc[gtex.gene != gene, :]
+            gtex = gtex.append(newrow, ignore_index=True)
+
+    # Compute summary stats per gene
+    return calc_gtex_stats(gtex)
+
+
+def get_expression_features(genes, ensg_ids, gtex_medians, gtex_mads):
+    """
+    Collect various expression features per gene
+    """
+
+    xfeats_tmp = {g : [] for g in genes}
+    header_cols = []
+
+    # Load GTEx medians
+    if gtex_medians is not None:
+        xmed_df = load_gtex(gtex_medians)
+        xmed_cols = 'n_tissues_expressed median_expression_min median_expression_q1 ' + \
+                    'median_expression_mean median_expression_q3 median_expression_max ' + \
+                    'median_expression_sd'
+        xmed_cols = xmed_cols.split()
+        for gene in genes:
+            if any(xmed_df.gene == gene):
+                for v in 'gt0 min q1 mean q3 max sd'.split():
+                    xfeats_tmp[gene].append(xmed_df[xmed_df.gene == gene].iloc[:, 1:][v].iloc[0])
+            else:
+                for col in xmed_cols:
+                    xfeats_tmp[gene].append(0)
+        header_cols += xmed_cols
+
+    # Load GTEx MADs
+    if gtex_mads is not None:
+        xmad_df = load_gtex(gtex_mads)
+        xmad_cols = 'expression_mad_min expression_mad_q1 expression_mad_mean ' + \
+                    'expression_mad_q3 expression_mad_max expression_mad_sd'
+        xmad_cols = xmad_cols.split()
+        for gene in genes:
+            if any(xmad_df.gene == gene):
+                for v in 'min q1 mean q3 max sd'.split():
+                    xfeats_tmp[gene].append(xmad_df[xmad_df.gene == gene].iloc[:, 1:][v].iloc[0])
+            else:
+                for col in xmad_cols:
+                    xfeats_tmp[gene].append(0)
+        header_cols += xmad_cols
+
+    # Format output string of all expression features per gene
+    header = '\t'.join(header_cols)
+    expression_features = {}
+    for gene in genes:
+        xfeats_str = '\t'.join([str(x) for x in xfeats_tmp[gene]])
+        expression_features[gene] = xfeats_str
+
+    return header, expression_features
+
+
+
+def write_outbed(outbed, header, genes, txbt, tx_stats, genomic_features,
+                 expression_features):
     """
     Format output table of features and write to output BED file
     """
@@ -401,6 +507,9 @@ def write_outbed(outbed, header, genes, txbt, tx_stats, genomic_features):
 
         if genomic_features is not None:
             outstr = outstr + '\t' + genomic_features[gene]
+
+        if expression_features is not None:
+            outstr = outstr + '\t' + expression_features[gene]
 
         outbed.write(outstr + '\n')
 
@@ -420,10 +529,16 @@ def main():
     parser.add_argument('gtf', help='GTF of genes to consider.')
     parser.add_argument('--get-genomic', action='store_true', help='Collect genomic ' +
                         'features. [default: False]')
+    parser.add_argument('--get-expression', action='store_true', help='Collect ' +
+                        'gene expression features. [default: False]')
     parser.add_argument('--centro-telo-bed', help='BED file indicating ' + 
                         'centromere & telomere positions per chromosome.')
     parser.add_argument('--ref-fasta', help='Reference fasta file. Only necessary ' +
                         'to compute GC content if --get-genomic is specified.')
+    parser.add_argument('--gtex-medians', help='GTEx gene X tissue expression medians. ' +
+                        'Only used if --get-expression is specified.')
+    parser.add_argument('--gtex-mads', help='GTEx gene X tissue expression MADs. ' +
+                        'Only used if --get-expression is specified.')
     parser.add_argument('--athena-tracks', help='Annotate transcripts with track(s). ' +
                         'Must be formatted as for athena annotate-bins.')
     parser.add_argument('--min-intron-size', type=int, default=4, help='Minimum ' +
@@ -450,7 +565,7 @@ def main():
     outbed_header = '\t'.join('#chr start end gene'.split())
 
     # Load & filter input GTF
-    gtfbt, txbt, exonbt, genes, transcripts = process_gtf(args.gtf)
+    gtfbt, txbt, exonbt, genes, ensg_ids, transcripts = process_gtf(args.gtf)
 
     # Get transcript stats
     tx_stats = get_tx_stats(genes, txbt)
@@ -472,8 +587,17 @@ def main():
     else:
         genomic_features = None
 
+    # Get expression stats, if optioned
+    if args.get_expression:
+        header_add, expression_features = \
+            get_expression_features(genes, ensg_ids, args.gtex_medians, args.gtex_mads)
+        outbed_header = outbed_header + '\t' + header_add
+    else:
+        expression_features = None
+
     # Format output table of features
-    write_outbed(outbed, outbed_header, genes, txbt, tx_stats, genomic_features)
+    write_outbed(outbed, outbed_header, genes, txbt, tx_stats, genomic_features,
+                 expression_features)
     if args.outbed is not None \
     and args.outbed not in 'stdout -'.split() \
     and args.bgzip:

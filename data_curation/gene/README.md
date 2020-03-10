@@ -60,17 +60,38 @@ We collected the following genome-based gene features:
 
 #### Gene features: expression  
 
-TBD
+We collected the following expression-based gene features:  
+
+| Feature name | Abbreviation | Description | Source |  
+| :--- | :--- | :--- | :--- |  
+| Number of expressing tissues | `n_tissues_expressed` | Number of tissues with median expression (TPM) > 1 in GTEx v7 | GTEx v7 [(GTEx Consortium, _Nature_, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/29022597) |  
+| Min. average expression | `median_expression_min` | Minimum of median expression values across all tissues in GTEx v7 | GTEx v7 [(GTEx Consortium, _Nature_, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/29022597) |  
+| First quartile of average expression | `median_expression_q1` | First quartile of median expression values across all tissues in GTEx v7 | GTEx v7 [(GTEx Consortium, _Nature_, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/29022597) |  
+| Mean average expression | `median_expression_mean` | Mean of median expression values across all tissues in GTEx v7 | GTEx v7 [(GTEx Consortium, _Nature_, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/29022597) |  
+| Third quartile of average expression | `median_expression_q3` | Third quartile of median expression values across all tissues in GTEx v7 | GTEx v7 [(GTEx Consortium, _Nature_, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/29022597) |  
+| Max. average expression | `median_expression_max` | Maximum of median expression values across all tissues in GTEx v7 | GTEx v7 [(GTEx Consortium, _Nature_, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/29022597) |  
+| Min. expression MAD | `expression_mad_min` | Minimum of median absolute deviation (MAD) of expression values  across all tissues in GTEx v7 | GTEx v7 [(GTEx Consortium, _Nature_, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/29022597) |  
+| First quartile of expression MAD | `expression_mad_q1` | First quartile of median absolute deviation (MAD) of expression values  across all tissues in GTEx v7 | GTEx v7 [(GTEx Consortium, _Nature_, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/29022597) |  
+| Mean expression MAD | `expression_mad_mean` | Mean of median absolute deviation (MAD) of expression values  across all tissues in GTEx v7 | GTEx v7 [(GTEx Consortium, _Nature_, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/29022597) |  
+| Third quartile of expression MAD | `expression_mad_q3` | Third quartile of median absolute deviation (MAD) of expression values  across all tissues in GTEx v7 | GTEx v7 [(GTEx Consortium, _Nature_, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/29022597) |  
+| Max. expression MAD | `expression_mad_max` | Maximum of median absolute deviation (MAD) of expression values  across all tissues in GTEx v7 | GTEx v7 [(GTEx Consortium, _Nature_, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/29022597) |  
+
+All expression values were derived from GTEx v7 (rather than the final v8 release) because GTEx v7 was the last version native to hg19/Gencode v19, which was a direct match for the Gencode version used in this study.  
+
+#### Gene features: constraint
+
+We collected the following gene features related to evolutionary constraint:  
+
+
+
 
 #### Gene features: chromatin  
 
-TBD
+_TBD_  
 
 #### Gene features: variation  
 
-TBD
-
-#### Other gene features TBD  
+_TBD_  
 
 ## Gene set definitions  
 
