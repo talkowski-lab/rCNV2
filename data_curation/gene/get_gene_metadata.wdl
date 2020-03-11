@@ -235,13 +235,13 @@ task get_constraint_data {
       --gnomad-constraint gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
       --rvis-tsv RVIS_Unpublished_ExACv2_March2017.txt \
       --eds-tsv EDS.Wang_2018.tsv.gz \
-      --outbed gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
+      --outbed ${prefix}.constraint_features.${contig}.bed.gz \
       --bgzip \
       subset.gtf.gz
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:a174db7b8741c6ddec07116fb0c815657b1b7cbd426a566cd73cbc27c27fab71"
+    docker: "talkowski/rcnv@sha256:abaa1d4fc1c6a4e74f73ee13ff15c477cddbd5b791dcbc51f1269b49201f4554"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"
@@ -272,7 +272,7 @@ task join_data {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:a174db7b8741c6ddec07116fb0c815657b1b7cbd426a566cd73cbc27c27fab71"
+    docker: "talkowski/rcnv@sha256:abaa1d4fc1c6a4e74f73ee13ff15c477cddbd5b791dcbc51f1269b49201f4554"
     preemptible: 1
     disks: "local-disk 50 SSD"
     bootDiskSizeGb: "20"

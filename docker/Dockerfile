@@ -61,7 +61,7 @@ VOLUME ["/root/.config"]
 RUN apt-get -qqy update \
     && apt-get -qqy install libxrender1 libcairo2-dev libxt-dev libx11-dev
 RUN apt-get -qqy upgrade
-RUN Rscript -e "sapply(c('optparse','metafor','KernSmooth','metap','MASS'),\
+RUN Rscript -e "sapply(c('optparse','metafor','KernSmooth','metap','MASS','flux'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 RUN Rscript -e "sapply(c('beeswarm'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
@@ -77,7 +77,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 773e121f8e3314cf6b050d575a08770ae0961112 && \
+    git checkout f755ec9dfaa0936388dd9ed0fc2a46eed245693a && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)

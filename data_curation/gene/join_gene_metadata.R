@@ -28,7 +28,7 @@ load.meta <- function(mdat.in){
 join.mdats <- function(mdat.list){
   merged <- mdat.list[[1]]
   for(i in 2:length(mdat.list)){
-    merged <- merge(merged, mdat.list[[2]],
+    merged <- merge(merged, mdat.list[[i]],
                     by=c("chr", "start", "end", "gene"),
                     all=F, sort=F)
   }

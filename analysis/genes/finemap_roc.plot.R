@@ -33,7 +33,7 @@ roc <- function(stats, steps=seq(1, 0, -0.001)){
     fall <- length(idxs) / nrow(stats)
     return(c(minPIP, fall, fother, ftrue))
   })))
-  colnames(roc_res) <- c("maxPIP", "frac_all", "frac_other", "frac_true")
+  colnames(roc_res) <- c("minPIP", "frac_all", "frac_other", "frac_true")
   return(roc_res)
 }
 
@@ -47,18 +47,33 @@ load.data.single <- function(path, truth){
   return(x)
 }
 
+# Find ROC-optimal point
+optimize.roc <- function(roc.res){
+  roc.res <- roc.res
+  # Compute Euclidean distance from (0, 1)
+  x2 <- (roc.res$frac_other - 0) ^ 2
+  y2 <- (roc.res$frac_true - 1) ^ 2
+  d <- sqrt(x2 + y2)
+  d.best <- min(d)
+  d.best.idx <- sort(which(d == d.best))[1]
+  return(roc.res[d.best.idx, ])
+}
+
 # Wrapper to load all datasets
 load.datasets <- function(data.in, truth){
   datlist <- read.table(data.in, header=F, sep="\t")
-  colnames(datlist) <- c("name", "color", "path")
+  colnames(datlist) <- c("name", "color", "lty", "path")
   data <- lapply(1:nrow(datlist), function(i){
     stats <- load.data.single(datlist$path[i], truth)
     roc.res <- roc(stats)
-    roc.opt <- optimize.roc(roc)
+    roc.opt <- optimize.roc(roc.res)
+    roc.auc <- flux::auc(roc.res$frac_other, roc.res$frac_true)
     return(list("stats"=stats,
                 "roc"=roc.res,
                 "roc.opt"=roc.opt,
-                "color"=datlist$color[i]))
+                "auc"=roc.auc,
+                "color"=datlist$color[i],
+                "lty"=datlist$lty[i]))
   })
   names(data) <- datlist$name
   return(data)
@@ -72,7 +87,9 @@ plot.roc <- function(data){
   abline(0, 1, col="gray70")
   lapply(data, function(x){
     points(x$roc$frac_other, x$roc$frac_true,
-           type="l", col=x$color, lwd=3)
+           type="l", col=x$color, lwd=2, lty=x$lty)
+    points(x$roc.opt$frac_other, x$roc.opt$frac_true,
+           pch=19, col=x$color)
   })
   legend("bottomright", legend=names(data), lwd=5, cex=0.75, 
          col=sapply(data, function(x){x$color}), bty="n")
@@ -85,6 +102,7 @@ plot.roc <- function(data){
 ### RSCRIPT BLOCK ###
 #####################
 require(optparse, quietly=T)
+require(flux, quietly=T)
 
 # List of command-line options
 option_list <- list()
