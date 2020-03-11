@@ -158,6 +158,7 @@ gsutil -m cp gs://rcnv_project/cleaned_data/genes/annotations/EDS.Wang_2018.tsv.
   --gnomad-constraint gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
   --rvis-tsv RVIS_Unpublished_ExACv2_March2017.txt \
   --eds-tsv EDS.Wang_2018.tsv.gz \
+  --outbed gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
   --bgzip \
   gencode.v19.canonical.pext_filtered.gtf.gz
 

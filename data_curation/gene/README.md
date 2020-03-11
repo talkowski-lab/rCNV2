@@ -105,10 +105,6 @@ We collected the following gene features related to evolutionary constraint:
 
 _TBD_  
 
-#### Gene features: variation  
-
-_TBD_  
-
 ## Gene set definitions  
 
 Throughout our analyses, we reference various subsets of genes. These are defined below.  

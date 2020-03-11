@@ -37,10 +37,20 @@ workflow get_gene_metadata {
         contig=contig[0],
         rCNV_bucket=rCNV_bucket
     }
+    call get_constraint_data {
+      input:
+        gtf=gtf,
+        ref_fasta=ref_fasta,
+        ref_fasta_idx=ref_fasta_idx,
+        prefix=gtf_prefix,
+        contig=contig[0],
+        rCNV_bucket=rCNV_bucket
+    }
     call join_data {
       input:
         genomic_metadata=get_genomic_data.metadata_table,
         expression_metadata=get_expression_data.metadata_table,
+        constraint_metadata=get_constraint_data.metadata_table,
         prefix="${gtf_prefix}.merged_features.${contig[0]}"
     }
   }
@@ -62,6 +72,14 @@ workflow get_gene_metadata {
       eigen_prefix="expression_eigenfeature",
       rCNV_bucket=rCNV_bucket
   }
+  call cat_metadata as merge_constraint_data {
+    input:
+      data_shards=get_constraint_data.metadata_table,
+      eigenfeatures_min_var_exp=eigenfeatures_min_var_exp,
+      prefix="${gtf_prefix}.constraint_features",
+      eigen_prefix="constraint_eigenfeature",
+      rCNV_bucket=rCNV_bucket
+  }
   call cat_metadata as merge_joined_data {
     input:
       data_shards=join_data.metadata_table,
@@ -77,6 +95,8 @@ workflow get_gene_metadata {
     File genes_genomic_eigen_metadata = merge_genomic_data.merged_data_eigen
     File genes_expression_metadata = merge_expression_data.merged_data
     File genes_expression_eigen_metadata = merge_expression_data.merged_data_eigen
+    File genes_constraint_metadata = merge_constraint_data.merged_data
+    File genes_constraint_eigen_metadata = merge_constraint_data.merged_data_eigen
     File genes_joined_metadata = merge_joined_data.merged_data
     File genes_joined_eigen_metadata = merge_joined_data.merged_data_eigen
   }
@@ -186,6 +206,8 @@ task get_expression_data {
 # Collect constraint metadata for all genes from a single contig
 task get_constraint_data {
   File gtf
+  File ref_fasta
+  File ref_fasta_idx
   String prefix
   String contig
   String rCNV_bucket
@@ -201,19 +223,25 @@ task get_constraint_data {
     # Subset input files to chromosome of interest
     tabix -f ${gtf}
     tabix -h ${gtf} ${contig} | bgzip -c > subset.gtf.gz
+    samtools faidx ${ref_fasta} ${contig} \
+    | bgzip -c \
+    > ref.fa.gz
+    samtools faidx ref.fa.gz
 
     # Collect genomic metadata
     /opt/rCNV2/data_curation/gene/get_gene_features.py \
       --get-constraint \
-      --gtex-medians gtex_stats/*.GTEx_v7_constraint_stats.median.tsv.gz \
-      --gtex-mads gtex_stats/*.GTEx_v7_constraint_stats.mad.tsv.gz \
-      --outbed ${prefix}.constraint_features.${contig}.bed.gz \
+      --ref-fasta ref.fa.gz \
+      --gnomad-constraint gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
+      --rvis-tsv RVIS_Unpublished_ExACv2_March2017.txt \
+      --eds-tsv EDS.Wang_2018.tsv.gz \
+      --outbed gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
       --bgzip \
       subset.gtf.gz
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:5239898782e9936bf377373935fce5829907f68276b35e196204ba3f4615496e"
+    docker: "talkowski/rcnv@sha256:09ea97525579ee2f2d55a80e7acdabfaa87a28e61d02027401464e08c50f6c3a"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"
@@ -229,6 +257,7 @@ task get_constraint_data {
 task join_data {
   File genomic_metadata
   File expression_metadata
+  File constraint_metadata
   String prefix
 
   command <<<
@@ -237,12 +266,13 @@ task join_data {
     /opt/rCNV2/data_curation/gene/join_gene_metadata.R \
       ${genomic_metadata} \
       ${expression_metadata} \
+      ${constraint_metadata} \
     | bgzip -c \
     > ${prefix}.bed.gz
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:4a1e6bb51d419410c72ef17b0bce74bd8c735e6c6dc79183c8d93790b04a6ad9"
+    docker: "talkowski/rcnv@sha256:09ea97525579ee2f2d55a80e7acdabfaa87a28e61d02027401464e08c50f6c3a"
     preemptible: 1
     disks: "local-disk 50 SSD"
     bootDiskSizeGb: "20"

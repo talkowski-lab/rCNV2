@@ -53,8 +53,11 @@ load.datasets <- function(data.in, truth){
   colnames(datlist) <- c("name", "color", "path")
   data <- lapply(1:nrow(datlist), function(i){
     stats <- load.data.single(datlist$path[i], truth)
+    roc.res <- roc(stats)
+    roc.opt <- optimize.roc(roc)
     return(list("stats"=stats,
-                "roc"=roc(stats),
+                "roc"=roc.res,
+                "roc.opt"=roc.opt,
                 "color"=datlist$color[i]))
   })
   names(data) <- datlist$name
@@ -105,7 +108,7 @@ plot.out <- args$args[3]
 # DEV PARAMTERS
 setwd("~/scratch")
 data.in <- "finemap_roc_input.tsv"
-truth.in <- "finemap_roc_truth.tsv"
+truth.in <- "constrained_truth_set.tsv"
 plot.out <- "finemap_roc.pdf"
 
 # Read truth genes

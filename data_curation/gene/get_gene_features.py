@@ -611,6 +611,7 @@ def get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ens
             ex_keep = all_ex_cons_df['info'].str.contains('gene_name "{}"'.format(gene))
             if ex_keep.sum() > 0:
                 ex_cons_df = all_ex_cons_df.loc[ex_keep, 'size cons'.split()]
+                ex_cons_df = ex_cons_df.loc[ex_cons_df.cons.astype(str) != '.', :]
                 ex_cons = np.ma.average(ex_cons_df['cons'].astype(float).to_numpy(), 
                                         weights=ex_cons_df['size'].to_numpy())
             else:
@@ -618,6 +619,8 @@ def get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ens
             tx_keep = all_tx_cons_df['info'].str.contains('gene_name "{}"'.format(gene))
             if tx_keep.sum() > 0:
                 tx_cons = all_tx_cons_df.loc[tx_keep, 'cons'].values[0]
+                if str(tx_cons) == '.':
+                    tx_cons = 0
             else:
                 tx_cons = 0
             cfeats_tmp[gene] += [prom_cons, ex_cons, tx_cons]
