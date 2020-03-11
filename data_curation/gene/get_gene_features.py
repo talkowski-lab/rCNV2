@@ -32,6 +32,7 @@ def process_gtf(gtf_in):
 
     # Build lists of eligible gene names and ensembl IDs
     genes, ensg_ids, transcripts = [], [], []
+    ensg_to_gene, gene_to_ensg = {}, {}
 
     for f in gtfbt:
         if f.fields[2] == 'transcript':
@@ -44,6 +45,10 @@ def process_gtf(gtf_in):
                 ensg_ids.append(ensg_id)
             if tname not in transcripts:
                 transcripts.append(tname)
+            if ensg_id not in ensg_to_gene.keys():
+                ensg_to_gene[ensg_id] = gname
+            if gname not in gene_to_ensg.keys():
+                gene_to_ensg[gname] = ensg_id
 
     # Filter & clean records in gtf
     def _filter_gtf(feature):
@@ -77,7 +82,7 @@ def process_gtf(gtf_in):
     txbt = gtfbt.filter(lambda x: x.fields[2] == 'transcript').saveas()
     exonbt = gtfbt.filter(lambda x: x.fields[2] == 'exon').saveas()
 
-    return gtfbt, txbt, exonbt, genes, ensg_ids, transcripts
+    return gtfbt, txbt, exonbt, genes, ensg_ids, transcripts, ensg_to_gene, gene_to_ensg
 
 
 def load_cens_tels(chrom_stats_bed):
@@ -495,8 +500,9 @@ def get_expression_features(genes, ensg_ids, gtex_medians, gtex_mads):
     return header, expression_features
 
 
-def get_constraint_features(genes, ensg_ids, tx_stats, ref_fasta, 
-                            promoter_size=1000):
+def get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ensg,
+                            gnomad_tsv, rvis_tsv, eds_tsv, ref_fasta, 
+                            phastcons_url, promoter_size=1000):
     """
     Collect various evolutionary constraint features per gene
     """
@@ -504,30 +510,131 @@ def get_constraint_features(genes, ensg_ids, tx_stats, ref_fasta,
     cfeats_tmp = {g : [] for g in genes}
 
     # Compile feature headers for output file
-    header_cols = 'promoter_gc_pct promoter_cpg_count'
-    header_cols = header_cols.split()
+    header_cols = []
 
-    # Get CG pct and CpG count for gene promoters
+    # Parse gnomAD constraint stats
+    if gnomad_tsv is not None:
+        # Load gnomAD data
+        gnomad = pd.read_csv(gnomad_tsv, delimiter='\t', compression='gzip')
+        keep_gnomad_cols = 'gene pLI pNull pRec oe_mis oe_lof oe_mis_upper ' + \
+                           'oe_lof_upper mis_z lof_z'
+        gnomad = gnomad.loc[gnomad.gene.isin(genes), keep_gnomad_cols.split()]
+        # Fill in missing genes and values with overall means
+        gnomad_means = gnomad.iloc[:, 1:].apply(np.nanmean).to_dict()
+        gnomad.fillna(gnomad_means, axis=0, inplace=True)
+        for gene in genes:
+            if not any(gnomad.gene == gene):
+                newrow = pd.Series([gene] + list(gnomad_means.values()), 
+                                   index=gnomad.columns)
+                gnomad = gnomad.append(newrow, ignore_index=True)
+        # Add values to cfeats per gene
+        for gene in genes:
+            gvals = gnomad.loc[gnomad.gene == gene, :].values.tolist()[0][1:]
+            cfeats_tmp[gene] += gvals
+        header_cols += ['gnomad_' + x for x in list(gnomad.columns)[1:]]
+
+    # Add RVIS, if optioned. Assumes RVIS March 2017 release corresponding to gnomAD v2.0
+    if rvis_tsv is not None:
+        rvis = pd.read_csv(rvis_tsv, delimiter='\t', usecols=[0, 2, 3], skiprows=1,
+                           names='gene rvis rvis_pct'.split())
+        rvis = rvis.loc[rvis.gene.isin(genes), :]
+        rvis_means = rvis.iloc[:, 1:].apply(np.nanmean).values.tolist()
+        for gene in genes:
+            if any(rvis.gene == gene):
+                gvals = rvis.loc[rvis.gene == gene, :].values.tolist()[0][1:]
+                cfeats_tmp[gene] += gvals
+            else:
+                cfeats_tmp[gene] += rvis_means
+        header_cols += rvis.columns.tolist()[1:]
+
+    # Add EDS, if optioned
+    if eds_tsv is not None:
+        eds = pd.read_csv(eds_tsv, delimiter='\t', names='ensg eds'.split(), skiprows=1)
+        eds = eds.loc[eds.ensg.isin([x.split('.')[0] for x in gene_to_ensg.values()]), :]
+        eds_mean = np.nanmean(eds.eds)
+        for gene in genes:
+            ensg = gene_to_ensg[gene].split('.')[0]
+            if any(eds.ensg == ensg):
+                cfeats_tmp[gene].append(eds.eds[eds.ensg == ensg].values[0])
+            else:
+                cfeats_tmp[gene].append(eds_mean)
+        header_cols.append('eds')
+
+    # Make dictionary of promoter coordinates
+    promoters = {}
     for gene in genes:
         chrom = tx_stats[gene]['tx_coords'][0].chrom
         if tx_stats[gene]['tx_strand'] == '+':
             prom_end = tx_stats[gene]['tx_coords'][0].start
-            prom_start = int(np.nanmax([prom_end - 1000, 0]))
+            prom_start = int(np.nanmax([prom_end - promoter_size, 0]))
         else:
             prom_start = tx_stats[gene]['tx_coords'][0].stop
-            prom_end = prom_start + 1000
-        prom_gc, prom_cpg = calc_gc(chrom, prom_start, prom_end, ref_fasta, cpg=True)
-        cfeats_tmp.append(prom_gc)
-        cfeats_tmp.append(prom_cpg)
+            prom_end = prom_start + promoter_size
+        prom_str = '{}\t{}\t{}\t{}'.format(chrom, prom_start, prom_end, gene)
+        prom_bt = pbt.BedTool(prom_str, from_string=True)
+        promoters[gene] = {'chrom' : chrom,
+                           'start' : prom_start,
+                           'end' : prom_end,
+                           'prom_bt' : prom_bt}
 
-        import pdb; pdb.set_trace()
+    # Get CG pct and CpG count for gene promoters if ref_fasta specified
+    if ref_fasta is not None:
+        for gene in genes:
+            prom_gc, prom_cpg = \
+                calc_gc(promoters[gene]['chrom'], promoters[gene]['start'], 
+                        promoters[gene]['end'], ref_fasta, cpg=True)
+            cfeats_tmp[gene].append(prom_gc)
+            cfeats_tmp[gene].append(prom_cpg)
+        header_cols += 'promoter_gc_pct promoter_cpg_count'.split()
 
+    # Get promoter, exon, and gene body conservation if phastcons_url is provided
+    if phastcons_url is not None:
+        # Make master pbt.BedTool of all promoters for one-shot conservation calculation
+        all_prom_str = ''.join([str(v['prom_bt'][0]) for v in promoters.values()])
+        all_prom_bt = pbt.BedTool(all_prom_str, from_string=True)
+        all_prom_cons = add_local_track(all_prom_bt, phastcons_url, 'map-mean', 8, True)
+        all_prom_cons_df = \
+            all_prom_cons.to_dataframe(names='chr start end gene cons'.split())
+        # Calculate conservation for all exons
+        all_ex_cons = add_local_track(exonbt, phastcons_url, 'map-mean', 8, True)
+        all_ex_cons_df = all_ex_cons.to_dataframe().iloc[:, np.r_[0, 3:5, 8:10]]
+        all_ex_cons_df.columns = 'chr start end info cons'.split()
+        all_ex_cons_df['size'] = all_ex_cons_df['end'] - all_ex_cons_df['start']
+        # Calculate conservation for all gene bodies
+        all_tx_cons = add_local_track(txbt, phastcons_url, 'map-mean', 8, True)
+        all_tx_cons_df = all_tx_cons.\
+                             to_dataframe(names='chr x y start end sc st z info cons'.split()).\
+                             iloc[:, np.r_[0, 3:5, 8:10]]
+        # Annotate for each gene
+        for gene in genes:
+            prom_cons = all_prom_cons_df.loc[all_prom_cons_df.gene == gene]['cons'].iloc[0]
+            ex_keep = all_ex_cons_df['info'].str.contains('gene_name "{}"'.format(gene))
+            if ex_keep.sum() > 0:
+                ex_cons_df = all_ex_cons_df.loc[ex_keep, 'size cons'.split()]
+                ex_cons = np.ma.average(ex_cons_df['cons'].astype(float).to_numpy(), 
+                                        weights=ex_cons_df['size'].to_numpy())
+            else:
+                ex_cons = 0
+            tx_keep = all_tx_cons_df['info'].str.contains('gene_name "{}"'.format(gene))
+            if tx_keep.sum() > 0:
+                tx_cons = all_tx_cons_df.loc[tx_keep, 'cons'].values[0]
+            else:
+                tx_cons = 0
+            cfeats_tmp[gene] += [prom_cons, ex_cons, tx_cons]
+        header_cols += 'promoter_phastcons exon_phastcons gene_body_phastcons'.split()
 
+    # Format output string of all constraint features per gene
+    header = '\t'.join(header_cols)
+    constraint_features = {}
+    for gene in genes:
+        cfeats_str = '\t'.join([str(x) for x in cfeats_tmp[gene]])
+        constraint_features[gene] = cfeats_str
 
+    return header, constraint_features
 
 
 def write_outbed(outbed, header, genes, txbt, tx_stats, genomic_features,
-                 expression_features):
+                 expression_features, constraint_features):
     """
     Format output table of features and write to output BED file
     """
@@ -548,6 +655,9 @@ def write_outbed(outbed, header, genes, txbt, tx_stats, genomic_features,
 
         if expression_features is not None:
             outstr = outstr + '\t' + expression_features[gene]
+
+        if constraint_features is not None:
+            outstr = outstr + '\t' + constraint_features[gene]            
 
         outbed.write(outstr + '\n')
 
@@ -576,12 +686,20 @@ def main():
     parser.add_argument('--ref-fasta', help='Reference fasta file. Only necessary ' +
                         'to compute GC content if --get-genomic is specified, and ' +
                         'promoter stats if --get-constraint is specified.')
+    parser.add_argument('--athena-tracks', help='Annotate transcripts with track(s). ' +
+                        'Must be formatted as for athena annotate-bins.')
     parser.add_argument('--gtex-medians', help='GTEx gene X tissue expression medians. ' +
                         'Only used if --get-expression is specified.')
     parser.add_argument('--gtex-mads', help='GTEx gene X tissue expression MADs. ' +
                         'Only used if --get-expression is specified.')
-    parser.add_argument('--athena-tracks', help='Annotate transcripts with track(s). ' +
-                        'Must be formatted as for athena annotate-bins.')
+    parser.add_argument('--gnomad-constraint', help='gnomAD constraint tsv. Only ' +
+                        'used if --get-constraint is specified.')
+    parser.add_argument('--rvis-tsv', help='RVIS tsv. Only used if --get-constraint ' +
+                        'is specified.')
+    parser.add_argument('--eds-tsv', help='EDS tsv. Only used if --get-constraint ' +
+                        'is specified.')
+    parser.add_argument('--phastcons-bw-url', help='URL to phastCons bigWig.',
+                        default='http://hgdownload.soe.ucsc.edu/goldenPath/hg19/phastCons100way/hg19.100way.phastCons.bw')
     parser.add_argument('--min-intron-size', type=int, default=4, help='Minimum ' +
                         'size of intron to retain (bp). [default: 4]')
     parser.add_argument('--no-scaling', action='store_true', help='Do not perform ' +
@@ -606,7 +724,8 @@ def main():
     outbed_header = '\t'.join('#chr start end gene'.split())
 
     # Load & filter input GTF
-    gtfbt, txbt, exonbt, genes, ensg_ids, transcripts = process_gtf(args.gtf)
+    gtfbt, txbt, exonbt, genes, ensg_ids, transcripts, ensg_to_gene, gene_to_ensg \
+        = process_gtf(args.gtf)
 
     # Get transcript stats
     tx_stats = get_tx_stats(genes, txbt)
@@ -639,13 +758,17 @@ def main():
     # Get constraint stats, if optioned
     if args.get_constraint:
         header_add, constraint_features = \
-            get_constraint_features(genes, ensg_ids, tx_stats, args.ref_fasta)
+            get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ensg,
+                                    args.gnomad_constraint, args.rvis_tsv, 
+                                    args.eds_tsv, args.ref_fasta, 
+                                    args.phastcons_bw_url)
+        outbed_header = outbed_header + '\t' + header_add
     else:
         constraint_features = None
 
     # Format output table of features
     write_outbed(outbed, outbed_header, genes, txbt, tx_stats, genomic_features,
-                 expression_features)
+                 expression_features, constraint_features)
     if args.outbed is not None \
     and args.outbed not in 'stdout -'.split() \
     and args.bgzip:

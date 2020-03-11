@@ -66,13 +66,13 @@ plot.roc <- function(data){
   par(mar=c(3, 3, 1, 1))
   plot(x=c(0, 1), y=c(0, 1), type="n",
        xaxs="i", yaxs="i", xlab="", ylab="")
-  abline(0, 1, col="gray90")
+  abline(0, 1, col="gray70")
   lapply(data, function(x){
     points(x$roc$frac_other, x$roc$frac_true,
-           type="l", col=x$color, lwd=2)
+           type="l", col=x$color, lwd=3)
   })
-  legend("bottomright", legend=names(data), lwd=4, cex=0.75, 
-         col=sapply(data, function(x){x$color}))
+  legend("bottomright", legend=names(data), lwd=5, cex=0.75, 
+         col=sapply(data, function(x){x$color}), bty="n")
   mtext(1, line=2, text="Fraction of other associations retained")
   mtext(2, line=2, text="Fraction of true positive associations retained")
 }

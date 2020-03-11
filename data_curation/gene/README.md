@@ -82,8 +82,24 @@ All expression values were derived from GTEx v7 (rather than the final v8 releas
 
 We collected the following gene features related to evolutionary constraint:  
 
-
-
+| Feature name | Abbreviation | Description | Source |  
+| :--- | :--- | :--- | :--- |  
+| Probability of loss-of-function intolerance | `gnomad_pLI` | Probability of loss-of-function intolerance calculated in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _bioRxiv_, 2019)](https://www.biorxiv.org/content/10.1101/531210v2) |  
+| Probability of complete haplosufficiency | `gnomad_pNull` | Probability of haplosufficiency calculated in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _bioRxiv_, 2019)](https://www.biorxiv.org/content/10.1101/531210v2) |  
+| Probability of recessive lethality | `gnomad_pRec` | Probability of recessive lethality calculated in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _bioRxiv_, 2019)](https://www.biorxiv.org/content/10.1101/531210v2) |  
+| gnomAD missense obs:exp | `gnomad_oe_mis` | Observed : expected ratio for missense SNVs in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _bioRxiv_, 2019)](https://www.biorxiv.org/content/10.1101/531210v2) |  
+| gnomAD loss-of-function obs:exp | `gnomad_oe_lof` | Observed : expected ratio for loss-of-function SNVs in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _bioRxiv_, 2019)](https://www.biorxiv.org/content/10.1101/531210v2) |  
+| gnomAD missense obs:exp (upper 90% CI) | `gnomad_oe_mis_upper` | Upper 90% confidence interval of obs:exp ratio for missense SNVs in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _bioRxiv_, 2019)](https://www.biorxiv.org/content/10.1101/531210v2) |  
+| gnomAD loss-of-function obs:exp (upper 90% CI) | `gnomad_oe_lof_upper` | Upper 90% confidence interval of obs:exp ratio for loss-of-function SNVs in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _bioRxiv_, 2019)](https://www.biorxiv.org/content/10.1101/531210v2) |  
+| gnomAD missense Z-score | `gnomad_mis_z` | Z-score for missense obs:exp ratio in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _bioRxiv_, 2019)](https://www.biorxiv.org/content/10.1101/531210v2) |  
+| gnomAD loss-of-function Z-score | `gnomad_lof_z` | Z-score for loss-of-function obs:exp ratio in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _bioRxiv_, 2019)](https://www.biorxiv.org/content/10.1101/531210v2) |  
+| RVIS | `rvis` | Residual variation intolerance score (RVIS) computed on gnomAD v2.0 | [Petrovski _et al._, _PLOS Genetics_, 2013](https://www.ncbi.nlm.nih.gov/pubmed/23990802) |  
+| RVIS percentile | `rvis_pct` | RVIS percentile computed on gnomAD v2.0 | [Petrovski _et al._, _PLOS Genetics_, 2013](https://www.ncbi.nlm.nih.gov/pubmed/23990802) |  
+| Promoter GC content | `promoter_gc_pct` | Percentage of C/G nucleotides in gene promoter | [UCSC Genome Browser](http://genome.ucsc.edu) |  
+| Promoter CpG count | `promoter_cpg_count` | Count of CpG dinucleotides in gene promoter | [UCSC Genome Browser](http://genome.ucsc.edu) |  
+| Promoter conservation | `promoter_phastcons` | Mean 100-way phastCons score in gene promoter | [UCSC Genome Browser](http://genome.ucsc.edu) |  
+| Exon conservation | `exon_phastcons` | Mean 100-way hastCons score in exons (weighted by exon size) | [UCSC Genome Browser](http://genome.ucsc.edu) |  
+| Gene body conservation | `gene_body_phastcons` | Mean 100-way phastCons score across entire gene body | [UCSC Genome Browser](http://genome.ucsc.edu) |  
 
 #### Gene features: chromatin  
 

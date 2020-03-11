@@ -183,6 +183,48 @@ task get_expression_data {
 }
 
 
+# Collect constraint metadata for all genes from a single contig
+task get_constraint_data {
+  File gtf
+  String prefix
+  String contig
+  String rCNV_bucket
+
+  command <<<
+    set -e
+
+    # Download necessary data & references
+    wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
+    wget http://genic-intolerance.org/data/RVIS_Unpublished_ExACv2_March2017.txt
+    gsutil -m cp ${rCNV_bucket}/cleaned_data/genes/annotations/EDS.Wang_2018.tsv.gz ./
+
+    # Subset input files to chromosome of interest
+    tabix -f ${gtf}
+    tabix -h ${gtf} ${contig} | bgzip -c > subset.gtf.gz
+
+    # Collect genomic metadata
+    /opt/rCNV2/data_curation/gene/get_gene_features.py \
+      --get-constraint \
+      --gtex-medians gtex_stats/*.GTEx_v7_constraint_stats.median.tsv.gz \
+      --gtex-mads gtex_stats/*.GTEx_v7_constraint_stats.mad.tsv.gz \
+      --outbed ${prefix}.constraint_features.${contig}.bed.gz \
+      --bgzip \
+      subset.gtf.gz
+  >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:5239898782e9936bf377373935fce5829907f68276b35e196204ba3f4615496e"
+    preemptible: 1
+    memory: "4 GB"
+    disks: "local-disk 100 SSD"
+    bootDiskSizeGb: "20"
+  }
+
+  output {
+   File metadata_table = "${prefix}.constraint_features.${contig}.bed.gz"
+  }
+}
+
 # Join metadata for multiple conditions
 task join_data {
   File genomic_metadata
@@ -200,7 +242,7 @@ task join_data {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:5239898782e9936bf377373935fce5829907f68276b35e196204ba3f4615496e"
+    docker: "talkowski/rcnv@sha256:4a1e6bb51d419410c72ef17b0bce74bd8c735e6c6dc79183c8d93790b04a6ad9"
     preemptible: 1
     disks: "local-disk 50 SSD"
     bootDiskSizeGb: "20"

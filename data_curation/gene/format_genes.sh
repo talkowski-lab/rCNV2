@@ -149,11 +149,15 @@ done > gene_features.athena_tracklist.tsv
 
 # Gather per-gene constraint metadata
 wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
-wget http://genic-intolerance.org/data/GenicIntolerance_v3_12Mar16.txt
-# Add: promoter CpG count, promoter conservation, average exon conservation, EDS
+wget http://genic-intolerance.org/data/RVIS_Unpublished_ExACv2_March2017.txt
+gsutil -m cp gs://rcnv_project/cleaned_data/genes/annotations/EDS.Wang_2018.tsv.gz ./
+# Add: promoter conservation, average exon conservation, EDS
 /opt/rCNV2/data_curation/gene/get_gene_features.py \
   --get-constraint \
   --ref-fasta Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz \
+  --gnomad-constraint gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
+  --rvis-tsv RVIS_Unpublished_ExACv2_March2017.txt \
+  --eds-tsv EDS.Wang_2018.tsv.gz \
   --bgzip \
   gencode.v19.canonical.pext_filtered.gtf.gz
 
@@ -237,6 +241,11 @@ done < refs/test_phenotypes.list
 
 # Copy HPO-based gene lists to rCNV bucket (note: requires permissions)
 gsutil -m cp *.HPOdb.*genes.list gs://rcnv_project/cleaned_data/genes/gene_lists/
+
+
+# Generate ClinGen dosage sensitive gene lists
+wget ftp://ftp.clinicalgenome.org/ClinGen_gene_curation_list_GRCh37.tsv
+
 
 
 # Generate HTML table of gene lists for README
