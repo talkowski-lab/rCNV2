@@ -167,6 +167,7 @@ gsutil -m cp gs://rcnv_project/cleaned_data/genes/annotations/EDS.Wang_2018.tsv.
 /opt/rCNV2/data_curation/gene/join_gene_metadata.R \
   gencode.v19.canonical.pext_filtered.genomic_features.bed.gz \
   gencode.v19.canonical.pext_filtered.expression_features.bed.gz \
+  gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
 | bgzip -c \
 > gencode.v19.canonical.pext_filtered.all_features.bed.gz
 

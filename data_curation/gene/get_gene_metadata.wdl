@@ -241,7 +241,7 @@ task get_constraint_data {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:09ea97525579ee2f2d55a80e7acdabfaa87a28e61d02027401464e08c50f6c3a"
+    docker: "talkowski/rcnv@sha256:a174db7b8741c6ddec07116fb0c815657b1b7cbd426a566cd73cbc27c27fab71"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"
@@ -272,7 +272,7 @@ task join_data {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:09ea97525579ee2f2d55a80e7acdabfaa87a28e61d02027401464e08c50f6c3a"
+    docker: "talkowski/rcnv@sha256:a174db7b8741c6ddec07116fb0c815657b1b7cbd426a566cd73cbc27c27fab71"
     preemptible: 1
     disks: "local-disk 50 SSD"
     bootDiskSizeGb: "20"

@@ -612,8 +612,16 @@ def get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ens
             if ex_keep.sum() > 0:
                 ex_cons_df = all_ex_cons_df.loc[ex_keep, 'size cons'.split()]
                 ex_cons_df = ex_cons_df.loc[ex_cons_df.cons.astype(str) != '.', :]
-                ex_cons = np.ma.average(ex_cons_df['cons'].astype(float).to_numpy(), 
-                                        weights=ex_cons_df['size'].to_numpy())
+                if len(ex_cons_df) > 0:
+                    try:
+                        ex_cons = np.ma.average(ex_cons_df['cons'].astype(float).to_numpy(), 
+                                                weights=ex_cons_df['size'].to_numpy())
+                    except:
+                        # Debug message
+                        print('Failed on exon phastCons calculation for ' + gene)
+                        exit(1)
+                else:
+                    ex_cons = 0
             else:
                 ex_cons = 0
             tx_keep = all_tx_cons_df['info'].str.contains('gene_name "{}"'.format(gene))
