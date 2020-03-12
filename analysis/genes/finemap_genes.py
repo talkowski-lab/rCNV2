@@ -265,6 +265,11 @@ def functional_finemap(hpo_data, gene_features_in, null_variance=0.42 ** 2,
     for colname in '#chr chr start end'.split():
         if colname in features.columns:
             features.drop(labels=colname, axis=1, inplace=True)
+    for col in features.columns.tolist()[1:]:
+        missing = (features[col] == '.')
+        if missing.sum() > 0:
+            fmean = np.nanmean(features.loc[~missing, col].astype(float))
+            features.loc[missing, col] = fmean
     sig_df = make_sig_genes_df(hpo_data)
     features.iloc[:, 1:] = scale(features.iloc[:, 1:])
     features = features.loc[features.gene.isin(sig_df.gene), :]

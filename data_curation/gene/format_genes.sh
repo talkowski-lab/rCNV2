@@ -245,9 +245,25 @@ done < refs/test_phenotypes.list
 gsutil -m cp *.HPOdb.*genes.list gs://rcnv_project/cleaned_data/genes/gene_lists/
 
 
-# Generate ClinGen dosage sensitive gene lists
+# Generate ClinGen dosage sensitive gene lists & copy to rCNV bucket (note: requires permissions)
 wget ftp://ftp.clinicalgenome.org/ClinGen_gene_curation_list_GRCh37.tsv
+/opt/rCNV2/data_curation/gene/parse_clingen_genes.R \
+  ClinGen_gene_curation_list_GRCh37.tsv \
+  gencode.v19.canonical.pext_filtered.genes.list \
+  ./
+gsutil -m cp ClinGen.*.genes.list gs://rcnv_project/cleaned_data/genes/gene_lists/  
 
+
+# Generate DECIPHER/DDG2P gene lists & copy to rCNV bucket (note: requires permissions)
+wget http://www.ebi.ac.uk/gene2phenotype/downloads/DDG2P.csv.gz
+/opt/rCNV2/data_curation/gene/parse_ddg2p_genes.R \
+  DDG2P.csv.gz \
+  gencode.v19.canonical.pext_filtered.genes.list \
+  ./
+gsutil -m cp DDG2P.*.genes.list \
+  gs://rcnv_project/cleaned_data/genes/gene_lists/
+gsutil -m cp DDG2P.*.genes_with_hpos.tsv \
+  gs://rcnv_project/cleaned_data/genes/gene_lists/ddg2p_with_hpos/
 
 
 # Generate HTML table of gene lists for README
@@ -293,6 +309,89 @@ while read pheno hpo; do
   | sed 's/\t/\ \|\ /g' \
   | sed -e 's/^/\|\ /g' -e 's/$/\ \|/g'
 done < refs/test_phenotypes.list \
+>> genelist_table.html.txt
+# ClinGen dosage sensitive genes
+for dos in haploinsufficient triplosensitive; do
+  for conf in hc mc hmc lc all; do
+    case $conf in
+      "hc")
+        clab="high"
+        ;;
+      "mc")
+        clab="medium"
+        ;;
+      "hmc")
+        clab="high or medium"
+        ;;
+      "lc")
+        clab="low"
+        ;;
+      "all")
+        clab="any"
+        ;;
+    esac
+    for wrapper in 1; do
+      echo "ClinGen dominant $dos genes (${clab} confidence)"
+      cat ClinGen.${conf}_${dos}.genes.list | wc -l | addcom
+      echo "\`ClinGen.${conf}_${dos}\`"
+      echo "ClinGen gene curation map (accessed $( date | awk '{ print $2, $NF }' )) [Strande _et al._, _Am. J. Hum. Genet._, 2017](https://www.ncbi.nlm.nih.gov/pubmed/28552198)"
+      echo "Dominant $dos genes scored at $clab confidence by ClinGen"
+    done | paste -s \
+      | sed 's/\t/\ \|\ /g' \
+      | sed -e 's/^/\|\ /g' -e 's/$/\ \|/g'
+  done
+done \
+>> genelist_table.html.txt
+# DECIPHER genes
+for mech in lof gof other; do
+  case $mech in
+    "lof")
+      mdescrip="loss-of-function"
+      article="a"
+      ;;
+    "gof")
+      mdescrip="activating/gain-of-function"
+      article="an"
+      ;;
+    "other")
+      mdescrip="other/unknown coding"
+      article="an"
+      ;;
+  esac
+  for conf in hc mc hmc lc all; do
+    case $conf in
+      "hc")
+        clab="high"
+        rating='"confirmed"'
+        ;;
+      "mc")
+        clab="medium"
+        rating='"probable"'
+        ;;
+      "hmc")
+        clab="high or medium"
+        rating='"confirmed" or "probable"'
+        ;;
+      "lc")
+        clab="low"
+        rating='"possible"'
+        ;;
+      "all")
+        clab="any"
+        rating='"confirmed", "probable", or "possible"'
+        ;;
+    esac
+    for wrapper in 1; do
+      echo "DECIPHER dominant dev. disorder genes (${mdescrip} mechanism; ${clab} confidence)"
+      cat DDG2P.${conf}_${mech}.genes.list | wc -l | addcom
+      echo "\`DDG2P.${conf}_${mech}\`"
+      echo "DECIPHER/DDG2P (accessed $( date | awk '{ print $2, $NF }' )) [Wright _et al._, _Lancet_, 2015](https://www.ncbi.nlm.nih.gov/pubmed/25529582)"
+      echo "Dominant dev. disorder genes with $article $mdescrip mechanism scored as $rating in DECIPHER"
+    done | paste -s \
+      | sed 's/\t/\ \|\ /g' \
+      | sed -e 's/^/\|\ /g' -e 's/$/\ \|/g'
+  done
+done \
 >> genelist_table.html.txt
 cat genelist_table.html.txt
 

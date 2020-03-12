@@ -272,7 +272,7 @@ task join_data {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:abaa1d4fc1c6a4e74f73ee13ff15c477cddbd5b791dcbc51f1269b49201f4554"
+    docker: "talkowski/rcnv@sha256:40e1fe374e4de7af9e02da441ef27f02d59996f2cfdf60f043429d3deeeaa222"
     preemptible: 1
     disks: "local-disk 50 SSD"
     bootDiskSizeGb: "20"
@@ -321,7 +321,7 @@ task cat_metadata {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:5239898782e9936bf377373935fce5829907f68276b35e196204ba3f4615496e"
+    docker: "talkowski/rcnv@sha256:071cc1595d67604f517d31a5743961834d3ba6f9f95151d2a4a1e64708e307a9"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"

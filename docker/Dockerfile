@@ -69,7 +69,7 @@ RUN Rscript -e "sapply(c('beeswarm'),\
 # Install Athena toolkit
 RUN git clone https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/athena /opt/athena \
     && cd /opt/athena \
-    && git checkout bf1889c93dd2cda19cc0f986a9c0809ae46d4f43 \
+    && git checkout c2c1f4981c0b978275f3ce3e4b82d2e98a1989ef \
     && cd -
 RUN cd /opt/athena \
     && pip install -e .
@@ -77,7 +77,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout f755ec9dfaa0936388dd9ed0fc2a46eed245693a && \
+    git checkout 7e3dcd351c73cf5029cea117a11a9dfcb44d9876 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)
