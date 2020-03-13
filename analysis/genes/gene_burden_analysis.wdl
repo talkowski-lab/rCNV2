@@ -26,9 +26,11 @@ workflow gene_burden_analysis {
   Int max_genes_per_cnv
   Float p_cutoff
   Float meta_secondary_p_cutoff
-  Float meta_or_cutoff
   Int meta_nominal_cohorts_cutoff
-  Int sig_gene_pad
+  File finemap_genomic_features
+  File finemap_expression_features
+  File finemap_constraint_features
+  File finemap_merged_features
   String rCNV_bucket
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
@@ -127,25 +129,72 @@ workflow gene_burden_analysis {
     }
   }
 
-  # Refine individually significant genes
+  # Fine-map significant genes
   scatter ( cnv in cnv_types ) {
-    call prep_refinement {
+    # Genomic features
+    call finemap_genes as finemap_genomic {
       input:
         completion_tokens=rCNV_meta_analysis.completion_token,
         phenotype_list=phenotype_list,
-        metacohort_list=metacohort_list,
-        gtf=gtf,
+        metacohort_sample_table=metacohort_sample_table,
         freq_code="rCNV",
         CNV=cnv,
         meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
         meta_secondary_p_cutoff=meta_secondary_p_cutoff,
-        meta_or_cutoff=meta_or_cutoff,
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
-        sig_gene_pad=sig_gene_pad,
+        finemap_output_label="genomic_features",
+        gene_features=finemap_genomic_features,
+        rCNV_bucket=rCNV_bucket
+    }
+    
+    # Expression features
+    call finemap_genes as finemap_expression {
+      input:
+        completion_tokens=rCNV_meta_analysis.completion_token,
+        phenotype_list=phenotype_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code="rCNV",
+        CNV=cnv,
+        meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+        meta_secondary_p_cutoff=meta_secondary_p_cutoff,
+        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+        finemap_output_label="expression_features",
+        gene_features=finemap_expression_features,
+        rCNV_bucket=rCNV_bucket
+    }
+    
+    # Constraint features
+    call finemap_genes as finemap_constraint {
+      input:
+        completion_tokens=rCNV_meta_analysis.completion_token,
+        phenotype_list=phenotype_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code="rCNV",
+        CNV=cnv,
+        meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+        meta_secondary_p_cutoff=meta_secondary_p_cutoff,
+        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+        finemap_output_label="constraint_features",
+        gene_features=finemap_constraint_features,
+        rCNV_bucket=rCNV_bucket
+    }
+    
+    # Merged features
+    call finemap_genes as finemap_merged {
+      input:
+        completion_tokens=rCNV_meta_analysis.completion_token,
+        phenotype_list=phenotype_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code="rCNV",
+        CNV=cnv,
+        meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+        meta_secondary_p_cutoff=meta_secondary_p_cutoff,
+        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+        finemap_output_label="merged_features",
+        gene_features=finemap_merged_features,
         rCNV_bucket=rCNV_bucket
     }
   }
-
 
   output {}
 }
@@ -508,19 +557,18 @@ task meta_analysis {
 }
 
 
-# Prepare data for refinement
-task prep_refinement {
+# Fine-map genes
+task finemap_genes {
   Array[File] completion_tokens # Must delocalize something from meta-analysis step to prevent caching
   File phenotype_list
-  File metacohort_list
-  File gtf
+  File metacohort_sample_table
   String freq_code
   String CNV
   Array[File] meta_p_cutoff_tables
   Float meta_secondary_p_cutoff
-  Float meta_or_cutoff
   Int meta_nominal_cohorts_cutoff
-  Int sig_gene_pad
+  String finemap_output_label
+  File gene_features
   String rCNV_bucket
 
   command <<<
@@ -530,101 +578,45 @@ task prep_refinement {
     find / -name "*gene_burden.${freq_code}.*.empirical_genome_wide_pval.hpo_cutoffs.tsv*" \
     | xargs -I {} mv {} ./
 
-    # Download all meta-analysis stats files and necessary data
-    mkdir stats/
+    # Copy association stats from the project Google Bucket (note: requires permissions)
+    mkdir stats
     gsutil -m cp \
-      ${rCNV_bucket}/analysis/gene_burden/**.${freq_code}.**.gene_burden.meta_analysis.stats.bed.gz \
+      ${rCNV_bucket}/analysis/gene_burden/**.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz \
       stats/
-    gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
-    mkdir refs/
-    gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/* refs/
 
-    # Make representative BED file of genes used in meta-analysis
-    zcat stats/$( sed -n '1p' ${phenotype_list} | cut -f1 ).${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz \
-    | cut -f1-4 | bgzip -c \
-    > all_genes.bed.gz
+    # Write tsv input
+    while read prefix hpo; do
+      for wrapper in 1; do
+        echo "$hpo"
+        echo "stats/$prefix.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz"
+        awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' ${meta_p_cutoffs_tsv}
+      done | paste -s
+    done < ${phenotype_list} \
+    > ${freq_code}.${CNV}.gene_fine_mapping.stats_input.tsv
 
-    # Iterate over phenotypes and make matrix of p-values, odds ratios (lower 95% CI), and nominal sig cohorts
-    mkdir pvals/
-    mkdir secondary_pvals/
-    mkdir ors/
-    mkdir nomsig/
-    while read pheno hpo; do
-      stats=stats/$pheno.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz
-      p_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
-             | awk -v OFS="\t" '{ if ($1=="meta_phred_p") print NR }' )
-      secondary_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
-                       | awk -v OFS="\t" '{ if ($1=="meta_phred_p_secondary") print NR }' )
-      lnor_lower_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
-                        | awk -v OFS="\t" '{ if ($1=="meta_lnOR_lower") print NR }' )
-      nom_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
-                 | awk -v OFS="\t" '{ if ($1=="n_nominal_cohorts") print NR }' )
-      zcat $stats | awk -v FS="\t" -v idx=$p_idx '{ if ($1 !~ "#") print $(idx) }' \
-      | cat <( echo "$pheno.${CNV}" ) - \
-      > pvals/$pheno.${CNV}.pvals.txt
-      zcat $stats | awk -v FS="\t" -v idx=$secondary_idx '{ if ($1 !~ "#") print $(idx) }' \
-      | cat <( echo "$pheno.${CNV}" ) - \
-      > pvals/$pheno.${CNV}.secondary_pvals.txt
-      zcat $stats | awk -v FS="\t" -v idx=$lnor_lower_idx '{ if ($1 !~ "#") print $(idx) }' \
-      | cat <( echo "$pheno.${CNV}" ) - \
-      > ors/$pheno.${CNV}.lnOR_lower.txt
-      zcat $stats | awk -v FS="\t" -v idx=$nom_idx '{ if ($1 !~ "#") print $(idx) }' \
-      | cat <( echo "$pheno.${CNV}" ) - \
-      > nomsig/$pheno.${CNV}.nomsig_counts.txt
-    done < ${phenotype_list}
-    paste <( zcat all_genes.bed.gz | cut -f1-4 ) \
-          pvals/*.${CNV}.pvals.txt \
-    | bgzip -c \
-    > ${CNV}.pval_matrix.bed.gz
-    paste <( zcat all_genes.bed.gz | cut -f1-4 ) \
-          pvals/*.${CNV}.secondary_pvals.txt \
-    | bgzip -c \
-    > ${CNV}.secondary_pval_matrix.bed.gz
-    paste <( zcat all_genes.bed.gz | cut -f1-4 ) \
-          ors/*.${CNV}.lnOR_lower.txt \
-    | bgzip -c \
-    > ${CNV}.lnOR_lower_matrix.bed.gz
-    paste <( zcat all_genes.bed.gz | cut -f1-4 ) \
-          nomsig/*.${CNV}.nomsig_counts.txt \
-    | bgzip -c \
-    > ${CNV}.nominal_cohort_counts.bed.gz
-
-    # Get matrix of gene significance labels
-    /opt/rCNV2/analysis/genes/get_significant_genes.R \
-      --pvalues ${CNV}.pval_matrix.bed.gz \
-      --secondary-pvalues ${CNV}.secondary_pval_matrix.bed.gz \
-      --p-is-phred \
-      --p-cutoffs gene_burden.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv \
-      --odds-ratios ${CNV}.lnOR_lower_matrix.bed.gz \
-      --or-is-ln \
-      --min-secondary-p ${meta_secondary_p_cutoff} \
-      --min-or ${meta_or_cutoff} \
-      --nominal-counts ${CNV}.nominal_cohort_counts.bed.gz \
+    # Run functional fine-mapping procedure
+    /opt/rCNV2/analysis/genes/finemap_genes.py \
+      --secondary-p-cutoff ${meta_secondary_p_cutoff} \
       --min-nominal ${meta_nominal_cohorts_cutoff} \
-      --secondary-or-nom \
-      --out-prefix ${freq_code}.${CNV}. \
-      all_genes.bed.gz
-    bgzip -f ${freq_code}.${CNV}.all_genes_labeled.bed
-    bgzip -f ${freq_code}.${CNV}.significant_genes.bed
+      --secondary-or-nominal \
+      --outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv \
+      --naive-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.tsv \
+      --genetic-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.${finemap_output_label}.tsv \
+      --coeffs-out ${freq_code}.${CNV}.gene_fine_mapping.logit_coeffs.${finemap_output_label}.tsv \
+      ${freq_code}.${CNV}.gene_fine_mapping.stats_input.tsv \
+      ${gene_features}
 
-    # Cluster blocks of significant genes to be refined
-    /opt/rCNV2/analysis/genes/cluster_gene_blocks.py \
-      --bgzip \
-      --outfile ${freq_code}.${CNV}.sig_gene_blocks_to_refine.bed.gz \
-      ${freq_code}.${CNV}.all_genes_labeled.bed.gz
-
-    # Prep input file for locus refinement
-    while read meta; do
-      echo -e "$meta\tcleaned_cnv/$meta.${freq_code}.bed.gz\tphenos/$meta.cleaned_phenos.txt"
-    done < <( cut -f1 ${metacohort_list} | fgrep -v "mega" )\
-    > gene_refinement.${freq_code}_metacohort_info.tsv
+    # Copy results to output bucket
+    gsutil -m cp \
+      ${freq_code}.${CNV}.gene_fine_mapping.*.${finemap_output_label}.tsv \
+      ${rCNV_bucket}/analysis/gene_burden/fine_mapping/
   >>>
 
   output {
-    File genes_to_refine = "${freq_code}.${CNV}.sig_gene_blocks_to_refine.bed.gz"
-    File metacohort_info_tsv = "gene_refinement.${freq_code}_metacohort_info.tsv"
-    File pval_matrix = "${CNV}.pval_matrix.bed.gz"
-    File labeled_genes = "${freq_code}.${CNV}.all_genes_labeled.bed.gz"
+    File finemapped_output = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv"
+    File naive_output = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.tsv"
+    File genetic_output = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.${finemap_output_label}.tsv"
+    File logit_coeffs = "${freq_code}.${CNV}.gene_fine_mapping.logit_coeffs.${finemap_output_label}.tsv"
   }
 
   runtime {

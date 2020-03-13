@@ -119,8 +119,9 @@ def finemap(gene_priors, gene_info, null_variance=0.42 ** 2):
 
 
 def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True, 
-                block_merge_dist=1000000, block_prefix='gene_block', 
-                null_variance=0.42 ** 2):
+                secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
+                secondary_or_nominal=True, block_merge_dist=1000000, 
+                block_prefix='gene_block', null_variance=0.42 ** 2):
     """
     Loads & processes all necessary data for a single phenotype
     Returns a dict with the following entries:
@@ -155,7 +156,8 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
         lnOR_upper = format_stat(lnOR_upper)
 
         # Store gene association stats if significant
-        if is_gene_sig(primary_p, secondary_p, n_nominal, primary_p_cutoff):
+        if is_gene_sig(primary_p, secondary_p, n_nominal, primary_p_cutoff,
+                       secondary_p_cutoff, n_nominal, secondary_or_nominal):
             gene_bt = pbt.BedTool('\t'.join([chrom, start, end, gene]), from_string=True)
             gene_stats = {'lnOR' : lnOR, 
                           'lnOR_lower' : lnOR_lower,
@@ -188,7 +190,8 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
     return hpo_info
 
 
-def load_all_hpos(statslist):
+def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
+                  secondary_or_nominal=True):
     """
     Wrapper function to process each HPO with process_hpo()
     Returns a dict with one entry per HPO
@@ -200,7 +203,11 @@ def load_all_hpos(statslist):
         reader = csv.reader(infile, delimiter='\t')
         for hpo, stats_in, pval, in reader:
             primary_p_cutoff = float(pval)
-            hpo_data[hpo] = process_hpo(hpo, stats_in, primary_p_cutoff)
+            hpo_data[hpo] = process_hpo(hpo, stats_in, primary_p_cutoff, 
+                                        p_is_phred=True, 
+                                        secondary_p_cutoff=secondary_p_cutoff, 
+                                        n_nominal_cutoff=n_nominal_cutoff, 
+                                        secondary_or_nominal=secondary_or_nominal)
 
     return hpo_data
 
@@ -398,6 +405,15 @@ def main():
                         'for functional fine-mapping. First column = gene name. ' +
                         'All other columns must be numeric features. Optionally, ' + 
                         'first three columns can be BED-like, and will be dropped.')
+    parser.add_argument('--secondary-p-cutoff', help='Maximum secondary P-value to ' + 
+                        'consider as significant. [default: 1]', default=1, type=float)
+    parser.add_argument('--min-nominal', help='Minimum number of individual cohorts ' + 
+                        'required to be nominally significant to consider ' +
+                        'significant. [default: 1]', default=1, type=int)
+    parser.add_argument('--secondary-or-nominal', dest='secondary_or_nom', 
+                        help='Allow genes to meet either --secondary-p-cutoff ' +
+                        'or --min-nominal, but do not require both. ' +
+                        '[default: require both]', default=False, action='store_true')
     parser.add_argument('-o', '--outfile', default='stdout', help='Output tsv of ' +
                         'final fine-mapping results for all genes and phenotypes.')
     parser.add_argument('--naive-outfile', help='Output tsv of naive results ' +
@@ -419,7 +435,8 @@ def main():
         coeffs_out = None
 
     # Process data per hpo
-    hpo_data = load_all_hpos(args.statslist)
+    hpo_data = load_all_hpos(args.statslist, args.secondary_p_cutoff, 
+                             args.min_nominal, args.secondary_or_nom)
 
     # Write naive and/or genetics-only fine-mapping results (for ROC comparisons)
     if args.naive_outfile is not None:

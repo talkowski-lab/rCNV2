@@ -19,9 +19,14 @@ options(scipen=100000, stringsAsFactors=F)
 #################
 # Load truth set
 load.truth <- function(truth.in){
-  x <- read.table(truth.in, sep="\t", header=T, comment.char="")
-  colnames(x)[1] <- "HPO"
-  return(x)
+  truth.list <- read.table(truth.in, header=F, sep="\t")
+  truth.sets <- lapply(1:nrow(truth.list), function(i){
+    x <- read.table(truth.list[i, 2], sep="\t", header=T, comment.char="")
+    colnames(x)[1] <- "HPO"
+    return(list("truth.genes"=x, "name"=truth.list[i, 1]))
+  })
+  names(truth.sets) <- truth.list[, 1]
+  return(truth.sets)
 }
 
 # Compute ROC
@@ -48,14 +53,32 @@ load.data.single <- function(path, truth){
 }
 
 # Find ROC-optimal point
-optimize.roc <- function(roc.res){
+optimize.roc <- function(roc.res, return.dist=F){
   # Compute Euclidean distance from (0, 1)
   x2 <- (roc.res$frac_other - 0) ^ 2
   y2 <- (roc.res$frac_true - 1) ^ 2
   d <- sqrt(x2 + y2)
   d.best <- min(d)
   best.idx <- sort(which(d == d.best))[1]
-  return(roc.res[best.idx, ])
+  if(return.dist==F){
+    return(roc.res[best.idx, ])
+  }else{
+    return(d)
+  }
+}
+
+# Joint ROC optimization
+joint.roc.opt <- function(data){
+  n.models <- length(data[[1]])
+  sapply(1:n.models, function(i){
+    roc.dists <- do.call("cbind", lapply(data, function(d){
+      rd <- optimize.roc(d[[i]]$roc, return.dist=T)
+      rd - min(rd)
+    }))
+    joint.dist <- apply(roc.dists, 1, function(vals){sqrt(sum(vals^2))})
+    joint.best <- sort(which(joint.dist == min(joint.dist)))[1]
+    return(data[[1]][[i]]$roc$minPIP[joint.best])
+  })
 }
 
 # Wrapper to load all datasets
@@ -80,8 +103,8 @@ load.datasets <- function(data.in, truth){
 }
 
 # ROC plot
-plot.roc <- function(data){
-  par(mar=c(3, 3, 1, 1))
+plot.roc <- function(data, title=NULL){
+  par(mar=c(3, 3, 1.5, 1))
   plot(x=c(0, 1), y=c(0, 1), type="n",
        xaxs="i", yaxs="i", xlab="", ylab="")
   abline(0, 1, col="gray70")
@@ -94,20 +117,21 @@ plot.roc <- function(data){
   sapply(rev(lorder), function(i){
     x <- data[[i]]
     points(x$roc.opt$frac_other, x$roc.opt$frac_true,
-           pch=19, col=x$color)
+           pch=21, bg=x$color)
     points(x$midPIP$frac_other, x$midPIP$frac_true,
-           pch=23, bg=x$color, col="black")
+           pch=23, bg=x$color)
   })
   legend("bottomright", lwd=5, cex=0.75, bty="n",
          col=sapply(data, function(x){x$color})[lorder], 
          legend=paste(names(data), " (AUC=",
                       sapply(data, function(x){format(round(x$auc, 2), nsmall=2)}),
                       ")", sep="")[lorder])
-  legend("topleft", cex=0.75, bty="n", pch=c(19, 23),
+  legend("topleft", cex=0.75, bty="n", pch=c(21, 23),
          legend=c("ROC-optimal cutoff", "PIP > 0.5"),
-         pt.bg=c(NA, "gray50"))
-  mtext(1, line=2, text="Fraction of other associations retained")
-  mtext(2, line=2, text="Fraction of true positive associations retained")
+         pt.bg=c("gray50", "gray50"))
+  mtext(1, line=2, text="Fraction of other genes retained")
+  mtext(2, line=2, text="Fraction of true positives retained")
+  mtext(3, line=0.1, text=title)
 }
 
 
@@ -128,27 +152,36 @@ opts <- args$options
 
 # Checks for appropriate positional arguments
 if(length(args$args) != 3){
-  stop("Three positional arguments: data.tsv, truth_genes.tsv, and path to plot.pdf\n")
+  stop("Three positional arguments: data.tsv, truth_sets.tsv, and out_prefix\n")
 }
 
 # Writes args & opts to vars
 data.in <- args$args[1]
 truth.in <- args$args[2]
-plot.out <- args$args[3]
+out.prefix <- args$args[3]
 
 # DEV PARAMTERS
 setwd("~/scratch")
 data.in <- "finemap_roc_input.tsv"
-truth.in <- "clingen_truth_set.tsv"
-plot.out <- "finemap_roc.pdf"
+truth.in <- "finemap_roc_truth_sets.tsv"
+out.prefix <- "finemap_roc"
 
-# Read truth genes
+# Read truth sets
 truth <- load.truth(truth.in)
 
 # Load each input, annotate vs. truth, and store as list
-data <- load.datasets(data.in, truth)
+data <- lapply(truth, function(tlist){
+  load.datasets(data.in, tlist$truth.genes)
+})
+names(data) <- names(truth)
 
-# Plot ROC
-pdf(plot.out, height=4, width=4)
-plot.roc(data)
-dev.off()
+# # Determine joint ROC-optimal cutoff
+# joint.roc.opts <- joint.roc.opt(data)
+
+# Plot ROCs
+sapply(1:length(data), function(i){
+  # pdf(plot.out, height=4, width=4)
+  plot.roc(data[[i]], title=names(data)[i])
+  # dev.off()
+})
+
