@@ -637,7 +637,7 @@ task finemap_genes {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:ba79300eb72ff4213093a66c4d61deb2da32a65a7b89431d979573dbd2ed0266"
+    docker: "talkowski/rcnv@sha256:99ecbf9d2e190f8f0acf37e069a0875d4931dd2938903367043cd982d153dacc"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -780,7 +780,7 @@ task plot_finemap_res {
     esac
 
     # Plot ROCs
-    mkdir finemap_plots
+    mkdir ${freq_code}_${CNV}_finemap_plots/
     /opt/rCNV2/analysis/genes/finemap_roc.plot.R \
       finemap_roc_input.tsv \
       finemap_roc_truth_sets.tsv \
@@ -795,7 +795,7 @@ task plot_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:ba79300eb72ff4213093a66c4d61deb2da32a65a7b89431d979573dbd2ed0266"
+    docker: "talkowski/rcnv@sha256:99ecbf9d2e190f8f0acf37e069a0875d4931dd2938903367043cd982d153dacc"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

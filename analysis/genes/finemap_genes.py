@@ -244,8 +244,8 @@ def rmse(pairs):
     return np.sqrt(np.sum(mse) / len(pairs))
 
 
-def functional_finemap(hpo_data, gene_features_in, null_variance=0.42 ** 2, 
-                       converge_rmse=10e-6, quiet=False):
+def functional_finemap(hpo_data, gene_features_in, logit_alpha, 
+                       null_variance=0.42 ** 2, converge_rmse=10e-6, quiet=False):
     """
     Conduct E-M optimized functional fine-mapping for all gene blocks & HPOs
     Two returns:
@@ -293,8 +293,12 @@ def functional_finemap(hpo_data, gene_features_in, null_variance=0.42 ** 2,
         logit_df.drop(labels='gene', axis=1, inplace=True)
 
         # Fit logit GLM & predict new priors
-        logit = GLM(logit_df.PIP, logit_df.drop(labels='PIP', axis=1),
-                    family=families.Binomial()).fit_regularized(L1_wt=0)
+        glm = GLM(logit_df.PIP, logit_df.drop(labels='PIP', axis=1),
+                  family=families.Binomial())
+        if logit_alpha is None:
+            logit = glm.fit()
+        else:
+            logit = glm.fit_regularized(L1_wt = 1 - logit_alpha)
         pred_priors = logit.predict(features.drop(labels='gene', axis=1))
         new_priors = features.gene.to_frame().join(pred_priors.to_frame(name='prior'))
         
@@ -333,7 +337,13 @@ def functional_finemap(hpo_data, gene_features_in, null_variance=0.42 ** 2,
     # Report completion
     print('Converged after {:,} iterations'.format(k))
 
-    return sig_df.sort_values('PIP', ascending=False), logit.summary().tables[1]
+    # Save table
+    if logit_alpha is None:
+        tab_out = logit.summary().tables[1]
+    else:
+        tab_out = logit.params
+
+    return sig_df.sort_values('PIP', ascending=False), tab_out
 
 
 def bmavg(sig_dfs, outfile):
@@ -358,21 +368,35 @@ def bmavg(sig_dfs, outfile):
     outfile.close()
 
 
-def coeff_avg(coeff_tables, outfile):
+def coeff_avg(coeff_tables, outfile, logit_alpha):
     """
     Average logit coefficients across all models & write as tsv
     Input: list of statsmodels.iolib.table.SimpleTable
     """
 
-    cols = 'feature coeff stderr zscore pvalue lower upper'.split()
+    if logit_alpha is None:
 
-    def ct2df(ct, k):
-        df = pd.read_html(ct.as_html(), header=0)[0]
-        fmtcols = ' '.join([cols[0]] + [x + '_{0}' for x in cols[1:]])
-        df.columns = fmtcols.format(k).split()
-        return df
+        cols = 'feature coeff stderr zscore pvalue lower upper'.split()
 
-    ct_dfs = [ct2df(ct, k+1) for k, ct in enumerate(coeff_tables)]
+        def ct2df(ct, k):
+            df = pd.read_html(ct.as_html(), header=0)[0]
+            fmtcols = ' '.join([cols[0]] + [x + '_{0}' for x in cols[1:]])
+            df.columns = fmtcols.format(k).split()
+            return df
+
+        ct_dfs = [ct2df(ct, k+1) for k, ct in enumerate(coeff_tables)]
+
+    else:
+
+        cols = 'feature coeff'.split()
+
+        def ct2df(ct, k):
+            features = ct.index.tolist()
+            values = ct.values.tolist()
+            df = pd.DataFrame(tuple(zip(features, values)), columns = cols)
+            return df
+
+        ct_dfs = [ct2df(ct, k+1) for k, ct in enumerate(coeff_tables)]
 
     merged_df = reduce(lambda left, right: pd.merge(left, right, on='feature'), 
                        ct_dfs)
@@ -382,7 +406,8 @@ def coeff_avg(coeff_tables, outfile):
         avg_df[col] = subdf.mean(axis=1)
     
     # Recompute P-values according to averaged Z-score
-    avg_df['pvalue'] = [2 * norm.sf(abs(z)) for z in avg_df.zscore]
+    if logit_alpha is None:
+        avg_df['pvalue'] = [2 * norm.sf(abs(z)) for z in avg_df.zscore]
 
     avg_df.rename(columns={'feature' : '#feature'}).\
            to_csv(outfile, sep='\t', index=False, na_rep='NA')
@@ -414,6 +439,9 @@ def main():
                         help='Allow genes to meet either --secondary-p-cutoff ' +
                         'or --min-nominal, but do not require both. ' +
                         '[default: require both]', default=False, action='store_true')
+    parser.add_argument('--regularization', dest='logit_alpha', type=float,
+                        help='Regularization parameter (ElNet alpha) for logit glm.' +
+                        '[default: no regularization]')
     parser.add_argument('-o', '--outfile', default='stdout', help='Output tsv of ' +
                         'final fine-mapping results for all genes and phenotypes.')
     parser.add_argument('--naive-outfile', help='Output tsv of naive results ' +
@@ -453,7 +481,7 @@ def main():
 
     # Perform functional fine-mapping with Bayesian model averaging
     Wsq = [(i / 10) ** 2 for i in range(2, 11, 2)]
-    finemap_res = [functional_finemap(hpo_data, args.gene_features, w) 
+    finemap_res = [functional_finemap(hpo_data, args.gene_features, args.logit_alpha, w) 
                    for w in Wsq]
     
     # Average models across Wsq priors and write to --outfile
@@ -462,7 +490,7 @@ def main():
 
     # If optioned, average logit coefficients across models and write to --coeffs-out
     coeff_tables = [x[1] for x in finemap_res]
-    coeff_avg(coeff_tables, coeffs_out)
+    coeff_avg(coeff_tables, coeffs_out, args.logit_alpha)
 
 
 if __name__ == '__main__':
