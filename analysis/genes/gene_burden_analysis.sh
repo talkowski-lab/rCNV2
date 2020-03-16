@@ -454,6 +454,8 @@ paste meta_res/*.${freq_code}.$CNV.gene_burden.meta_analysis.secondary_p_values.
 #           which is currently just a code snippet referencing local filepaths
 
 
+
+
 # Fine-map significant gene blocks
 # Test/dev parameters
 freq_code="rCNV"
@@ -495,6 +497,144 @@ done < ${phenotype_list} \
   ${freq_code}.${CNV}.gene_fine_mapping.stats_input.tsv \
   ${gene_features}
 
+
+
+
+# Plot results of fine-mapping
+# Test/dev parameters
+freq_code="rCNV"
+CNV="DEL"
+phenotype_list="test_phenotypes.list"
+rCNV_bucket="gs://rcnv_project"
+
+# Copy all fine-mapped gene lists
+mkdir finemap_stats/
+gsutil -m cp \
+  ${rCNV_bucket}/analysis/gene_burden/fine_mapping/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.*.tsv \
+  finemap_stats/
+
+# Make input tsv
+for wrapper in 1; do
+  echo -e "Naive prior\tgrey70\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.genomic_features.tsv"
+  echo -e "Weighted prior\t'#264653'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.genomic_features.tsv"
+  echo -e "Genomic features\t'#E76F51'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.tsv"
+  echo -e "Gene expression\t'#E9C46A'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.tsv"
+  echo -e "Gene constraint\t'#F4A261'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.tsv"
+  echo -e "Full model\t'#2A9D8F'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.tsv"
+done > finemap_roc_input.tsv
+
+# Make all gene truth sets
+gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes/gene_lists ./
+
+# HPO-associated
+while read prefix hpo; do
+  awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }' \
+    gene_lists/$prefix.HPOdb.genes.list
+done < ${phenotype_list} \
+| sort -Vk1,1 -k2,2V | uniq \
+| cat <( echo -e "#HPO\tgene" ) - \
+> hpo_truth_set.tsv
+
+# Make CNV type-dependent truth sets
+case ${CNV} in
+  "DEL")
+    # Union (ClinGen HI + DDG2P dominant LoF)
+    while read prefix hpo; do
+      cat gene_lists/ClinGen.hmc_haploinsufficient.genes.list \
+          gene_lists/DDG2P.hmc_lof.genes.list \
+      | awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }'
+    done < ${phenotype_list} \
+    | sort -Vk1,1 -k2,2V | uniq \
+    | cat <( echo -e "#HPO\tgene" ) - \
+    > union_truth_set.lof.tsv
+
+    # Intersection (ClinGen HI + DDG2P dominant LoF)
+    while read prefix hpo; do
+      fgrep -wf \
+        gene_lists/ClinGen.hmc_haploinsufficient.genes.list \
+        gene_lists/DDG2P.hmc_lof.genes.list \
+      | awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }'
+    done < ${phenotype_list} \
+    | sort -Vk1,1 -k2,2V | uniq \
+    | cat <( echo -e "#HPO\tgene" ) - \
+    > intersection_truth_set.lof.tsv
+
+    # ClinGen HI alone
+    while read prefix hpo; do
+      awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }' \
+        gene_lists/ClinGen.all_haploinsufficient.genes.list
+    done < ${phenotype_list} \
+    | sort -Vk1,1 -k2,2V | uniq \
+    | cat <( echo -e "#HPO\tgene" ) - \
+    > clingen_truth_set.lof.tsv
+
+    # DDG2P lof + other alone
+    while read prefix hpo; do
+      cat gene_lists/DDG2P.all_lof.genes.list \
+          gene_lists/DDG2P.all_other.genes.list \
+      | awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }'
+    done < ${phenotype_list} \
+    | sort -Vk1,1 -k2,2V | uniq \
+    | cat <( echo -e "#HPO\tgene" ) - \
+    > ddg2p_truth_set.lof.tsv
+
+    # Write truth set input tsv
+    for wrapper in 1; do
+      echo -e "ClinGen HI & DECIPHER LoF (union)\tunion_truth_set.lof.tsv"
+      echo -e "ClinGen HI & DECIPHER LoF (intersection)\tintersection_truth_set.lof.tsv"
+      echo -e "ClinGen HI (any confidence)\tclingen_truth_set.lof.tsv"
+      echo -e "DECIPHER dominant LoF/unk. (any confidence)\tddg2p_truth_set.lof.tsv"
+      echo -e "HPO-matched disease genes\thpo_truth_set.tsv"
+    done > finemap_roc_truth_sets.tsv
+    ;;
+
+  "DUP")
+    # Union (ClinGen HI + DDG2P dominant CG)
+    while read prefix hpo; do
+      cat gene_lists/ClinGen.hmc_triplosensitive.genes.list \
+          gene_lists/DDG2P.hmc_gof.genes.list \
+      | awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }'
+    done < ${phenotype_list} \
+    | sort -Vk1,1 -k2,2V | uniq \
+    | cat <( echo -e "#HPO\tgene" ) - \
+    > union_truth_set.gof.tsv
+
+    # ClinGen triplo alone
+    while read prefix hpo; do
+      awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }' \
+        gene_lists/ClinGen.all_triplosensitive.genes.list
+    done < ${phenotype_list} \
+    | sort -Vk1,1 -k2,2V | uniq \
+    | cat <( echo -e "#HPO\tgene" ) - \
+    > clingen_truth_set.triplo.tsv
+
+    # DDG2P gof + other alone
+    while read prefix hpo; do
+      cat gene_lists/DDG2P.all_gof.genes.list \
+          gene_lists/DDG2P.all_other.genes.list \
+      | awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }'
+    done < ${phenotype_list} \
+    | sort -Vk1,1 -k2,2V | uniq \
+    | cat <( echo -e "#HPO\tgene" ) - \
+    > ddg2p_truth_set.gof.tsv
+
+    # Write truth set input tsv
+    for wrapper in 1; do
+      echo -e "ClinGen TS & DECIPHER GoF (union)\tunion_truth_set.gof.tsv"
+      echo -e "ClinGen TS (any confidence)\tclingen_truth_set.triplo.tsv"
+      echo -e "DECIPHER dominant GoF/unk. (any confidence)\tddg2p_truth_set.gof.tsv"
+      echo -e "HPO-matched disease genes\thpo_truth_set.tsv"
+    done > finemap_roc_truth_sets.tsv
+    ;;
+
+esac
+
+# Plot ROCs
+mkdir finemap_plots
+/opt/rCNV2/analysis/genes/finemap_roc.plot.R \
+  finemap_roc_input.tsv \
+  finemap_roc_truth_sets.tsv \
+  ${freq_code}_${CNV}_finemap_plots/${freq_code}.${CNV}.finemap_results
 
 
 

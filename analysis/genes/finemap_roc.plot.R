@@ -93,7 +93,11 @@ load.datasets <- function(data.in, truth){
     return(list("stats"=stats,
                 "roc"=roc.res,
                 "roc.opt"=roc.opt,
-                "midPIP"=roc.res[which(roc.res$minPIP == 0.5), ],
+                "PIP_0.1"=roc.res[which(round(roc.res$minPIP, 3) == 0.100), ],
+                "PIP_0.3"=roc.res[which(round(roc.res$minPIP, 3) == 0.300), ],
+                "PIP_0.5"=roc.res[which(round(roc.res$minPIP, 3) == 0.500), ],
+                "PIP_0.7"=roc.res[which(round(roc.res$minPIP, 3) == 0.700), ],
+                "PIP_0.9"=roc.res[which(round(roc.res$minPIP, 3) == 0.900), ],
                 "auc"=roc.auc,
                 "color"=datlist$color[i],
                 "lty"=datlist$lty[i]))
@@ -118,19 +122,40 @@ plot.roc <- function(data, title=NULL){
     x <- data[[i]]
     points(x$roc.opt$frac_other, x$roc.opt$frac_true,
            pch=21, bg=x$color)
-    points(x$midPIP$frac_other, x$midPIP$frac_true,
-           pch=23, bg=x$color)
+    sapply(c(1, 3, 5, 7, 9), function(d){
+      fname <- paste("PIP_0", d, sep=".")
+      vals <- unlist(x[which(names(x) == fname)])
+      names(vals) <- colnames(x$roc)
+      points(vals[3], vals[4],
+             pch=23, bg="white", cex=1.2)
+      text(x=vals[3], y=vals[4],
+           labels=d, col=x$color, cex=0.65)
+    })
+    # points(x$PIP_0.3$frac_other, x$PIP_0.3$frac_true,
+    #        pch=23, bg="white", cex=1.2)
+    # text(x=x$PIP_0.3$frac_other, y=x$PIP_0.3$frac_true,
+    #      labels="3", col=x$color, cex=0.65)
+    # points(x$PIP_0.5$frac_other, x$PIP_0.5$frac_true,
+    #        pch=23, bg="white", cex=1.2)
+    # text(x=x$PIP_0.5$frac_other, y=x$PIP_0.5$frac_true,
+    #      labels="5", col=x$color, cex=0.65)
+    # points(x$PIP_0.9$frac_other, x$PIP_0.9$frac_true,
+    #        pch=23, bg="white", cex=1.2)
+    # text(x=x$PIP_0.9$frac_other, y=x$PIP_0.9$frac_true,
+    #      labels="9", col=x$color, cex=0.65)
   })
   legend("bottomright", lwd=5, cex=0.75, bty="n",
          col=sapply(data, function(x){x$color})[lorder], 
-         legend=paste(names(data), " (AUC=",
+         legend=paste(names(data), " (",
                       sapply(data, function(x){format(round(x$auc, 2), nsmall=2)}),
                       ")", sep="")[lorder])
   legend("topleft", cex=0.75, bty="n", pch=c(21, 23),
-         legend=c("ROC-optimal cutoff", "PIP > 0.5"),
-         pt.bg=c("gray50", "gray50"))
+         legend=c("ROC-optimal cutoff", "PIP > 0.N"),
+         pt.bg=c("gray50", "white"), pt.cex=c(1, 1.4))
+  legend("topleft", cex=0.75, bty="n", pch=c(NA, "N"),
+         legend=c("", ""), pt.cex=0.5)
   mtext(1, line=2, text="Fraction of other genes retained")
-  mtext(2, line=2, text="Fraction of true positives retained")
+  mtext(2, line=2, text="Fraction of known associations retained")
   mtext(3, line=0.1, text=title)
 }
 
@@ -160,11 +185,11 @@ data.in <- args$args[1]
 truth.in <- args$args[2]
 out.prefix <- args$args[3]
 
-# DEV PARAMTERS
-setwd("~/scratch")
-data.in <- "finemap_roc_input.tsv"
-truth.in <- "finemap_roc_truth_sets.tsv"
-out.prefix <- "finemap_roc"
+# # DEV PARAMTERS
+# setwd("~/scratch")
+# data.in <- "finemap_roc_input.tsv"
+# truth.in <- "finemap_roc_truth_sets.tsv"
+# out.prefix <- "finemap_roc"
 
 # Read truth sets
 truth <- load.truth(truth.in)
@@ -178,10 +203,27 @@ names(data) <- names(truth)
 # # Determine joint ROC-optimal cutoff
 # joint.roc.opts <- joint.roc.opt(data)
 
+# Plot histograms of PIPs
+pdf(paste(out.prefix, "PIP_distributions.pdf", sep="."),
+    height=2.25, width=12)
+par(mfrow=c(1, length(data[[1]])),
+    mar=c(4, 4, 1.5, 1.5))
+hmax <- max(sapply(1:length(data[[1]]), function(i){
+  max(hist(data[[1]][[i]]$stats$PIP, breaks=seq(0, 1, 0.02), plot=F)$counts)
+}))
+sapply(1:length(data[[1]]), function(i){
+  color <- data[[1]][[i]]$color
+  hist(data[[1]][[i]]$stats$PIP, breaks=seq(0, 1, 0.02),
+       col=color, border=color, xlab="PIP", ylab="Associations",
+       main=names(data[[1]])[i], ylim=c(0, hmax))
+})
+dev.off()
+
 # Plot ROCs
 sapply(1:length(data), function(i){
-  # pdf(plot.out, height=4, width=4)
+  sanitized.name <- gsub('_$', '', gsub('[_]+', "_", gsub('[\ |(|)|&|/|-]', "_", tolower(names(data)[i]))))
+  pdf(paste(out.prefix, sanitized.name, "roc.pdf", sep="."), height=4, width=4)
   plot.roc(data[[i]], title=names(data)[i])
-  # dev.off()
+  dev.off()
 })
 

@@ -196,6 +196,17 @@ workflow gene_burden_analysis {
     }
   }
 
+  # Once complete, plot finemap results
+  scatter( cnv in cnv_types ) {
+    call plot_finemap_res {
+      completion_tokens=[finemap_genomic.completion_token, finemap_expression.completion_token, finemap_constraint.completion_token, finemap_merged.completion_token],
+      freq_code="rCNV",
+      CNV=cnv,
+      phenotype_list=phenotype_list,
+      rCNV_bucket=rCNV_bucket
+    }
+  }
+
   output {}
 }
 
@@ -589,7 +600,8 @@ task finemap_genes {
       for wrapper in 1; do
         echo "$hpo"
         echo "stats/$prefix.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz"
-        awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' ${meta_p_cutoffs_tsv}
+        awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' \
+          gene_burden.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv
       done | paste -s
     done < ${phenotype_list} \
     > ${freq_code}.${CNV}.gene_fine_mapping.stats_input.tsv
@@ -610,6 +622,9 @@ task finemap_genes {
     gsutil -m cp \
       ${freq_code}.${CNV}.gene_fine_mapping.*.${finemap_output_label}.tsv \
       ${rCNV_bucket}/analysis/gene_burden/fine_mapping/
+
+    # Make completion token to track caching
+    echo "Done" > completion.txt
   >>>
 
   output {
@@ -617,11 +632,11 @@ task finemap_genes {
     File naive_output = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.tsv"
     File genetic_output = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.${finemap_output_label}.tsv"
     File logit_coeffs = "${freq_code}.${CNV}.gene_fine_mapping.logit_coeffs.${finemap_output_label}.tsv"
+    File completion_token = "completion.txt"
   }
 
   runtime {
-    # TODO: update docker
-    # docker: "talkowski/rcnv@sha256:89bf370a55c031dcebf0884324c8352d289946908a4fe0430e50d2bf9de2d6e1"
+    docker: "talkowski/rcnv@sha256:04bd80331bb4fc2278120cc47a1f4613a3b1bbdf5f81950abffa2b57ba2d42c5"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -629,3 +644,160 @@ task finemap_genes {
   }
 }
 
+
+# Plot fine-mapping results
+task plot_finemap_res {
+  Array[Array[File]] completion_tokens
+  String freq_code
+  String CNV
+  File phenotype_list
+  String rCNV_bucket
+
+  command <<<
+    set -e
+
+    # Copy all fine-mapped gene lists
+    mkdir finemap_stats/
+    gsutil -m cp \
+      ${rCNV_bucket}/analysis/gene_burden/fine_mapping/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.*.tsv \
+      finemap_stats/
+
+    # Make input tsv
+    for wrapper in 1; do
+      echo -e "Naive prior\tgrey70\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.genomic_features.tsv"
+      echo -e "Weighted prior\t'#264653'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.genomic_features.tsv"
+      echo -e "Genomic features\t'#E76F51'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.tsv"
+      echo -e "Gene expression\t'#E9C46A'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.tsv"
+      echo -e "Gene constraint\t'#F4A261'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.tsv"
+      echo -e "Full model\t'#2A9D8F'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.tsv"
+    done > finemap_roc_input.tsv
+
+    # Make all gene truth sets
+    gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes/gene_lists ./
+
+    # HPO-associated
+    while read prefix hpo; do
+      awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }' \
+        gene_lists/$prefix.HPOdb.genes.list
+    done < ${phenotype_list} \
+    | sort -Vk1,1 -k2,2V | uniq \
+    | cat <( echo -e "#HPO\tgene" ) - \
+    > hpo_truth_set.tsv
+
+    # Make CNV type-dependent truth sets
+    case ${CNV} in
+      "DEL")
+        # Union (ClinGen HI + DDG2P dominant LoF)
+        while read prefix hpo; do
+          cat gene_lists/ClinGen.hmc_haploinsufficient.genes.list \
+              gene_lists/DDG2P.hmc_lof.genes.list \
+          | awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }'
+        done < ${phenotype_list} \
+        | sort -Vk1,1 -k2,2V | uniq \
+        | cat <( echo -e "#HPO\tgene" ) - \
+        > union_truth_set.lof.tsv
+
+        # Intersection (ClinGen HI + DDG2P dominant LoF)
+        while read prefix hpo; do
+          fgrep -wf \
+            gene_lists/ClinGen.hmc_haploinsufficient.genes.list \
+            gene_lists/DDG2P.hmc_lof.genes.list \
+          | awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }'
+        done < ${phenotype_list} \
+        | sort -Vk1,1 -k2,2V | uniq \
+        | cat <( echo -e "#HPO\tgene" ) - \
+        > intersection_truth_set.lof.tsv
+
+        # ClinGen HI alone
+        while read prefix hpo; do
+          awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }' \
+            gene_lists/ClinGen.all_haploinsufficient.genes.list
+        done < ${phenotype_list} \
+        | sort -Vk1,1 -k2,2V | uniq \
+        | cat <( echo -e "#HPO\tgene" ) - \
+        > clingen_truth_set.lof.tsv
+
+        # DDG2P lof + other alone
+        while read prefix hpo; do
+          cat gene_lists/DDG2P.all_lof.genes.list \
+              gene_lists/DDG2P.all_other.genes.list \
+          | awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }'
+        done < ${phenotype_list} \
+        | sort -Vk1,1 -k2,2V | uniq \
+        | cat <( echo -e "#HPO\tgene" ) - \
+        > ddg2p_truth_set.lof.tsv
+
+        # Write truth set input tsv
+        for wrapper in 1; do
+          echo -e "ClinGen HI & DECIPHER LoF (union)\tunion_truth_set.lof.tsv"
+          echo -e "ClinGen HI & DECIPHER LoF (intersection)\tintersection_truth_set.lof.tsv"
+          echo -e "ClinGen HI (any confidence)\tclingen_truth_set.lof.tsv"
+          echo -e "DECIPHER dominant LoF/unk. (any confidence)\tddg2p_truth_set.lof.tsv"
+          echo -e "HPO-matched disease genes\thpo_truth_set.tsv"
+        done > finemap_roc_truth_sets.tsv
+        ;;
+
+      "DUP")
+        # Union (ClinGen HI + DDG2P dominant CG)
+        while read prefix hpo; do
+          cat gene_lists/ClinGen.hmc_triplosensitive.genes.list \
+              gene_lists/DDG2P.hmc_gof.genes.list \
+          | awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }'
+        done < ${phenotype_list} \
+        | sort -Vk1,1 -k2,2V | uniq \
+        | cat <( echo -e "#HPO\tgene" ) - \
+        > union_truth_set.gof.tsv
+
+        # ClinGen triplo alone
+        while read prefix hpo; do
+          awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }' \
+            gene_lists/ClinGen.all_triplosensitive.genes.list
+        done < ${phenotype_list} \
+        | sort -Vk1,1 -k2,2V | uniq \
+        | cat <( echo -e "#HPO\tgene" ) - \
+        > clingen_truth_set.triplo.tsv
+
+        # DDG2P gof + other alone
+        while read prefix hpo; do
+          cat gene_lists/DDG2P.all_gof.genes.list \
+              gene_lists/DDG2P.all_other.genes.list \
+          | awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }'
+        done < ${phenotype_list} \
+        | sort -Vk1,1 -k2,2V | uniq \
+        | cat <( echo -e "#HPO\tgene" ) - \
+        > ddg2p_truth_set.gof.tsv
+
+        # Write truth set input tsv
+        for wrapper in 1; do
+          echo -e "ClinGen TS & DECIPHER GoF (union)\tunion_truth_set.gof.tsv"
+          echo -e "ClinGen TS (any confidence)\tclingen_truth_set.triplo.tsv"
+          echo -e "DECIPHER dominant GoF/unk. (any confidence)\tddg2p_truth_set.gof.tsv"
+          echo -e "HPO-matched disease genes\thpo_truth_set.tsv"
+        done > finemap_roc_truth_sets.tsv
+        ;;
+
+    esac
+
+    # Plot ROCs
+    mkdir finemap_plots
+    /opt/rCNV2/analysis/genes/finemap_roc.plot.R \
+      finemap_roc_input.tsv \
+      finemap_roc_truth_sets.tsv \
+      ${freq_code}_${CNV}_finemap_plots/${freq_code}.${CNV}.finemap_results
+
+    # Compress results
+    tar -czvf ${freq_code}_${CNV}_finemap_plots.tgz ${freq_code}_${CNV}_finemap_plots
+  >>>
+
+  output {
+    File plots_tarball = "${freq_code}_${CNV}_finemap_plots.tgz"
+  }
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:04bd80331bb4fc2278120cc47a1f4613a3b1bbdf5f81950abffa2b57ba2d42c5"
+    preemptible: 1
+    memory: "4 GB"
+    bootDiskSizeGb: "20"
+    disks: "local-disk 50 HDD"
+  }
+}
