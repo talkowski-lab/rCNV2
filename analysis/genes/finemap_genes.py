@@ -294,7 +294,7 @@ def functional_finemap(hpo_data, gene_features_in, null_variance=0.42 ** 2,
 
         # Fit logit GLM & predict new priors
         logit = GLM(logit_df.PIP, logit_df.drop(labels='PIP', axis=1),
-                    family=families.Binomial()).fit()
+                    family=families.Binomial()).fit_regularized(L1_wt=0)
         pred_priors = logit.predict(features.drop(labels='gene', axis=1))
         new_priors = features.gene.to_frame().join(pred_priors.to_frame(name='prior'))
         

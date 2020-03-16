@@ -199,11 +199,12 @@ workflow gene_burden_analysis {
   # Once complete, plot finemap results
   scatter( cnv in cnv_types ) {
     call plot_finemap_res {
-      completion_tokens=[finemap_genomic.completion_token, finemap_expression.completion_token, finemap_constraint.completion_token, finemap_merged.completion_token],
-      freq_code="rCNV",
-      CNV=cnv,
-      phenotype_list=phenotype_list,
-      rCNV_bucket=rCNV_bucket
+      input:
+        completion_tokens=[finemap_genomic.completion_token, finemap_expression.completion_token, finemap_constraint.completion_token, finemap_merged.completion_token],
+        freq_code="rCNV",
+        CNV=cnv,
+        phenotype_list=phenotype_list,
+        rCNV_bucket=rCNV_bucket
     }
   }
 
@@ -636,7 +637,7 @@ task finemap_genes {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:04bd80331bb4fc2278120cc47a1f4613a3b1bbdf5f81950abffa2b57ba2d42c5"
+    docker: "talkowski/rcnv@sha256:ba79300eb72ff4213093a66c4d61deb2da32a65a7b89431d979573dbd2ed0266"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -794,7 +795,7 @@ task plot_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:04bd80331bb4fc2278120cc47a1f4613a3b1bbdf5f81950abffa2b57ba2d42c5"
+    docker: "talkowski/rcnv@sha256:ba79300eb72ff4213093a66c4d61deb2da32a65a7b89431d979573dbd2ed0266"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
