@@ -612,6 +612,7 @@ task finemap_genes {
       --secondary-p-cutoff ${meta_secondary_p_cutoff} \
       --min-nominal ${meta_nominal_cohorts_cutoff} \
       --secondary-or-nominal \
+      --regularization 1 \
       --outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv \
       --naive-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.tsv \
       --genetic-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.${finemap_output_label}.tsv \
@@ -637,7 +638,7 @@ task finemap_genes {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:99ecbf9d2e190f8f0acf37e069a0875d4931dd2938903367043cd982d153dacc"
+    docker: "talkowski/rcnv@sha256:7f16f69d8aa098e99736dba05f68fb14644af1537664c39138ef345f7f6b3b5d"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -795,7 +796,7 @@ task plot_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:99ecbf9d2e190f8f0acf37e069a0875d4931dd2938903367043cd982d153dacc"
+    docker: "talkowski/rcnv@sha256:7f16f69d8aa098e99736dba05f68fb14644af1537664c39138ef345f7f6b3b5d"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

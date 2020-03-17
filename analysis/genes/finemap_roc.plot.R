@@ -89,7 +89,11 @@ load.datasets <- function(data.in, truth){
     stats <- load.data.single(datlist$path[i], truth)
     roc.res <- roc(stats)
     roc.opt <- optimize.roc(roc.res)
-    roc.auc <- flux::auc(roc.res$frac_other, roc.res$frac_true)
+    if(any(stats$true)){
+      roc.auc <- flux::auc(roc.res$frac_other, roc.res$frac_true)
+    }else{
+      roc.auc <- NA
+    }
     return(list("stats"=stats,
                 "roc"=roc.res,
                 "roc.opt"=roc.opt,

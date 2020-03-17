@@ -490,6 +490,7 @@ done < ${phenotype_list} \
   --secondary-p-cutoff ${meta_secondary_p_cutoff} \
   --min-nominal ${meta_nominal_cohorts_cutoff} \
   --secondary-or-nominal \
+  --regularization 1 \
   --outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv \
   --naive-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.tsv \
   --genetic-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.${finemap_output_label}.tsv \
