@@ -638,7 +638,7 @@ task finemap_genes {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7f16f69d8aa098e99736dba05f68fb14644af1537664c39138ef345f7f6b3b5d"
+    docker: "talkowski/rcnv@sha256:788371e3e4c904918793b766ef4886bcc75631971d8acfb394ea199fccf2ada3"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -666,8 +666,8 @@ task plot_finemap_res {
 
     # Make input tsv
     for wrapper in 1; do
-      echo -e "Naive prior\tgrey70\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.genomic_features.tsv"
-      echo -e "Weighted prior\t'#264653'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.genomic_features.tsv"
+      echo -e "Prior\tgrey70\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.genomic_features.tsv"
+      echo -e "Posterior\t'#264653'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.genomic_features.tsv"
       echo -e "Genomic features\t'#E76F51'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.tsv"
       echo -e "Gene expression\t'#E9C46A'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.tsv"
       echo -e "Gene constraint\t'#F4A261'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.tsv"
@@ -796,7 +796,7 @@ task plot_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7f16f69d8aa098e99736dba05f68fb14644af1537664c39138ef345f7f6b3b5d"
+    docker: "talkowski/rcnv@sha256:788371e3e4c904918793b766ef4886bcc75631971d8acfb394ea199fccf2ada3"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

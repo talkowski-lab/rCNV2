@@ -516,8 +516,8 @@ gsutil -m cp \
 
 # Make input tsv
 for wrapper in 1; do
-  echo -e "Naive prior\tgrey70\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.genomic_features.tsv"
-  echo -e "Weighted prior\t'#264653'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.genomic_features.tsv"
+  echo -e "Prior\tgrey70\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.genomic_features.tsv"
+  echo -e "Posterior\t'#264653'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.genomic_features.tsv"
   echo -e "Genomic features\t'#E76F51'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.tsv"
   echo -e "Gene expression\t'#E9C46A'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.tsv"
   echo -e "Gene constraint\t'#F4A261'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.tsv"
@@ -631,11 +631,14 @@ case ${CNV} in
 esac
 
 # Plot ROCs
-mkdir finemap_plots
+mkdir ${freq_code}_${CNV}_finemap_plots/
 /opt/rCNV2/analysis/genes/finemap_roc.plot.R \
   finemap_roc_input.tsv \
   finemap_roc_truth_sets.tsv \
   ${freq_code}_${CNV}_finemap_plots/${freq_code}.${CNV}.finemap_results
+
+# Compress results
+tar -czvf ${freq_code}_${CNV}_finemap_plots.tgz ${freq_code}_${CNV}_finemap_plots
 
 
 

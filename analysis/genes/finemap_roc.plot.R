@@ -81,6 +81,19 @@ joint.roc.opt <- function(data){
   })
 }
 
+# Gather calibration
+get.calibration <- function(stats, n.pip.bins=5){
+  pip.breaks <- quantile(stats$PIP, seq(0, 1, by=1/n.pip.bins), na.rm=T)
+  cal <- as.data.frame(t(sapply(1:(length(pip.breaks)-1), function(i){
+    idx <- which(stats$PIP > pip.breaks[i] & stats$PIP <= pip.breaks[i+1])
+    true <- length(which(stats$true[idx]))
+    binconf(true, length(idx))
+  })))
+  colnames(cal) <- c("est", "lower", "upper")
+  rownames(cal) <- pip.mins
+  return(cal)
+}
+
 # Wrapper to load all datasets
 load.datasets <- function(data.in, truth){
   datlist <- read.table(data.in, header=F, sep="\t")
@@ -103,6 +116,7 @@ load.datasets <- function(data.in, truth){
                 "PIP_0.7"=roc.res[which(round(roc.res$minPIP, 3) == 0.700), ],
                 "PIP_0.9"=roc.res[which(round(roc.res$minPIP, 3) == 0.900), ],
                 "auc"=roc.auc,
+                "calibration"=get.calibration(stats),
                 "color"=datlist$color[i],
                 "lty"=datlist$lty[i]))
   })
@@ -164,11 +178,39 @@ plot.roc <- function(data, title=NULL){
 }
 
 
+# Calibration plot
+plot.calibration <- function(data, title=NULL){
+  plot.dat <- do.call("cbind", lapply(data, function(d){d$roc$frac_true/d$roc$frac_all}))
+  xvals <- data[[1]]$roc$minPIP
+  keep.idx <- which(sapply(xvals, round, 3) %in% seq(0, 1, 0.1))
+  plot.dat <- plot.dat[keep.idx, ]
+  xvals <- xvals[keep.idx]
+  par(mar=c(2.75, 4, 1.5, 1))
+  plot(x=range(xvals), y=c(0, max(plot.dat, na.rm=T)), type="n",
+       xaxt="n", yaxt="n", xlab="", ylab="")
+  abline(h=1, lty=2, col="gray80")
+  sapply(1:ncol(plot.dat), function(i){
+    points(x=xvals, y=plot.dat[, i], col=data[[i]]$color, pch=19)
+    points(x=xvals, y=plot.dat[, i], col=data[[i]]$color, type="l")
+  })
+  axis(1, at=seq(0, 1, 0.2), labels=NA)
+  axis(1, at=seq(0, 1, 0.2), tick=F, line=-0.5)
+  mtext(1, line=1.75, text="Min PIP")
+  axis(2, las=2)
+  mtext(2, line=3, text="Fold-Enrichment")
+  mtext(3, line=0.2, text=title, font=2)
+  legend("bottomright", cex=0.6, pch=19, bg="white",
+         col=sapply(data, function(x){x$color}), 
+         legend=names(data))
+}
+
+
 #####################
 ### RSCRIPT BLOCK ###
 #####################
 require(optparse, quietly=T)
 require(flux, quietly=T)
+require(Hmisc, quietly=T)
 
 # List of command-line options
 option_list <- list()
@@ -231,3 +273,10 @@ sapply(1:length(data), function(i){
   dev.off()
 })
 
+# Plot enrichments
+sapply(1:length(data), function(i){
+  sanitized.name <- gsub('_$', '', gsub('[_]+', "_", gsub('[\ |(|)|&|/|-]', "_", tolower(names(data)[i]))))
+  pdf(paste(out.prefix, sanitized.name, "enrichment.pdf", sep="."), height=3, width=4.5)
+  plot.calibration(data[[i]], title=names(data)[i])
+  dev.off()
+})
