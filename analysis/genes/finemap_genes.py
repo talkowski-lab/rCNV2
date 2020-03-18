@@ -161,7 +161,7 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
         # Store gene association stats
         if sig_only:
             if is_gene_sig(primary_p, secondary_p, n_nominal, primary_p_cutoff,
-                           secondary_p_cutoff, n_nominal, secondary_or_nominal):
+                           secondary_p_cutoff, n_nominal_cutoff, secondary_or_nominal):
                 gene_bt = pbt.BedTool('\t'.join([chrom, start, end, gene]), 
                                       from_string=True)
                 gene_stats = {'lnOR' : lnOR, 
@@ -557,14 +557,14 @@ def main():
     # Write naive and/or genetics-only fine-mapping results (for ROC comparisons)
     if args.naive_outfile is not None:
         naive_outfile = open(args.naive_outfile, 'w')
-        make_sig_genes_df(hpo_data, naive=True).\
+        make_sig_genes_df(hpo_data, naive=True, sig_only=True).\
             rename(columns={'HPO' : '#HPO'}).\
             to_csv(naive_outfile, sep='\t', index=False, na_rep='NA')
         naive_outfile.close()
 
     if args.genetic_outfile is not None:
         genetic_outfile = open(args.genetic_outfile, 'w')
-        make_sig_genes_df(hpo_data).\
+        make_sig_genes_df(hpo_data, sig_only=True).\
             rename(columns={'HPO' : '#HPO'}).\
             to_csv(genetic_outfile, sep='\t', index=False, na_rep='NA')
         genetic_outfile.close()

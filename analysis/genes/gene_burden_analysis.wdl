@@ -627,10 +627,10 @@ task finemap_genes {
       --regularization-alpha ${finemap_elnet_alpha} \
       --regularization-l1-l2-mix ${finemap_elnet_l1_l2_mix} \
       --distance 500000 \
-      --outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.sig_genes_only.tsv \
+      --outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv \
       --all-genes-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.all_genes_from_blocks.tsv \
-      --naive-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.all_genes_from_blocks.tsv \
-      --genetic-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.${finemap_output_label}.all_genes_from_blocks.tsv \
+      --naive-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.tsv \
+      --genetic-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.${finemap_output_label}.tsv \
       --coeffs-out ${freq_code}.${CNV}.gene_fine_mapping.logit_coeffs.${finemap_output_label}.tsv \
       ${freq_code}.${CNV}.gene_fine_mapping.stats_input.tsv \
       ${gene_features}
@@ -645,16 +645,16 @@ task finemap_genes {
   >>>
 
   output {
-    File finemapped_output = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.sig_genes_only.tsv"
+    File finemapped_output = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv"
     File finemapped_output_all_genes = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.all_genes_from_blocks.tsv"
-    File naive_output = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.all_genes_from_blocks.tsv"
-    File genetic_output = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.${finemap_output_label}.all_genes_from_blocks.tsv"
+    File naive_output = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.tsv"
+    File genetic_output = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.${finemap_output_label}.tsv"
     File logit_coeffs = "${freq_code}.${CNV}.gene_fine_mapping.logit_coeffs.${finemap_output_label}.tsv"
     File completion_token = "completion.txt"
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:cbef7b2c1df166854ab9c018004ba3fc64ae817beea7c772bcbdb5d39b2bf465"
+    docker: "talkowski/rcnv@sha256:49baeea4d05aab7e52c87cd157abc35c7b8147bb4ee5e2fda1dbb2b097aa9074"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -682,12 +682,12 @@ task plot_finemap_res {
 
     # Make input tsv
     for wrapper in 1; do
-      echo -e "Prior\tgrey70\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.genomic_features.all_genes_from_blocks.tsv"
-      echo -e "Posterior\t'#264653'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.genomic_features.all_genes_from_blocks.tsv"
-      echo -e "Genomic features\t'#E76F51'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.all_genes_from_blocks.tsv"
-      echo -e "Gene expression\t'#E9C46A'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.all_genes_from_blocks.tsv"
-      echo -e "Gene constraint\t'#F4A261'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.all_genes_from_blocks.tsv"
-      echo -e "Full model\t'#2A9D8F'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.all_genes_from_blocks.tsv"
+      echo -e "Prior\tgrey70\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.genomic_features.tsv"
+      echo -e "Posterior\t'#264653'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.genomic_features.tsv"
+      echo -e "Genomic features\t'#E76F51'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.tsv"
+      echo -e "Gene expression\t'#E9C46A'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.tsv"
+      echo -e "Gene constraint\t'#F4A261'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.tsv"
+      echo -e "Full model\t'#2A9D8F'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.tsv"
     done > finemap_roc_input.tsv
 
     # Make all gene truth sets
@@ -812,7 +812,7 @@ task plot_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:cbef7b2c1df166854ab9c018004ba3fc64ae817beea7c772bcbdb5d39b2bf465"
+    docker: "talkowski/rcnv@sha256:49baeea4d05aab7e52c87cd157abc35c7b8147bb4ee5e2fda1dbb2b097aa9074"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

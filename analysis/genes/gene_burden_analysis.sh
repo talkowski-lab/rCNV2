@@ -495,10 +495,10 @@ done < ${phenotype_list} \
   --regularization-alpha ${finemap_elnet_alpha} \
   --regularization-l1-l2-mix ${finemap_elnet_l1_l2_mix} \
   --distance 500000 \
-  --outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.sig_genes_only.tsv \
+  --outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv \
   --all-genes-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.all_genes_from_blocks.tsv \
-  --naive-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.all_genes_from_blocks.tsv \
-  --genetic-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.${finemap_output_label}.all_genes_from_blocks.tsv \
+  --naive-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.tsv \
+  --genetic-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.${finemap_output_label}.tsv \
   --coeffs-out ${freq_code}.${CNV}.gene_fine_mapping.logit_coeffs.${finemap_output_label}.tsv \
   ${freq_code}.${CNV}.gene_fine_mapping.stats_input.tsv \
   ${gene_features}
