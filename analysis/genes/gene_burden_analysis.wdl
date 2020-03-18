@@ -27,6 +27,8 @@ workflow gene_burden_analysis {
   Float p_cutoff
   Float meta_secondary_p_cutoff
   Int meta_nominal_cohorts_cutoff
+  Float finemap_elnet_alpha
+  Float finemap_elnet_l1_l2_mix
   File finemap_genomic_features
   File finemap_expression_features
   File finemap_constraint_features
@@ -142,6 +144,8 @@ workflow gene_burden_analysis {
         meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
         meta_secondary_p_cutoff=meta_secondary_p_cutoff,
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+        finemap_elnet_alpha=finemap_elnet_alpha,
+        finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
         finemap_output_label="genomic_features",
         gene_features=finemap_genomic_features,
         rCNV_bucket=rCNV_bucket
@@ -158,6 +162,8 @@ workflow gene_burden_analysis {
         meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
         meta_secondary_p_cutoff=meta_secondary_p_cutoff,
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+        finemap_elnet_alpha=finemap_elnet_alpha,
+        finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
         finemap_output_label="expression_features",
         gene_features=finemap_expression_features,
         rCNV_bucket=rCNV_bucket
@@ -174,6 +180,8 @@ workflow gene_burden_analysis {
         meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
         meta_secondary_p_cutoff=meta_secondary_p_cutoff,
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+        finemap_elnet_alpha=finemap_elnet_alpha,
+        finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
         finemap_output_label="constraint_features",
         gene_features=finemap_constraint_features,
         rCNV_bucket=rCNV_bucket
@@ -190,6 +198,8 @@ workflow gene_burden_analysis {
         meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
         meta_secondary_p_cutoff=meta_secondary_p_cutoff,
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+        finemap_elnet_alpha=finemap_elnet_alpha,
+        finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
         finemap_output_label="merged_features",
         gene_features=finemap_merged_features,
         rCNV_bucket=rCNV_bucket
@@ -579,6 +589,8 @@ task finemap_genes {
   Array[File] meta_p_cutoff_tables
   Float meta_secondary_p_cutoff
   Int meta_nominal_cohorts_cutoff
+  Float finemap_elnet_alpha
+  Float finemap_elnet_l1_l2_mix
   String finemap_output_label
   File gene_features
   String rCNV_bucket
@@ -612,7 +624,8 @@ task finemap_genes {
       --secondary-p-cutoff ${meta_secondary_p_cutoff} \
       --min-nominal ${meta_nominal_cohorts_cutoff} \
       --secondary-or-nominal \
-      --regularization 1 \
+      --regularization-alpha ${finemap_elnet_alpha} \
+      --regularization-l1-l2-mix ${finemap_elnet_l1_l2_mix} \
       --outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv \
       --all-genes-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.all_genes_from_blocks.tsv \
       --naive-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.tsv \
@@ -640,7 +653,7 @@ task finemap_genes {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:94123b9a69dba608bdfd2933651b58b98b660c1d47d5bd490c13921906dc2469"
+    docker: "talkowski/rcnv@sha256:6765156a0c7589479ea027993f3d56f97e6c9165c5a5be9be828f8d737b7caca"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"

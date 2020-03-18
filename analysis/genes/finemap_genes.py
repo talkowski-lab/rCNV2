@@ -310,7 +310,7 @@ def rmse(pairs):
     return np.sqrt(np.sum(mse) / len(pairs))
 
 
-def functional_finemap(hpo_data, gene_features_in, logit_alpha, 
+def functional_finemap(hpo_data, gene_features_in, l1_l2_mix, logit_alpha, 
                        null_variance=0.42 ** 2, converge_rmse=10e-8, quiet=False):
     """
     Conduct E-M optimized functional fine-mapping for all gene blocks & HPOs
@@ -367,7 +367,7 @@ def functional_finemap(hpo_data, gene_features_in, logit_alpha,
         if logit_alpha is None:
             logit = glm.fit()
         else:
-            logit = glm.fit_regularized(L1_wt = 1 - logit_alpha, alpha=1)
+            logit = glm.fit_regularized(L1_wt = 1 - l1_l2_mix, alpha=logit_alpha)
         pred_priors = logit.predict(features.drop(labels='gene', axis=1))
         new_priors = features.gene.to_frame().join(pred_priors.to_frame(name='prior'))
         
@@ -515,9 +515,13 @@ def main():
                         help='Allow genes to meet either --secondary-p-cutoff ' +
                         'or --min-nominal, but do not require both. ' +
                         '[default: require both]', default=False, action='store_true')
-    parser.add_argument('--regularization', dest='logit_alpha', type=float,
+    parser.add_argument('--regularization-alpha', dest='logit_alpha', type=float,
+                        help='Regularization penalty weight for logit glm. Must ' +
+                        'be in ~ [0, 1]. [default: no regularization]', default=0.2)
+    parser.add_argument('--regularization-l1-l2-mix', dest='l1_l2_mix', type=float,
                         help='Regularization parameter (elastic net alpha) for ' +
-                        'logit glm. Must be in ~ [0, 1]. [default: no regularization]')
+                        'logit glm. 0 = L1, 1 = L2, (0, 1) = elastic net. ' +
+                        '[default: L2 regularization]', default=1)
     parser.add_argument('-o', '--outfile', default='stdout', help='Output tsv of ' +
                         'final fine-mapping results for significant genes and ' + 
                         'phenotypes.')
@@ -558,8 +562,8 @@ def main():
 
     # Perform functional fine-mapping with Bayesian model averaging
     Wsq = [(i / 10) ** 2 for i in range(2, 11, 2)]
-    finemap_res = [functional_finemap(hpo_data, args.gene_features, args.logit_alpha, w) 
-                   for w in Wsq]
+    finemap_res = [functional_finemap(hpo_data, args.gene_features, args.l1_l2_mix, 
+                                      args.logit_alpha, w) for w in Wsq]
     
     # Average models across Wsq priors and write to --outfile
     bms = [x[0] for x in finemap_res]

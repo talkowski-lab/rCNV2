@@ -468,6 +468,8 @@ gene_features="gencode.v19.canonical.pext_filtered.all_features.eigenfeatures.be
 finemap_output_label="all_features"
 meta_secondary_p_cutoff=0.05
 meta_nominal_cohorts_cutoff=2
+finemap_elnet_alpha=0.1
+finemap_elnet_l1_l2_mix=1
 
 # Copy association stats from the project Google Bucket (note: requires permissions)
 mkdir stats
@@ -490,7 +492,8 @@ done < ${phenotype_list} \
   --secondary-p-cutoff ${meta_secondary_p_cutoff} \
   --min-nominal ${meta_nominal_cohorts_cutoff} \
   --secondary-or-nominal \
-  --regularization 1 \
+  --regularization-alpha ${finemap_elnet_alpha} \
+  --regularization-l1-l2-mix ${finemap_elnet_l1_l2_mix} \
   --outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv \
   --all-genes-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.all_genes_from_blocks.tsv \
   --naive-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.tsv \
