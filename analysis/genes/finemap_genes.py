@@ -189,7 +189,7 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
 
 def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True, 
                 secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
-                secondary_or_nominal=True, block_merge_dist=1000000, 
+                secondary_or_nominal=True, block_merge_dist=500000, 
                 block_prefix='gene_block', null_variance=0.42 ** 2):
     """
     Loads & processes all necessary data for a single phenotype
@@ -254,7 +254,7 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
 
 
 def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
-                  secondary_or_nominal=True):
+                  secondary_or_nominal=True, block_merge_dist=500000):
     """
     Wrapper function to process each HPO with process_hpo()
     Returns a dict with one entry per HPO
@@ -270,7 +270,8 @@ def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2,
                                         p_is_phred=True, 
                                         secondary_p_cutoff=secondary_p_cutoff, 
                                         n_nominal_cutoff=n_nominal_cutoff, 
-                                        secondary_or_nominal=secondary_or_nominal)
+                                        secondary_or_nominal=secondary_or_nominal,
+                                        block_merge_dist=block_merge_dist)
 
     return hpo_data
 
@@ -522,6 +523,9 @@ def main():
                         help='Regularization parameter (elastic net alpha) for ' +
                         'logit glm. 0 = L1, 1 = L2, (0, 1) = elastic net. ' +
                         '[default: L2 regularization]', default=1)
+    parser.add_argument('--distance', help='Distance to pad each significant gene ' +
+                        'prior to fine-mapping. [default: 500kb]', default=500000, 
+                        type=int)
     parser.add_argument('-o', '--outfile', default='stdout', help='Output tsv of ' +
                         'final fine-mapping results for significant genes and ' + 
                         'phenotypes.')
@@ -543,19 +547,20 @@ def main():
 
     # Process data per hpo
     hpo_data = load_all_hpos(args.statslist, args.secondary_p_cutoff, 
-                             args.min_nominal, args.secondary_or_nom)
+                             args.min_nominal, args.secondary_or_nom, 
+                             args.distance)
 
     # Write naive and/or genetics-only fine-mapping results (for ROC comparisons)
     if args.naive_outfile is not None:
         naive_outfile = open(args.naive_outfile, 'w')
-        make_sig_genes_df(hpo_data, naive=True, sig_only=True).\
+        make_sig_genes_df(hpo_data, naive=True).\
             rename(columns={'HPO' : '#HPO'}).\
             to_csv(naive_outfile, sep='\t', index=False, na_rep='NA')
         naive_outfile.close()
 
     if args.genetic_outfile is not None:
         genetic_outfile = open(args.genetic_outfile, 'w')
-        make_sig_genes_df(hpo_data, sig_only=True).\
+        make_sig_genes_df(hpo_data).\
             rename(columns={'HPO' : '#HPO'}).\
             to_csv(genetic_outfile, sep='\t', index=False, na_rep='NA')
         genetic_outfile.close()
@@ -570,7 +575,7 @@ def main():
     bmavg(bms, hpo_data, outfile, sig_only=True)
     if args.all_genes_outfile is not None:
         all_genes_outfile = open(args.all_genes_outfile, 'w')
-        bmavg(bms, hpo_data, all_genes_outfile, sig_only=False)
+        bmavg(bms, hpo_data, all_genes_outfile)
 
     # If optioned, average logit coefficients across models and write to --coeffs-out
     if args.coeffs_out is not None:
