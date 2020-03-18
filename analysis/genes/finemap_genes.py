@@ -292,8 +292,12 @@ def make_sig_genes_df(hpo_data, naive=False, sig_only=False):
                 else:
                     ABF = np.nan
                     PIP = 1 / len(block['finemap_res'].keys())
-                if (sig_only and gene in hpo_data[hpo]['sig_genes'].keys()) \
-                or not sig_only:
+                if sig_only:
+                    if gene in hpo_data[hpo]['sig_genes'].keys():
+                        sig_df = sig_df.append(pd.Series([hpo, gene, ABF, PIP],
+                                                         index=sig_df.columns), 
+                                                         ignore_index=True)
+                else:
                     sig_df = sig_df.append(pd.Series([hpo, gene, ABF, PIP],
                                                      index=sig_df.columns), 
                                                      ignore_index=True)
@@ -416,7 +420,7 @@ def functional_finemap(hpo_data, gene_features_in, l1_l2_mix, logit_alpha,
     return sig_df.sort_values('PIP', ascending=False), tab_out
 
 
-def bmavg(sig_dfs, hpo_data, outfile, sig_only=True):
+def bmavg(sig_dfs, hpo_data, outfile, sig_only=False):
     """
     Average ABFs and PIPs for all genes across models (list of sig_dfs)
     """

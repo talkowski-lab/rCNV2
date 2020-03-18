@@ -654,7 +654,7 @@ task finemap_genes {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:01e259e4fb9e4a41fd058b6c27815708bb589f4ccdc84ab01ab80431692c49d5"
+    docker: "talkowski/rcnv@sha256:cbef7b2c1df166854ab9c018004ba3fc64ae817beea7c772bcbdb5d39b2bf465"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -812,7 +812,7 @@ task plot_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:01e259e4fb9e4a41fd058b6c27815708bb589f4ccdc84ab01ab80431692c49d5"
+    docker: "talkowski/rcnv@sha256:cbef7b2c1df166854ab9c018004ba3fc64ae817beea7c772bcbdb5d39b2bf465"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

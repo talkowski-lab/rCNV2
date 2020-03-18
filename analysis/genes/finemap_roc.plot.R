@@ -42,6 +42,19 @@ roc <- function(stats, steps=seq(1, 0, -0.001)){
   return(roc_res)
 }
 
+# Compute PRC
+prc <- function(stats, steps=seq(1, 0, -0.001)){
+  prc_res <- as.data.frame(t(sapply(steps, function(minPIP){
+    idxs <- which(stats$PIP > minPIP)
+    prec <- length(which(stats$true[idxs])) / length(idxs)
+    recall <- length(which(stats$true[idxs])) / length(which(stats$true))
+    fall <- length(idxs) / nrow(stats)
+    return(c(minPIP, fall, prec, recall))
+  })))
+  colnames(prc_res) <- c("minPIP", "frac_all", "precision", "recall")
+  return(prc_res)
+}
+
 # Load a single dataset and annotate vs truth sets
 load.data.single <- function(path, truth){
   x <- read.table(path, header=T, sep="\t", comment.char="")
@@ -58,7 +71,7 @@ optimize.roc <- function(roc.res, return.dist=F){
   x2 <- (roc.res$frac_other - 0) ^ 2
   y2 <- (roc.res$frac_true - 1) ^ 2
   d <- sqrt(x2 + y2)
-  d.best <- min(d)
+  d.best <- min(d, na.rm=T)
   best.idx <- sort(which(d == d.best))[1]
   if(return.dist==F){
     return(roc.res[best.idx, ])
@@ -73,7 +86,7 @@ joint.roc.opt <- function(data){
   sapply(1:n.models, function(i){
     roc.dists <- do.call("cbind", lapply(data, function(d){
       rd <- optimize.roc(d[[i]]$roc, return.dist=T)
-      rd - min(rd)
+      rd - min(rd, na.rm=T)
     }))
     joint.dist <- apply(roc.dists, 1, function(vals){sqrt(sum(vals^2))})
     joint.best <- sort(which(joint.dist == min(joint.dist)))[1]
@@ -81,8 +94,22 @@ joint.roc.opt <- function(data){
   })
 }
 
+# Find PRC-optimal point
+optimize.prc <- function(prc.res, return.dist=F){
+  # Compute Euclidean distance from (1, 1)
+  x2 <- (prc.res$recall - 1) ^ 2
+  y2 <- (prc.res$precision - 1) ^ 2
+  d <- sqrt(x2 + y2)
+  d.best <- min(d, na.rm=T)
+  best.idx <- sort(which(d == d.best))[1]
+  if(return.dist==F){
+    return(prc.res[best.idx, ])
+  }else{
+    return(d)
+  }
+}
 # Gather calibration
-get.calibration <- function(stats, n.pip.bins=5){
+get.calibration <- function(stats, n.pip.bins=20){
   pip.breaks <- quantile(stats$PIP, seq(0, 1, by=1/n.pip.bins), na.rm=T)
   cal <- as.data.frame(t(sapply(1:(length(pip.breaks)-1), function(i){
     idx <- which(stats$PIP > pip.breaks[i] & stats$PIP <= pip.breaks[i+1])
@@ -101,20 +128,32 @@ load.datasets <- function(data.in, truth){
     stats <- load.data.single(datlist$path[i], truth)
     roc.res <- roc(stats)
     roc.opt <- optimize.roc(roc.res)
+    prc.res <- prc(stats)
+    prc.opt <- optimize.prc(prc.res)
     if(any(stats$true)){
       roc.auc <- flux::auc(roc.res$frac_other, roc.res$frac_true)
+      prc.auc <- flux::auc(prc.res$recall, prc.res$precision)
     }else{
       roc.auc <- NA
+      prc.auc <- NA
     }
     return(list("stats"=stats,
                 "roc"=roc.res,
                 "roc.opt"=roc.opt,
-                "PIP_0.1"=roc.res[which(round(roc.res$minPIP, 3) == 0.100), ],
-                "PIP_0.3"=roc.res[which(round(roc.res$minPIP, 3) == 0.300), ],
-                "PIP_0.5"=roc.res[which(round(roc.res$minPIP, 3) == 0.500), ],
-                "PIP_0.7"=roc.res[which(round(roc.res$minPIP, 3) == 0.700), ],
-                "PIP_0.9"=roc.res[which(round(roc.res$minPIP, 3) == 0.900), ],
-                "auc"=roc.auc,
+                "roc.auc"=roc.auc,
+                "roc.PIP_0.1"=roc.res[which(round(roc.res$minPIP, 3) == 0.100), ],
+                "roc.PIP_0.3"=roc.res[which(round(roc.res$minPIP, 3) == 0.300), ],
+                "roc.PIP_0.5"=roc.res[which(round(roc.res$minPIP, 3) == 0.500), ],
+                "roc.PIP_0.7"=roc.res[which(round(roc.res$minPIP, 3) == 0.700), ],
+                "roc.PIP_0.9"=roc.res[which(round(roc.res$minPIP, 3) == 0.900), ],
+                "prc"=prc.res,
+                "prc.opt"=prc.opt,
+                "prc.auc"=prc.auc,
+                "prc.PIP_0.1"=prc.res[which(round(prc.res$minPIP, 3) == 0.100), ],
+                "prc.PIP_0.3"=prc.res[which(round(prc.res$minPIP, 3) == 0.300), ],
+                "prc.PIP_0.5"=prc.res[which(round(prc.res$minPIP, 3) == 0.500), ],
+                "prc.PIP_0.7"=prc.res[which(round(prc.res$minPIP, 3) == 0.700), ],
+                "prc.PIP_0.9"=prc.res[which(round(prc.res$minPIP, 3) == 0.900), ],
                 "calibration"=get.calibration(stats),
                 "color"=datlist$color[i],
                 "lty"=datlist$lty[i]))
@@ -128,8 +167,8 @@ plot.roc <- function(data, title=NULL){
   par(mar=c(3, 3, 1.5, 1))
   plot(x=c(0, 1), y=c(0, 1), type="n",
        xaxs="i", yaxs="i", xlab="", ylab="")
-  abline(0, 1, col="gray70")
-  lorder <- order(-sapply(data, function(x){x$auc}))
+  abline(0, 1, col="gray70", lty=2)
+  lorder <- order(-sapply(data, function(x){x$roc.auc}))
   sapply(rev(lorder), function(i){
     x <- data[[i]]
     points(x$roc$frac_other, x$roc$frac_true,
@@ -140,7 +179,7 @@ plot.roc <- function(data, title=NULL){
     points(x$roc.opt$frac_other, x$roc.opt$frac_true,
            pch=21, bg=x$color)
     sapply(c(1, 3, 5, 7, 9), function(d){
-      fname <- paste("PIP_0", d, sep=".")
+      fname <- paste("roc.PIP_0", d, sep=".")
       vals <- unlist(x[which(names(x) == fname)])
       names(vals) <- colnames(x$roc)
       points(vals[3], vals[4],
@@ -148,23 +187,11 @@ plot.roc <- function(data, title=NULL){
       text(x=vals[3], y=vals[4],
            labels=d, col=x$color, cex=0.65)
     })
-    # points(x$PIP_0.3$frac_other, x$PIP_0.3$frac_true,
-    #        pch=23, bg="white", cex=1.2)
-    # text(x=x$PIP_0.3$frac_other, y=x$PIP_0.3$frac_true,
-    #      labels="3", col=x$color, cex=0.65)
-    # points(x$PIP_0.5$frac_other, x$PIP_0.5$frac_true,
-    #        pch=23, bg="white", cex=1.2)
-    # text(x=x$PIP_0.5$frac_other, y=x$PIP_0.5$frac_true,
-    #      labels="5", col=x$color, cex=0.65)
-    # points(x$PIP_0.9$frac_other, x$PIP_0.9$frac_true,
-    #        pch=23, bg="white", cex=1.2)
-    # text(x=x$PIP_0.9$frac_other, y=x$PIP_0.9$frac_true,
-    #      labels="9", col=x$color, cex=0.65)
   })
   legend("bottomright", lwd=5, cex=0.75, bty="n",
          col=sapply(data, function(x){x$color})[lorder], 
          legend=paste(names(data), " (",
-                      sapply(data, function(x){format(round(x$auc, 2), nsmall=2)}),
+                      sapply(data, function(x){format(round(x$roc.auc, 2), nsmall=2)}),
                       ")", sep="")[lorder])
   legend("topleft", cex=0.75, bty="n", pch=c(21, 23),
          legend=c("ROC-optimal cutoff", "PIP > 0.N"),
@@ -177,20 +204,64 @@ plot.roc <- function(data, title=NULL){
 }
 
 
+# PRC plot
+plot.prc <- function(data, title=NULL){
+  par(mar=c(3, 3, 1.5, 1))
+  prec.max <- max(sapply(data, function(l){l$prc$precision}), na.rm=T)
+  prec.baseline <- data[[1]]$prc$precision[which(data[[1]]$prc$minPIP==0)]
+  plot(x=c(0, 1), y=c(0, prec.max), type="n",
+       xaxs="i", yaxs="i", xlab="", ylab="")
+  abline(h=prec.baseline, col="gray70", lty=2)
+  lorder <- order(-sapply(data, function(x){x$prc.auc}))
+  sapply(rev(lorder), function(i){
+    x <- data[[i]]
+    points(x$prc$recall, x$prc$precision,
+           type="l", col=x$color, lwd=2, lty=x$lty)
+  })
+  sapply(rev(lorder), function(i){
+    x <- data[[i]]
+    points(x$prc.opt$recall, x$prc.opt$precision,
+           pch=21, bg=x$color)
+    sapply(c(1, 3, 5, 7, 9), function(d){
+      fname <- paste("prc.PIP_0", d, sep=".")
+      vals <- unlist(x[which(names(x) == fname)])
+      names(vals) <- colnames(x$prc)
+      points(vals[4], vals[3],
+             pch=23, bg="white", cex=1.2)
+      text(x=vals[4], y=vals[3],
+           labels=d, col=x$color, cex=0.65)
+    })
+  })
+  legend("topright", lwd=5, cex=0.75, bty="n",
+         col=sapply(data, function(x){x$color})[lorder], 
+         legend=paste(names(data), " (",
+                      sapply(data, function(x){format(round(x$prc.auc, 2), nsmall=2)}),
+                      ")", sep="")[lorder])
+  legend("bottomleft", cex=0.75, bty="n", pch=c(21, 23),
+         legend=c("PRC-optimal cutoff", "PIP > 0.N"),
+         pt.bg=c("gray50", "white"), pt.cex=c(1, 1.4))
+  legend("bottomleft", cex=0.75, bty="n", pch=c(NA, "N"),
+         legend=c("", ""), pt.cex=0.5)
+  mtext(1, line=2, text="Recall (known associations)")
+  mtext(2, line=2, text="Precision (known associations)")
+  mtext(3, line=0.1, text=title)
+}
+
+
 # Calibration plot
 plot.calibration <- function(data, title=NULL){
   plot.dat <- do.call("cbind", lapply(data, function(d){d$roc$frac_true/d$roc$frac_all}))
   xvals <- data[[1]]$roc$minPIP
-  keep.idx <- which(sapply(xvals, round, 3) %in% seq(0, 1, 0.1))
-  plot.dat <- plot.dat[keep.idx, ]
-  xvals <- xvals[keep.idx]
+  # keep.idx <- which(sapply(xvals, round, 3) %in% seq(0, 1, 0.05))
+  # plot.dat <- plot.dat[keep.idx, ]
+  # xvals <- xvals[keep.idx]
   par(mar=c(2.75, 4, 1.5, 1))
   plot(x=range(xvals), y=c(0, max(plot.dat, na.rm=T)), type="n",
        xaxt="n", yaxt="n", xlab="", ylab="")
   abline(h=1, lty=2, col="gray80")
   sapply(1:ncol(plot.dat), function(i){
-    points(x=xvals, y=plot.dat[, i], col=data[[i]]$color, pch=19)
-    points(x=xvals, y=plot.dat[, i], col=data[[i]]$color, type="l")
+    # points(x=xvals, y=plot.dat[, i], col=data[[i]]$color, pch=19, cex=0.7)
+    points(x=xvals, y=plot.dat[, i], col=data[[i]]$color, type="l", lwd=2)
   })
   axis(1, at=seq(0, 1, 0.2), labels=NA)
   axis(1, at=seq(0, 1, 0.2), tick=F, line=-0.5)
@@ -269,6 +340,14 @@ sapply(1:length(data), function(i){
   sanitized.name <- gsub('_$', '', gsub('[_]+', "_", gsub('[\ |(|)|&|/|-]', "_", tolower(names(data)[i]))))
   pdf(paste(out.prefix, sanitized.name, "roc.pdf", sep="."), height=4, width=4)
   plot.roc(data[[i]], title=names(data)[i])
+  dev.off()
+})
+
+# Plot PRCs
+sapply(1:length(data), function(i){
+  sanitized.name <- gsub('_$', '', gsub('[_]+', "_", gsub('[\ |(|)|&|/|-]', "_", tolower(names(data)[i]))))
+  pdf(paste(out.prefix, sanitized.name, "prc.pdf", sep="."), height=4, width=4)
+  plot.prc(data[[i]], title=names(data)[i])
   dev.off()
 })
 
