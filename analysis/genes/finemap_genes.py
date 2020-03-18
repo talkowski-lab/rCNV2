@@ -275,7 +275,7 @@ def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2,
     return hpo_data
 
 
-def make_sig_genes_df(hpo_data, naive=False):
+def make_sig_genes_df(hpo_data, naive=False, sig_only=False):
     """
     Makes pd.DataFrame of all significant genes, HPOs, ABFs, and PIPs
     """
@@ -291,8 +291,11 @@ def make_sig_genes_df(hpo_data, naive=False):
                 else:
                     ABF = np.nan
                     PIP = 1 / len(block['finemap_res'].keys())
-                sig_df = sig_df.append(pd.Series([hpo, gene, ABF, PIP],
-                                                 index=sig_df.columns), ignore_index=True)
+                if (sig_only and gene in hpo_data[hpo]['sig_genes'].keys()) \
+                or not sig_only:
+                    sig_df = sig_df.append(pd.Series([hpo, gene, ABF, PIP],
+                                                     index=sig_df.columns), 
+                                                     ignore_index=True)
 
     return sig_df.sort_values('PIP', ascending=False)
 
@@ -308,7 +311,7 @@ def rmse(pairs):
 
 
 def functional_finemap(hpo_data, gene_features_in, logit_alpha, 
-                       null_variance=0.42 ** 2, converge_rmse=10e-6, quiet=False):
+                       null_variance=0.42 ** 2, converge_rmse=10e-8, quiet=False):
     """
     Conduct E-M optimized functional fine-mapping for all gene blocks & HPOs
     Two returns:
@@ -353,7 +356,10 @@ def functional_finemap(hpo_data, gene_features_in, logit_alpha,
         # Join sig_df with features for logistic regression
         logit_df = sig_df.loc[:, 'gene PIP'.split()].merge(features, how='left', 
                                                            on='gene')
-        logit_df.drop(labels='gene', axis=1, inplace=True)
+
+        # When fitting regression, take mean of PIPs for genes appearing multiple times
+        # This can happen due to multiple HPO associations with the same gene
+        logit_df = logit_df.groupby('gene').mean()
 
         # Fit logit GLM & predict new priors
         glm = GLM(logit_df.PIP, logit_df.drop(labels='PIP', axis=1),
@@ -409,12 +415,19 @@ def functional_finemap(hpo_data, gene_features_in, logit_alpha,
     return sig_df.sort_values('PIP', ascending=False), tab_out
 
 
-def bmavg(sig_dfs, outfile):
+def bmavg(sig_dfs, hpo_data, outfile, sig_only=True):
     """
     Average ABFs and PIPs for all genes across models (list of sig_dfs)
     """
 
-    sig_genes = sig_dfs[0].loc[:, 'HPO gene'.split()].to_records(index=False).tolist()
+    if sig_only:
+        sig_genes = []
+        for hpo, info in hpo_data.items():
+            for gene in info['sig_genes'].keys():
+                sig_genes.append((hpo, gene))
+    else:
+        sig_genes = sig_dfs[0].loc[:, 'HPO gene'.split()].to_records(index=False).tolist()
+
     sig_df = pd.DataFrame(columns=sig_dfs[0].columns)
 
     for hpo, gene in sig_genes:
@@ -506,7 +519,10 @@ def main():
                         help='Regularization parameter (ElNet alpha) for logit glm.' +
                         '[default: no regularization]')
     parser.add_argument('-o', '--outfile', default='stdout', help='Output tsv of ' +
-                        'final fine-mapping results for all genes and phenotypes.')
+                        'final fine-mapping results for significant genes and ' + 
+                        'phenotypes.')
+    parser.add_argument('--all-genes-outfile', help='Output tsv of final ' +
+                        'fine-mapping results for all genes and phenotypes.')
     parser.add_argument('--naive-outfile', help='Output tsv of naive results ' +
                         'before fine-mapping for all genes and phenotypes.')
     parser.add_argument('--genetic-outfile', help='Output tsv of genetics-only ' +
@@ -520,10 +536,6 @@ def main():
         outfile = stdout
     else:
         outfile = open(args.outfile, 'w')
-    if args.coeffs_out is not None:
-        coeffs_out = open(args.coeffs_out, 'w')
-    else:
-        coeffs_out = None
 
     # Process data per hpo
     hpo_data = load_all_hpos(args.statslist, args.secondary_p_cutoff, 
@@ -532,13 +544,15 @@ def main():
     # Write naive and/or genetics-only fine-mapping results (for ROC comparisons)
     if args.naive_outfile is not None:
         naive_outfile = open(args.naive_outfile, 'w')
-        make_sig_genes_df(hpo_data, naive=True).rename(columns={'HPO' : '#HPO'}).\
+        make_sig_genes_df(hpo_data, naive=True, sig_only=True).\
+            rename(columns={'HPO' : '#HPO'}).\
             to_csv(naive_outfile, sep='\t', index=False, na_rep='NA')
         naive_outfile.close()
 
     if args.genetic_outfile is not None:
         genetic_outfile = open(args.genetic_outfile, 'w')
-        make_sig_genes_df(hpo_data).rename(columns={'HPO' : '#HPO'}).\
+        make_sig_genes_df(hpo_data, sig_only=True).\
+            rename(columns={'HPO' : '#HPO'}).\
             to_csv(genetic_outfile, sep='\t', index=False, na_rep='NA')
         genetic_outfile.close()
 
@@ -549,11 +563,16 @@ def main():
     
     # Average models across Wsq priors and write to --outfile
     bms = [x[0] for x in finemap_res]
-    bmavg(bms, outfile)
+    bmavg(bms, hpo_data, outfile, sig_only=True)
+    if args.all_genes_outfile is not None:
+        all_genes_outfile = open(args.all_genes_outfile, 'w')
+        bmavg(bms, hpo_data, all_genes_outfile, sig_only=False)
 
     # If optioned, average logit coefficients across models and write to --coeffs-out
-    coeff_tables = [x[1] for x in finemap_res]
-    coeff_avg(coeff_tables, coeffs_out, args.logit_alpha)
+    if args.coeffs_out is not None:
+        coeffs_out = open(args.coeffs_out, 'w')
+        coeff_tables = [x[1] for x in finemap_res]
+        coeff_avg(coeff_tables, coeffs_out, args.logit_alpha)
 
 
 if __name__ == '__main__':

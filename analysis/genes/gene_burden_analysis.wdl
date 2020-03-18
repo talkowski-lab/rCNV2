@@ -614,6 +614,7 @@ task finemap_genes {
       --secondary-or-nominal \
       --regularization 1 \
       --outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv \
+      --all-genes-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.all_genes_from_blocks.tsv \
       --naive-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.tsv \
       --genetic-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.${finemap_output_label}.tsv \
       --coeffs-out ${freq_code}.${CNV}.gene_fine_mapping.logit_coeffs.${finemap_output_label}.tsv \
