@@ -367,7 +367,7 @@ def functional_finemap(hpo_data, gene_features_in, logit_alpha,
         if logit_alpha is None:
             logit = glm.fit()
         else:
-            logit = glm.fit_regularized(L1_wt = 1 - logit_alpha)
+            logit = glm.fit_regularized(L1_wt = 1 - logit_alpha, alpha=1)
         pred_priors = logit.predict(features.drop(labels='gene', axis=1))
         new_priors = features.gene.to_frame().join(pred_priors.to_frame(name='prior'))
         
@@ -516,8 +516,8 @@ def main():
                         'or --min-nominal, but do not require both. ' +
                         '[default: require both]', default=False, action='store_true')
     parser.add_argument('--regularization', dest='logit_alpha', type=float,
-                        help='Regularization parameter (ElNet alpha) for logit glm.' +
-                        '[default: no regularization]')
+                        help='Regularization parameter (elastic net alpha) for ' +
+                        'logit glm. Must be in ~ [0, 1]. [default: no regularization]')
     parser.add_argument('-o', '--outfile', default='stdout', help='Output tsv of ' +
                         'final fine-mapping results for significant genes and ' + 
                         'phenotypes.')

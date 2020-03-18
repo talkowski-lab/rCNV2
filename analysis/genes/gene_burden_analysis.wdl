@@ -623,7 +623,7 @@ task finemap_genes {
 
     # Copy results to output bucket
     gsutil -m cp \
-      ${freq_code}.${CNV}.gene_fine_mapping.*.${finemap_output_label}.tsv \
+      ${freq_code}.${CNV}.gene_fine_mapping.*.${finemap_output_label}*tsv \
       ${rCNV_bucket}/analysis/gene_burden/fine_mapping/
 
     # Make completion token to track caching
@@ -632,6 +632,7 @@ task finemap_genes {
 
   output {
     File finemapped_output = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv"
+    File finemapped_output_all_genes = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.all_genes_from_blocks.tsv"
     File naive_output = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.tsv"
     File genetic_output = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.${finemap_output_label}.tsv"
     File logit_coeffs = "${freq_code}.${CNV}.gene_fine_mapping.logit_coeffs.${finemap_output_label}.tsv"
@@ -639,7 +640,7 @@ task finemap_genes {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:788371e3e4c904918793b766ef4886bcc75631971d8acfb394ea199fccf2ada3"
+    docker: "talkowski/rcnv@sha256:94123b9a69dba608bdfd2933651b58b98b660c1d47d5bd490c13921906dc2469"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
