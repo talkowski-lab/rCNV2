@@ -96,13 +96,17 @@ def finemap(gene_priors, gene_info, null_variance=0.42 ** 2):
             theta = gene_info[gene]['lnOR']
             se = ci2se((gene_info[gene]['lnOR_upper'], gene_info[gene]['lnOR_lower']))
             V = se ** 2
-            zsq = (theta ** 2) / V
-            W = null_variance
-            ABF = np.sqrt((V+W) / V) * np.exp((-zsq / 2) * (W / (V+W)))
+            if V > 0:
+                zsq = (theta ** 2) / V
+                W = null_variance
+                ABF = np.sqrt((V+W) / V) * np.exp((-zsq / 2) * (W / (V+W)))
 
-            # Wakefield 2009 formulates BF relative to H0. We need to invert to 
-            # obtain evidence & posterior for H1 (i.e., true non-zero effect)
-            ABF = 1 / ABF
+                # Wakefield 2009 formulates BF relative to H0. We need to invert to 
+                # obtain evidence & posterior for H1 (i.e., true non-zero effect)
+                ABF = 1 / ABF
+
+            else:
+                ABF = 0
 
             finemap_res[gene] = {'ABF' : ABF}
 
@@ -118,34 +122,33 @@ def finemap(gene_priors, gene_info, null_variance=0.42 ** 2):
     return finemap_res
 
 
-def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True, 
+def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True, 
                 secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
-                secondary_or_nominal=True, block_merge_dist=1000000, 
-                block_prefix='gene_block', null_variance=0.42 ** 2):
+                secondary_or_nominal=True, sig_only=False, keep_genes=None):
     """
-    Loads & processes all necessary data for a single phenotype
-    Returns a dict with the following entries:
-        sig_genes : dict of sig genes, with each entry corresponding to stats
-                    for a single significant gene
-        blocks : pbt.BedTool of clustered significant genes to be fine-mapped
+    Input: csv.reader of meta-analysis association stats
+    Output: dict of gene stats (either sig_only or all genes in reader)
     """
-
-    hpo_info = {'sig_genes' : {},
-                'blocks' : {}}
-    se_by_chrom = {}
 
     if path.splitext(stats_in)[1] in '.gz .bgz .bgzip'.split():
-        reader = csv.reader(gzip.open(stats_in, 'rt'), delimiter='\t')
+        csvin = gzip.open(stats_in, 'rt')
     else:
-        reader = csv.reader(open(stats_in), delimiter='\t')
+        csvin = open(stats_in)
+    reader = csv.reader(csvin, delimiter='\t')
 
-    # Parse data for each gene
+    stats_dict = {}
+
     for chrom, start, end, gene, n_nominal, top_cohort, lnOR, lnOR_lower, \
         lnOR_upper, zscore, primary_p, secondary_p in reader:
 
         # Skip header line
         if chrom.startswith('#'):
             continue
+
+        # If optioned, restrict on gene name
+        if keep_genes is not None:
+            if gene not in keep_genes:
+                continue
 
         # Clean up gene data
         primary_p = format_stat(primary_p, p_is_phred, 1)
@@ -155,21 +158,81 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
         lnOR_lower = format_stat(lnOR_lower)
         lnOR_upper = format_stat(lnOR_upper)
 
-        # Store gene association stats if significant
-        if is_gene_sig(primary_p, secondary_p, n_nominal, primary_p_cutoff,
-                       secondary_p_cutoff, n_nominal, secondary_or_nominal):
-            gene_bt = pbt.BedTool('\t'.join([chrom, start, end, gene]), from_string=True)
+        # Store gene association stats
+        if sig_only:
+            if is_gene_sig(primary_p, secondary_p, n_nominal, primary_p_cutoff,
+                           secondary_p_cutoff, n_nominal, secondary_or_nominal):
+                gene_bt = pbt.BedTool('\t'.join([chrom, start, end, gene]), 
+                                      from_string=True)
+                gene_stats = {'lnOR' : lnOR, 
+                              'lnOR_lower' : lnOR_lower,
+                              'lnOR_upper' : lnOR_upper, 
+                              'zscore' : format_stat(zscore),
+                              'primary_p' : primary_p, 'secondary_p' : secondary_p,
+                              'n_nominal' : n_nominal, 'gene_bt' : gene_bt}
+                stats_dict[gene] = gene_stats
+        else:
+            gene_bt = pbt.BedTool('\t'.join([chrom, start, end, gene]), 
+                                  from_string=True)
             gene_stats = {'lnOR' : lnOR, 
                           'lnOR_lower' : lnOR_lower,
                           'lnOR_upper' : lnOR_upper, 
                           'zscore' : format_stat(zscore),
                           'primary_p' : primary_p, 'secondary_p' : secondary_p,
                           'n_nominal' : n_nominal, 'gene_bt' : gene_bt}
-            hpo_info['sig_genes'][gene] = gene_stats
+            stats_dict[gene] = gene_stats
 
+    csvin.close()
+
+    return stats_dict
+
+
+def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True, 
+                secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
+                secondary_or_nominal=True, block_merge_dist=1000000, 
+                block_prefix='gene_block', null_variance=0.42 ** 2):
+    """
+    Loads & processes all necessary data for a single phenotype
+    Returns a dict with the following entries:
+        sig_genes : dict of sig genes, with each entry corresponding to stats
+                    for a single significant gene
+        all_genes : dict of sig genes + all genes within block_merge_dist with
+                    stats per gene
+        blocks : pbt.BedTool of all clustered genes to be fine-mapped
+    """
+
+    hpo_info = {'blocks' : {}}
+    se_by_chrom = {}
+
+    # First pass: parse data for significant genes only
+    hpo_info['sig_genes'] = parse_stats(stats_in, primary_p_cutoff, p_is_phred, 
+                                        secondary_p_cutoff, n_nominal_cutoff, 
+                                        secondary_or_nominal, sig_only=True)
+
+    # Second pass: parse data for all genes within block_merge_dist of sig_genes
     if len(hpo_info['sig_genes']) > 0:
+        # Make bt of significant genes
+        sig_gene_bts = [g['gene_bt'] for g in hpo_info['sig_genes'].values()]
+        if len(sig_gene_bts) > 1:
+            sig_genes_bt = sig_gene_bts[0].cat(*sig_gene_bts[1:], postmerge=False).sort()
+        else:
+            sig_genes_bt = sig_gene_bts[0]
+
+        # Intersect sig genes with all genes
+        all_genes_bt = pbt.BedTool(stats_in).cut(range(4)).sort()
+        nearby_genes = all_genes_bt.closest(sig_genes_bt.sort(), d=True).\
+                           filter(lambda x: int(x[8]) > -1 and \
+                                            int(x[8]) <= block_merge_dist).\
+                           saveas().to_dataframe().loc[:, 'name'].values.tolist()
+
+        # Gather gene stats
+        hpo_info['all_genes'] = parse_stats(stats_in, primary_p_cutoff, p_is_phred, 
+                                            secondary_p_cutoff, n_nominal_cutoff, 
+                                            secondary_or_nominal, sig_only=False,
+                                            keep_genes=nearby_genes)
+
         # Cluster significant genes into blocks to be fine-mapped
-        gene_bts = [g['gene_bt'] for g in hpo_info['sig_genes'].values()]
+        gene_bts = [g['gene_bt'] for g in hpo_info['all_genes'].values()]
         if len(gene_bts) > 1:
             genes_bt = gene_bts[0].cat(*gene_bts[1:], postmerge=False).sort()
         else:
@@ -183,7 +246,7 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
             block_id = '_'.join([hpo, block_prefix, str(k)])
             genes = block[3].split(',')
             gene_priors = {gene : 1 / len(genes) for gene in genes}
-            finemap_res = finemap(gene_priors, hpo_info['sig_genes'], null_variance)
+            finemap_res = finemap(gene_priors, hpo_info['all_genes'], null_variance)
             hpo_info['blocks'][block_id] = {'coords' : block,
                                             'finemap_res' : finemap_res}
 
@@ -263,7 +326,7 @@ def functional_finemap(hpo_data, gene_features_in, logit_alpha,
         for block_id, block_data in hpo_data[hpo]['blocks'].items():
             genes = list(block_data['finemap_res'].keys())
             gene_priors = {gene : 1 / len(genes) for gene in genes}
-            updated_finemap_res = finemap(gene_priors, hpo_data[hpo]['sig_genes'], 
+            updated_finemap_res = finemap(gene_priors, hpo_data[hpo]['all_genes'], 
                                           null_variance)
             hpo_data[hpo]['blocks'][block_id]['finemap_res'] = updated_finemap_res
 
@@ -311,7 +374,7 @@ def functional_finemap(hpo_data, gene_features_in, logit_alpha,
                 # Normalize new priors within each block such that sum(priors) = 1
                 sum_priors = np.sum(list(gene_priors.values()))
                 gene_priors = {g : p / sum_priors for g, p in gene_priors.items()}
-                new_finemap_res = finemap(gene_priors, hpo_data[hpo]['sig_genes'],
+                new_finemap_res = finemap(gene_priors, hpo_data[hpo]['all_genes'],
                                           null_variance)
                 hpo_data[hpo]['blocks'][block_id]['finemap_res'] = new_finemap_res
 

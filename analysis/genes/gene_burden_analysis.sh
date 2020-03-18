@@ -13,11 +13,11 @@
 
 # Launch docker image
 docker run --rm -it talkowski/rcnv
+gcloud auth login
 
 
 # Copy all filtered CNV data, gene coordinates, and other references 
 # from the project Google Bucket (note: requires permissions)
-gcloud auth login
 mkdir cleaned_cnv/
 gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
 gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./

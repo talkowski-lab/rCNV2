@@ -90,7 +90,6 @@ get.calibration <- function(stats, n.pip.bins=5){
     binconf(true, length(idx))
   })))
   colnames(cal) <- c("est", "lower", "upper")
-  rownames(cal) <- pip.mins
   return(cal)
 }
 
