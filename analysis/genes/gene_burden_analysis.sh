@@ -521,12 +521,12 @@ gsutil -m cp \
 
 # Make input tsv
 for wrapper in 1; do
-  echo -e "Prior\tgrey70\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.genomic_features.all_genes_from_blocks.tsv"
-  echo -e "Posterior\t'#264653'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.genomic_features.all_genes_from_blocks.tsv"
-  echo -e "Genomic features\t'#E76F51'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.all_genes_from_blocks.tsv"
-  echo -e "Gene expression\t'#E9C46A'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.all_genes_from_blocks.tsv"
-  echo -e "Gene constraint\t'#F4A261'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.all_genes_from_blocks.tsv"
-  echo -e "Full model\t'#2A9D8F'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.all_genes_from_blocks.tsv"
+  echo -e "Prior\tgrey70\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.genomic_features.tsv"
+  echo -e "Posterior\t'#264653'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.genomic_features.tsv"
+  echo -e "Genomic features\t'#E76F51'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.tsv"
+  echo -e "Gene expression\t'#E9C46A'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.tsv"
+  echo -e "Gene constraint\t'#F4A261'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.tsv"
+  echo -e "Full model\t'#2A9D8F'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.tsv"
 done > finemap_roc_input.tsv
 
 # Make all gene truth sets
@@ -584,8 +584,18 @@ case ${CNV} in
     | cat <( echo -e "#HPO\tgene" ) - \
     > ddg2p_truth_set.lof.tsv
 
+    # Combine all truth sets into master union
+    cat union_truth_set.lof.tsv \
+        clingen_truth_set.lof.tsv \
+        ddg2p_truth_set.lof.tsv \
+        hpo_truth_set.tsv \
+    | fgrep -v "#" | sort -Vk1,1 -k2,2V | uniq \
+    | cat <( echo -e "#HPO\tgene" ) - \
+    > master_union_truth_set.lof.tsv
+
     # Write truth set input tsv
     for wrapper in 1; do
+      echo -e "Union of all truth sets\tmaster_union_truth_set.lof.tsv"
       echo -e "ClinGen HI & DECIPHER LoF (union)\tunion_truth_set.lof.tsv"
       echo -e "ClinGen HI & DECIPHER LoF (intersection)\tintersection_truth_set.lof.tsv"
       echo -e "ClinGen HI (any confidence)\tclingen_truth_set.lof.tsv"
@@ -624,8 +634,18 @@ case ${CNV} in
     | cat <( echo -e "#HPO\tgene" ) - \
     > ddg2p_truth_set.gof.tsv
 
+    # Combine all truth sets into master union
+    cat union_truth_set.gof.tsv \
+        clingen_truth_set.gof.tsv \
+        ddg2p_truth_set.gof.tsv \
+        hpo_truth_set.tsv \
+    | fgrep -v "#" | sort -Vk1,1 -k2,2V | uniq \
+    | cat <( echo -e "#HPO\tgene" ) - \
+    > master_union_truth_set.gof.tsv
+
     # Write truth set input tsv
     for wrapper in 1; do
+      echo -e "Union of all truth sets\tmaster_union_truth_set.gof.tsv"
       echo -e "ClinGen TS & DECIPHER GoF (union)\tunion_truth_set.gof.tsv"
       echo -e "ClinGen TS (any confidence)\tclingen_truth_set.triplo.tsv"
       echo -e "DECIPHER dominant GoF/unk. (any confidence)\tddg2p_truth_set.gof.tsv"
@@ -635,9 +655,9 @@ case ${CNV} in
 
 esac
 
-# Plot ROCs
+# Plot finemapping QC
 mkdir ${freq_code}_${CNV}_finemap_plots/
-/opt/rCNV2/analysis/genes/finemap_roc.plot.R \
+/opt/rCNV2/analysis/genes/plot_finemap_results.R \
   finemap_roc_input.tsv \
   finemap_roc_truth_sets.tsv \
   ${freq_code}_${CNV}_finemap_plots/${freq_code}.${CNV}.finemap_results

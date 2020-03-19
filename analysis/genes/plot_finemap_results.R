@@ -8,7 +8,7 @@
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Plot ROC analysis of various gene fine-mapping approaches
+# Plot quality assessment analyses of various gene fine-mapping approaches
 
 
 options(scipen=100000, stringsAsFactors=F)
@@ -80,20 +80,6 @@ optimize.roc <- function(roc.res, return.dist=F){
   }
 }
 
-# Joint ROC optimization
-joint.roc.opt <- function(data){
-  n.models <- length(data[[1]])
-  sapply(1:n.models, function(i){
-    roc.dists <- do.call("cbind", lapply(data, function(d){
-      rd <- optimize.roc(d[[i]]$roc, return.dist=T)
-      rd - min(rd, na.rm=T)
-    }))
-    joint.dist <- apply(roc.dists, 1, function(vals){sqrt(sum(vals^2))})
-    joint.best <- sort(which(joint.dist == min(joint.dist)))[1]
-    return(data[[1]][[i]]$roc$minPIP[joint.best])
-  })
-}
-
 # Find PRC-optimal point
 optimize.prc <- function(prc.res, return.dist=F){
   # Compute Euclidean distance from (1, 1)
@@ -160,6 +146,67 @@ load.datasets <- function(data.in, truth){
   })
   names(data) <- datlist$name
   return(data)
+}
+
+# Load raw gene features & subset to genes with PIPs
+load.features <- function(stats, raw.features.in){
+  f <- read.table(raw.features.in, sep="\t", comment.char="", header=T)[, -c(1:3)]
+  # Standard normalize all features
+  f[, 2:ncol(f)] <- apply(f[, 2:ncol(f)], 2, function(vals){
+    newvals <- as.numeric(scale(as.numeric(vals), center=T, scale=T))
+    nas <- which(is.na(newvals))
+    if(length(nas > 0)){
+      newvals[nas] <- mean(newvals, na.rm=T)
+    }
+    return(newvals)
+  })
+  f <- f[which(f$gene %in% stats$gene), ]
+  return(f)
+}
+
+# PIP comparison scatterplot
+pip.scatter <- function(stats1, stats2, color1, color2, label1, label2,
+                        title.cex=0.75, lpos="right"){
+  # Join PIPs
+  x <- merge(stats1, stats2, by=c("HPO", "gene"), suffix=c(".1", ".2"))
+  x <- x[, grep("PIP", colnames(x), fixed=T)]
+  colors <- apply(x, 1, function(p){if(p[1] > p[2]){color1}else{color2}})
+  # Plot
+  par(mar=c(4, 4, 2, 2))
+  plot(x, xlim=c(0, 1), ylim=c(0, 1), col=colors, pch=19, cex=0.75,
+       panel.first=c(abline(0, 1, lty=2)), 
+       xlab=paste("PIP (", label1, ")", sep=""), 
+       ylab=paste("PIP (", label2, ")", sep=""))
+  mtext(3, text=paste(label1, "vs.", label2), font=2, line=0.2, cex=title.cex)
+  legend(lpos, cex=0.7, col=c(color1, color2), pch=19,
+         legend=c(paste(label1 , ">", label2),
+                  paste(label2 , ">", label1)))
+}
+
+# PIP comparison histogram
+pip.split.hist <- function(stats1, stats2, color1, color2, label1, label2,
+                           title.cex=0.75){
+  # Join PIPs
+  x <- merge(stats1, stats2, by=c("HPO", "gene"), suffix=c(".1", ".2"))
+  x <- x[, grep("PIP", colnames(x), fixed=T)]
+  d <- x$PIP.2 - x$PIP.1
+  # Plot
+  par(mar=c(4, 4, 2, 2), bty="n")
+  h <- hist(d, breaks=seq(-1, 1, 0.05), plot=F)
+  plot(x=c(-1, 1), y=c(0, max(h$counts)), type="n",
+       xlab=paste("PIP (", label2 , " - ", label1, ")", sep=""),
+       ylab="Genes (count)")
+  rect(xleft=h$breaks[which(h$mids<0)],
+       xright=h$breaks[which(h$mids<0)+1],
+       ybottom=0, ytop=h$counts[which(h$mids<0)], col=color1)
+  rect(xleft=h$breaks[which(h$mids>0)],
+       xright=h$breaks[which(h$mids>0)+1],
+       ybottom=0, ytop=h$counts[which(h$mids>0)], col=color2)
+  mtext(3, text=paste(label1, "vs.", label2), font=2, line=0.2, cex=title.cex)
+  legend("topleft", cex=0.7, text.col=color1, bty="n",
+         legend=paste(label1 , ">\n", label2))
+  legend("topright", cex=0.7, text.col=color2, bty="n",
+         legend=paste(label2 , ">\n", label1))
 }
 
 # ROC plot
@@ -274,6 +321,63 @@ plot.calibration <- function(data, title=NULL){
          legend=names(data))
 }
 
+# Get raw correlation of features vs PIPs
+calc.feat.cors <- function(stats, features, logit=F){
+  rhos <- sapply(2:ncol(features), function(i){
+    x <- merge(features[, c(1, i)],
+          stats[, which(colnames(stats) %in% c("gene", "PIP"))],
+          all.x=F, all.y=T)
+    x <- as.data.frame(t(sapply(sort(unique(x$gene)), function(g){
+      apply(x[which(x$gene==g), -c(1)], 2, mean, na.rm=T)
+    })))
+    colnames(x) <- c("feature", "PIP")
+    if(logit==T){
+      as.numeric(cor.test(x$PIP, x$feature, method="spearman")$estimate)
+    }else{
+      glm(PIP ~ feature, family="binomial", data=x)$coefficients[-1]
+    }
+  })
+  names(rhos) <- colnames(features)[2:ncol(features)]
+  return(rhos)
+}
+
+# Barplot of top and bottom N feature correlations
+plot.feat.cors <- function(data, features, top.N=10, logit=F){
+  rhos <- sort(calc.feat.cors(data$stats, features, logit))
+  par(mfrow=c(1, 2), bty="n")
+  par(mar=c(0.5, 1, 4, 6))
+  plot(x=c(min(-max(abs(rhos), na.rm=T), na.rm=T), 0), y=c(0, (2*top.N)+1), type="n",
+       xaxt="n", yaxt="n", xlab="", ylab="")
+  abline(v=axTicks(3), col="gray90")
+  rect(xleft=head(rhos, top.N), xright=0, 
+       ybottom=(1:top.N)-0.85, ytop=(1:top.N)-0.15, 
+       col=data$color)
+  axis(4, at=(1:top.N)-0.5, las=2, line=-0.9, tick=F,
+       labels=names(head(rhos, top.N)))
+  axis(3)
+  if(logit==T){
+    mtext(3, text="Std. logit coeff.", line=2.5)
+  }else{
+    mtext(3, text="Spearman's Rho (vs. PIP)", line=2.5)
+  }
+  
+  par(mar=c(0.5, 6, 4, 1))
+  plot(x=c(0, max(abs(rhos), na.rm=T)), y=c(0, (2*top.N)+1), type="n",
+       xaxt="n", yaxt="n", xlab="", ylab="")
+  abline(v=axTicks(3), col="gray90")
+  rect(xleft=0, xright=tail(rhos, top.N), 
+       ybottom=((1:top.N)-0.85)+top.N+1, ytop=((1:top.N)-0.15)+top.N+1, 
+       col=data$color)
+  axis(2, at=(1:top.N)-0.5+top.N+1, las=2, line=-0.9, tick=F,
+       labels=names(tail(rhos, top.N)))
+  axis(3)
+  if(logit==T){
+    mtext(3, text="Std. logit coeff.", line=2.5)
+  }else{
+    mtext(3, text="Spearman's Rho (vs. PIP)", line=2.5)
+  }
+}
+
 
 #####################
 ### RSCRIPT BLOCK ###
@@ -292,19 +396,21 @@ args <- parse_args(OptionParser(usage="%prog roc_input.tsv truth_genes.tsv",
 opts <- args$options
 
 # Checks for appropriate positional arguments
-if(length(args$args) != 3){
-  stop("Three positional arguments: data.tsv, truth_sets.tsv, and out_prefix\n")
+if(length(args$args) != 4){
+  stop("Three positional arguments: data.tsv, truth_sets.tsv, raw_features.bed, and out_prefix\n")
 }
 
 # Writes args & opts to vars
 data.in <- args$args[1]
 truth.in <- args$args[2]
-out.prefix <- args$args[3]
+raw.features.in <- args$args[3]
+out.prefix <- args$args[4]
 
 # # DEV PARAMTERS
 # setwd("~/scratch")
 # data.in <- "finemap_roc_input.tsv"
 # truth.in <- "finemap_roc_truth_sets.tsv"
+# raw.features.in <- "gencode.v19.canonical.pext_filtered.all_features.bed.gz"
 # out.prefix <- "finemap_roc"
 
 # Read truth sets
@@ -316,8 +422,8 @@ data <- lapply(truth, function(tlist){
 })
 names(data) <- names(truth)
 
-# # Determine joint ROC-optimal cutoff
-# joint.roc.opts <- joint.roc.opt(data)
+# Load raw features
+features <- load.features(data[[1]][[1]]$stats, raw.features.in)
 
 # Plot histograms of PIPs
 pdf(paste(out.prefix, "PIP_distributions.pdf", sep="."),
@@ -334,6 +440,72 @@ sapply(1:length(data[[1]]), function(i){
        main=names(data[[1]])[i], ylim=c(0, hmax))
 })
 dev.off()
+
+# Plot PIP comparison scatterplots
+if(names(data[[1]])[1] %in% c("Prior", "Posterior")){
+  png(paste(out.prefix, "PIP_comparisons", tolower(names(data[[1]])[1]), "scatter.png", sep="."),
+      height=2.5*300, width=2.5*(length(data[[1]])-1)*300, res=300)
+  par(mfrow=c(1, length(data[[1]]) - 1))
+  sapply(2:length(data[[1]]), function(i){
+    pip.scatter(stats1=data[[1]][[1]]$stats,
+                stats2=data[[1]][[i]]$stats,
+                color1=data[[1]][[1]]$color,
+                color2=data[[1]][[i]]$color,
+                label1=names(data[[1]])[1],
+                label2=names(data[[1]])[i],
+                lpos="bottomright")
+  })
+  dev.off()
+}
+if(names(data[[1]])[2] %in% c("Prior", "Posterior")){
+  png(paste(out.prefix, "PIP_comparisons", tolower(names(data[[1]])[2]), "scatter.png", sep="."),
+      height=2.5*300, width=2.5*(length(data[[1]])-1)*300, res=300)
+  par(mfrow=c(1, length(data[[1]]) - 1))
+  sapply(1:length(data[[1]]), function(i){
+    if(i != 2){
+      pip.scatter(stats1=data[[1]][[2]]$stats,
+                  stats2=data[[1]][[i]]$stats,
+                  color1=data[[1]][[2]]$color,
+                  color2=data[[1]][[i]]$color,
+                  label1=names(data[[1]])[2],
+                  label2=names(data[[1]])[i],
+                  lpos="topleft")
+    }
+  })
+  dev.off()
+}
+
+# Plot PIP comparison histograms
+if(names(data[[1]])[1] %in% c("Prior", "Posterior")){
+  png(paste(out.prefix, "PIP_comparisons", tolower(names(data[[1]])[1]), "hist.png", sep="."),
+      height=2.5*300, width=2.5*(length(data[[1]])-1)*300, res=300)
+  par(mfrow=c(1, length(data[[1]]) - 1))
+  sapply(2:length(data[[1]]), function(i){
+    pip.split.hist(stats1=data[[1]][[1]]$stats,
+                   stats2=data[[1]][[i]]$stats,
+                   color1=data[[1]][[1]]$color,
+                   color2=data[[1]][[i]]$color,
+                   label1=names(data[[1]])[1],
+                   label2=names(data[[1]])[i])
+  })
+  dev.off()
+}
+if(names(data[[1]])[2] %in% c("Prior", "Posterior")){
+  png(paste(out.prefix, "PIP_comparisons", tolower(names(data[[1]])[2]), "hist.png", sep="."),
+      height=2.5*300, width=2.5*(length(data[[1]])-1)*300, res=300)
+  par(mfrow=c(1, length(data[[1]]) - 1))
+  sapply(1:length(data[[1]]), function(i){
+    if(i != 2){
+      pip.split.hist(stats1=data[[1]][[2]]$stats,
+                     stats2=data[[1]][[i]]$stats,
+                     color1=data[[1]][[2]]$color,
+                     color2=data[[1]][[i]]$color,
+                     label1=names(data[[1]])[2],
+                     label2=names(data[[1]])[i])
+    }
+  })
+  dev.off()
+}
 
 # Plot ROCs
 sapply(1:length(data), function(i){
@@ -356,5 +528,14 @@ sapply(1:length(data), function(i){
   sanitized.name <- gsub('_$', '', gsub('[_]+', "_", gsub('[\ |(|)|&|/|-]', "_", tolower(names(data)[i]))))
   pdf(paste(out.prefix, sanitized.name, "enrichment.pdf", sep="."), height=3, width=4.5)
   plot.calibration(data[[i]], title=names(data)[i])
+  dev.off()
+})
+
+# Plot correlations with raw features
+sapply(1:length(data[[1]]), function(i){
+  sanitized.name <- gsub(" ", "_", tolower(names(data[[1]])[i]), fixed=T)
+  pdf(paste(out.prefix, sanitized.name, "raw_feature_correlations.pdf", sep="."),
+      height=8, width=8)
+  plot.feat.cors(data[[1]][[i]], features, logit=F)
   dev.off()
 })
