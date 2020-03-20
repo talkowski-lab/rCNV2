@@ -511,6 +511,10 @@ done < ${phenotype_list} \
 freq_code="rCNV"
 CNV="DEL"
 phenotype_list="test_phenotypes.list"
+raw_features_genomic="gencode.v19.canonical.pext_filtered.genomic_features.bed.gz"
+raw_features_expression="gencode.v19.canonical.pext_filtered.expression_features.bed.gz"
+raw_features_constraint="gencode.v19.canonical.pext_filtered.constraint_features.bed.gz"
+raw_features_merged="gencode.v19.canonical.pext_filtered.all_features.bed.gz"
 rCNV_bucket="gs://rcnv_project"
 
 # Copy all fine-mapped gene lists
@@ -519,7 +523,7 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/gene_burden/fine_mapping/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.*.tsv \
   finemap_stats/
 
-# Make input tsv
+# Make input tsvs
 for wrapper in 1; do
   echo -e "Prior\tgrey70\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.genomic_features.tsv"
   echo -e "Posterior\t'#264653'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.genomic_features.tsv"
@@ -528,6 +532,12 @@ for wrapper in 1; do
   echo -e "Gene constraint\t'#F4A261'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.tsv"
   echo -e "Full model\t'#2A9D8F'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.tsv"
 done > finemap_roc_input.tsv
+for wrapper in 1; do
+  echo -e "Genomic features\t'#E76F51'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.all_genes_from_blocks.tsv\t${raw_features_genomic}"
+  echo -e "Gene expression\t'#E9C46A'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.all_genes_from_blocks.tsv\t${raw_features_expression}"
+  echo -e "Gene constraint\t'#F4A261'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.all_genes_from_blocks.tsv\t${raw_features_constraint}"
+  echo -e "Full model\t'#2A9D8F'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.all_genes_from_blocks.tsv\t${raw_features_merged}"
+done > finemap_feature_cor_input.tsv
 
 # Make all gene truth sets
 gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes/gene_lists ./
@@ -655,12 +665,15 @@ case ${CNV} in
 
 esac
 
-# Plot finemapping QC
+# Plot finemapping QC & feature correlations
 mkdir ${freq_code}_${CNV}_finemap_plots/
 /opt/rCNV2/analysis/genes/plot_finemap_results.R \
   finemap_roc_input.tsv \
   finemap_roc_truth_sets.tsv \
   ${freq_code}_${CNV}_finemap_plots/${freq_code}.${CNV}.finemap_results
+/opt/rCNV2/analysis/genes/plot_finemap_coefficients.R \
+  finemap_feature_cor_input.tsv \
+  ${freq_code}_${CNV}_finemap_plots/${freq_code}.${CNV}.finemap_feature_cors
 
 # Compress results
 tar -czvf ${freq_code}_${CNV}_finemap_plots.tgz ${freq_code}_${CNV}_finemap_plots

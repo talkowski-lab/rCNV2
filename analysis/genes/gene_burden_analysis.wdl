@@ -33,6 +33,7 @@ workflow gene_burden_analysis {
   File finemap_expression_features
   File finemap_constraint_features
   File finemap_merged_features
+  File raw_finemap_merged_features
   String rCNV_bucket
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
@@ -213,6 +214,7 @@ workflow gene_burden_analysis {
         completion_tokens=[finemap_genomic.completion_token, finemap_expression.completion_token, finemap_constraint.completion_token, finemap_merged.completion_token],
         freq_code="rCNV",
         CNV=cnv,
+        raw_features_merged=raw_finemap_merged_features,
         phenotype_list=phenotype_list,
         rCNV_bucket=rCNV_bucket
     }
@@ -654,7 +656,7 @@ task finemap_genes {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:5d985cf3474c417e93f75fdebf9691068265480d452c385d307d81b90ad1ef8a"
+    docker: "talkowski/rcnv@sha256:3fa77040b951854967db7c3b8cd476bf7fd88b7472ce58f3ff5132fab6d20236"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -669,6 +671,10 @@ task plot_finemap_res {
   String freq_code
   String CNV
   File phenotype_list
+  File raw_features_genomic
+  File raw_features_expression
+  File raw_features_constraint
+  File raw_features_merged
   String rCNV_bucket
 
   command <<<
@@ -680,7 +686,7 @@ task plot_finemap_res {
       ${rCNV_bucket}/analysis/gene_burden/fine_mapping/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.*.tsv \
       finemap_stats/
 
-    # Make input tsv
+    # Make input tsvs
     for wrapper in 1; do
       echo -e "Prior\tgrey70\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.genomic_features.tsv"
       echo -e "Posterior\t'#264653'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.genomic_features.tsv"
@@ -689,6 +695,12 @@ task plot_finemap_res {
       echo -e "Gene constraint\t'#F4A261'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.tsv"
       echo -e "Full model\t'#2A9D8F'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.tsv"
     done > finemap_roc_input.tsv
+    for wrapper in 1; do
+      echo -e "Genomic features\t'#E76F51'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.all_genes_from_blocks.tsv\t${raw_features_genomic}"
+      echo -e "Gene expression\t'#E9C46A'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.all_genes_from_blocks.tsv\t${raw_features_expression}"
+      echo -e "Gene constraint\t'#F4A261'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.all_genes_from_blocks.tsv\t${raw_features_constraint}"
+      echo -e "Full model\t'#2A9D8F'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.all_genes_from_blocks.tsv\t${raw_features_merged}"
+    done > finemap_feature_cor_input.tsv
 
     # Make all gene truth sets
     gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes/gene_lists ./
@@ -745,8 +757,18 @@ task plot_finemap_res {
         | cat <( echo -e "#HPO\tgene" ) - \
         > ddg2p_truth_set.lof.tsv
 
+        # Combine all truth sets into master union
+        cat union_truth_set.lof.tsv \
+            clingen_truth_set.lof.tsv \
+            ddg2p_truth_set.lof.tsv \
+            hpo_truth_set.tsv \
+        | fgrep -v "#" | sort -Vk1,1 -k2,2V | uniq \
+        | cat <( echo -e "#HPO\tgene" ) - \
+        > master_union_truth_set.lof.tsv
+
         # Write truth set input tsv
         for wrapper in 1; do
+          echo -e "Union of all truth sets\tmaster_union_truth_set.lof.tsv"
           echo -e "ClinGen HI & DECIPHER LoF (union)\tunion_truth_set.lof.tsv"
           echo -e "ClinGen HI & DECIPHER LoF (intersection)\tintersection_truth_set.lof.tsv"
           echo -e "ClinGen HI (any confidence)\tclingen_truth_set.lof.tsv"
@@ -785,8 +807,18 @@ task plot_finemap_res {
         | cat <( echo -e "#HPO\tgene" ) - \
         > ddg2p_truth_set.gof.tsv
 
+        # Combine all truth sets into master union
+        cat union_truth_set.gof.tsv \
+            clingen_truth_set.gof.tsv \
+            ddg2p_truth_set.gof.tsv \
+            hpo_truth_set.tsv \
+        | fgrep -v "#" | sort -Vk1,1 -k2,2V | uniq \
+        | cat <( echo -e "#HPO\tgene" ) - \
+        > master_union_truth_set.gof.tsv
+
         # Write truth set input tsv
         for wrapper in 1; do
+          echo -e "Union of all truth sets\tmaster_union_truth_set.gof.tsv"
           echo -e "ClinGen TS & DECIPHER GoF (union)\tunion_truth_set.gof.tsv"
           echo -e "ClinGen TS (any confidence)\tclingen_truth_set.triplo.tsv"
           echo -e "DECIPHER dominant GoF/unk. (any confidence)\tddg2p_truth_set.gof.tsv"
@@ -796,12 +828,15 @@ task plot_finemap_res {
 
     esac
 
-    # Plot ROCs
+    # Plot finemapping QC & feature correlations
     mkdir ${freq_code}_${CNV}_finemap_plots/
-    /opt/rCNV2/analysis/genes/finemap_roc.plot.R \
+    /opt/rCNV2/analysis/genes/plot_finemap_results.R \
       finemap_roc_input.tsv \
       finemap_roc_truth_sets.tsv \
       ${freq_code}_${CNV}_finemap_plots/${freq_code}.${CNV}.finemap_results
+    /opt/rCNV2/analysis/genes/plot_finemap_coefficients.R \
+      finemap_feature_cor_input.tsv \
+      ${freq_code}_${CNV}_finemap_plots/${freq_code}.${CNV}.finemap_feature_cors
 
     # Compress results
     tar -czvf ${freq_code}_${CNV}_finemap_plots.tgz ${freq_code}_${CNV}_finemap_plots
@@ -812,7 +847,7 @@ task plot_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:5d985cf3474c417e93f75fdebf9691068265480d452c385d307d81b90ad1ef8a"
+    docker: "talkowski/rcnv@sha256:3fa77040b951854967db7c3b8cd476bf7fd88b7472ce58f3ff5132fab6d20236"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

@@ -148,22 +148,6 @@ load.datasets <- function(data.in, truth){
   return(data)
 }
 
-# Load raw gene features & subset to genes with PIPs
-load.features <- function(stats, raw.features.in){
-  f <- read.table(raw.features.in, sep="\t", comment.char="", header=T)[, -c(1:3)]
-  # Standard normalize all features
-  f[, 2:ncol(f)] <- apply(f[, 2:ncol(f)], 2, function(vals){
-    newvals <- as.numeric(scale(as.numeric(vals), center=T, scale=T))
-    nas <- which(is.na(newvals))
-    if(length(nas > 0)){
-      newvals[nas] <- mean(newvals, na.rm=T)
-    }
-    return(newvals)
-  })
-  f <- f[which(f$gene %in% stats$gene), ]
-  return(f)
-}
-
 # PIP comparison scatterplot
 pip.scatter <- function(stats1, stats2, color1, color2, label1, label2,
                         title.cex=0.75, lpos="right"){
@@ -321,63 +305,6 @@ plot.calibration <- function(data, title=NULL){
          legend=names(data))
 }
 
-# Get raw correlation of features vs PIPs
-calc.feat.cors <- function(stats, features, logit=F){
-  rhos <- sapply(2:ncol(features), function(i){
-    x <- merge(features[, c(1, i)],
-          stats[, which(colnames(stats) %in% c("gene", "PIP"))],
-          all.x=F, all.y=T)
-    x <- as.data.frame(t(sapply(sort(unique(x$gene)), function(g){
-      apply(x[which(x$gene==g), -c(1)], 2, mean, na.rm=T)
-    })))
-    colnames(x) <- c("feature", "PIP")
-    if(logit==T){
-      as.numeric(cor.test(x$PIP, x$feature, method="spearman")$estimate)
-    }else{
-      glm(PIP ~ feature, family="binomial", data=x)$coefficients[-1]
-    }
-  })
-  names(rhos) <- colnames(features)[2:ncol(features)]
-  return(rhos)
-}
-
-# Barplot of top and bottom N feature correlations
-plot.feat.cors <- function(data, features, top.N=10, logit=F){
-  rhos <- sort(calc.feat.cors(data$stats, features, logit))
-  par(mfrow=c(1, 2), bty="n")
-  par(mar=c(0.5, 1, 4, 6))
-  plot(x=c(min(-max(abs(rhos), na.rm=T), na.rm=T), 0), y=c(0, (2*top.N)+1), type="n",
-       xaxt="n", yaxt="n", xlab="", ylab="")
-  abline(v=axTicks(3), col="gray90")
-  rect(xleft=head(rhos, top.N), xright=0, 
-       ybottom=(1:top.N)-0.85, ytop=(1:top.N)-0.15, 
-       col=data$color)
-  axis(4, at=(1:top.N)-0.5, las=2, line=-0.9, tick=F,
-       labels=names(head(rhos, top.N)))
-  axis(3)
-  if(logit==T){
-    mtext(3, text="Std. logit coeff.", line=2.5)
-  }else{
-    mtext(3, text="Spearman's Rho (vs. PIP)", line=2.5)
-  }
-  
-  par(mar=c(0.5, 6, 4, 1))
-  plot(x=c(0, max(abs(rhos), na.rm=T)), y=c(0, (2*top.N)+1), type="n",
-       xaxt="n", yaxt="n", xlab="", ylab="")
-  abline(v=axTicks(3), col="gray90")
-  rect(xleft=0, xright=tail(rhos, top.N), 
-       ybottom=((1:top.N)-0.85)+top.N+1, ytop=((1:top.N)-0.15)+top.N+1, 
-       col=data$color)
-  axis(2, at=(1:top.N)-0.5+top.N+1, las=2, line=-0.9, tick=F,
-       labels=names(tail(rhos, top.N)))
-  axis(3)
-  if(logit==T){
-    mtext(3, text="Std. logit coeff.", line=2.5)
-  }else{
-    mtext(3, text="Spearman's Rho (vs. PIP)", line=2.5)
-  }
-}
-
 
 #####################
 ### RSCRIPT BLOCK ###
@@ -390,27 +317,25 @@ require(Hmisc, quietly=T)
 option_list <- list()
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage="%prog roc_input.tsv truth_genes.tsv",
+args <- parse_args(OptionParser(usage="%prog roc_input.tsv truth_genes.tsv out.prefix",
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Checks for appropriate positional arguments
-if(length(args$args) != 4){
-  stop("Three positional arguments: data.tsv, truth_sets.tsv, raw_features.bed, and out_prefix\n")
+if(length(args$args) != 3){
+  stop("Three positional arguments: data.tsv, truth_sets.tsv, and out_prefix\n")
 }
 
 # Writes args & opts to vars
 data.in <- args$args[1]
 truth.in <- args$args[2]
-raw.features.in <- args$args[3]
-out.prefix <- args$args[4]
+out.prefix <- args$args[3]
 
 # # DEV PARAMTERS
 # setwd("~/scratch")
 # data.in <- "finemap_roc_input.tsv"
 # truth.in <- "finemap_roc_truth_sets.tsv"
-# raw.features.in <- "gencode.v19.canonical.pext_filtered.all_features.bed.gz"
 # out.prefix <- "finemap_roc"
 
 # Read truth sets
@@ -421,9 +346,6 @@ data <- lapply(truth, function(tlist){
   load.datasets(data.in, tlist$truth.genes)
 })
 names(data) <- names(truth)
-
-# Load raw features
-features <- load.features(data[[1]][[1]]$stats, raw.features.in)
 
 # Plot histograms of PIPs
 pdf(paste(out.prefix, "PIP_distributions.pdf", sep="."),
@@ -531,11 +453,3 @@ sapply(1:length(data), function(i){
   dev.off()
 })
 
-# Plot correlations with raw features
-sapply(1:length(data[[1]]), function(i){
-  sanitized.name <- gsub(" ", "_", tolower(names(data[[1]])[i]), fixed=T)
-  pdf(paste(out.prefix, sanitized.name, "raw_feature_correlations.pdf", sep="."),
-      height=8, width=8)
-  plot.feat.cors(data[[1]][[i]], features, logit=F)
-  dev.off()
-})
