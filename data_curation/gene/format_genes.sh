@@ -151,13 +151,17 @@ done > gene_features.athena_tracklist.tsv
 wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
 wget http://genic-intolerance.org/data/RVIS_Unpublished_ExACv2_March2017.txt
 gsutil -m cp gs://rcnv_project/cleaned_data/genes/annotations/EDS.Wang_2018.tsv.gz ./
+wget https://storage.googleapis.com/gnomad-public/legacy/exac_browser/forweb_cleaned_exac_r03_march16_z_data_pLI_CNV-final.txt.gz
+wget https://doi.org/10.1371/journal.pgen.1001154.s002
 # Add: promoter conservation, average exon conservation, EDS
 /opt/rCNV2/data_curation/gene/get_gene_features.py \
   --get-constraint \
   --ref-fasta Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz \
   --gnomad-constraint gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
+  --exac-cnv forweb_cleaned_exac_r03_march16_z_data_pLI_CNV-final.txt.gz \
   --rvis-tsv RVIS_Unpublished_ExACv2_March2017.txt \
   --eds-tsv EDS.Wang_2018.tsv.gz \
+  --hi-tsv journal.pgen.1001154.s002 \
   --outbed gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
   --bgzip \
   gencode.v19.canonical.pext_filtered.gtf.gz

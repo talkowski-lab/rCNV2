@@ -501,8 +501,8 @@ def get_expression_features(genes, ensg_ids, gtex_medians, gtex_mads):
 
 
 def get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ensg,
-                            gnomad_tsv, rvis_tsv, eds_tsv, ref_fasta, 
-                            phastcons_url, promoter_size=1000):
+                            gnomad_tsv, exac_cnv_tsv, rvis_tsv, eds_tsv, hi_tsv, 
+                            ref_fasta, phastcons_url, promoter_size=1000):
     """
     Collect various evolutionary constraint features per gene
     """
@@ -533,6 +533,16 @@ def get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ens
             cfeats_tmp[gene] += gvals
         header_cols += ['gnomad_' + x for x in list(gnomad.columns)[1:]]
 
+    # Add ExAC CNV Z-score
+    if exac_cnv_tsv is not None:
+        # Load ExAC CNV data
+        exac = pd.read_csv(exac_cnv_tsv, delimiter='\t')
+        exac_vals = exac.set_index(exac.gene).loc[:, 'cnv_z'].fillna(0).to_dict()
+        # Add values to cfeats per gene
+        for gene in genes:
+            cfeats_tmp[gene].append(exac_vals.get(gene, 0))
+        header_cols.append('exac_cnv_z')
+
     # Add RVIS, if optioned. Assumes RVIS March 2017 release corresponding to gnomAD v2.0
     if rvis_tsv is not None:
         rvis = pd.read_csv(rvis_tsv, delimiter='\t', usecols=[0, 2, 3], skiprows=1,
@@ -559,6 +569,14 @@ def get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ens
             else:
                 cfeats_tmp[gene].append(eds_mean)
         header_cols.append('eds')
+
+    # Add Hurles HI scores, if optioned
+    if hi_tsv is not None:
+        hi_dat = {f.name.split('|')[0] : float(f.score) for f in pbt.BedTool(hi_tsv)}
+        hi_avg = np.nanmean(list(hi_dat.values()))
+        for gene in genes:
+            cfeats_tmp[gene].append(hi_dat.get(gene, hi_avg))
+        header_cols.append('hurles_hi')
 
     # Make dictionary of promoter coordinates
     promoters = {}
@@ -705,10 +723,14 @@ def main():
                         'Only used if --get-expression is specified.')
     parser.add_argument('--gnomad-constraint', help='gnomAD constraint tsv. Only ' +
                         'used if --get-constraint is specified.')
+    parser.add_argument('--exac-cnv', help='ExAC CNV constraint tsv. Only used ' +
+                        'if --get-constraint is specified.')
     parser.add_argument('--rvis-tsv', help='RVIS tsv. Only used if --get-constraint ' +
                         'is specified.')
     parser.add_argument('--eds-tsv', help='EDS tsv. Only used if --get-constraint ' +
                         'is specified.')
+    parser.add_argument('--hi-tsv', help='Hurles HI scores tsv. Only used if ' +
+                        '--get-constraint is specified.')
     parser.add_argument('--phastcons-bw-url', help='URL to phastCons bigWig.',
                         default='http://hgdownload.soe.ucsc.edu/goldenPath/hg19/phastCons100way/hg19.100way.phastCons.bw')
     parser.add_argument('--min-intron-size', type=int, default=4, help='Minimum ' +
@@ -769,9 +791,10 @@ def main():
     # Get constraint stats, if optioned
     if args.get_constraint:
         header_add, constraint_features = \
-            get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ensg,
-                                    args.gnomad_constraint, args.rvis_tsv, 
-                                    args.eds_tsv, args.ref_fasta, 
+            get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, 
+                                    gene_to_ensg, args.gnomad_constraint, 
+                                    args.exac_cnv, args.rvis_tsv, args.eds_tsv, 
+                                    args.hi_tsv, args.ref_fasta, 
                                     args.phastcons_bw_url)
         outbed_header = outbed_header + '\t' + header_add
     else:
