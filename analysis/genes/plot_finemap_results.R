@@ -57,7 +57,7 @@ prc <- function(stats, steps=seq(1, 0, -0.001)){
 
 # Load a single dataset and annotate vs truth sets
 load.data.single <- function(path, truth){
-  x <- read.table(path, header=T, sep="\t", comment.char="")
+  x <- read.table(path, header=T, sep="\t", comment.char="")[, 1:4]
   colnames(x)[1] <- "HPO"
   truth$true <- TRUE
   x <- merge(x, truth, all.x=T, all.y=F, by=c("HPO", "gene"))

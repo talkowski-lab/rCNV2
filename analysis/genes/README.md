@@ -140,17 +140,33 @@ Unlike the plots from Step 2, the dashed lines from Step 3 correspond to empiric
 
 These files are stored in the same location as the per-metacohort analysis results.  
 
-### 4. Collapse associations across phenotypes & fine-map causal genes  
+### 4. Fine-map causal genes  
 
-Lastly, we clustered all significant genes per phenotype into "significant gene blocks" by merging all genes within ±1Mb that were significantly associated with the same phenotype.  
+### Clustering significant genes into "gene blocks"  
 
-In practice, we considered a gene to be exome-wide significant if its primary P-value P exceeded the exome-wide significance threshold for that phenotype and CNV type, and it satisifed at least one of the following two criteria:
+We clustered all significant genes per phenotype into "significant gene blocks" by merging all genes within ±500kb that were significantly associated with the same phenotype.  
+
+In practice, we considered a gene to be exome-wide significant if its primary P-value exceeded the exome-wide significance threshold for that phenotype and CNV type, and it satisifed at least one of the following two criteria:
 1. Secondary P-value (as [described above](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/genes/#3-combine-association-statistics-across-metacohorts)) was also nominally significant (P < 0.05); and/or
 2. At least two metacohorts were nominally significant (P < 0.05) per Fisher's exact test.  
 
-Absent a true replication sample, these _post hoc_ filters were required to protect against Winner's Curse.  
+Absent a true replication sample, these _post hoc_ filters were applied to protect against Winner's Curse.  
 
-Next, we aimed to define the minimal set of genes per block with a posterior probability > 30% for being a causal gene per block. **THIS SECTION IS A WORK IN PROGRESS, PLEASE IGNORE FOR NOW**
+### Functional fine-mapping
+
+Next, we aimed to define the minimal set of genes per block most likely to be causal for each phenotypic association.  
+
+To accomplish this, we adapted several GWAS fine-mapping algorithms, as follows:
+
+1. We transformed all association statistics for all genes per block (including non-significant genes) into approximate Bayes factors (ABFs) following the procedure specified by [Wakefield _et al._, _Genet. Epi._, 2009](https://onlinelibrary.wiley.com/doi/abs/10.1002/gepi.20359) and [Wakefield _et al._, _Am. J. Hum. Genet._, 2007](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1950810/). For these calculations, we used an empirical Bayes approach to estimate null variance based on the observed variances for all exome-wide significant genes pooled across all phenotypes.  
+
+2. We calculated posterior inclusion probabilities (PIPs) for each gene per block based on the ABFs from [1] while assuming a flat prior (_i.e._, each gene per block is equally likely to be causal).  
+
+3. We developed an adaptation of E-M algorithms described in [Kichaev _et al._, _PLOS Genet._, 2014](https://doi.org/10.1371/journal.pgen.1004722) and [Wen _et al._, _PLOS Genet._, 2017](https://doi.org/10.1371/journal.pgen.1006646) to iteratively update gene priors for each block based on functional enrichments in a logistic regression framework. For this purpose, we used all gene features [described elsewhere in this repository](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene#gene-features).
+
+4. Finally, we computed a 95% credible set of genes per block based on the cumulative sum of PIPs for genes ranked by causal likelihood.  
+
+For downstream analyses, we considered any gene with PIP ≥ 0.1 to be a "candidate" causal gene, and any gene with PIP ≥ 0.9 to be a "strong candidate" causal gene.   
 
 ---  
 
