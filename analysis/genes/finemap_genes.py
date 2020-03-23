@@ -250,6 +250,10 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
             hpo_info['blocks'][block_id] = {'coords' : block,
                                             'finemap_res' : finemap_res}
 
+    # If no genes are significant, add empty placeholder dict for all genes
+    else:
+        hpo_info['all_genes'] = {}
+
     return hpo_info
 
 
@@ -276,15 +280,86 @@ def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2,
     return hpo_data
 
 
-def make_sig_genes_df(hpo_data, naive=False, sig_only=False):
+def estimate_null_variance(hpo_data):
     """
-    Makes pd.DataFrame of all significant genes, HPOs, ABFs, and PIPs
+    Estimates null variance per phenotype from average of all significant genes
     """
 
-    sig_df = pd.DataFrame(columns='HPO gene ABF PIP'.split())
+    vardict_all = {hpo : {} for hpo in hpo_data.keys()}
+    vardict_sig = {hpo : [] for hpo in hpo_data.keys()}
+    vardict_best = {hpo : [] for hpo in hpo_data.keys()}
+    vardict_final = {hpo : {} for hpo in hpo_data.keys()}
+
+    for hpo, dat in hpo_data.items():
+        
+        for gene, gdat in dat['all_genes'].items():
+            # Estimate null variance from effect size per Wakefield, AJHG, 2007
+            var = (float(gdat['lnOR']) / 1.96) ** 2
+            vardict_all[hpo][gene] = var
+            if gene in dat['sig_genes'].keys():
+                vardict_sig[hpo].append(var)
+        
+        for bdat in dat['blocks'].values():
+            bpvals = [(gene, dat['all_genes'][gene]['primary_p']) for gene \
+                          in bdat['finemap_res'].keys()]
+            best_gene = sorted(bpvals, key=lambda x: x[1])[0][0]
+            vardict_best[hpo].append(vardict_all[hpo][best_gene])
+
+    # Compute two null variance estimates for fine-mapping:
+    # 1. Mean of all significant genes
+    # 2. Mean of all top genes (one per block)
+    v1 = np.nanmean([x for l in vardict_sig.values() for x in l])
+    v2 = np.nanmean([x for l in vardict_best.values() for x in l])
+
+    return [v1, v2]
+
+
+def update_finemap(hpo_data, W):
+    """
+    Update initial finemapping results (flat prior) with a new null variance
+    """
+
+    for hpo, hdat in hpo_data.items():
+        for block_id, bdat in hdat['blocks'].items():
+            genes = list(bdat['finemap_res'].keys())
+            gene_priors = {gene : 1 / len(genes) for gene in genes}
+            finemap_res = finemap(gene_priors, hpo_data[hpo]['all_genes'], W)
+            hpo_data[hpo]['blocks'][block_id]['finemap_res'] = finemap_res
+
+    return hpo_data
+
+
+def make_cs(finemap_res, cs_val=0.95):
+    """
+    Aggregate genes into credible set based on sum of ranked PIPs
+    """
+
+    cs_genes = []
+
+    vals = pd.DataFrame.from_dict(finemap_res, orient='index')
+    vals = vals.sort_values(by='PIP', ascending=False)
+
+    cs_sum = 0
+    for i in range(len(vals)):
+        cs_genes.append(vals.index[i])
+        cs_sum += vals.PIP[i]
+
+        if cs_sum >= cs_val:
+            break
+    
+    return sorted(list(set(cs_genes)))
+
+
+def make_sig_genes_df(hpo_data, naive=False, sig_only=False, cs_val=0.95):
+    """
+    Makes pd.DataFrame of all significant genes, CSs, HPOs, ABFs, and PIPs
+    """
+
+    sig_df = pd.DataFrame(columns='HPO gene ABF PIP credible_set'.split())
 
     for hpo in hpo_data.keys():
-        for block in hpo_data[hpo]['blocks'].values():
+        for block_id, block in hpo_data[hpo]['blocks'].items():
+            cs_genes = make_cs(block['finemap_res'], cs_val)
             for gene, stats in block['finemap_res'].items():
                 if not naive:
                     ABF = stats['ABF']
@@ -292,13 +367,19 @@ def make_sig_genes_df(hpo_data, naive=False, sig_only=False):
                 else:
                     ABF = np.nan
                     PIP = 1 / len(block['finemap_res'].keys())
+                if gene in cs_genes:
+                    cs_assign = block_id
+                else:
+                    cs_assign = None
                 if sig_only:
                     if gene in hpo_data[hpo]['sig_genes'].keys():
-                        sig_df = sig_df.append(pd.Series([hpo, gene, ABF, PIP],
+                        sig_df = sig_df.append(pd.Series([hpo, gene, ABF, PIP, 
+                                                          cs_assign],
                                                          index=sig_df.columns), 
                                                          ignore_index=True)
                 else:
-                    sig_df = sig_df.append(pd.Series([hpo, gene, ABF, PIP],
+                    sig_df = sig_df.append(pd.Series([hpo, gene, ABF, PIP,
+                                                      cs_assign],
                                                      index=sig_df.columns), 
                                                      ignore_index=True)
 
@@ -316,7 +397,8 @@ def rmse(pairs):
 
 
 def functional_finemap(hpo_data, gene_features_in, l1_l2_mix, logit_alpha, 
-                       null_variance=0.42 ** 2, converge_rmse=10e-8, quiet=False):
+                       cs_val=0.95, null_variance=0.42 ** 2, converge_rmse=10e-8, 
+                       quiet=False):
     """
     Conduct E-M optimized functional fine-mapping for all gene blocks & HPOs
     Two returns:
@@ -348,7 +430,7 @@ def functional_finemap(hpo_data, gene_features_in, l1_l2_mix, logit_alpha,
         if missing.sum() > 0:
             fmean = np.nanmean(features.loc[~missing, col].astype(float))
             features.loc[missing, col] = fmean
-    sig_df = make_sig_genes_df(hpo_data)
+    sig_df = make_sig_genes_df(hpo_data, cs_val=cs_val)
     features.iloc[:, 1:] = scale(features.iloc[:, 1:])
     features = features.loc[features.gene.isin(sig_df.gene), :]
 
@@ -390,7 +472,7 @@ def functional_finemap(hpo_data, gene_features_in, l1_l2_mix, logit_alpha,
                 hpo_data[hpo]['blocks'][block_id]['finemap_res'] = new_finemap_res
 
         # Compute RMSE for PIPs and coefficients
-        new_sig_df = make_sig_genes_df(hpo_data)
+        new_sig_df = make_sig_genes_df(hpo_data, cs_val=cs_val)
         PIPs_oldnew = sig_df.merge(new_sig_df, on='HPO gene'.split(), 
                                    suffixes=('_old', '_new'))\
                             .loc[:, 'PIP_old PIP_new'.split()]\
@@ -420,7 +502,7 @@ def functional_finemap(hpo_data, gene_features_in, l1_l2_mix, logit_alpha,
     return sig_df.sort_values('PIP', ascending=False), tab_out
 
 
-def bmavg(sig_dfs, hpo_data, outfile, sig_only=False):
+def bmavg(sig_dfs, hpo_data, outfile, sig_only=False, cs_val=0.95):
     """
     Average ABFs and PIPs for all genes across models (list of sig_dfs)
     """
@@ -438,13 +520,33 @@ def bmavg(sig_dfs, hpo_data, outfile, sig_only=False):
     for hpo, gene in sig_genes:
         ABFs = [df.loc[(df.HPO == hpo) & (df.gene == gene), :].iloc[0]['ABF'] \
                 for df in sig_dfs]
+        if all(a is None for a in ABFs):
+            avg_ABF = None
+        else:
+            avg_ABF = np.nanmean(ABFs)
         PIPs = [df.loc[(df.HPO == hpo) & (df.gene == gene), :].iloc[0]['PIP'] \
                 for df in sig_dfs]
-        sig_df = sig_df.append(pd.Series([hpo, gene, np.nanmean(ABFs), 
-                                          np.nanmean(PIPs)], index=sig_df.columns),
+        avg_PIP = np.nanmean(PIPs)
+        sig_df = sig_df.append(pd.Series([hpo, gene, avg_ABF, avg_PIP, None], 
+                                         index=sig_df.columns),
                                ignore_index=True)
 
-    sig_df.sort_values('PIP', ascending=False).rename(columns={'HPO' : '#HPO'}).\
+    sig_df = sig_df.sort_values('PIP', ascending=False)
+
+    for hpo in hpo_data:
+        for bid, binfo in hpo_data[hpo]['blocks'].items():
+            bgenes = list(binfo['finemap_res'].keys())
+            block_df = sig_df.loc[(sig_df.HPO == hpo) & (sig_df.gene.isin(bgenes)), :]
+            block_pips = [tuple(x) for x in block_df.loc[:, 'gene PIP'.split()].to_numpy()]
+            cs_sum = 0
+            for gene, pip in block_pips:
+                sig_df.loc[(sig_df.HPO == hpo) & (sig_df.gene == gene), 'credible_set'] \
+                    = bid
+                cs_sum += pip
+                if cs_sum >= cs_val:
+                    break
+
+    sig_df.rename(columns={'HPO' : '#HPO'}).\
            to_csv(outfile, sep='\t', index=False, na_rep='NA')
     outfile.close()
 
@@ -520,6 +622,8 @@ def main():
                         help='Allow genes to meet either --secondary-p-cutoff ' +
                         'or --min-nominal, but do not require both. ' +
                         '[default: require both]', default=False, action='store_true')
+    parser.add_argument('--credible-sets', dest='cs_val', type=float, default=0.95,
+                        help='Credible set value. [default: 0.95]')
     parser.add_argument('--regularization-alpha', dest='logit_alpha', type=float,
                         help='Regularization penalty weight for logit glm. Must ' +
                         'be in ~ [0, 1]. [default: no regularization]', default=0.2)
@@ -554,32 +658,37 @@ def main():
                              args.min_nominal, args.secondary_or_nom, 
                              args.distance)
 
+    # Estimate null variance based on most significant gene from each block
+    Wsq = estimate_null_variance(hpo_data)
+
+    # Update original finemapping results with re-estimated null variance
+    hpo_data = update_finemap(hpo_data, np.nanmean(Wsq))
+
     # Write naive and/or genetics-only fine-mapping results (for ROC comparisons)
     if args.naive_outfile is not None:
         naive_outfile = open(args.naive_outfile, 'w')
-        make_sig_genes_df(hpo_data, naive=True, sig_only=True).\
+        make_sig_genes_df(hpo_data, naive=True, sig_only=True, cs_val=args.cs_val).\
             rename(columns={'HPO' : '#HPO'}).\
             to_csv(naive_outfile, sep='\t', index=False, na_rep='NA')
         naive_outfile.close()
 
     if args.genetic_outfile is not None:
         genetic_outfile = open(args.genetic_outfile, 'w')
-        make_sig_genes_df(hpo_data, sig_only=True).\
+        make_sig_genes_df(hpo_data, sig_only=True, cs_val=args.cs_val).\
             rename(columns={'HPO' : '#HPO'}).\
             to_csv(genetic_outfile, sep='\t', index=False, na_rep='NA')
         genetic_outfile.close()
 
     # Perform functional fine-mapping with Bayesian model averaging
-    Wsq = [(i / 10) ** 2 for i in range(2, 11, 2)]
     finemap_res = [functional_finemap(hpo_data, args.gene_features, args.l1_l2_mix, 
-                                      args.logit_alpha, w) for w in Wsq]
+                                      args.logit_alpha, args.cs_val, w) for w in Wsq]
     
     # Average models across Wsq priors and write to --outfile
     bms = [x[0] for x in finemap_res]
     bmavg(bms, hpo_data, outfile, sig_only=True)
     if args.all_genes_outfile is not None:
         all_genes_outfile = open(args.all_genes_outfile, 'w')
-        bmavg(bms, hpo_data, all_genes_outfile)
+        bmavg(bms, hpo_data, all_genes_outfile, cs_val=args.cs_val)
 
     # If optioned, average logit coefficients across models and write to --coeffs-out
     if args.coeffs_out is not None:

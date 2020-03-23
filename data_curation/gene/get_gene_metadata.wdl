@@ -219,6 +219,8 @@ task get_constraint_data {
     wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
     wget http://genic-intolerance.org/data/RVIS_Unpublished_ExACv2_March2017.txt
     gsutil -m cp ${rCNV_bucket}/cleaned_data/genes/annotations/EDS.Wang_2018.tsv.gz ./
+    wget https://storage.googleapis.com/gnomad-public/legacy/exac_browser/forweb_cleaned_exac_r03_march16_z_data_pLI_CNV-final.txt.gz
+    wget https://doi.org/10.1371/journal.pgen.1001154.s002
 
     # Subset input files to chromosome of interest
     tabix -f ${gtf}
@@ -233,15 +235,17 @@ task get_constraint_data {
       --get-constraint \
       --ref-fasta ref.fa.gz \
       --gnomad-constraint gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
+      --exac-cnv forweb_cleaned_exac_r03_march16_z_data_pLI_CNV-final.txt.gz \
       --rvis-tsv RVIS_Unpublished_ExACv2_March2017.txt \
       --eds-tsv EDS.Wang_2018.tsv.gz \
+      --hi-tsv journal.pgen.1001154.s002 \
       --outbed ${prefix}.constraint_features.${contig}.bed.gz \
       --bgzip \
       subset.gtf.gz
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:abaa1d4fc1c6a4e74f73ee13ff15c477cddbd5b791dcbc51f1269b49201f4554"
+    docker: "talkowski/rcnv@sha256:9da6bae9884d16b82a7bc702c52a6646529d014b529062b4df19d6f3ee1acc7d"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"
@@ -272,7 +276,7 @@ task join_data {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:40e1fe374e4de7af9e02da441ef27f02d59996f2cfdf60f043429d3deeeaa222"
+    docker: "talkowski/rcnv@sha256:9da6bae9884d16b82a7bc702c52a6646529d014b529062b4df19d6f3ee1acc7d"
     preemptible: 1
     disks: "local-disk 50 SSD"
     bootDiskSizeGb: "20"

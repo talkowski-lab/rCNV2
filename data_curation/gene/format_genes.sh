@@ -122,6 +122,7 @@ wget ftp://ftp.ensembl.org/pub/grch37/current/fasta/homo_sapiens/dna/Homo_sapien
 gunzip Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz
 bgzip Homo_sapiens.GRCh37.dna.primary_assembly.fa
 samtools faidx Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz
+ref_fasta=Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz
 for wrapper in 1; do 
   echo -e "refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz\tcoverage\trepeat_cov"
   echo -e "refs/GRCh37.somatic_hypermutable_sites.bed.gz\tcoverage\thypermutable_cov"
@@ -130,7 +131,7 @@ done > gene_features.athena_tracklist.tsv
 /opt/rCNV2/data_curation/gene/get_gene_features.py \
   --get-genomic \
   --centro-telo-bed refs/GRCh37.centromeres_telomeres.bed.gz \
-  --ref-fasta Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz \
+  --ref-fasta ${ref_fasta} \
   --athena-tracks gene_features.athena_tracklist.tsv \
   --outbed gencode.v19.canonical.pext_filtered.genomic_features.bed.gz \
   --bgzip \
@@ -156,7 +157,7 @@ wget https://doi.org/10.1371/journal.pgen.1001154.s002
 # Add: promoter conservation, average exon conservation, EDS
 /opt/rCNV2/data_curation/gene/get_gene_features.py \
   --get-constraint \
-  --ref-fasta Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz \
+  --ref-fasta ${ref_fasta} \
   --gnomad-constraint gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
   --exac-cnv forweb_cleaned_exac_r03_march16_z_data_pLI_CNV-final.txt.gz \
   --rvis-tsv RVIS_Unpublished_ExACv2_March2017.txt \

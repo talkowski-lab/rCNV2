@@ -19,7 +19,7 @@ options(scipen=100000, stringsAsFactors=F)
 #################
 # Load a single finemap stats .tsv
 load.stats.single <- function(path){
-  x <- read.table(path, header=T, sep="\t", comment.char="")
+  x <- read.table(path, header=T, sep="\t", comment.char="")[, 1:4]
   colnames(x)[1] <- "HPO"
   x[, 3:4] <- apply(x[, 3:4], 2, as.numeric)
   return(x)
