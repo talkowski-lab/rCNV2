@@ -166,7 +166,7 @@ To accomplish this, we adapted several GWAS fine-mapping algorithms, as follows:
 
 4. Finally, we computed a 95% credible set of genes per block based on the cumulative sum of PIPs for genes ranked by causal likelihood.  
 
-For downstream analyses, we considered any gene with PIP ≥ 0.1 to be a "candidate" causal gene, and any gene with PIP ≥ 0.9 to be a "strong candidate" causal gene.   
+For downstream analyses, we considered any gene with PIP ≥ 0.1 to be a "candidate" causal gene, and any gene with PIP ≥ 0.9 to be a "strong candidate" causal gene.  
 
 ---  
 

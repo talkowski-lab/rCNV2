@@ -196,7 +196,7 @@ loeuf_idx=$( zcat gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
 zcat gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
 | fgrep -wf gencode.v19.canonical.pext_filtered.genes.list \
 | awk -v pli_idx=${pli_idx} -v loeuf_idx=${loeuf_idx} -v FS="\t" \
-  '{ if ($pli_idx >= 0.9 || $loeuf_idx == 0 ) print $1 }' \
+  '{ if ( ($pli_idx >= 0.9 && $pli_idx != "NA") || ($loeuf_idx == 0 && $loeuf_idx != "NA") ) print $1 }' \
 | sort -Vk1,1 \
 > gnomad.v2.1.1.lof_constrained.genes.list
 awk '{ print "gene_name \""$1"\"" }' \
@@ -222,17 +222,18 @@ gsutil -m cp gnomad.v2.1.1.lof_constrained.genes.list \
 
 
 # Generate gene list of all genes associated with each HPO term
-wget http://compbio.charite.de/jenkins/job/hpo.annotations.monthly/lastSuccessfulBuild/artifact/annotation/ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt
+wget http://compbio.charite.de/jenkins/job/hpo.annotations/lastSuccessfulBuild/artifact/util/annotation/phenotype_to_genes.txt
 while read pheno hpo; do
-  awk -v hpo=${hpo} '{ if ($1==hpo) print $NF }' \
-    ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt \
+  awk -v hpo=${hpo} -v FS="\t" '{ if ($1==hpo) print $4 }' \
+    phenotype_to_genes.txt \
   | fgrep -wf gencode.v19.canonical.pext_filtered.genes.list \
   | sort -Vk1,1 | uniq \
   > $pheno.HPOdb.genes.list
 done < refs/test_phenotypes.list
 # For HP0000118 & UNKNOWN, take union of all genes associated with any HPO term
-sed '1d' ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt \
-| awk '{ print $NF }' \
+sed '1d' phenotype_to_genes.txt \
+| awk -v FS="\t" '{ print $4 }' \
+| fgrep -wf gencode.v19.canonical.pext_filtered.genes.list \
 | sort -Vk1,1 | uniq \
 > HP0000118.HPOdb.genes.list
 cp HP0000118.HPOdb.genes.list UNKNOWN.HPOdb.genes.list
