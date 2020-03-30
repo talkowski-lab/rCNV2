@@ -61,3 +61,4 @@ write.table(sort(dat$gene[which(dat$Triplosensitivity.Score == 1 & dat$gene %in%
 write.table(sort(dat$gene[which(dat$Triplosensitivity.Score %in% 1:3 & dat$gene %in% elig)]),
             paste(outdir, "ClinGen.all_triplosensitive.genes.list", sep="/"),
             col.names=F, row.names=F, sep="\t", quote=F)
+

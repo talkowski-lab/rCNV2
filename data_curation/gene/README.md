@@ -118,7 +118,8 @@ All gene lists in the table below are available from `gs://rcnv_project/cleaned_
 | Gene set | Genes | Filename prefix | Source | Description |
 | :--- | ---: | :--- | :--- | :---- | 
 | All genes | 18,641 | `gencode.v19.canonical.pext_filtered` | Gencode v19 [Harrow _et al._, _Genome Res._, 2012](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | Canonical transcripts from autosomal, protein-coding genes |
-| Constrained genes | 3,036 | `gnomad.v2.1.1.lof_constrained` | gnomAD v2.1.1 [Karczewski _et al._, _bioRxiv_, 2019](https://www.biorxiv.org/content/10.1101/531210v3) | pLI ≥ 0.9 or in the first LOEUF sextile |
+| Constrained genes | 3,036 | `gnomad.v2.1.1.lof_constrained` | gnomAD v2.1.1 [Karczewski _et al._, _bioRxiv_, 2019](https://www.biorxiv.org/content/10.1101/531210v3) | pLI ≥ 0.9 or in the first LOEUF sextile |  
+| Mutation-tolerant genes | 2,013 | `gnomad.v2.1.1.mutation_tolerant` | gnomAD v2.1.1 [Karczewski _et al._, _bioRxiv_, 2019](https://www.biorxiv.org/content/10.1101/531210v3) | pLI ≥ 0.01, the last third of LOEUF, missense Z-score ≤ 0, missense OEUF ≥ 1, and synonymous Z-score ~ (-3, 3) |  
 | Phenotypic abnormality (HP:0000118)-associated genes | 3,825 | `HP0000118.HPOdb` | HPO database (accessed Mar 2020) [Köhler _et al._, _Nucleic Acids Res._, 2018](https://academic.oup.com/nar/article/47/D1/D1018/5198478) | Genes linked to HP:0000118 |
 | Abnormality of the nervous system (HP:0000707)-associated genes | 2,875 | `HP0000707.HPOdb` | HPO database (accessed Mar 2020) [Köhler _et al._, _Nucleic Acids Res._, 2018](https://academic.oup.com/nar/article/47/D1/D1018/5198478) | Genes linked to HP:0000707 |
 | Abnormality of nervous system physiology (HP:0012638)-associated genes | 2,678 | `HP0012638.HPOdb` | HPO database (accessed Mar 2020) [Köhler _et al._, _Nucleic Acids Res._, 2018](https://academic.oup.com/nar/article/47/D1/D1018/5198478) | Genes linked to HP:0012638 |
