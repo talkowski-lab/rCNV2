@@ -2,7 +2,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-2020 Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -104,37 +104,6 @@ workflow sliding_window_analysis {
         p_val_column_name="meta_phred_p_secondary"
     }
 
-  #   # 1% FDR, secondary
-  #   call calc_meta_p_cutoff as calc_fdr_1pct_cutoffs_secondary {
-  #     input:
-  #       phenotype_list=phenotype_list,
-  #       metacohort_sample_table=metacohort_sample_table,
-  #       freq_code="rCNV",
-  #       CNV=cnv,
-  #       n_pheno_perms=n_pheno_perms,
-  #       fdr_target=0.01,
-  #       rCNV_bucket=rCNV_bucket,
-  #       dummy_completion_markers=rCNV_perm_test.completion_marker,
-  #       fdr_table_suffix="empirical_fdr_1pct_pval_secondary",
-  #       p_val_column_name="meta_phred_p_secondary"
-  #   }
-
-  #   # 5% FDR, secondary
-  #   call calc_meta_p_cutoff as calc_fdr_5pct_cutoffs_secondary {
-  #     input:
-  #       phenotype_list=phenotype_list,
-  #       metacohort_sample_table=metacohort_sample_table,
-  #       freq_code="rCNV",
-  #       CNV=cnv,
-  #       n_pheno_perms=n_pheno_perms,
-  #       fdr_target=0.05,
-  #       rCNV_bucket=rCNV_bucket,
-  #       dummy_completion_markers=rCNV_perm_test.completion_marker,
-  #       fdr_table_suffix="empirical_fdr_5pct_pval_secondary",
-  #       p_val_column_name="meta_phred_p_secondary"
-  #   }
-  # }
-
   # Perform meta-analysis of rCNV association statistics
   scatter ( pheno in phenotypes ) {
     call meta_analysis as rCNV_meta_analysis {
@@ -152,97 +121,97 @@ workflow sliding_window_analysis {
     }
   }
 
-  # Refine minimal credible regions
-  scatter ( cnv in cnv_types ) {
-    call prep_refinement {
-      input:
-        completion_tokens=rCNV_meta_analysis.completion_token,
-        phenotype_list=phenotype_list,
-        metacohort_list=metacohort_list,
-        binned_genome=binned_genome,
-        freq_code="rCNV",
-        CNV=cnv,
-        meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
-        meta_secondary_p_cutoff=meta_secondary_p_cutoff,
-        meta_or_cutoff=meta_or_cutoff,
-        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
-        sig_window_pad=sig_window_pad,
-        rCNV_bucket=rCNV_bucket
-    }
-  }
-  scatter ( contig in contigs ) {
-    # DEL
-    call refine_regions as refine_rCNV_regions_DEL {
-      input:
-        contig=contig[0],
-        regions_to_refine=prep_refinement.regions_to_refine[0],
-        metacohort_info_tsv=prep_refinement.metacohort_info_tsv[0],
-        pval_matrix=prep_refinement.pval_matrix[0],
-        labeled_windows=prep_refinement.labeled_windows[0],
-        freq_code="rCNV",
-        CNV="DEL",
-        meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
-        meta_p_ladder_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_ladder,
-        meta_secondary_p_cutoff=meta_secondary_p_cutoff,
-        meta_or_cutoff=meta_or_cutoff,
-        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
-        meta_model_prefix=meta_model_prefix,
-        credible_interval=credible_interval,
-        refine_max_cnv_size=refine_max_cnv_size,
-        rCNV_bucket=rCNV_bucket
-    }
-    # DUP
-    call refine_regions as refine_rCNV_regions_DUP {
-      input:
-        contig=contig[0],
-        regions_to_refine=prep_refinement.regions_to_refine[1],
-        metacohort_info_tsv=prep_refinement.metacohort_info_tsv[1],
-        pval_matrix=prep_refinement.pval_matrix[1],
-        labeled_windows=prep_refinement.labeled_windows[1],
-        freq_code="rCNV",
-        CNV="DUP",
-        meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
-        meta_p_ladder_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_ladder,
-        meta_secondary_p_cutoff=meta_secondary_p_cutoff,
-        meta_or_cutoff=meta_or_cutoff,
-        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
-        meta_model_prefix=meta_model_prefix,
-        credible_interval=credible_interval,
-        refine_max_cnv_size=refine_max_cnv_size,
-        rCNV_bucket=rCNV_bucket
-    }
-  }
-  call merge_refinements as merge_refinements_DEL {
-    input:
-      loci=refine_rCNV_regions_DEL.loci,
-      associations=refine_rCNV_regions_DEL.associations,
-      logfiles=refine_rCNV_regions_DEL.logfile,
-      freq_code="rCNV",
-      CNV="DEL",
-      rCNV_bucket=rCNV_bucket
-  }
-  call merge_refinements as merge_refinements_DUP {
-    input:
-      loci=refine_rCNV_regions_DUP.loci,
-      associations=refine_rCNV_regions_DUP.associations,
-      logfiles=refine_rCNV_regions_DUP.logfile,
-      freq_code="rCNV",
-      CNV="DUP",
-      rCNV_bucket=rCNV_bucket
-  }
+  # # Refine minimal credible regions
+  # scatter ( cnv in cnv_types ) {
+  #   call prep_refinement {
+  #     input:
+  #       completion_tokens=rCNV_meta_analysis.completion_token,
+  #       phenotype_list=phenotype_list,
+  #       metacohort_list=metacohort_list,
+  #       binned_genome=binned_genome,
+  #       freq_code="rCNV",
+  #       CNV=cnv,
+  #       meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+  #       meta_secondary_p_cutoff=meta_secondary_p_cutoff,
+  #       meta_or_cutoff=meta_or_cutoff,
+  #       meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+  #       sig_window_pad=sig_window_pad,
+  #       rCNV_bucket=rCNV_bucket
+  #   }
+  # }
+  # scatter ( contig in contigs ) {
+  #   # DEL
+  #   call refine_regions as refine_rCNV_regions_DEL {
+  #     input:
+  #       contig=contig[0],
+  #       regions_to_refine=prep_refinement.regions_to_refine[0],
+  #       metacohort_info_tsv=prep_refinement.metacohort_info_tsv[0],
+  #       pval_matrix=prep_refinement.pval_matrix[0],
+  #       labeled_windows=prep_refinement.labeled_windows[0],
+  #       freq_code="rCNV",
+  #       CNV="DEL",
+  #       meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+  #       meta_p_ladder_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_ladder,
+  #       meta_secondary_p_cutoff=meta_secondary_p_cutoff,
+  #       meta_or_cutoff=meta_or_cutoff,
+  #       meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+  #       meta_model_prefix=meta_model_prefix,
+  #       credible_interval=credible_interval,
+  #       refine_max_cnv_size=refine_max_cnv_size,
+  #       rCNV_bucket=rCNV_bucket
+  #   }
+  #   # DUP
+  #   call refine_regions as refine_rCNV_regions_DUP {
+  #     input:
+  #       contig=contig[0],
+  #       regions_to_refine=prep_refinement.regions_to_refine[1],
+  #       metacohort_info_tsv=prep_refinement.metacohort_info_tsv[1],
+  #       pval_matrix=prep_refinement.pval_matrix[1],
+  #       labeled_windows=prep_refinement.labeled_windows[1],
+  #       freq_code="rCNV",
+  #       CNV="DUP",
+  #       meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+  #       meta_p_ladder_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_ladder,
+  #       meta_secondary_p_cutoff=meta_secondary_p_cutoff,
+  #       meta_or_cutoff=meta_or_cutoff,
+  #       meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+  #       meta_model_prefix=meta_model_prefix,
+  #       credible_interval=credible_interval,
+  #       refine_max_cnv_size=refine_max_cnv_size,
+  #       rCNV_bucket=rCNV_bucket
+  #   }
+  # }
+  # call merge_refinements as merge_refinements_DEL {
+  #   input:
+  #     loci=refine_rCNV_regions_DEL.loci,
+  #     associations=refine_rCNV_regions_DEL.associations,
+  #     logfiles=refine_rCNV_regions_DEL.logfile,
+  #     freq_code="rCNV",
+  #     CNV="DEL",
+  #     rCNV_bucket=rCNV_bucket
+  # }
+  # call merge_refinements as merge_refinements_DUP {
+  #   input:
+  #     loci=refine_rCNV_regions_DUP.loci,
+  #     associations=refine_rCNV_regions_DUP.associations,
+  #     logfiles=refine_rCNV_regions_DUP.logfile,
+  #     freq_code="rCNV",
+  #     CNV="DUP",
+  #     rCNV_bucket=rCNV_bucket
+  # }
 
-  # Plot summary metrics for final credible regions
-  call plot_region_summary as plot_rCNV_regions {
-    input:
-      freq_code="rCNV",
-      DEL_regions=merge_refinements_DEL.final_loci,
-      DUP_regions=merge_refinements_DUP.final_loci,
-      rCNV_bucket=rCNV_bucket
-  }
+  # # Plot summary metrics for final credible regions
+  # call plot_region_summary as plot_rCNV_regions {
+  #   input:
+  #     freq_code="rCNV",
+  #     DEL_regions=merge_refinements_DEL.final_loci,
+  #     DUP_regions=merge_refinements_DUP.final_loci,
+  #     rCNV_bucket=rCNV_bucket
+  # }
 
   output {
-    Array[File] final_sig_regions = [merge_refinements_DEL.final_loci, merge_refinements_DUP.final_loci]
-    Array[File] final_sig_associations = [merge_refinements_DEL.final_associations, merge_refinements_DUP.final_associations]
+    # Array[File] final_sig_regions = [merge_refinements_DEL.final_loci, merge_refinements_DUP.final_loci]
+    # Array[File] final_sig_associations = [merge_refinements_DEL.final_associations, merge_refinements_DUP.final_associations]
   }
 }
 
@@ -518,6 +487,7 @@ task meta_analysis {
         --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
         --model ${meta_model_prefix} \
         --p-is-phred \
+        --spa \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed

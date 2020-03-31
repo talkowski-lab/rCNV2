@@ -228,7 +228,7 @@ make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T,
 
 
 # Perform meta-analysis for a single window
-meta.single <- function(stats.merged, cohorts, row.idx, model="re", empirical.continuity=T, drop_top_cohort=F){
+meta.single <- function(stats.merged, cohorts, row.idx, model="fe", empirical.continuity=T, drop_top_cohort=F){
   # If no CNVs are observed, return all NAs
   if(sum(stats.merged[row.idx, grep("_alt", colnames(stats.merged), fixed=T)])>0){
     meta.df <- make.meta.df(stats.merged, cohorts, row.idx, empirical.continuity, drop_top_cohort)
@@ -255,6 +255,18 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="re", empirical.co
                            add=0, drop00=F, correct=F)
         out.v <- as.numeric(c(meta.res$b, meta.res$ci.lb, meta.res$ci.ub,
                               meta.res$MH, -log10(meta.res$MHp)))
+      }else if(model=="fe"){
+        meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                                     measure="OR", data=meta.df, method="FE", slab=cohort_name,
+                                     add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
+                             error=function(e){
+                               print(paste("row", row.idx, "failed to converge. Retrying with more iterations...", sep=" "))
+                               rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                                       measure="OR", data=meta.df, method="FE", slab=cohort_name,
+                                       add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
+                             })
+        out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
+                              meta.res$zval, -log10(meta.res$pval)))
       }
       # Force to p-values reflecting Ha : OR > 1
       if(!is.na(out.v[1]) & !is.na(out.v[5])){
@@ -290,8 +302,27 @@ make.meta.lookup.table <- function(stats.merged, cohorts, model, empirical.conti
 }
 
 
+# Apply saddlepoint approximation to vector of Z-scores to generate adjusted P-values
+saddlepoint.adj <- function(zscores, phred=T){
+  mu.hat <- mean(zscores, na.rm=T)
+  sd.hat <- sd(zscores, na.rm=T)
+  cumuls <- gaussianCumulants(mu.hat, sd.hat)
+  dx <- 0.01
+  x <- seq(-40, 40, dx)
+  saddle.pdf <- saddlepoint(x, 1, cumuls)$approx
+  saddle.cdf <- cumsum(saddle.pdf * 0.01)
+  calc.saddle.p <- function(z){if(!is.na(z)){1 - tail(saddle.cdf[which(x<z)], 1)}else{NA}}
+  new.pvals <- sapply(zscores, calc.saddle.p)
+  if(phred==T){
+    return(-log10(new.pvals))
+  }else{
+    return(new.pvals)
+  }
+}
+
+
 # Wrapper function to perform a meta-analysis on all windows
-meta <- function(stats.merged, cohorts, model="re"){
+meta <- function(stats.merged, cohorts, model="fe", saddle=T){
   # Make meta-analysis lookup table
   meta.lookup.table <- make.meta.lookup.table(stats.merged, cohorts, model, 
                                               empirical.continuity=T)
@@ -301,11 +332,19 @@ meta <- function(stats.merged, cohorts, model="re"){
   meta.res <- meta.res[with(meta.res, order(chr, start)), ]
   
   # Compute secondary P-value
-  meta.res$meta_phred_p_secondary <- sapply(1:nrow(meta.res), function(i){
-    meta.single(meta.res, cohorts, i, model, empirical.continuity=T, drop_top_cohort=T)[5]
-  })
+  meta.res.secondary <- as.data.frame(t(sapply(1:nrow(meta.res), function(i){
+    meta.single(meta.res, cohorts, i, model, empirical.continuity=T, drop_top_cohort=T)
+  })))
+  colnames(meta.res.secondary) <- c("meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper", "meta_z", "meta_phred_p")
+  
+  # Adjust P-values using saddlepoint approximation of null distribution, if optioned
+  if(saddle==T){
+    meta.res$meta_phred_p <- saddlepoint.adj(meta.res$meta_z)
+    meta.res.secondary$meta_phred_p <- saddlepoint.adj(meta.res.secondary$meta_z)
+  }
   
   # Format output
+  meta.res$meta_phred_p_secondary <- meta.res.secondary$meta_phred_p
   return(as.data.frame(cbind(meta.res[, which(colnames(meta.res) %in% c("chr", "start", "end", 
                                                                         "n_nominal_cohorts", "top_cohort"))],
                              meta.res[, grep("meta_", colnames(meta.res), fixed=T)])))
@@ -319,17 +358,20 @@ meta <- function(stats.merged, cohorts, model="re"){
 # Load required libraries
 require(optparse, quietly=T)
 require(metafor, quietly=T)
+require(EQL, quietly=T)
 
 # List of command-line options
 option_list <- list(
   make_option(c("--or-corplot"), type="character", default=NULL, 
               help="output .jpg file for pairwise odds ratio correlation plot [default %default]",
               metavar="path"),
-  make_option(c("--model"), type="character", default="re", 
-              help="specify meta-analysis model ('re': random effects, 'mh': Mantel-Haenszel) [default %default]",
+  make_option(c("--model"), type="character", default="fe", 
+              help="specify meta-analysis model ('re': random effects, 'fe': fixed effects, 'mh': Mantel-Haenszel) [default '%default']",
               metavar="string"),
   make_option(c("--p-is-phred"), action="store_true", default=FALSE, 
-              help="provided P-values are Phred-scaled (-log10(P)) [default %default]")
+              help="provided P-values are Phred-scaled (-log10(P)) [default %default]"),
+  make_option(c("--spa"), action="store_true", default=FALSE, 
+              help="apply saddlepoint approximation of null distribution [default %default]")
 )
 
 # Get command-line arguments & options
@@ -344,14 +386,19 @@ outfile <- args$args[2]
 corplot.out <- opts$`or-corplot`
 model <- opts$model
 p.is.phred <- opts$`p-is-phred`
+spa <- opts$spa
 
 # # Dev parameters
-# infile <- "~/scratch/window_meta_dummy_input.txt"
+# setwd("~/scratch")
+# infile <- "~/scratch/HP0100852.rCNV.DEL.sliding_window.meta_analysis.input.txt"
+# # infile <- "~/scratch/HP0001250.rCNV.DEL.sliding_window.meta_analysis.input.txt"
 # # infile <- "~/scratch/window_meta_dummy_input.ndd.txt"
-# outfile <- "~/scratch/window_meta_test_results.bed"
+# outfile <- "~/scratch/HP0100852.rCNV.DEL.window_meta_test_results.bed"
+# # outfile <- "~/scratch/HP0001250.rCNV.DEL.window_meta_test_results.bed"
 # corplot.out <- "~/scratch/corplot.test.jpg"
-# model <- "re"
+# model <- "fe"
 # p.is.phred <- T
+# spa <- T
 
 # Read list of cohorts to meta-analyze
 cohort.info <- read.table(infile, header=F, sep="\t")
@@ -372,7 +419,7 @@ if(!is.null(corplot.out)){
 
 # Conduct meta-analysis & write to file
 stats.merged <- combine.stats(stats.list)
-stats.meta <- meta(stats.merged, cohort.info[, 1], model=model)
+stats.meta <- meta(stats.merged, cohort.info[, 1], model=model, saddle=spa)
 colnames(stats.meta)[1] <- "#chr"
 write.table(stats.meta, outfile, sep="\t",
             row.names=F, col.names=T, quote=F)

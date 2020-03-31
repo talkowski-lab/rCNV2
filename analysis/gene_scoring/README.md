@@ -87,7 +87,7 @@ Where:
 *  `T_alt` was the estimated alternative effect size computed from [gold-standard haploinsufficient genes](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/gene_scoring#gold-standard-dosage-sensitive-genes), and  
 *  `W` was the null standard error computed from gold-standard haploinsufficient genes.  
 
-Per equation (2) from [Wakefield, _Am. J. Hum. Genet._, 2008](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1950810/), we can further define a Bayesian false discovery probability (BFDP) for each gene as:  
+Per equation (2) from [Wakefield, _Am. J. Hum. Genet._, 2007](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1950810/), we can further define a Bayesian false discovery probability (BFDP) for each gene as:  
 
 ```
 BFDP = ( PO x BF ) / ( 1 + ( PO x BF ) )

@@ -63,7 +63,7 @@ RUN apt-get -qqy update \
 RUN apt-get -qqy upgrade
 RUN Rscript -e "sapply(c('optparse','metafor','KernSmooth','metap','MASS','flux'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
-RUN Rscript -e "sapply(c('beeswarm','Hmisc'),\
+RUN Rscript -e "sapply(c('beeswarm','Hmisc','EQL'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 
 # Install Athena toolkit
@@ -77,7 +77,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout b50daf748ec6bd90ab58f9ab951e8706b36df596 && \
+    git checkout 349ecdb8f562012ddedcf5d77bcc4ff9953025df && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)

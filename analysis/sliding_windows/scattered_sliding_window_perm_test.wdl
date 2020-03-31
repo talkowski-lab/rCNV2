@@ -2,7 +2,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-2020 Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -154,6 +154,7 @@ task permuted_burden_test {
       /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
         --model ${meta_model_prefix} \
         --p-is-phred \
+        --spa \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed

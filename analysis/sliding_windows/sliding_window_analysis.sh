@@ -38,10 +38,12 @@ binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
 p_cutoff=0.00000385862
 meta_p_cutoff=0.00000385862
-meta_model_prefix="re"
+meta_model_prefix="fe"
 bin_overlap=0.5
 pad_controls=50000
-
+# Test/dev parameters (anxiety, with bad case:control imbalance)
+hpo="HP:0100852"
+prefix="HP0100852"
 
 
 
@@ -154,7 +156,7 @@ binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
 p_cutoff=0.00000385862
 n_pheno_perms=50
-meta_model_prefix="re"
+meta_model_prefix="fe"
 i=1
 bin_overlap=0.5
 pad_controls=50000
@@ -257,6 +259,7 @@ while read prefix hpo; do
       /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
         --model ${meta_model_prefix} \
         --p-is-phred \
+        --spa \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
@@ -312,6 +315,38 @@ echo -e "\nANALYZING P-VALUE MATRIX\n"
 
 
 
+# Test/dev parameters (all cases)
+hpo="HP:0000118"
+prefix="HP0000118"
+# Test/dev parameters (seizures)
+hpo="HP:0001250"
+prefix="HP0001250"
+meta="meta1"
+freq_code="rCNV"
+phenotype_list="refs/test_phenotypes.list"
+metacohort_list="refs/rCNV_metacohort_list.txt"
+metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
+binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
+rCNV_bucket="gs://rcnv_project"
+p_cutoff=0.00000385862
+meta_p_cutoff=0.00000385862
+meta_model_prefix="fe"
+bin_overlap=0.5
+pad_controls=50000
+# Test/dev parameters (anxiety, with bad case:control imbalance)
+hpo="HP:0100852"
+prefix="HP0100852"
+
+# Copy necessary data for local testing (without running the above -- this is not in the WDL)
+gsutil -m cp \
+  ${rCNV_bucket}/analysis/analysis_refs/sliding_window.${freq_code}.*.empirical_genome_wide_pval.hpo_cutoffs.tsv \
+  ./
+gsutil -m cp \
+  ${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/meta**.stats.bed.gz* \
+  ./
+
+
+
 # Run meta-analysis for each phenotype
 while read prefix hpo; do
 
@@ -358,6 +393,7 @@ while read prefix hpo; do
       --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
       --model ${meta_model_prefix} \
       --p-is-phred \
+      --spa \
       ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
       ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
     bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
@@ -476,7 +512,7 @@ meta_p_cutoff=0.00000385862
 meta_secondary_p_cutoff=0.05
 meta_or_cutoff=1
 meta_nominal_cohorts_cutoff=2
-meta_model_prefix="re"
+meta_model_prefix="fe"
 sig_window_pad=1000000
 refine_max_cnv_size=3000000
 
