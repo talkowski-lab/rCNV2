@@ -202,7 +202,7 @@ done
 mkdir ${freq_code}_gene_scoring_QC_plots/
 /opt/rCNV2/analysis/gene_scoring/plot_gene_score_qc.R \
   ${freq_code}.gene_scores.tsv.gz \
-  DEL.finemap_roc_truth_sets.tsv \
-  DUP.finemap_roc_truth_sets.tsv \
+  DEL.roc_truth_sets.tsv \
+  DUP.roc_truth_sets.tsv \
   ${freq_code}_gene_scoring_QC_plots/${freq_code}_gene_score_qc
 

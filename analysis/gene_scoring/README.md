@@ -71,10 +71,67 @@ For modeling, we assumed each gene had equal prior likelihood of being haploinsu
 
 ### 3. Bayes factor calculation for each gene  
 
+We next computed the likelihood ratio that each gene was CNV-tolerant versus being dosage sensitive.  
 
+Given a gene with an estimated log odds ratio `T_hat`  and standard error `V_hat`, we compute the Bayes Factor (`BF`) as:  
+
+```
+H0 : T_hat ≤ T_null
+H1 : T_hat ≥ T_alt
+
+BF = ( 1 - N(T_hat - T_null, W) ) / N(T_hat - T_alt)
+```
+
+Where:  
+*  `T_null` was the estimated null effect size computed from [gold-standard dosage-insensitive genes](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/gene_scoring#gold-standard-dosage-insensitive-genes),  
+*  `T_alt` was the estimated alternative effect size computed from [gold-standard haploinsufficient genes](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/gene_scoring#gold-standard-dosage-sensitive-genes), and  
+*  `W` was the null standard error computed from gold-standard haploinsufficient genes.  
+
+Per equation (2) from [Wakefield, _Am. J. Hum. Genet._, 2008](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1950810/), we can further define a Bayesian false discovery probability (BFDP) for each gene as:  
+
+```
+BFDP = ( PO x BF ) / ( 1 + ( PO x BF ) )
+```
+
+Where `PO` is the prior odds of the null; _i.e._, the odds of any gene _not_ being dosage sensitive, which was estimated [as described above](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/gene_scoring#2b-estimation-of-prior-fraction-of-dosage-sensitive-genes).  
 
 ### 4. Prediction of dosage sensitivity scores
 
+Using the BFDP values calculated for each gene [as described above](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/gene_scoring#3-bayes-factor-calculation-for-each-gene), we next trained and applied a regression model to predict the probability of a gene being haploinsufficient or triplosensitive based on [gene-level functional metadata](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene#gene-features) alone.  
+
+We first divided all 22 autosomes into 11 pairs while balancing the total number of genes per chromosome pair, as follows:  
+
+| Chromosome #1 | Chromosome #2 | Genes |  
+| ---: | ---: | ---: |  
+| 1 | 21 | 2,036 |  
+| 19 | 18 | 1,586 |  
+| 2 | 13 | 1,473 |  
+| 11 | 22 | 1,520 |  
+| 17 | 20 | 1,579 |  
+| 3 | 15 | 1,566 |  
+| 12 | 14 | 1,593 |  
+| 5 | 8 | 1,464 |  
+| 6 | 10 | 1,507 |  
+| 7 | 9 | 1,476 |  
+| 16 | 4 | 1,463 |  
+
+To predict gene-level scores for each pair of chromosomes, we used the other 10 pairs to train & cross-validate a regression model.  
+
+For each of 10 cross-validation iterations, we used 9/10 chromosome pairs for training and held out one pair for testing.  
+
+This process can be summarized as follows:
+
+1. Fit logit glm of `BFDP ~ features` for all genes from the 9/10 training pairs using light (alpha=0.1) L<sup>2</sup> regularization to protect against overfitting;  
+2. Compute root mean-squared error (RMSE) of predicted and actual BFDPs for all genes on the 10<sup>th</sup> chromosome pair (held out from training); 
+3. Repeat steps [1-2] once for each of the 10 training pairs as the held-out test pair; 
+4. Select the most predictive model based on lowest RMSE; and 
+5. Apply the most predictive model from [4] to predict BFDPs for the genes from the 11<sup>th</sup> pair of (completely held-out) prediction chromosomes.  
+
+After computing predicted BFDPs for all genes using this strategy described above, we subsequently standard-normalized the predicted BFDPs, and defined final gene scores as `1 – normal_cdf( normalized BFDP )`.  
+
+In practice we dubbed these final scores as:  
+*  **pHI**: probability of haploinsufficiency; and
+*  **pTS**: probability of triplosensitivity.  
 
 ---  
 
