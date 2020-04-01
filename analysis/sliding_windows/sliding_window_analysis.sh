@@ -41,6 +41,7 @@ meta_p_cutoff=0.00000385862
 meta_model_prefix="fe"
 bin_overlap=0.5
 pad_controls=50000
+max_manhattan_phred_p=30
 # Test/dev parameters (anxiety, with bad case:control imbalance)
 hpo="HP:0100852"
 prefix="HP0100852"
@@ -110,7 +111,7 @@ while read prefix hpo; do
       /opt/rCNV2/utils/plot_manhattan_qq.R \
         --p-col-name "fisher_phred_p" \
         --p-is-phred \
-        --max-phred-p 100 \
+        --max-phred-p ${max_manhattan_phred_p} \
         --cutoff ${p_cutoff} \
         --highlight-bed "$highlight_bed" \
         --highlight-name "$highlight_title" \
@@ -125,7 +126,7 @@ while read prefix hpo; do
       --miami \
       --p-col-name "fisher_phred_p" \
       --p-is-phred \
-      --max-phred-p 100 \
+      --max-phred-p ${max_manhattan_phred_p} \
       --cutoff ${p_cutoff} \
       --highlight-bed /opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz \
       --highlight-name "Known DUP GDs (Owen 2018)" \
@@ -403,6 +404,7 @@ while read prefix hpo; do
     /opt/rCNV2/utils/plot_manhattan_qq.R \
       --p-col-name "meta_phred_p" \
       --p-is-phred \
+      --max-phred-p ${max_manhattan_phred_p} \
       --cutoff $meta_p_cutoff \
       --highlight-bed "$highlight_bed" \
       --highlight-name "$highlight_title" \
@@ -417,6 +419,7 @@ while read prefix hpo; do
     --miami \
     --p-col-name "meta_phred_p" \
     --p-is-phred \
+    --max-phred-p ${max_manhattan_phred_p} \
     --cutoff $DUP_p_cutoff \
     --highlight-bed /opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz \
     --highlight-name "Known DUP GDs (Owen 2018)" \

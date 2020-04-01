@@ -69,7 +69,7 @@ mkdir rare_cnv_curated/
 while read cohort N; do
   /opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
     --minsize 100000 \
-    --maxsize 10000000 \
+    --maxsize 20000000 \
     --nsamp $N \
     --maxfreq 0.01 \
     --recipoverlap 0.5 \
@@ -94,7 +94,7 @@ mkdir veryrare_cnv_curated/
 while read cohort N; do
   /opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
     --minsize 100000 \
-    --maxsize 10000000 \
+    --maxsize 20000000 \
     --nsamp $N \
     --maxfreq 0.001 \
     --recipoverlap 0.5 \
@@ -119,7 +119,7 @@ mkdir ultrarare_cnv_curated/
 while read cohort N; do
   /opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
     --minsize 100000 \
-    --maxsize 10000000 \
+    --maxsize 20000000 \
     --nsamp $N \
     --maxfreq 0.0001 \
     --recipoverlap 0.5 \

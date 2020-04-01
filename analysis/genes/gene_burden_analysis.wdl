@@ -2,14 +2,14 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-2020 Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
 # Analysis of case-control CNV burdens per gene
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_gene_burden_perm_test/versions/4/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_gene_burden_perm_test/versions/5/plain-WDL/descriptor" as scattered_perm
 
 
 workflow gene_burden_analysis {
@@ -25,6 +25,7 @@ workflow gene_burden_analysis {
   Float min_cds_ovr_dup
   Int max_genes_per_cnv
   Float p_cutoff
+  Int max_manhattan_phred_p
   Float meta_secondary_p_cutoff
   Int meta_nominal_cohorts_cutoff
   Float finemap_elnet_alpha
@@ -56,6 +57,7 @@ workflow gene_burden_analysis {
         min_cds_ovr_dup=min_cds_ovr_dup,
         max_genes_per_cnv=max_genes_per_cnv,
         p_cutoff=p_cutoff,
+        max_manhattan_phred_p=max_manhattan_phred_p,
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
     }
@@ -126,6 +128,7 @@ workflow gene_burden_analysis {
         metacohort_sample_table=metacohort_sample_table,
         freq_code="rCNV",
         meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+        max_manhattan_phred_p=max_manhattan_phred_p,
         meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0]
@@ -237,6 +240,7 @@ task burden_test {
   Float min_cds_ovr_dup
   Int max_genes_per_cnv
   Float p_cutoff
+  Int max_manhattan_phred_p
   String rCNV_bucket
   String prefix
 
@@ -323,7 +327,7 @@ task burden_test {
         /opt/rCNV2/utils/plot_manhattan_qq.R \
           --p-col-name "fisher_phred_p" \
           --p-is-phred \
-          --max-phred-p 100 \
+          --max-phred-p ${max_manhattan_phred_p} \
           --cutoff ${p_cutoff} \
           --highlight-bed "${prefix}.highlight_regions.bed" \
           --highlight-name "Constrained genes associated with this phenotype" \
@@ -338,7 +342,7 @@ task burden_test {
         --miami \
         --p-col-name "fisher_phred_p" \
         --p-is-phred \
-        --max-phred-p 100 \
+        --max-phred-p ${max_manhattan_phred_p} \
         --cutoff ${p_cutoff} \
         --highlight-bed "${prefix}.highlight_regions.bed" \
         --highlight-name "Constrained genes associated with this phenotype" \
@@ -432,7 +436,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:89bf370a55c031dcebf0884324c8352d289946908a4fe0430e50d2bf9de2d6e1"
+    docker: "talkowski/rcnv@sha256:2a187ca67610a1d63555393721d4d29111e3c85160e904db6b912663a30ebb98"
     preemptible: 1
     memory: "32 GB"
     disks: "local-disk 275 HDD"
@@ -455,6 +459,7 @@ task meta_analysis {
   File metacohort_sample_table
   String freq_code
   Array[File] meta_p_cutoff_tables
+  Int max_manhattan_phred_p
   String meta_model_prefix
   String rCNV_bucket
   String prefix
@@ -520,6 +525,7 @@ task meta_analysis {
         --or-corplot ${prefix}.${freq_code}.$CNV.gene_burden.or_corplot_grid.jpg \
         --model ${meta_model_prefix} \
         --p-is-phred \
+        --spa \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
@@ -529,6 +535,7 @@ task meta_analysis {
       /opt/rCNV2/utils/plot_manhattan_qq.R \
         --p-col-name "meta_phred_p" \
         --p-is-phred \
+        --max-phred-p ${max_manhattan_phred_p} \
         --cutoff $meta_p_cutoff \
         --highlight-bed "${prefix}.highlight_regions.bed" \
         --highlight-name "Constrained genes associated with this phenotype" \
@@ -543,6 +550,7 @@ task meta_analysis {
       --miami \
       --p-col-name "meta_phred_p" \
       --p-is-phred \
+      --max-phred-p ${max_manhattan_phred_p} \
       --cutoff $DUP_p_cutoff \
       --highlight-bed "${prefix}.highlight_regions.bed" \
       --highlight-name "Constrained genes associated with this phenotype" \
@@ -573,7 +581,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:89bf370a55c031dcebf0884324c8352d289946908a4fe0430e50d2bf9de2d6e1"
+    docker: "talkowski/rcnv@sha256:2a187ca67610a1d63555393721d4d29111e3c85160e904db6b912663a30ebb98"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -656,7 +664,7 @@ task finemap_genes {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:25b17d2a08c7fa7446c4f91d1295bb7749838e8db01d90746d4281b33e8ac6ed"
+    docker: "talkowski/rcnv@sha256:2a187ca67610a1d63555393721d4d29111e3c85160e904db6b912663a30ebb98"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -847,7 +855,7 @@ task plot_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:25b17d2a08c7fa7446c4f91d1295bb7749838e8db01d90746d4281b33e8ac6ed"
+    docker: "talkowski/rcnv@sha256:2a187ca67610a1d63555393721d4d29111e3c85160e904db6b912663a30ebb98"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

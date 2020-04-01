@@ -49,8 +49,9 @@ min_cds_ovr_del=0.1
 min_cds_ovr_dup=0.5
 max_genes_per_cnv=20000
 p_cutoff=0.000002896368
+max_manhattan_phred_p=30
 n_pheno_perms=50
-meta_model_prefix="re"
+meta_model_prefix="fe"
 i=1
 
 
@@ -129,7 +130,7 @@ while read pheno hpo; do
       /opt/rCNV2/utils/plot_manhattan_qq.R \
         --p-col-name "fisher_phred_p" \
         --p-is-phred \
-        --max-phred-p 100 \
+        --max-phred-p ${max_manhattan_phred_p} \
         --cutoff ${p_cutoff} \
         --highlight-bed "${prefix}.highlight_regions.bed" \
         --highlight-name "Constrained genes associated with this phenotype" \
@@ -144,7 +145,7 @@ while read pheno hpo; do
       --miami \
       --p-col-name "fisher_phred_p" \
       --p-is-phred \
-      --max-phred-p 100 \
+      --max-phred-p ${max_manhattan_phred_p} \
       --cutoff ${p_cutoff} \
       --highlight-bed "${prefix}.highlight_regions.bed" \
       --highlight-name "Constrained genes associated with this phenotype" \
@@ -269,6 +270,7 @@ while read prefix hpo; do
       /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
         --model ${meta_model_prefix} \
         --p-is-phred \
+        --spa \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.perm_$i.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.perm_$i.bed
@@ -362,6 +364,7 @@ while read prefix hpo; do
         --or-corplot ${prefix}.${freq_code}.$CNV.gene_burden.or_corplot_grid.jpg \
         --model ${meta_model_prefix} \
         --p-is-phred \
+        --spa \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
@@ -371,6 +374,7 @@ while read prefix hpo; do
       /opt/rCNV2/utils/plot_manhattan_qq.R \
         --p-col-name "meta_phred_p" \
         --p-is-phred \
+        --max-phred-p ${max_manhattan_phred_p} \
         --cutoff $meta_p_cutoff \
         --highlight-bed "${prefix}.highlight_regions.bed" \
         --highlight-name "Constrained genes associated with this phenotype" \
@@ -385,6 +389,7 @@ while read prefix hpo; do
       --miami \
       --p-col-name "meta_phred_p" \
       --p-is-phred \
+      --max-phred-p ${max_manhattan_phred_p} \
       --cutoff $DUP_p_cutoff \
       --highlight-bed "${prefix}.highlight_regions.bed" \
       --highlight-name "Constrained genes associated with this phenotype" \
@@ -695,7 +700,7 @@ tar -czvf ${freq_code}_${CNV}_finemap_plots.tgz ${freq_code}_${CNV}_finemap_plot
 # meta_secondary_p_cutoff=0.05
 # meta_or_cutoff=1
 # meta_nominal_cohorts_cutoff=2
-# meta_model_prefix="re"
+# meta_model_prefix="fe"
 # sig_gene_pad=1000000
 # refine_max_cnv_size=3000000
 
@@ -806,7 +811,7 @@ tar -czvf ${freq_code}_${CNV}_finemap_plots.tgz ${freq_code}_${CNV}_finemap_plot
 # meta_secondary_p_cutoff=0.05
 # meta_or_cutoff=1
 # meta_nominal_cohorts_cutoff=2
-# meta_model_prefix="re"
+# meta_model_prefix="fe"
 # pad_controls=0
 # min_cds_ovr=0.1
 # sig_gene_pad=1000000

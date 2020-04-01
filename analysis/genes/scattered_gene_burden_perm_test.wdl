@@ -2,7 +2,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-2020 Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -186,6 +186,7 @@ task permuted_burden_test {
       /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
         --model ${meta_model_prefix} \
         --p-is-phred \
+        --spa \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.perm_$i.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.perm_$i.bed
@@ -201,7 +202,7 @@ task permuted_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e218d978db38fba6c8ed9b17ad4d9d9820d73dbbc52e22b28d23f76fade15ab1"
+    docker: "talkowski/rcnv@sha256:2a187ca67610a1d63555393721d4d29111e3c85160e904db6b912663a30ebb98"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

@@ -239,33 +239,33 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="fe", empirical.co
       # Meta-analysis
       if(model=="re"){
         meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                                     measure="OR", data=meta.df, random = ~ 1 | cohort, slab=cohort_name,
+                                     measure="OR", data=meta.df, method="REML", random = ~ 1 | cohort, slab=cohort_name,
                                      add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
                              error=function(e){
                                print(paste("row", row.idx, "failed to converge. Retrying with more iterations...", sep=" "))
                                rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                                       measure="OR", data=meta.df, random = ~ 1 | cohort, slab=cohort_name,
+                                       measure="OR", data=meta.df, method="REML", random = ~ 1 | cohort, slab=cohort_name,
                                        add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
                              })
-        out.v <- as.numeric(c(meta.res$b[1, 1], meta.res$ci.lb, meta.res$ci.ub,
+        out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
                               meta.res$zval, -log10(meta.res$pval)))
       }else if(model=="mh"){
         meta.res <- rma.mh(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
                            measure="OR", data=meta.df, slab=cohort_name,
                            add=0, drop00=F, correct=F)
         out.v <- as.numeric(c(meta.res$b, meta.res$ci.lb, meta.res$ci.ub,
-                              meta.res$MH, -log10(meta.res$MHp)))
+                              meta.res$zval, -log10(meta.res$MHp)))
       }else if(model=="fe"){
         meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                                     measure="OR", method="FE", data=meta.df, slab=cohort_name,
+                                     measure="OR", data=meta.df, method="FE", slab=cohort_name,
                                      add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
                              error=function(e){
                                print(paste("row", row.idx, "failed to converge. Retrying with more iterations...", sep=" "))
                                rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                                       measure="OR", method="FE", data=meta.df, slab=cohort_name,
+                                       measure="OR", data=meta.df, method="FE", slab=cohort_name,
                                        add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
                              })
-        out.v <- as.numeric(c(meta.res$b[1, 1], meta.res$ci.lb, meta.res$ci.ub,
+        out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
                               meta.res$zval, -log10(meta.res$pval)))
       }
       # Force to p-values reflecting Ha : OR > 1
@@ -322,7 +322,7 @@ saddlepoint.adj <- function(zscores, phred=T){
 
 
 # Wrapper function to perform a meta-analysis on all genes
-meta <- function(stats.merged, cohorts, model="fe", saddle=T){
+meta <- function(stats.merged, cohorts, model="fe", saddle=T, secondary=T){
   # Make meta-analysis lookup table
   meta.lookup.table <- make.meta.lookup.table(stats.merged, cohorts, model, 
                                               empirical.continuity=T)
@@ -331,20 +331,27 @@ meta <- function(stats.merged, cohorts, model="fe", saddle=T){
   meta.res <- merge(stats.merged, meta.lookup.table, sort=F, all.x=T, all.y=F)
   meta.res <- meta.res[with(meta.res, order(chr, start, gene)), ]
   
-  # Compute secondary P-value
-  meta.res.secondary <- as.data.frame(t(sapply(1:nrow(meta.res), function(i){
-    meta.single(meta.res, cohorts, i, model, empirical.continuity=T, drop_top_cohort=T)
-  })))
-  colnames(meta.res.secondary) <- c("meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper", "meta_z", "meta_phred_p")
-  
   # Adjust P-values using saddlepoint approximation of null distribution, if optioned
   if(saddle==T){
     meta.res$meta_phred_p <- saddlepoint.adj(meta.res$meta_z)
-    meta.res.secondary$meta_phred_p <- saddlepoint.adj(meta.res.secondary$meta_z)
+  }
+  
+  # Compute secondary P-value
+  if(secondary==T){
+    meta.res.secondary <- as.data.frame(t(sapply(1:nrow(meta.res), function(i){
+      meta.single(meta.res, cohorts, i, model, empirical.continuity=T, drop_top_cohort=T)
+    })))
+    colnames(meta.res.secondary) <- c("meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper", "meta_z", "meta_phred_p")
+
+    # Saddlepoint on secondary, if optioned
+    if(saddle==T){
+      meta.res.secondary$meta_phred_p <- saddlepoint.adj(meta.res.secondary$meta_z)
+    }
+    
+    meta.res$meta_phred_p_secondary <- meta.res.secondary$meta_phred_p
   }
   
   # Format output
-  meta.res$meta_phred_p_secondary <- meta.res.secondary$meta_phred_p
   return(as.data.frame(cbind(meta.res[, which(colnames(meta.res) %in% c("chr", "start", "end", "gene",
                                                                         "n_nominal_cohorts", "top_cohort"))],
                              meta.res[, grep("meta_", colnames(meta.res), fixed=T)])))
@@ -371,7 +378,9 @@ option_list <- list(
   make_option(c("--p-is-phred"), action="store_true", default=FALSE, 
               help="provided P-values are Phred-scaled (-log10(P)) [default %default]"),
   make_option(c("--spa"), action="store_true", default=FALSE, 
-              help="apply saddlepoint approximation of null distribution [default %default]")
+              help="apply saddlepoint approximation of null distribution [default %default]"),
+  make_option(c("--no-secondary"), action="store_true", default=FALSE, 
+              help="do not compute secondary P-value [default %default]")
 )
 
 # Get command-line arguments & options
@@ -387,6 +396,7 @@ corplot.out <- opts$`or-corplot`
 model <- opts$model
 p.is.phred <- opts$`p-is-phred`
 spa <- opts$`spa`
+secondary <- !(opts$`no-secondary`)
 
 # # Dev parameters
 # infile <- "~/scratch/dec18_gene_burden/gene.meta_test.input.txt2"
@@ -395,6 +405,7 @@ spa <- opts$`spa`
 # model <- "fe"
 # p.is.phred <- T
 # spa <- T
+# secondary <- T
 
 # Read list of cohorts to meta-analyze
 cohort.info <- read.table(infile, header=F, sep="\t")
@@ -415,7 +426,8 @@ if(!is.null(corplot.out)){
 
 # Conduct meta-analysis & write to file
 stats.merged <- combine.stats(stats.list)
-stats.meta <- meta(stats.merged, cohort.info[, 1], model=model, saddle=spa)
+stats.meta <- meta(stats.merged, cohort.info[, 1], model=model, 
+                   saddle=spa, secondary=secondary)
 colnames(stats.meta)[1] <- "#chr"
 write.table(stats.meta, outfile, sep="\t",
             row.names=F, col.names=T, quote=F)

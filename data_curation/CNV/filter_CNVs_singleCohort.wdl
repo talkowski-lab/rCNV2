@@ -146,7 +146,7 @@ task filter_cnvs_singleChrom {
     /opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
       --chr ${contig} \
       --minsize 100000 \
-      --maxsize 10000000 \
+      --maxsize 20000000 \
       --nsamp ${N} \
       --maxfreq ${max_freq} \
       --recipoverlap 0.5 \
