@@ -160,7 +160,7 @@ get.adjusted.cutoffs <- function(cutoff.mat, stat, pred.n=NULL, exclude.outliers
 
 # Plot FDR, annotated with means and fitted curve
 plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target, 
-                      model="exponential", title=NULL, floor=F){
+                      model="exponential", title=NULL, plot.exp=T, floor=F){
   
   phred.target <- -log10(fdr.target)
   if(is.null(title)){
@@ -183,7 +183,9 @@ plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target,
     if(floor==T){
       fit.df$y[which(fit.df$y < phred.target)] <- phred.target
     }
-    lines(fit.df$x, fit.df$y, col="red", lwd=3)
+    if(plot.exp==T){
+      lines(fit.df$x, fit.df$y, col="red", lwd=3)
+    }
   }
   
   # Add group means
@@ -199,9 +201,15 @@ plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target,
   mtext(3, line=0.1, text=title, font=2)
   
   # Add legend
-  legend("topright", pch=c(1, 15, NA, NA), lwd=c(1, 1, 3, 1), lty=c(NA, NA, 1, 1), 
-         col=c("gray75", "black", "red", "black"), cex=0.9, 
-         legend=c("Permutation", stat, "Exponential Fit", "FDR Target"))
+  if(plot.exp==T){
+    legend("topright", pch=c(1, 15, NA, NA), lwd=c(1, 1, 3, 1), lty=c(NA, NA, 1, 1), 
+           col=c("gray75", "black", "red", "black"), cex=0.9, 
+           legend=c("Permutation", stat, "Exponential Fit", "FDR Target"))
+  }else{
+    legend("topright", pch=c(1, 15, NA), lwd=c(1, 1, 1), lty=c(NA, NA, 1), 
+           col=c("gray75", "black", "black"), cex=0.9, 
+           legend=c("Permutation", stat, "FDR Target"))
+  }
 }
 
 
@@ -221,6 +229,8 @@ option_list <- list(
               help="P-value increments to evaluate (Phred-scaled) [default %default]"),
   make_option(c("--fdr-target"), type="numeric", default=0.01,
               help="FDR target [default %default]"),
+  make_option(c("--flat-ladder"), action="store_true", default=FALSE,
+              help="Enforce true FDR target for ladder [default %default]"),
   make_option(c("--plot"), type="character", default=NULL,
               help="path to .png of FDR fit vs. permutations [default %default]")
 )
@@ -242,6 +252,7 @@ cnvtype <- opts$cnv
 max.cutoff <- opts$`max-cutoff`
 cutoff.step <- opts$`cutoff-step`
 fdr.target <- opts$`fdr-target`
+flat.ladder <- opts$`flat-ladder`
 plot.out <- opts$`plot`
 
 # # DEV PARAMETERS
@@ -252,6 +263,7 @@ plot.out <- opts$`plot`
 # max.cutoff <- 20
 # cutoff.step <- 0.05
 # fdr.target <- 0.00000385862
+# flat.ladder <- T
 # plot.out <- "~/scratch/meta_cutoffs.test.png"
 
 # Load sample size info
@@ -283,9 +295,15 @@ write.table(df.out.empirical.mean, outfile.hpos, sep="\t", quote=F,
             col.names=T, row.names=F)
 
 # Format & write output file against arbitrary sample size steps
-df.out.ladder <- get.adjusted.cutoffs(cutoff.mat, "mean", 
-                                      pred.n=as.numeric(sapply(3:5, function(x){seq(1, 9.9, 0.1) * 10 ^ x})),
-                                      exclude.outliers=T)$df
+if(flat.ladder == T){
+  df.out.ladder <- data.frame("#n_cases"=as.numeric(sapply(3:5, function(x){seq(1, 9.9, 0.1) * 10 ^ x})),
+                              "min_p"=fdr.target)
+  colnames(df.out.ladder)[1] <- "#n_cases"
+}else{
+  df.out.ladder <- get.adjusted.cutoffs(cutoff.mat, "mean", 
+                                        pred.n=as.numeric(sapply(3:5, function(x){seq(1, 9.9, 0.1) * 10 ^ x})),
+                                        exclude.outliers=T)$df
+}
 outfile.ladder <- paste(out.prefix, ".ncase_cutoff_ladder.tsv", sep="")
 write.table(df.out.ladder, outfile.ladder, sep="\t", quote=F,
             col.names=T, row.names=F)
@@ -303,7 +321,7 @@ if(!is.null(plot.out)){
   plot.fdrs(cutoff.mat, mean.cutoffs, "Mean", fdr.target, 
             title=paste(cnvtype, "Permutation Results for FDR =",
                         format(fdr.target, scientific=T, digits=3)),
-            floor=F)
+            plot.exp=!flat.ladder, floor=F)
   dev.off()
 }
 

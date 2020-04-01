@@ -2,13 +2,13 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-2020 Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
 # Filter raw CNV data to rare, very rare, and ultra rare subsets
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:filter_cnvs_singleCohort/versions/50/plain-WDL/descriptor" as filter_single
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:filter_cnvs_singleCohort/versions/51/plain-WDL/descriptor" as filter_single
 
 
 workflow filter_CNV_data {
@@ -104,7 +104,7 @@ task combine_subsets {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:9d5358ce77dd436d067dea901d9b1d19b575f635f9b09cacfe38ff84cce7e62a"
+    docker: "talkowski/rcnv@sha256:33e1e77e2848b056b16ef918866db9c034a789543440154b80b1fe1ef99b250e"
     preemptible: 1
   }
 

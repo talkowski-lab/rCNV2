@@ -134,7 +134,7 @@ Note that permissions must be granted per user prior to data access.
 
 All raw CNV data was subjected to the same set of global filters:  
  * Restricted to autosomes
- * CNV size ≥ 100kb and ≤ 10Mb
+ * CNV size ≥ 100kb and ≤ 20Mb
  * Does not have substantial overlap<sup>1</sup> with a common CNV (`AF`>1%) in any population from WGS resolution in gnomAD-SV<sup>2</sup> ([Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674))  
  * Does not have substantial overlap<sup>1</sup> with a common CNV (`AF`>1%) in any population from WGS resolution in the 1000 Genomes Project, Phase III ([Sudmant _et al._, _Nature_ (2015)](https://www.nature.com/articles/nature15394))  
  * Does not have substantial overlap<sup>1</sup> with a common CNV (`AF`>1%) from WGS resolution in the NIH Center for Common Disease Genetics SV callset ([Abel _et al._, _bioRxiv_ (2018)](https://www.biorxiv.org/content/10.1101/508515v1))  

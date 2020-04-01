@@ -2,7 +2,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-2020 Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -166,7 +166,7 @@ task filter_cnvs_singleChrom {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:9d5358ce77dd436d067dea901d9b1d19b575f635f9b09cacfe38ff84cce7e62a"
+    docker: "talkowski/rcnv@sha256:33e1e77e2848b056b16ef918866db9c034a789543440154b80b1fe1ef99b250e"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 200 SSD"
@@ -217,7 +217,7 @@ task merge_beds {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:9d5358ce77dd436d067dea901d9b1d19b575f635f9b09cacfe38ff84cce7e62a"
+    docker: "talkowski/rcnv@sha256:33e1e77e2848b056b16ef918866db9c034a789543440154b80b1fe1ef99b250e"
     preemptible: 1
   }
 

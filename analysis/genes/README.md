@@ -37,9 +37,10 @@ We considered a CNV to overlap a gene based on its CDS overlap and CNV type, as 
 
 | CNV type | Min. CDS overlap | Rationale |  
 | :--- | ---: | :--- |  
-| DEL | ≥10% | Most coding deletions should result in loss-of-function, but we wanted to impose a liberal minimum overlap to protect against spurious annotations given the coarse resolution of most microarrays. |  
-| DUP | ≥50% | Functional annotation of duplications is more challenging than deletions, so we imposed a stricter CDS overlap to isolate CNVs predicted to duplicate most (if not all) of a gene.  |  
+| DEL | ≥5% | Most coding deletions should result in loss-of-function, but we wanted to impose a liberal minimum overlap to protect against spurious annotations given the coarse resolution of most microarrays. |  
+| DUP | ≥80% | Functional annotation of duplications is more challenging than deletions, so we imposed a stricter CDS overlap to isolate CNVs predicted to duplicate nearly all of a gene.  |  
 
+Finally, given that CNV breakpoint precision varies by locus, platform, and CNV calling algorithm, we systematically extended the breakpoints of each control CNV by +50kb. CNV breakpoints in cases were **not** extended. We did this to conservatively protect against spurrious associations arising from situations where control CNVs breakpoints might be underestimated compared to case breakpoints.  
 
 ### 2. Calculate burden statistics between cases & controls  
 
@@ -103,13 +104,15 @@ gs://rcnv_project/analysis/gene_burden/UNKNOWN/
 
 ### 3. Combine association statistics across metacohorts  
 
-We combined CNV association statistics across metacohorts for each gene using a random-effects meta-analysis. The P-value from this model was designated as the "`primary`" P-value.  
+We combined CNV association statistics across metacohorts for each gene using a fixed-effects meta-analysis. The P-value from this model was designated as the "`primary`" P-value.  
 
-We also computed a "`secondary`" P-value, which was calculated from an identical random-effects meta-analysis model after excluding the single most significant metacohort per gene.  
+We also computed a "`secondary`" P-value, which was calculated from an identical fixed-effects meta-analysis model after excluding the single most significant metacohort per gene.  
 
 The code to perform this step is contained in `gene_meta_analysis.R`.  
 
 Given that rare CNV counts per gene are (a) sparse and (b) zero-inflated, and furthermore that (c) the case & control sample sizes are unbalanced for most phenotype groups (_e.g._, frequently >10- to 100-fold more controls than cases), we implemented an empirical continuity correction as proposed by [Sweeting _et al._, _Stat. Med._, 2004.](https://onlinelibrary.wiley.com/doi/10.1002/sim.1761)  
+
+Furthermore, as sample size imbalance between cases and controls has been shown to distort test statistics in genetic association studies, we applied a saddlepoint approximation correction to the test statistics for each phenotype per CNV type to recalibrate our primary and secondary P-values. This procedure is based on [Dey et al., _Am. J. Hum. Genet._, 2017](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5501775/).  
 
 Each phenotype & CNV type were meta-analyzed separately for a total of two meta-analyses per phenotype.  
 

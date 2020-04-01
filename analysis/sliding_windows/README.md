@@ -98,13 +98,15 @@ gs://rcnv_project/analysis/sliding_windows/UNKNOWN/
 
 ### 3. Combine association statistics across metacohorts  
 
-We combined CNV association statistics across metacohorts for each sliding window using a random-effects meta-analysis. The P-value from this model was designated as the "`primary`" P-value.  
+We combined CNV association statistics across metacohorts for each sliding window using a fixed-effects meta-analysis. The P-value from this model was designated as the "`primary`" P-value.  
 
-We also computed a "`secondary`" P-value, which was calculated from an identical random-effects meta-analysis model after excluding the single most significant metacohort per window.  
+We also computed a "`secondary`" P-value, which was calculated from an identical fixed-effects meta-analysis model after excluding the single most significant metacohort per window.  
 
 The code to perform this step is contained in `window_meta_analysis.R`.  
 
 Given that rare CNV counts per window are (a) sparse and (b) zero-inflated, and furthermore that (c) the case & control sample sizes are unbalanced for most phenotype groups (_e.g._, frequently >10- to 100-fold more controls than cases), we implemented an empirical continuity correction as proposed by [Sweeting _et al._, _Stat. Med._, 2004.](https://onlinelibrary.wiley.com/doi/10.1002/sim.1761)  
+
+Furthermore, as sample size imbalance between cases and controls has been shown to distort test statistics in genetic association studies, we applied a saddlepoint approximation correction to the test statistics for each phenotype per CNV type to recalibrate our primary and secondary P-values. This procedure is based on [Dey et al., _Am. J. Hum. Genet._, 2017](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5501775/).  
 
 Each phenotype & CNV type were meta-analyzed separately for a total of two meta-analyses per phenotype.  
 
@@ -126,8 +128,6 @@ We empirically determined the primary P-value threshold for each CNV type and ph
 Steps 1-3 were repeated 50 times for each CNV type and phenotype.  
 
 Following permutation, we computed the mean primary P-value threshold per phenotype and CNV type. We used this value to assess genome-wide significance of primary P-values for locus discovery.    
-
-Finally, for each CNV type, we fit an exponential decay model of empirical P-value threshold versus total number of case samples after excluding outlier permutations and HPO terms. We used this model to assign a genome-wide P-value threshold per phenotype for region refinement (_not_ discovery; see below).  
 
 #### Output files  
 
