@@ -634,7 +634,8 @@ task finemap_genes {
       for wrapper in 1; do
         echo "$hpo"
         echo "stats/$prefix.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz"
-        awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' ${meta_p_cutoffs_tsv}
+        awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' \
+          gene_burden.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv
       done | paste -s
     done < ${phenotype_list} \
     > ${freq_code}.${CNV}.gene_fine_mapping.stats_input.tsv
@@ -697,7 +698,7 @@ task finemap_genes {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3d448259a3a9a97630d7af11b0fac01d0a5c0b63ad6e15fe233b1cac78a715db"
+    docker: "talkowski/rcnv@sha256:8a9b39abd866f0294429d19846a7c172997d5ceb53a9f28313e336fb441654d4"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -888,7 +889,7 @@ task plot_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3d448259a3a9a97630d7af11b0fac01d0a5c0b63ad6e15fe233b1cac78a715db"
+    docker: "talkowski/rcnv@sha256:8a9b39abd866f0294429d19846a7c172997d5ceb53a9f28313e336fb441654d4"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
