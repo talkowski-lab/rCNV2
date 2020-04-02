@@ -396,6 +396,7 @@ task calc_meta_p_cutoff {
     /opt/rCNV2/analysis/sliding_windows/calc_empirical_fdr.R \
       --cnv ${CNV} \
       --fdr-target ${fdr_target} \
+      --linear-fit \
       --flat-ladder \
       --plot sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}_permutation_results.png \
       ${freq_code}.${CNV}.permuted_pval_matrix.txt.gz \

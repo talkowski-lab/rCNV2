@@ -305,6 +305,7 @@ paste perm_res/*.gene_burden.meta_analysis.permuted_p_values.*.txt \
 /opt/rCNV2/analysis/sliding_windows/calc_empirical_fdr.R \
   --cnv ${CNV} \
   --fdr-target ${fdr_target} \
+  --linear-fit \
   --flat-ladder \
   --plot gene_burden.${freq_code}.${CNV}.${fdr_table_suffix}_permutation_results.png \
   ${freq_code}.${CNV}.permuted_pval_matrix.txt.gz \
