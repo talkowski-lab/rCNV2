@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-2020 Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -113,8 +113,13 @@ fit.exp.decay <- function(x, y){
              control=nls.control(maxiter=1000, warnOnly=T)))
 }
 
+# Calculate weighted mean
+calc.wmean <- function(vals, weights){
+  sum(weights * vals) / sum(weights)
+}
+
 # Calculate adjusted p-value cutoffs per HPO term
-get.adjusted.cutoffs <- function(cutoff.mat, stat, pred.n=NULL, exclude.outliers=T){
+get.adjusted.cutoffs <- function(cutoff.mat, stat, pred.n=NULL, exclude.outliers=T, linear.fit=F){
   # Determine outlier permutations and phenotypes, if optioned
   if(exclude.outliers==T){
     # Find individual outlier permutations (matched on hpo)
@@ -140,8 +145,7 @@ get.adjusted.cutoffs <- function(cutoff.mat, stat, pred.n=NULL, exclude.outliers
   }else{
     cutoff.stat.df <- get.cutoff.stat(cutoff.mat, stat)
   }
-  
-  fit <- fit.exp.decay(cutoff.stat.df$n.cases, cutoff.stat.df$fdr.cutoff)
+
   if(is.null(pred.n)){
     pred.labs <- unlist(unique(cutoff.mat$hpo))
     pred.n <- sapply(pred.labs, function(hpo){head(cutoff.mat$n.cases[which(cutoff.mat$hpo==hpo)], 1)})
@@ -150,8 +154,17 @@ get.adjusted.cutoffs <- function(cutoff.mat, stat, pred.n=NULL, exclude.outliers
     pred.labs <- pred.n
     col1.name <- "#n_cases"
   }
-  fit.df <- data.frame("x"=pred.n)
-  fit.df$y <- predict(fit, newdata=fit.df)
+    
+  if(linear.fit==T){
+    weights <- sqrt(cutoff.stat.df$n.cases)
+    wmean <- calc.wmean(cutoff.stat.df$fdr.cutoff, weights)
+    fit.df <- data.frame("x"=pred.n, "y"=wmean)
+    fit <- NULL
+  }else{
+    fit <- fit.exp.decay(cutoff.stat.df$n.cases, cutoff.stat.df$fdr.cutoff)
+    fit.df <- data.frame("x"=pred.n)
+    fit.df$y <- predict(fit, newdata=fit.df)
+  }
   out.df <- as.data.frame(cbind(pred.labs, unlist(10^-fit.df$y)))
   out.df <- out.df[!duplicated(out.df), ]
   colnames(out.df) <- c(col1.name, "min_p")
@@ -160,7 +173,7 @@ get.adjusted.cutoffs <- function(cutoff.mat, stat, pred.n=NULL, exclude.outliers
 
 # Plot FDR, annotated with means and fitted curve
 plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target, 
-                      model="exponential", title=NULL, plot.exp=T, floor=F){
+                      model="exponential", title=NULL, linear.fit=F, plot.exp=T, floor=F){
   
   phred.target <- -log10(fdr.target)
   if(is.null(title)){
@@ -185,6 +198,9 @@ plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target,
     }
     if(plot.exp==T){
       lines(fit.df$x, fit.df$y, col="red", lwd=3)
+    }else if(linear.fit==T){
+      abline(h=calc.wmean(cutoff.stat.df$fdr.cutoff, sqrt(cutoff.stat.df$n.cases)), 
+             lwd=3, col="red")
     }
   }
   
@@ -202,11 +218,15 @@ plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target,
   
   # Add legend
   if(plot.exp==T){
-    legend("topright", pch=c(1, 15, NA, NA), lwd=c(1, 1, 3, 1), lty=c(NA, NA, 1, 1), 
+    legend("topright", pch=c(1, 15, NA, NA), lwd=c(1, 1, 3, 1), lty=c(NA, NA, 1, 2), 
            col=c("gray75", "black", "red", "black"), cex=0.9, 
            legend=c("Permutation", stat, "Exponential Fit", "FDR Target"))
+  }else if(linear.fit==T){
+    legend("topright", pch=c(1, 15, NA, NA), lwd=c(1, 1, 3, 1), lty=c(NA, NA, 1, 2), 
+           col=c("gray75", "black", "red", "black"), cex=0.9, 
+           legend=c("Permutation", stat, "Weighted Mean", "FDR Target"))
   }else{
-    legend("topright", pch=c(1, 15, NA), lwd=c(1, 1, 1), lty=c(NA, NA, 1), 
+    legend("topright", pch=c(1, 15, NA), lwd=c(1, 1, 1), lty=c(NA, NA, 2), 
            col=c("gray75", "black", "black"), cex=0.9, 
            legend=c("Permutation", stat, "FDR Target"))
   }
@@ -229,6 +249,8 @@ option_list <- list(
               help="P-value increments to evaluate (Phred-scaled) [default %default]"),
   make_option(c("--fdr-target"), type="numeric", default=0.01,
               help="FDR target [default %default]"),
+  make_option(c("--linear-fit"), action="store_true", default=FALSE,
+              help="Compute cross-phenotype weighted mean for universal cutoff instead of empirical mean per phenotype [default %default]"),
   make_option(c("--flat-ladder"), action="store_true", default=FALSE,
               help="Enforce true FDR target for ladder [default %default]"),
   make_option(c("--plot"), type="character", default=NULL,
@@ -252,17 +274,19 @@ cnvtype <- opts$cnv
 max.cutoff <- opts$`max-cutoff`
 cutoff.step <- opts$`cutoff-step`
 fdr.target <- opts$`fdr-target`
+linear.fit <- opts$`linear-fit`
 flat.ladder <- opts$`flat-ladder`
 plot.out <- opts$`plot`
 
 # # DEV PARAMETERS
-# pvals.in <- "~/scratch/rCNV.DUP.permuted_pval_matrix.txt.gz"
+# pvals.in <- "~/scratch/rCNV.DEL.permuted_pval_matrix.txt.gz"
 # hpos.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
 # out.prefix <- "~/scratch/meta_cutoffs.test"
-# cnvtype <- "DUP"
+# cnvtype <- "DEL"
 # max.cutoff <- 20
 # cutoff.step <- 0.05
 # fdr.target <- 0.00000385862
+# linear.fit <- T
 # flat.ladder <- T
 # plot.out <- "~/scratch/meta_cutoffs.test.png"
 
@@ -287,11 +311,18 @@ max.cutoffs <- get.cutoff.stat(cutoff.mat, "max")
 # Format & write output file matched to HPOs
 # df.out.mean <- get.adjusted.cutoffs(cutoff.mat, "mean", exclude.outliers=F)$df
 # df.out.mean.noOutliers <- get.adjusted.cutoffs(cutoff.mat, "mean", exclude.outliers=T)$df
-df.out.empirical.mean <- data.frame(unlist(as.character(mean.cutoffs$hpo)),
-                                    as.numeric(10^-mean.cutoffs$fdr.cutoff))
-colnames(df.out.empirical.mean) <- c("#hpo", "min_p")
+if(linear.fit==T){
+  # Compute flat weighted mean of all HPOs, if optioned
+  df.out.mean <- get.adjusted.cutoffs(cutoff.mat, "mean", exclude.outliers=F, 
+                                      linear.fit=linear.fit)$df
+}else{
+  # Otherwise, compute empirical mean for each HPO independently
+  df.out.mean <- data.frame(unlist(as.character(mean.cutoffs$hpo)),
+                                      as.numeric(10^-mean.cutoffs$fdr.cutoff))
+}
+colnames(df.out.mean) <- c("#hpo", "min_p")
 outfile.hpos <- paste(out.prefix, ".hpo_cutoffs.tsv", sep="")
-write.table(df.out.empirical.mean, outfile.hpos, sep="\t", quote=F,
+write.table(df.out.mean, outfile.hpos, sep="\t", quote=F,
             col.names=T, row.names=F)
 
 # Format & write output file against arbitrary sample size steps
@@ -310,18 +341,12 @@ write.table(df.out.ladder, outfile.ladder, sep="\t", quote=F,
 
 # Plot FDR data, if optioned
 if(!is.null(plot.out)){
-  # png(plot.out, res=300, height=5*300, width=6*300)
-  # par(mfrow=c(2, 2))
-  # plot.fdrs(cutoff.mat, mean.cutoffs, "Mean", fdr.target)
-  # plot.fdrs(cutoff.mat, median.cutoffs, "Median", fdr.target)
-  # plot.fdrs(cutoff.mat, q3.cutoffs, "Third quartile", fdr.target)
-  # plot.fdrs(cutoff.mat, max.cutoffs, "Max", fdr.target)
-  # dev.off()
+  plot.exp <- all(flat.ladder==F & linear.fit==F)
   png(plot.out, res=300, height=4*300, width=5*300)
   plot.fdrs(cutoff.mat, mean.cutoffs, "Mean", fdr.target, 
             title=paste(cnvtype, "Permutation Results for FDR =",
                         format(fdr.target, scientific=T, digits=3)),
-            plot.exp=!flat.ladder, floor=F)
+            linear.fit=linear.fit, plot.exp=plot.exp, floor=F)
   dev.off()
 }
 
