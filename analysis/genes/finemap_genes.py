@@ -280,7 +280,7 @@ def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2,
     return hpo_data
 
 
-def estimate_null_variance(hpo_data):
+def estimate_null_variance_basic(hpo_data):
     """
     Estimates null variance per phenotype from average of all significant genes
     """
@@ -288,7 +288,6 @@ def estimate_null_variance(hpo_data):
     vardict_all = {hpo : {} for hpo in hpo_data.keys()}
     vardict_sig = {hpo : [] for hpo in hpo_data.keys()}
     vardict_best = {hpo : [] for hpo in hpo_data.keys()}
-    vardict_final = {hpo : {} for hpo in hpo_data.keys()}
 
     for hpo, dat in hpo_data.items():
         
@@ -305,13 +304,33 @@ def estimate_null_variance(hpo_data):
             best_gene = sorted(bpvals, key=lambda x: x[1])[0][0]
             vardict_best[hpo].append(vardict_all[hpo][best_gene])
 
-    # Compute two null variance estimates for fine-mapping:
+    # Compute 2 null variance estimates for fine-mapping:
     # 1. Mean of all significant genes
     # 2. Mean of all top genes (one per block)
-    v1 = np.nanmean([x for l in vardict_sig.values() for x in l])
-    v2 = np.nanmean([x for l in vardict_best.values() for x in l])
+
+    v1 = np.nanmean([x for l in vardict_sig.values() for x in l if x > 0])
+    v2 = np.nanmean([x for l in vardict_best.values() for x in l if x > 0])
 
     return [v1, v2]
+
+
+def estimate_null_variance_gs(gs_lists, statslist):
+    """
+    Estimates null variance for all cases from the average of a list of known causal genes
+    """
+
+    # Read effect sizes per gene from highest level phenotype
+    stats = pd.read_csv(open(statslist).readline().rstrip().split('\t')[1], 
+                        delimiter='\t').loc[:, 'gene meta_lnOR'.split()]
+
+    # Iterate over lists of known causal genes and compute mean variance
+    var = []
+    for gslist in gs_lists:
+        gs_genes = open(gslist).read().splitlines()
+        gs_vars = (stats.meta_lnOR[stats.gene.isin(gs_genes)].astype(float) / 1.96) ** 2
+        var.append(float(np.nanmean(gs_vars)))
+
+    return var
 
 
 def update_finemap(hpo_data, W):
@@ -632,8 +651,12 @@ def main():
                         'logit glm. 0 = L1, 1 = L2, (0, 1) = elastic net. ' +
                         '[default: L2 regularization]', default=1)
     parser.add_argument('--distance', help='Distance to pad each significant gene ' +
-                        'prior to fine-mapping. [default: 500kb]', default=500000, 
+                        'prior to fine-mapping. [default: 1Mb]', default=1000000, 
                         type=int)
+    parser.add_argument('--known-causal-gene-lists', help='.tsv list of paths to ' +
+                        '.txt lists of known causal genes. Used for estimating null ' +
+                        'variance. Can be specified multiple times. [default: ' +
+                        'no known causal genes]', dest='gs_list')
     parser.add_argument('-o', '--outfile', default='stdout', help='Output tsv of ' +
                         'final fine-mapping results for significant genes and ' + 
                         'phenotypes.')
@@ -658,8 +681,16 @@ def main():
                              args.min_nominal, args.secondary_or_nom, 
                              args.distance)
 
-    # Estimate null variance based on most significant gene from each block
-    Wsq = estimate_null_variance(hpo_data)
+    # Estimate null variance based on:
+    #   1. most significant gene from each block
+    #   2. all significant genes
+    #   3. known causal genes (optional; can be multiple lists)
+    Wsq = estimate_null_variance_basic(hpo_data)
+    if args.gs_list is not None:
+        with open(args.gs_list) as gsf:
+            Wsq += estimate_null_variance_gs(gsf.read().splitlines(), args.statslist)
+    Wsq = sorted(Wsq)
+    print('Null variance estimates: ' + ', '.join([str(round(x, 3)) for x in Wsq]))
 
     # Update original finemapping results with re-estimated null variance
     hpo_data = update_finemap(hpo_data, np.nanmean(Wsq))

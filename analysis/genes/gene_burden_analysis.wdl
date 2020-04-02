@@ -30,6 +30,7 @@ workflow gene_burden_analysis {
   Int meta_nominal_cohorts_cutoff
   Float finemap_elnet_alpha
   Float finemap_elnet_l1_l2_mix
+  Int finemap_distance
   File finemap_genomic_features
   File finemap_expression_features
   File finemap_constraint_features
@@ -150,6 +151,7 @@ workflow gene_burden_analysis {
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         finemap_elnet_alpha=finemap_elnet_alpha,
         finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
+        finemap_distance=finemap_distance,
         finemap_output_label="genomic_features",
         gene_features=finemap_genomic_features,
         rCNV_bucket=rCNV_bucket
@@ -168,6 +170,7 @@ workflow gene_burden_analysis {
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         finemap_elnet_alpha=finemap_elnet_alpha,
         finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
+        finemap_distance=finemap_distance,
         finemap_output_label="expression_features",
         gene_features=finemap_expression_features,
         rCNV_bucket=rCNV_bucket
@@ -186,6 +189,7 @@ workflow gene_burden_analysis {
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         finemap_elnet_alpha=finemap_elnet_alpha,
         finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
+        finemap_distance=finemap_distance,
         finemap_output_label="constraint_features",
         gene_features=finemap_constraint_features,
         rCNV_bucket=rCNV_bucket
@@ -204,6 +208,7 @@ workflow gene_burden_analysis {
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         finemap_elnet_alpha=finemap_elnet_alpha,
         finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
+        finemap_distance=finemap_distance,
         finemap_output_label="merged_features",
         gene_features=finemap_merged_features,
         rCNV_bucket=rCNV_bucket
@@ -438,7 +443,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:fde16e782393b0e6319dc904e59137dcede0ec0d16e634ccb91a4b8de7a1565f"
+    docker: "talkowski/rcnv@sha256:3d448259a3a9a97630d7af11b0fac01d0a5c0b63ad6e15fe233b1cac78a715db"
     preemptible: 1
     memory: "32 GB"
     disks: "local-disk 275 HDD"
@@ -583,7 +588,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:fde16e782393b0e6319dc904e59137dcede0ec0d16e634ccb91a4b8de7a1565f"
+    docker: "talkowski/rcnv@sha256:3d448259a3a9a97630d7af11b0fac01d0a5c0b63ad6e15fe233b1cac78a715db"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -603,6 +608,7 @@ task finemap_genes {
   Int meta_nominal_cohorts_cutoff
   Float finemap_elnet_alpha
   Float finemap_elnet_l1_l2_mix
+  Int finemap_distance
   String finemap_output_label
   File gene_features
   String rCNV_bucket
@@ -614,22 +620,46 @@ task finemap_genes {
     find / -name "*gene_burden.${freq_code}.*.empirical_genome_wide_pval.hpo_cutoffs.tsv*" \
     | xargs -I {} mv {} ./
 
-    # Copy association stats from the project Google Bucket (note: requires permissions)
+    # Copy association stats & gene lists from the project Google Bucket (note: requires permissions)
     mkdir stats
     gsutil -m cp \
       ${rCNV_bucket}/analysis/gene_burden/**.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz \
       stats/
+    gsutil -m cp -r \
+      ${rCNV_bucket}/cleaned_data/genes/gene_lists \
+      ./
 
     # Write tsv input
     while read prefix hpo; do
       for wrapper in 1; do
         echo "$hpo"
         echo "stats/$prefix.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz"
-        awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' \
-          gene_burden.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv
+        awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' ${meta_p_cutoffs_tsv}
       done | paste -s
     done < ${phenotype_list} \
     > ${freq_code}.${CNV}.gene_fine_mapping.stats_input.tsv
+
+    # Make lists of a priori "true causal" genes for null variance estimation
+    case ${CNV} in
+      "DEL")
+        for wrapper in 1; do
+          echo "gene_lists/DDG2P.hmc_lof.genes.list"
+          echo "gene_lists/DDG2P.hmc_other.genes.list"
+          echo "gene_lists/ClinGen.hmc_haploinsufficient.genes.list"
+          echo "gene_lists/HP0000118.HPOdb.constrained.genes.list"
+          echo "gene_lists/gnomad.v2.1.1.lof_constrained.genes.list"
+        done > known_causal_gene_lists.tsv
+        ;;
+      "DUP")
+        for wrapper in 1; do
+          echo "gene_lists/DDG2P.all_gof.genes.list"
+          echo "gene_lists/DDG2P.hmc_other.genes.list"
+          echo "gene_lists/ClinGen.all_triplosensitive.genes.list"
+          echo "gene_lists/HP0000118.HPOdb.constrained.genes.list"
+          echo "gene_lists/gnomad.v2.1.1.lof_constrained.genes.list"
+        done > known_causal_gene_lists.tsv
+        ;;
+    esac
 
     # Run functional fine-mapping procedure
     /opt/rCNV2/analysis/genes/finemap_genes.py \
@@ -638,7 +668,8 @@ task finemap_genes {
       --secondary-or-nominal \
       --regularization-alpha ${finemap_elnet_alpha} \
       --regularization-l1-l2-mix ${finemap_elnet_l1_l2_mix} \
-      --distance 500000 \
+      --distance ${finemap_distance} \
+      --known-causal-gene-lists known_causal_gene_lists.tsv \
       --outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv \
       --all-genes-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.all_genes_from_blocks.tsv \
       --naive-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.tsv \
@@ -666,7 +697,7 @@ task finemap_genes {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:fde16e782393b0e6319dc904e59137dcede0ec0d16e634ccb91a4b8de7a1565f"
+    docker: "talkowski/rcnv@sha256:3d448259a3a9a97630d7af11b0fac01d0a5c0b63ad6e15fe233b1cac78a715db"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -857,7 +888,7 @@ task plot_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:fde16e782393b0e6319dc904e59137dcede0ec0d16e634ccb91a4b8de7a1565f"
+    docker: "talkowski/rcnv@sha256:3d448259a3a9a97630d7af11b0fac01d0a5c0b63ad6e15fe233b1cac78a715db"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

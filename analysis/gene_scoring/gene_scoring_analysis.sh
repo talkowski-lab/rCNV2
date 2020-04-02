@@ -26,10 +26,10 @@ phenotype_list="test_phenotypes.list"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 # gtf="genes/gencode.v19.canonical.gtf.gz"
 rCNV_bucket="gs://rcnv_project"
-theta0_del=1.167
-theta0_dup=0.778
-theta1=2.373
-var=1.467
+theta0_del=0.812
+theta0_dup=0.594
+theta1=1.620
+var=0.683
 prior=0.115
 gene_features="gencode.v19.canonical.pext_filtered.all_features.eigenfeatures.bed.gz"
 raw_gene_features="gencode.v19.canonical.pext_filtered.all_features.bed.gz"
@@ -45,6 +45,10 @@ mkdir stats && \
   gsutil -m cp -r \
     ${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/stats/**meta_analysis**bed.gz \
     ./stats/
+gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/${phenotype_list} ./
+gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/${metacohort_sample_table} ./
+gsutil -m cp ${rCNV_bucket}/cleaned_data/genes/metadata/${gene_features} ./
+gsutil -m cp ${rCNV_bucket}/cleaned_data/genes/metadata/${raw_gene_features} ./
 
 
 # Define list of high-confidence dosage-sensitive genes
@@ -109,10 +113,11 @@ gzip -f ${freq_code}.gene_scores.tsv
 #### Quality assessment of gene scores ####
 
 # Plot correlations of raw features vs scores
+mkdir gene_score_corplots
 /opt/rCNV2/analysis/gene_scoring/plot_score_feature_cors.R \
   ${freq_code}.gene_scores.tsv.gz \
   ${raw_gene_features} \
-  ${freq_code}.gene_scores.raw_feature_cors
+  gene_score_corplots/${freq_code}.gene_scores.raw_feature_cors
 
 # Make all gene truth sets
 gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes/gene_lists ./
@@ -204,5 +209,6 @@ mkdir ${freq_code}_gene_scoring_QC_plots/
   ${freq_code}.gene_scores.tsv.gz \
   DEL.roc_truth_sets.tsv \
   DUP.roc_truth_sets.tsv \
+  gold_standard.haplosufficient.genes.list \
   ${freq_code}_gene_scoring_QC_plots/${freq_code}_gene_score_qc
 

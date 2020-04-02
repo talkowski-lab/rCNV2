@@ -118,7 +118,7 @@ Estimating the number of independent tests performed across all windows, phenoty
 
 Instead, we targeted an "genome-wide" significance threshold of P ≤ 3.86x10<sup>-6</sup>, which corresonds to a Bonferroni correction if applied to the number of non-overlapping 200kb windows tested in our analysis.  
 
-We empirically determined the primary P-value threshold for each CNV type and phenotype that matched our desired genome-wide FDR as follows:  
+We empirically determined the primary P-value threshold for each CNV type that matched our desired genome-wide FDR as follows:  
 
 1. permute phenotype labels for all CNVs while matching on size (split by quantile) and CNV type (DEL/DUP);  
 2. rerun all association tests (described above), including meta-analysis, for each phenotype & CNV combination;   
@@ -127,7 +127,7 @@ We empirically determined the primary P-value threshold for each CNV type and ph
 
 Steps 1-3 were repeated 50 times for each CNV type and phenotype.  
 
-Following permutation, we computed the mean primary P-value threshold per phenotype and CNV type. We used this value to assess genome-wide significance of primary P-values for locus discovery.    
+Following permutation, we computed the mean primary P-value threshold per phenotype and CNV type, and subsequently computed the overall mean P-value threshold across all phenotypes weighted by the square root of the case sample size per phenotype. We used this overall mean P-value threshold to assess exome-wide significance of primary P-values for gene discovery.    
 
 #### Output files  
 

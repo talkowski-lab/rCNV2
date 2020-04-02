@@ -39,27 +39,30 @@ load.truth <- function(truth.in){
 }
 
 # Compute ROC
-roc <- function(stats, score, truth.genes, steps=seq(1, 0, -0.001)){
+roc <- function(stats, score, truth.genes, neg.genes, steps=seq(1, 0, -0.001)){
   x <- data.frame("score" = stats[, which(colnames(stats) == score)],
-                  "true" = stats$gene %in% truth.genes)
+                  "true" = stats$gene %in% truth.genes,
+                  "neg" = stats$gene %in% neg.genes)
   roc_res <- as.data.frame(t(sapply(steps, function(k){
     idxs <- which(x$score > k)
     ftrue <- length(which(x$true[idxs])) / length(which(x$true))
+    fneg <- length(which(x$neg[idxs])) / length(which(x$neg))
     fother <- length(which(!x$true[idxs])) / length(which(!x$true))
     fall <- length(idxs) / nrow(x)
-    return(c(k, fall, fother, ftrue))
+    return(c(k, fall, fother, ftrue, fneg))
   })))
-  colnames(roc_res) <- c("min_score", "frac_all", "frac_other", "frac_true")
+  colnames(roc_res) <- c("min_score", "frac_all", "frac_other", "frac_true", "frac_neg")
   return(roc_res)
 }
 
 # Compute PRC
-prc <- function(stats, score, truth.genes, steps=seq(1, 0, -0.001)){
+prc <- function(stats, score, truth.genes, neg.genes, steps=seq(1, 0, -0.001)){
   x <- data.frame("score" = stats[, which(colnames(stats) == score)],
-                  "true" = stats$gene %in% truth.genes)
+                  "true" = stats$gene %in% truth.genes,
+                  "neg" = stats$gene %in% neg.genes)
   prc_res <- as.data.frame(t(sapply(steps, function(k){
     idxs <- which(x$score > k)
-    prec <- length(which(x$true[idxs])) / length(idxs)
+    prec <- length(which(x$true[idxs])) / (length(which(x$true[idxs])) + length(which(x$neg[idxs])))
     recall <- length(which(x$true[idxs])) / length(which(x$true))
     fall <- length(idxs) / nrow(x)
     return(c(k, fall, prec, recall))
@@ -69,11 +72,11 @@ prc <- function(stats, score, truth.genes, steps=seq(1, 0, -0.001)){
 }
 
 # Wrapper to calculate all plotting data
-calc.plot.data <- function(stats, score, truth){
+calc.plot.data <- function(stats, score, truth, neg.genes){
   data <- lapply(1:length(truth), function(i){
-    roc.res <- roc(stats, score, truth[[i]]$truth.genes)
-    roc.auc <- flux::auc(roc.res$frac_other, roc.res$frac_true)
-    prc.res <- prc(stats, score, truth[[i]]$truth.genes)
+    roc.res <- roc(stats, score, truth[[i]]$truth.genes, neg.genes)
+    roc.auc <- flux::auc(roc.res$frac_neg, roc.res$frac_true)
+    prc.res <- prc(stats, score, truth[[i]]$truth.genes, neg.genes)
     prc.auc <- flux::auc(prc.res$recall, prc.res$precision)
     enrich.res <- data.frame("min_score"=roc.res$min_score,
                              "enrichment"=roc.res$frac_true / roc.res$frac_all)
@@ -97,7 +100,7 @@ plot.roc <- function(data, title="Receiver Operating Characteristic"){
   lorder <- order(-sapply(data, function(x){x$roc.auc}))
   sapply(rev(lorder), function(i){
     x <- data[[i]]
-    points(x$roc$frac_other, x$roc$frac_true,
+    points(x$roc$frac_neg, x$roc$frac_true,
            type="l", col=x$color, lwd=3)
   })
   legend("bottomright", pch=19, pt.cex=1.5, cex=0.75, bty="n",
@@ -105,8 +108,8 @@ plot.roc <- function(data, title="Receiver Operating Characteristic"){
          legend=paste(names(data), " (AUC=",
                       sapply(data, function(x){format(round(x$roc.auc, 2), nsmall=2)}),
                       ")", sep="")[lorder])
-  mtext(1, line=2, text="Fraction of other genes retained")
-  mtext(2, line=2, text="Fraction of true positives retained")
+  mtext(1, line=2, text="False positive rate")
+  mtext(2, line=2, text="True positive rate")
   mtext(3, line=0.1, text=title)
 }
 
@@ -130,8 +133,8 @@ plot.prc <- function(data, title="Precision/Recall"){
          legend=paste(names(data), " (AUC=",
                       sapply(data, function(x){format(round(x$prc.auc, 2), nsmall=2)}),
                       ")", sep="")[lorder])
-  mtext(1, line=2, text="Recall (true positives)")
-  mtext(2, line=2, text="Precision (true positives)")
+  mtext(1, line=2, text="Recall")
+  mtext(2, line=2, text="Precision")
   mtext(3, line=0.1, text=title)
 }
 
@@ -168,27 +171,29 @@ require(Hmisc, quietly=T)
 option_list <- list()
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage="%prog roc_input.tsv truth_genes.tsv out.prefix",
+args <- parse_args(OptionParser(usage="%prog scores.tsv del_truth.tsv dup_truth.tsv neg_genes.tsv out.prefix",
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Checks for appropriate positional arguments
-if(length(args$args) != 4){
-  stop("Three positional arguments: scores.tsv, del_truth.tsv, dup_truth.tsv, and out_prefix\n")
+if(length(args$args) != 5){
+  stop("Three positional arguments: scores.tsv, del_truth.tsv, dup_truth.tsv, neg_genes.tsv, and out_prefix\n")
 }
 
 # Writes args & opts to vars
 stats.in <- args$args[1]
 del_truth.in <- args$args[2]
 dup_truth.in <- args$args[3]
-out.prefix <- args$args[4]
+neg_genes.in <- args$args[4]
+out.prefix <- args$args[5]
 
 # # DEV PARAMTERS
 # setwd("~/scratch")
 # stats.in <- "rCNV.gene_scores.tsv.gz"
 # del_truth.in <- "DEL.roc_truth_sets.tsv"
 # dup_truth.in <- "DUP.roc_truth_sets.tsv"
+# neg_genes.in <- "gold_standard.haplosufficient.genes.list"
 # out.prefix <- "rCNV_gene_scoring_qc"
 
 # Read gene score stats
@@ -197,10 +202,11 @@ stats <- load.stats(stats.in)
 # Read truth sets
 del.truth <- load.truth(del_truth.in)
 dup.truth <- load.truth(dup_truth.in)
+neg.genes <- read.table(neg_genes.in, header=F)[, 1]
 
 # Compute plot stats for DEL & DUP
-del.data <- calc.plot.data(stats, "pHI", del.truth)
-dup.data <- calc.plot.data(stats, "pTS", dup.truth)
+del.data <- calc.plot.data(stats, "pHI", del.truth, neg.genes)
+dup.data <- calc.plot.data(stats, "pTS", dup.truth, neg.genes)
 
 # Generate all DEL/pHI plots
 pdf(paste(out.prefix, "pHI.roc.pdf", sep="."), height=4, width=4)
