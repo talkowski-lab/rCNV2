@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens per gene
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_gene_burden_perm_test/versions/5/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_gene_burden_perm_test/versions/6/plain-WDL/descriptor" as scattered_perm
 
 
 workflow gene_burden_analysis {
@@ -366,7 +366,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e218d978db38fba6c8ed9b17ad4d9d9820d73dbbc52e22b28d23f76fade15ab1"
+    docker: "talkowski/rcnv@sha256:fde16e782393b0e6319dc904e59137dcede0ec0d16e634ccb91a4b8de7a1565f"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -437,7 +437,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2a187ca67610a1d63555393721d4d29111e3c85160e904db6b912663a30ebb98"
+    docker: "talkowski/rcnv@sha256:fde16e782393b0e6319dc904e59137dcede0ec0d16e634ccb91a4b8de7a1565f"
     preemptible: 1
     memory: "32 GB"
     disks: "local-disk 275 HDD"
@@ -582,7 +582,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2a187ca67610a1d63555393721d4d29111e3c85160e904db6b912663a30ebb98"
+    docker: "talkowski/rcnv@sha256:fde16e782393b0e6319dc904e59137dcede0ec0d16e634ccb91a4b8de7a1565f"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -665,7 +665,7 @@ task finemap_genes {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2a187ca67610a1d63555393721d4d29111e3c85160e904db6b912663a30ebb98"
+    docker: "talkowski/rcnv@sha256:fde16e782393b0e6319dc904e59137dcede0ec0d16e634ccb91a4b8de7a1565f"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -856,7 +856,7 @@ task plot_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2a187ca67610a1d63555393721d4d29111e3c85160e904db6b912663a30ebb98"
+    docker: "talkowski/rcnv@sha256:fde16e782393b0e6319dc904e59137dcede0ec0d16e634ccb91a4b8de7a1565f"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
