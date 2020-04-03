@@ -84,13 +84,13 @@ opts <- args$options
 
 # Checks for appropriate positional arguments
 if(length(args$args) != 2){
-  stop("Three positional arguments: freq_matrix.bed.gz and outfile.bedx\n")
+  stop("Two positional arguments: freq_matrix.bed.gz and outfile.bed\n")
 }
 
 # Writes args & opts to vars
 freq.in <- args$args[1]
 outbed <- args$args[2]
-min.diff <- opts$`max-diff`
+min.diff <- opts$`min-diff`
 min.top <- opts$`min-top`
 max.mean <- opts$`max-mean`
 
