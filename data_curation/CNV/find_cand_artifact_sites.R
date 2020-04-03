@@ -21,7 +21,7 @@ options(stringsAsFactors=F, scipen=1000)
 # Read frequency matrix & filter to bins with at least one cohort above min.top
 read.freqs <- function(freq.in, min.top=0.01, max.mean=0.05){
   x <- read.table(freq.in, sep="\t", header=T)
-  cat(paste(prettyNum(nrow(x), big.mark=","), "total bins"))
+  cat(paste(prettyNum(nrow(x), big.mark=","), "total bins\n"))
   # Find bins with top > min.top
   rowmax <- apply(x[, -c(1:3)], 1, max, na.rm=T)
   pass <- which(rowmax>=min.top)
@@ -29,7 +29,7 @@ read.freqs <- function(freq.in, min.top=0.01, max.mean=0.05){
               prettyNum(nrow(x), big.mark=","), " bins ",
               "(", round(100*length(pass)/nrow(x), 1), 
               "%) with at least one platform above ",
-              round(100*min.top, 1), "% frequency", sep=""))
+              round(100*min.top, 1), "% frequency\n", sep=""))
   x <- x[pass, ]
   # Find bins with mean < max.mean
   rowmean <- apply(x[, -c(1:3)], 1, mean, na.rm=T)
@@ -38,7 +38,7 @@ read.freqs <- function(freq.in, min.top=0.01, max.mean=0.05){
               prettyNum(nrow(x), big.mark=","), " bins ",
               "(", round(100*length(pass2)/nrow(x), 1), 
               "%) with mean platform frequency below ",
-              round(100*max.mean, 1), "% frequency", sep=""))
+              round(100*max.mean, 1), "% frequency\n", sep=""))
   x[pass2, ]
 }
 
@@ -55,7 +55,7 @@ find.arts <- function(x, min.diff=0.01){
               prettyNum(nrow(x), big.mark=","), " bins ",
               "(", round(100*length(pass3)/nrow(x), 1), 
               "%) where absolute difference between top platform and mean platform freq is above ",
-              round(100*min.diff, 1), "% frequency", sep=""))
+              round(100*min.diff, 1), "% frequency\n", sep=""))
   x[pass3, 1:3]
 }
 
