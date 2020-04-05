@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens in sliding windows, genome-wide
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/16/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/17/plain-WDL/descriptor" as scattered_perm
 
 
 workflow sliding_window_analysis {
@@ -31,6 +31,9 @@ workflow sliding_window_analysis {
   Int refine_max_cnv_size
   File contigfile
   String rCNV_bucket
+  String fisher_cache_string
+  String perm_cache_string
+  String meta_cache_string
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
 
@@ -53,7 +56,8 @@ workflow sliding_window_analysis {
         p_cutoff=p_cutoff,
         max_manhattan_phred_p=max_manhattan_phred_p,
         rCNV_bucket=rCNV_bucket,
-        prefix=pheno[0]
+        prefix=pheno[0],
+        cache_string=fisher_cache_string
     }
 
     # Permute phenotypes to estimate empirical FDR
@@ -70,7 +74,8 @@ workflow sliding_window_analysis {
         n_pheno_perms=n_pheno_perms,
         meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
-        prefix=pheno[0]
+        prefix=pheno[0],
+        cache_string=perm_cache_string
     }
   }
   
@@ -121,7 +126,8 @@ workflow sliding_window_analysis {
         max_manhattan_phred_p=max_manhattan_phred_p,
         meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
-        prefix=pheno[0]
+        prefix=pheno[0],
+        cache_string=meta_cache_string
     }
   }
 
@@ -233,6 +239,7 @@ task burden_test {
   Int max_manhattan_phred_p
   String rCNV_bucket
   String prefix
+  String cache_string
 
   command <<<
     set -e
@@ -333,6 +340,8 @@ task burden_test {
       "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/"
     gsutil -m cp *.sliding_window.*.png \
       "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/plots/"
+
+    echo "${cache_string}" > completion.txt
   >>>
 
   runtime {
@@ -345,6 +354,7 @@ task burden_test {
   output {
     Array[File] stats_beds = glob("*.sliding_window.stats.bed.gz")
     Array[File] stats_bed_idxs = glob("*.sliding_window.stats.bed.gz.tbi")
+    File completion_token = "completion.txt"
     # Array[File] plots = glob("*.sliding_window.*.png")
   }
 }
@@ -411,7 +421,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3d448259a3a9a97630d7af11b0fac01d0a5c0b63ad6e15fe233b1cac78a715db"
+    docker: "talkowski/rcnv@sha256:6519871cadff358c95c52f0b443ce4197089ec1d881178c0ada97f1744e4cc2b"
     preemptible: 1
     memory: "32 GB"
     disks: "local-disk 275 HDD"
@@ -439,6 +449,7 @@ task meta_analysis {
   String meta_model_prefix
   String rCNV_bucket
   String prefix
+  String cache_string
 
   command <<<
     set -e
@@ -543,7 +554,7 @@ task meta_analysis {
       "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/plots/"
 
     # Must delocalize completion marker to prevent caching of final step
-    echo "DONE" > completion.txt
+    echo "${cache_string}" > completion.txt
   >>>
 
   output {
@@ -551,7 +562,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3d448259a3a9a97630d7af11b0fac01d0a5c0b63ad6e15fe233b1cac78a715db"
+    docker: "talkowski/rcnv@sha256:6519871cadff358c95c52f0b443ce4197089ec1d881178c0ada97f1744e4cc2b"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -681,7 +692,7 @@ task prep_refinement {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3d448259a3a9a97630d7af11b0fac01d0a5c0b63ad6e15fe233b1cac78a715db"
+    docker: "talkowski/rcnv@sha256:6519871cadff358c95c52f0b443ce4197089ec1d881178c0ada97f1744e4cc2b"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -777,7 +788,7 @@ task refine_regions {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3d448259a3a9a97630d7af11b0fac01d0a5c0b63ad6e15fe233b1cac78a715db"
+    docker: "talkowski/rcnv@sha256:6519871cadff358c95c52f0b443ce4197089ec1d881178c0ada97f1744e4cc2b"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -837,7 +848,7 @@ task merge_refinements {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3d448259a3a9a97630d7af11b0fac01d0a5c0b63ad6e15fe233b1cac78a715db"
+    docker: "talkowski/rcnv@sha256:6519871cadff358c95c52f0b443ce4197089ec1d881178c0ada97f1744e4cc2b"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -872,7 +883,7 @@ task plot_region_summary {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3d448259a3a9a97630d7af11b0fac01d0a5c0b63ad6e15fe233b1cac78a715db"
+    docker: "talkowski/rcnv@sha256:6519871cadff358c95c52f0b443ce4197089ec1d881178c0ada97f1744e4cc2b"
     preemptible: 1
   }
 }

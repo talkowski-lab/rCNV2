@@ -22,6 +22,10 @@ workflow scattered_sliding_window_perm_test {
   String meta_model_prefix
   String rCNV_bucket
   String prefix
+  String cache_string
+  # Note: passing cache_string as a WDL variable is required to manually 
+  # override caching since rCNV data is drawn directly from GCP bucket (and not)
+  # read as WDL input
 
 	scatter ( idx in range(n_pheno_perms) ) {
 	  call permuted_burden_test as rCNV_perm_test {
@@ -37,7 +41,8 @@ workflow scattered_sliding_window_perm_test {
         meta_model_prefix=meta_model_prefix,
 	      perm_idx=idx,
 	      rCNV_bucket=rCNV_bucket,
-	      prefix=prefix
+	      prefix=prefix,
+        cache_string=cache_string
 	  }
 	}
 
@@ -61,6 +66,7 @@ task permuted_burden_test {
   Int perm_idx
   String rCNV_bucket
   String prefix
+  String cache_string
 
   command <<<
     set -e
@@ -166,17 +172,18 @@ task permuted_burden_test {
         "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/permutations/"
 
     done
-    echo "Done" > complete.txt
+    echo "${cache_string}" > complete.txt
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:fde16e782393b0e6319dc904e59137dcede0ec0d16e634ccb91a4b8de7a1565f"
+    docker: "talkowski/rcnv@sha256:6519871cadff358c95c52f0b443ce4197089ec1d881178c0ada97f1744e4cc2b"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
   }
 
   # Note: must delocalize _something_ otherwise Cromwell will bypass this step
+
   output {
     File completion_marker = "complete.txt"
   }

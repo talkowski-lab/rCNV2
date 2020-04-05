@@ -25,6 +25,10 @@ workflow scattered_gene_burden_perm_test {
   String meta_model_prefix
   String rCNV_bucket
   String prefix
+  String cache_string
+  # Note: passing cache_string as a WDL variable is required to manually 
+  # override caching since rCNV data is drawn directly from GCP bucket (and not)
+  # read as WDL input
 
   scatter ( idx in range(n_pheno_perms) ) {
     call permuted_burden_test as rCNV_perm_test {
@@ -43,7 +47,8 @@ workflow scattered_gene_burden_perm_test {
         meta_model_prefix=meta_model_prefix,
         perm_idx=idx,
         rCNV_bucket=rCNV_bucket,
-        prefix=prefix
+        prefix=prefix,
+        cache_string=cache_string
     }
   }
 
@@ -70,6 +75,7 @@ task permuted_burden_test {
   Int perm_idx
   String rCNV_bucket
   String prefix
+  String cache_string
 
   command <<<
     set -e
@@ -198,7 +204,7 @@ task permuted_burden_test {
         "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/permutations/"
 
     done
-    echo "Done" > complete.txt
+    echo "${cache_string}" > complete.txt
   >>>
 
   runtime {

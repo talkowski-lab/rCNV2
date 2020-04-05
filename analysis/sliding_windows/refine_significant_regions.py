@@ -1227,8 +1227,8 @@ def main():
     parser.add_argument('--cnv-type', help='Type of CNVs to evaluate. [default: ' + 
                         'use all CNVs]', choices=['CNV', 'DEL', 'DUP'], 
                         default='CNV')
-    parser.add_argument('--model', help='Meta-analysis model to use. [default: "re"]', 
-                        default='re', choices=['mh', 're'])
+    parser.add_argument('--model', help='Meta-analysis model to use. [default: "fe"]', 
+                        default='fe', choices=['mh', 're', 'fe'])
     parser.add_argument('--hpo-p-cutoffs', help='.tsv of p-value cutoffs per phenotype. ' + 
                         '[default: 10e-8 for all phenotypes]')
     parser.add_argument('--p-cutoff-ladder', help='.tsv of p-value cutoffs for a ' + 

@@ -139,7 +139,8 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
     stats_dict = {}
 
     for chrom, start, end, gene, n_nominal, top_cohort, lnOR, lnOR_lower, \
-        lnOR_upper, zscore, primary_p, secondary_p in reader:
+        lnOR_upper, zscore, primary_p, secondary_lnOR, secondary_lnOR_lower, \
+        secondary_lnOR_upper, secondary_zscore, secondary_p in reader:
 
         # Skip header line
         if chrom.startswith('#'):

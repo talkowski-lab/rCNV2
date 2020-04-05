@@ -348,6 +348,10 @@ meta <- function(stats.merged, cohorts, model="fe", saddle=T, secondary=T){
       meta.res.secondary$meta_phred_p <- saddlepoint.adj(meta.res.secondary$meta_z)
     }
     
+    meta.res$meta_lnOR_secondary <- meta.res.secondary$meta_lnOR
+    meta.res$meta_lnOR_lower_secondary <- meta.res.secondary$meta_lnOR_lower
+    meta.res$meta_lnOR_upper_secondary <- meta.res.secondary$meta_lnOR_upper
+    meta.res$meta_z_secondary <- meta.res.secondary$meta_z
     meta.res$meta_phred_p_secondary <- meta.res.secondary$meta_phred_p
   }
   
