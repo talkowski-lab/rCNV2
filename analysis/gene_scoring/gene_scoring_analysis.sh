@@ -23,7 +23,7 @@ freq_code="rCNV"
 CNV="DEL"
 phenotype_list="test_phenotypes.list"
 # metacohort_list="refs/rCNV_metacohort_list.txt"
-metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
+metacohort_sample_table="HPOs_by_metacohort.table.tsv"
 # gtf="genes/gencode.v19.canonical.gtf.gz"
 rCNV_bucket="gs://rcnv_project"
 theta0_del=0.812
@@ -92,20 +92,45 @@ for CNV in DEL DUP; do
     --outfile ${freq_code}.$CNV.gene_abfs.tsv \
     stats/${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed.gz
 
-  # Score all genes
-  /opt/rCNV2/analysis/gene_scoring/score_genes.py \
-    --regularization-alpha ${elnet_alpha} \
-    --regularization-l1-l2-mix ${elnet_l1_l2_mix} \
-    --outfile ${freq_code}.$CNV.gene_scores.tsv \
+  # Score all genes for each candidate model
+  for model in logit svm randomforest lda naivebayes sgd; do
+    /opt/rCNV2/analysis/gene_scoring/score_genes.py \
+      --model ${model} \
+      --regularization-alpha ${elnet_alpha} \
+      --regularization-l1-l2-mix ${elnet_l1_l2_mix} \
+      --outfile ${freq_code}.$CNV.gene_scores.${model}.tsv \
+      ${freq_code}.$CNV.gene_abfs.tsv \
+      ${gene_features}
+  done
+
+  # Compare models, and manually evaluate to determine best model
+  compdir=${freq_code}_"$CNV"_model_comparisons
+  if ! [ -e $compdir ]; then
+    mkdir $compdir
+  fi
+  for wrapper in 1; do
+    for model in logit svm randomforest lda naivebayes sgd; do
+      echo $model
+      echo ${freq_code}.$CNV.gene_scores.${model}.tsv
+    done | paste - -
+  done > ${freq_code}.$CNV.model_evaluation.input.tsv
+  /opt/rCNV2/analysis/gene_scoring/compare_models.R \
+    ${freq_code}.$CNV.model_evaluation.input.tsv \
     ${freq_code}.$CNV.gene_abfs.tsv \
-    ${gene_features}
+    gold_standard.haploinsufficient.genes.list \
+    gold_standard.haplosufficient.genes.list \
+    $compdir/${freq_code}_"$CNV"_model_comparison
 done
+
+
+# Manually assign best model
+best_model="logit"
 
 
 # Merge scores
 /opt/rCNV2/analysis/gene_scoring/merge_del_dup_scores.R \
-  ${freq_code}.DEL.gene_scores.tsv \
-  ${freq_code}.DUP.gene_scores.tsv \
+  ${freq_code}.DEL.gene_scores.${best_model}.tsv \
+  ${freq_code}.DUP.gene_scores.${best_model}.tsv \
   ${freq_code}.gene_scores.tsv
 gzip -f ${freq_code}.gene_scores.tsv
 

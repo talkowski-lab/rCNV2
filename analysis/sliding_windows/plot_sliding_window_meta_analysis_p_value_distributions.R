@@ -65,7 +65,7 @@ sig.pairs.idx <- which(-log10(pairs$p)>6 & pairs$s<0.05)
 png("~/scratch/rCNV.primary_vs_secondary_pvalues.png", height=300*5, width=300*5, res=300)
 plot(-log10(pairs$p), -log10(pairs$s), cex=0.2,
      panel.first=c(abline(0, 1, lty=2, col="gray50")),
-     xlim=c(0, 40), ylim=c(0, 40),
+     xlim=c(0, 20), ylim=c(0, 20),
      xlab="-log10(P) Primary", ylab="-log10(P) Secondary",
      main="Primary vs. Secondary P-Values\nAll phenotypes & all CNV types")
 points(-log10(pairs$p)[sig.pairs.idx], -log10(pairs$s)[sig.pairs.idx], 

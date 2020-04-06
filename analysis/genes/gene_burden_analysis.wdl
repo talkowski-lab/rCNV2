@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens per gene
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_gene_burden_perm_test/versions/8/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_gene_burden_perm_test/versions/9/plain-WDL/descriptor" as scattered_perm
 
 
 workflow gene_burden_analysis {
@@ -107,20 +107,20 @@ workflow gene_burden_analysis {
         p_val_column_name="meta_phred_p"
     }
 
-    # Genome-wide, secondary
-    call calc_meta_p_cutoff as calc_genome_wide_cutoffs_secondary {
-      input:
-        phenotype_list=phenotype_list,
-        metacohort_sample_table=metacohort_sample_table,
-        freq_code="rCNV",
-        CNV=cnv,
-        n_pheno_perms=n_pheno_perms,
-        fdr_target=p_cutoff,
-        rCNV_bucket=rCNV_bucket,
-        dummy_completion_markers=rCNV_perm_test.completion_marker,
-        fdr_table_suffix="empirical_genome_wide_pval_secondary",
-        p_val_column_name="meta_phred_p_secondary"
-    }
+    # # Genome-wide, secondary
+    # call calc_meta_p_cutoff as calc_genome_wide_cutoffs_secondary {
+    #   input:
+    #     phenotype_list=phenotype_list,
+    #     metacohort_sample_table=metacohort_sample_table,
+    #     freq_code="rCNV",
+    #     CNV=cnv,
+    #     n_pheno_perms=n_pheno_perms,
+    #     fdr_target=p_cutoff,
+    #     rCNV_bucket=rCNV_bucket,
+    #     dummy_completion_markers=rCNV_perm_test.completion_marker,
+    #     fdr_table_suffix="empirical_genome_wide_pval_secondary",
+    #     p_val_column_name="meta_phred_p_secondary"
+    # }
   }
 
   # Perform meta-analysis of rCNV association statistics
@@ -380,7 +380,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:fde16e782393b0e6319dc904e59137dcede0ec0d16e634ccb91a4b8de7a1565f"
+    docker: "talkowski/rcnv@sha256:93ec0fee2b0ad415143eda627c2b3c8d2e1ef3c8ff4d3d620767637614fee5f8"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -453,7 +453,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:6519871cadff358c95c52f0b443ce4197089ec1d881178c0ada97f1744e4cc2b"
+    docker: "talkowski/rcnv@sha256:93ec0fee2b0ad415143eda627c2b3c8d2e1ef3c8ff4d3d620767637614fee5f8"
     preemptible: 1
     memory: "32 GB"
     disks: "local-disk 275 HDD"
@@ -599,7 +599,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:6519871cadff358c95c52f0b443ce4197089ec1d881178c0ada97f1744e4cc2b"
+    docker: "talkowski/rcnv@sha256:93ec0fee2b0ad415143eda627c2b3c8d2e1ef3c8ff4d3d620767637614fee5f8"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -709,7 +709,7 @@ task finemap_genes {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:6519871cadff358c95c52f0b443ce4197089ec1d881178c0ada97f1744e4cc2b"
+    docker: "talkowski/rcnv@sha256:93ec0fee2b0ad415143eda627c2b3c8d2e1ef3c8ff4d3d620767637614fee5f8"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -900,7 +900,7 @@ task plot_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:6519871cadff358c95c52f0b443ce4197089ec1d881178c0ada97f1744e4cc2b"
+    docker: "talkowski/rcnv@sha256:93ec0fee2b0ad415143eda627c2b3c8d2e1ef3c8ff4d3d620767637614fee5f8"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

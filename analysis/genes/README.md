@@ -37,10 +37,8 @@ We considered a CNV to overlap a gene based on its CDS overlap and CNV type, as 
 
 | CNV type | Min. CDS overlap | Rationale |  
 | :--- | ---: | :--- |  
-| DEL | ≥5% | Most coding deletions should result in loss-of-function, but we wanted to impose a liberal minimum overlap to protect against spurious annotations given the coarse resolution of most microarrays. |  
-| DUP | ≥80% | Functional annotation of duplications is more challenging than deletions, so we imposed a stricter CDS overlap to isolate CNVs predicted to duplicate nearly all of a gene.  |  
-
-Finally, given that CNV breakpoint precision varies by locus, platform, and CNV calling algorithm, we systematically extended the breakpoints of each control CNV by +50kb. CNV breakpoints in cases were **not** extended. We did this to conservatively protect against spurrious associations arising from situations where control CNVs breakpoints might be underestimated compared to case breakpoints.  
+| DEL | ≥10% | Most coding deletions should result in loss-of-function, but we wanted to impose a liberal minimum overlap to protect against spurious annotations given the coarse resolution of most microarrays. |  
+| DUP | ≥75% | Functional annotation of duplications is more challenging than deletions, so we imposed a stricter CDS overlap to isolate CNVs predicted to duplicate nearly all of a gene.  |  
 
 ### 2. Calculate burden statistics between cases & controls  
 

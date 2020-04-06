@@ -10,14 +10,21 @@ Fit model & score dosage sensitivity for all genes based on BFDP
 """
 
 
+model_options = 'logit svm randomforest lda naivebayes sgd'.split()
+
+
 from os import path
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import scale
+from sklearn.preprocessing import scale, StandardScaler
 from statsmodels.genmod.generalized_linear_model import GLM
 from statsmodels.genmod import families
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier as RFC
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDAC
+from sklearn.naive_bayes import GaussianNB as GNBC
+from sklearn.linear_model import SGDClassifier as SGDC
 from scipy.stats import norm
-# from statsmodels.stats.multitest import multipletests as padjust
 import argparse
 from sys import stdout
 
@@ -64,9 +71,9 @@ def pair_chroms(sumstats, chroms, quiet=False):
     return chrompairs
 
 
-def load_features(features_in, sumstats):
+def load_features(features_in):
     """
-    Load gene features, standardize, and subset to genes present in any gene block
+    Load & standardize gene features
     """
 
     # Read data & drop coordinates
@@ -75,17 +82,22 @@ def load_features(features_in, sumstats):
         if colname in features.columns:
             features.drop(labels=colname, axis=1, inplace=True)
 
-    # Fill missing values with column-wise means and normalize
+    # Fill missing values with column-wise means
     for col in features.columns.tolist()[1:]:
         missing = (features[col] == '.')
         if missing.sum() > 0:
             fmean = np.nanmean(features.loc[~missing, col].astype(float))
             features.loc[missing, col] = fmean
-    features.iloc[:, 1:] = scale(features.iloc[:, 1:])
 
     # Move gene name to row index
     features.set_axis(features.gene, axis=0, inplace=True)
     features.drop(labels='gene', axis=1, inplace=True)
+
+    # Apply sklearn standard normalization to features
+    scaler = StandardScaler().fit(features)
+    scaled_features = pd.DataFrame(scaler.transform(features),
+                                   columns=features.columns,
+                                   index=features.index)
 
     return features
 
@@ -100,9 +112,10 @@ def rmse(pairs):
     return np.sqrt(np.sum(mse) / len(pairs))
 
 
-def fit_model(features, sumstats, train_pairs, test_pairs, logit_alpha, l1_l2_mix):
+def fit_model(features, sumstats, train_pairs, test_pairs, model='logit', 
+              logit_alpha=0.1, l1_l2_mix=1):
     """
-    Fit glm to genes on train_chroms and calculate RMSE on test_chroms
+    Fit classifier to genes on train_chroms and calculate RMSE on test_chroms
     Note: train_pairs and test_pairs are tuples of chromosome names
     """
 
@@ -119,35 +132,60 @@ def fit_model(features, sumstats, train_pairs, test_pairs, logit_alpha, l1_l2_mi
 
     # Join sumstats with features for logistic regression, subset to 
     # chromosomes of interest, and drop genes with NaN bfdps
-    logit_df = sumstats.merge(features, how='left', left_index=True, 
+    full_df = sumstats.merge(features, how='left', left_index=True, 
                               right_index=True)
-    logit_df = logit_df.loc[logit_df.chrom.isin(allchroms), :].dropna()
-    train_df = logit_df.loc[logit_df.chrom.isin(trainchroms), :].\
+    full_df = full_df.loc[full_df.chrom.isin(allchroms), :].dropna()
+    train_df = full_df.loc[full_df.chrom.isin(trainchroms), :].\
                    drop(labels='chrom', axis=1)
-    test_df = logit_df.loc[logit_df.chrom.isin(testchroms), :].\
+    test_df = full_df.loc[full_df.chrom.isin(testchroms), :].\
                   drop(labels='chrom', axis=1)
 
-    # Fit logit GLM & predict on test set
-    glm = GLM(train_df.bfdp, train_df.drop(labels='bfdp', axis=1),
-              family=families.Binomial())
-    if logit_alpha is None:
-        logit = glm.fit()
+    # Fit according to specified model
+    if model == 'logit':
+        # Fit logit GLM & predict on test set
+        glm = GLM(train_df.bfdp, train_df.drop(labels='bfdp', axis=1),
+                  family=families.Binomial())
+        if logit_alpha is None:
+            fitted_model = glm.fit()
+        else:
+            fitted_model = glm.fit_regularized(L1_wt = 1 - l1_l2_mix, alpha=logit_alpha)
+        test_bfdps = fitted_model.predict(test_df.drop(labels='bfdp', axis=1))
+        test_bfdps.name = 'pred'
+
     else:
-        logit = glm.fit_regularized(L1_wt = 1 - l1_l2_mix, alpha=logit_alpha)
-    test_bfdps = logit.predict(test_df.drop(labels='bfdp', axis=1))
-    test_bfdps.name = 'pred'
+        # Instantiate classifier, depending on model
+        if model == 'svm':
+            classifier = SVC(random_state=0, max_iter=10000, probability=True, 
+                             class_weight='balanced', kernel='linear')
+        elif model == 'randomforest':
+            classifier = RFC(random_state=0)
+        elif model == 'lda':
+            classifier = LDAC()
+        elif model == 'naivebayes':
+            classifier = GNBC()
+        elif model == 'sgd':
+            classifier = SGDC(loss='log', l1_ratio=1 - l1_l2_mix, max_iter=10000,
+                              random_state=0, class_weight='balanced')
+
+        # Fit sklearn model & predict on test set
+        fitted_model = classifier.fit(train_df.drop(labels='bfdp', axis=1), 
+                                      np.round(train_df.bfdp))
+        test_bfdps = pd.Series(fitted_model.predict_proba(test_df.drop(labels='bfdp', axis=1))[:, 1],
+                               name='pred', index=test_df.index)
+        
 
     # Compute RMSE of bfdps for test set
     test_vals = test_df.merge(test_bfdps, left_index=True, right_index=True).\
                     loc[:, 'bfdp pred'.split()]
     test_rmse = rmse(test_vals.to_records(index=False))
 
-    return logit, test_rmse
+    return fitted_model, test_rmse
 
 
-def fit_model_cv(features, sumstats, all_pairs, logit_alpha, l1_l2_mix):
+def fit_model_cv(features, sumstats, all_pairs, model='logit', logit_alpha=0.1, 
+                 l1_l2_mix=1):
     """
-    Fit glm with N-fold CV 
+    Fit model with N-fold CV 
     """
 
     models = []
@@ -155,8 +193,8 @@ def fit_model_cv(features, sumstats, all_pairs, logit_alpha, l1_l2_mix):
         train_pairs = [x for k, x in enumerate(all_pairs) if k != i]
         test_pairs = all_pairs[i]
         model_fit, test_rmse = \
-            fit_model(features, sumstats, train_pairs, test_pairs, logit_alpha, 
-                      l1_l2_mix)
+            fit_model(features, sumstats, train_pairs, test_pairs, model, 
+                      logit_alpha, l1_l2_mix)
         models.append((test_rmse, model_fit))
 
     best_rmse, best_model = \
@@ -165,7 +203,8 @@ def fit_model_cv(features, sumstats, all_pairs, logit_alpha, l1_l2_mix):
     return best_model, best_rmse
 
 
-def predict_bfdps(features, sumstats, chrompairs, logit_alpha, l1_l2_mix, quiet=False):
+def predict_bfdps(features, sumstats, chrompairs, model='logit', logit_alpha=0.1, 
+                  l1_l2_mix=1, quiet=False):
     """
     Predicts bfdps for all genes with N-fold CV
     """
@@ -183,12 +222,16 @@ def predict_bfdps(features, sumstats, chrompairs, logit_alpha, l1_l2_mix, quiet=
             print(msg.format(len(pred_genes), pred_chroms[0], pred_chroms[1]))
         
         # Fit model
-        model, rmse = fit_model_cv(features, sumstats, train_pairs, logit_alpha, 
-                                   l1_l2_mix)
+        fitted_model, rmse = fit_model_cv(features, sumstats, train_pairs, model, 
+                                   logit_alpha, l1_l2_mix)
 
         # Predict bfdps
         pred_df = features.loc[features.index.isin(pred_genes), :]
-        pred_vals = model.predict(pred_df)
+        if model == 'logit':
+            pred_vals = fitted_model.predict(pred_df)
+        else:
+            pred_class_probs = fitted_model.predict_proba(pred_df)
+            pred_vals = pd.Series(pred_class_probs[:, 1], name='pred', index=pred_df.index)
         pred_vals.name = 'pred_bfdp'
         pred_bfdps.update(pred_vals)
 
@@ -198,9 +241,6 @@ def predict_bfdps(features, sumstats, chrompairs, logit_alpha, l1_l2_mix, quiet=
     # Compute final gene score as pnorm from Z-score of pred_bfdps
     pred_bfdps['score'] = norm.sf(scale(pred_bfdps.pred_bfdp))
     pred_bfdps['quantile'] = 100 * pred_bfdps.pred_bfdp.transform('rank') / len(pred_bfdps)
-
-    # # Compute Q-value as B-H FDR adjusted score
-    # pred_bfdps['fdr'] = padjust(1 - pred_bfdps['score'], method='fdr_bh')[1]
     
     return pred_bfdps
 
@@ -216,6 +256,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('stats', help='.tsv of stats with bfdp per gene.')
     parser.add_argument('features', help='.bed.gz of functional features per gene.')
+    parser.add_argument('-m', '--model', choices=model_options, default='logit',
+                        help='Choice of classifier. [default: logit]')
     parser.add_argument('--regularization-alpha', dest='logit_alpha', type=float,
                         help='Regularization penalty weight for logit glm. Must ' +
                         'be in ~ [0, 1]. [default: no regularization]', default=0.1)
@@ -241,13 +283,13 @@ def main():
     chrompairs = pair_chroms(sumstats, chroms)
 
     # Read gene features
-    features = load_features(args.features, sumstats)
+    features = load_features(args.features)
 
     # Predict bfdps for all genes
-    pred_bfdps = predict_bfdps(features, sumstats, chrompairs, args.logit_alpha, 
-                               args.l1_l2_mix)
+    pred_bfdps = predict_bfdps(features, sumstats, chrompairs, args.model, 
+                               args.logit_alpha, args.l1_l2_mix)
 
-    # DEV: write pred_bfdps out to file to decide how to handle quantile norm
+    # Write predicted BFDPs to outfile, along with scaled score & quantile
     pred_bfdps.to_csv(outfile, sep='\t', index=True, na_rep='NA')
 
 
