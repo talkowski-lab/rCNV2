@@ -523,6 +523,7 @@ esac
 
 # Run functional fine-mapping procedure
 /opt/rCNV2/analysis/genes/finemap_genes.py \
+  --cnv ${CNV} \
   --secondary-p-cutoff ${meta_secondary_p_cutoff} \
   --min-nominal ${meta_nominal_cohorts_cutoff} \
   --secondary-or-nominal \
@@ -531,10 +532,27 @@ esac
   --distance ${finemap_distance} \
   --known-causal-gene-lists known_causal_gene_lists.tsv \
   --outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv \
+  --sig-loci-bed ${freq_code}.${CNV}.final_genes.loci.bed \
+  --sig-assoc-bed ${freq_code}.${CNV}.final_genes.associations.bed \
   --all-genes-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.all_genes_from_blocks.tsv \
   --naive-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.tsv \
   --genetic-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.${finemap_output_label}.tsv \
   --coeffs-out ${freq_code}.${CNV}.gene_fine_mapping.logit_coeffs.${finemap_output_label}.tsv \
+  ${freq_code}.${CNV}.gene_fine_mapping.stats_input.tsv \
+  ${gene_features}
+
+# Repeat functional fine-mapping with secondary association stats (for supplement)
+/opt/rCNV2/analysis/genes/finemap_genes.py \
+  --secondary-p-cutoff ${meta_secondary_p_cutoff} \
+  --min-nominal ${meta_nominal_cohorts_cutoff} \
+  --secondary-or-nominal \
+  --regularization-alpha ${finemap_elnet_alpha} \
+  --regularization-l1-l2-mix ${finemap_elnet_l1_l2_mix} \
+  --distance ${finemap_distance} \
+  --known-causal-gene-lists known_causal_gene_lists.tsv \
+  --finemap-secondary \
+  --outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.secondary.tsv \
+  --all-genes-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.all_genes_from_blocks.secondary.tsv \
   ${freq_code}.${CNV}.gene_fine_mapping.stats_input.tsv \
   ${gene_features}
 

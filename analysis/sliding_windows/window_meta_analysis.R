@@ -352,9 +352,18 @@ meta <- function(stats.merged, cohorts, model="fe", saddle=T, secondary=T){
     meta.res$meta_phred_p_secondary <- meta.res.secondary$meta_phred_p
   }
   
+  # Compute pooled carrier frequencies
+  case.alt <- apply(meta.res[, grep("case_alt", colnames(meta.res), fixed=T)], 1, sum, na.rm=T)
+  case.ref <- apply(meta.res[, grep("case_ref", colnames(meta.res), fixed=T)], 1, sum, na.rm=T)
+  meta.res$case_freq <- case.alt / (case.alt + case.ref)
+  control.alt <- apply(meta.res[, grep("control_alt", colnames(meta.res), fixed=T)], 1, sum, na.rm=T)
+  control.ref <- apply(meta.res[, grep("control_ref", colnames(meta.res), fixed=T)], 1, sum, na.rm=T)
+  meta.res$control_freq <- control.alt / (control.alt + control.ref)
+  
   # Format output
   return(as.data.frame(cbind(meta.res[, which(colnames(meta.res) %in% c("chr", "start", "end", 
-                                                                        "n_nominal_cohorts", "top_cohort"))],
+                                                                        "n_nominal_cohorts", "top_cohort",
+                                                                        "case_freq", "control_freq"))],
                              meta.res[, grep("meta_", colnames(meta.res), fixed=T)])))
 }
 
@@ -403,11 +412,11 @@ secondary <- !(opts$`no-secondary`)
 # setwd("~/scratch")
 # # infile <- "~/scratch/HP0100852.rCNV.DEL.sliding_window.meta_analysis.input.txt"
 # # infile <- "~/scratch/HP0001250.rCNV.DEL.sliding_window.meta_analysis.input.txt"
-# infile <- "~/scratch/HP0001626.rCNV.DEL.sliding_window.meta_analysis.input.txt"
+# infile <- "~/scratch/HP0100852.rCNV.DEL.sliding_window.meta_analysis.input.txt"
 # # infile <- "~/scratch/window_meta_dummy_input.ndd.txt"
 # # outfile <- "~/scratch/HP0100852.rCNV.DEL.window_meta_test_results.bed"
 # # outfile <- "~/scratch/HP0001250.rCNV.DEL.window_meta_test_results.bed"
-# outfile <- "~/scratch/HP0001626.rCNV.DEL.window_meta_test_results.bed"
+# outfile <- "~/scratch/HP0100852.rCNV.DEL.window_meta_test_results.bed"
 # corplot.out <- "~/scratch/corplot.test.jpg"
 # model <- "fe"
 # p.is.phred <- T

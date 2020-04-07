@@ -124,7 +124,8 @@ def finemap(gene_priors, gene_info, null_variance=0.42 ** 2):
 
 def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True, 
                 secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
-                secondary_or_nominal=True, sig_only=False, keep_genes=None):
+                secondary_or_nominal=True, sig_only=False, keep_genes=None,
+                finemap_secondary=False):
     """
     Input: csv.reader of meta-analysis association stats
     Output: dict of gene stats (either sig_only or all genes in reader)
@@ -138,9 +139,10 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
 
     stats_dict = {}
 
-    for chrom, start, end, gene, n_nominal, top_cohort, lnOR, lnOR_lower, \
-        lnOR_upper, zscore, primary_p, secondary_lnOR, secondary_lnOR_lower, \
-        secondary_lnOR_upper, secondary_zscore, secondary_p in reader:
+    for chrom, start, end, gene, n_nominal, top_cohort, case_freq, control_freq,
+        lnOR, lnOR_lower, lnOR_upper, zscore, primary_p, secondary_lnOR, \
+        secondary_lnOR_lower, secondary_lnOR_upper, secondary_zscore, secondary_p \
+        in reader:
 
         # Skip header line
         if chrom.startswith('#'):
@@ -155,9 +157,18 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
         primary_p = format_stat(primary_p, p_is_phred, 1)
         secondary_p = format_stat(secondary_p, p_is_phred, 1)
         n_nominal = int(n_nominal)
-        lnOR = format_stat(lnOR)
-        lnOR_lower = format_stat(lnOR_lower)
-        lnOR_upper = format_stat(lnOR_upper)
+        case_freq = format_stat(case_freq)
+        control_freq = format_stat(control_freq)
+        if finemap_secondary:
+            use_lnOR = format_stat(secondary_lnOR)
+            use_lnOR_lower = format_stat(secondary_lnOR_lower)
+            use_lnOR_upper = format_stat(secondary_lnOR_upper)
+            use_zscore = format_stat(secondary_zscore)
+        else:
+            use_lnOR = format_stat(lnOR)
+            use_lnOR_lower = format_stat(lnOR_lower)
+            use_lnOR_upper = format_stat(lnOR_upper)
+            use_zscore = format_stat(zscore)
 
         # Store gene association stats
         if sig_only:
@@ -165,20 +176,22 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
                            secondary_p_cutoff, n_nominal_cutoff, secondary_or_nominal):
                 gene_bt = pbt.BedTool('\t'.join([chrom, start, end, gene]), 
                                       from_string=True)
-                gene_stats = {'lnOR' : lnOR, 
-                              'lnOR_lower' : lnOR_lower,
-                              'lnOR_upper' : lnOR_upper, 
-                              'zscore' : format_stat(zscore),
+                gene_stats = {'case_freq' : case_freq, 'control_freq' : control_freq,
+                              'lnOR' : use_lnOR, 
+                              'lnOR_lower' : use_lnOR_lower,
+                              'lnOR_upper' : use_lnOR_upper, 
+                              'zscore' : use_zscore,
                               'primary_p' : primary_p, 'secondary_p' : secondary_p,
                               'n_nominal' : n_nominal, 'gene_bt' : gene_bt}
                 stats_dict[gene] = gene_stats
         else:
             gene_bt = pbt.BedTool('\t'.join([chrom, start, end, gene]), 
                                   from_string=True)
-            gene_stats = {'lnOR' : lnOR, 
-                          'lnOR_lower' : lnOR_lower,
-                          'lnOR_upper' : lnOR_upper, 
-                          'zscore' : format_stat(zscore),
+            gene_stats = {'case_freq' : case_freq, 'control_freq' : control_freq,
+                          'lnOR' : use_lnOR, 
+                          'lnOR_lower' : use_lnOR_lower,
+                          'lnOR_upper' : use_lnOR_upper, 
+                          'zscore' : use_zscore,
                           'primary_p' : primary_p, 'secondary_p' : secondary_p,
                           'n_nominal' : n_nominal, 'gene_bt' : gene_bt}
             stats_dict[gene] = gene_stats
@@ -191,7 +204,8 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
 def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True, 
                 secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
                 secondary_or_nominal=True, block_merge_dist=500000, 
-                block_prefix='gene_block', null_variance=0.42 ** 2):
+                block_prefix='gene_block', null_variance=0.42 ** 2,
+                finemap_secondary=False):
     """
     Loads & processes all necessary data for a single phenotype
     Returns a dict with the following entries:
@@ -208,7 +222,8 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
     # First pass: parse data for significant genes only
     hpo_info['sig_genes'] = parse_stats(stats_in, primary_p_cutoff, p_is_phred, 
                                         secondary_p_cutoff, n_nominal_cutoff, 
-                                        secondary_or_nominal, sig_only=True)
+                                        secondary_or_nominal, sig_only=True,
+                                        finemap_secondary=finemap_secondary)
 
     # Second pass: parse data for all genes within block_merge_dist of sig_genes
     if len(hpo_info['sig_genes']) > 0:
@@ -230,7 +245,8 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
         hpo_info['all_genes'] = parse_stats(stats_in, primary_p_cutoff, p_is_phred, 
                                             secondary_p_cutoff, n_nominal_cutoff, 
                                             secondary_or_nominal, sig_only=False,
-                                            keep_genes=nearby_genes)
+                                            keep_genes=nearby_genes, 
+                                            finemap_secondary=finemap_secondary)
 
         # Cluster significant genes into blocks to be fine-mapped
         gene_bts = [g['gene_bt'] for g in hpo_info['all_genes'].values()]
@@ -259,7 +275,8 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
 
 
 def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
-                  secondary_or_nominal=True, block_merge_dist=500000):
+                  secondary_or_nominal=True, block_merge_dist=500000,
+                  finemap_secondary=False):
     """
     Wrapper function to process each HPO with process_hpo()
     Returns a dict with one entry per HPO
@@ -276,7 +293,8 @@ def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2,
                                         secondary_p_cutoff=secondary_p_cutoff, 
                                         n_nominal_cutoff=n_nominal_cutoff, 
                                         secondary_or_nominal=secondary_or_nominal,
-                                        block_merge_dist=block_merge_dist)
+                                        block_merge_dist=block_merge_dist,
+                                        finemap_secondary=finemap_secondary)
 
     return hpo_data
 
@@ -315,20 +333,25 @@ def estimate_null_variance_basic(hpo_data):
     return [v1, v2]
 
 
-def estimate_null_variance_gs(gs_lists, statslist):
+def estimate_null_variance_gs(gs_lists, statslist, finemap_secondary=False):
     """
     Estimates null variance for all cases from the average of a list of known causal genes
     """
 
     # Read effect sizes per gene from highest level phenotype
+    if finemap_secondary:
+        cols = 'gene meta_lnOR_secondary'.split()
+    else:
+        cols = 'gene meta_lnOR'.split()
     stats = pd.read_csv(open(statslist).readline().rstrip().split('\t')[1], 
-                        delimiter='\t').loc[:, 'gene meta_lnOR'.split()]
+                        delimiter='\t').loc[:, cols]
+    stats.columns = 'gene lnOR'.split()
 
     # Iterate over lists of known causal genes and compute mean variance
     var = []
     for gslist in gs_lists:
         gs_genes = open(gslist).read().splitlines()
-        gs_vars = (stats.meta_lnOR[stats.gene.isin(gs_genes)].astype(float) / 1.96) ** 2
+        gs_vars = (stats.lnOR[stats.gene.isin(gs_genes)].astype(float) / 1.96) ** 2
         var.append(float(np.nanmean(gs_vars)))
 
     return var
@@ -570,6 +593,8 @@ def bmavg(sig_dfs, hpo_data, outfile, sig_only=False, cs_val=0.95):
            to_csv(outfile, sep='\t', index=False, na_rep='NA')
     outfile.close()
 
+    return sig_df
+
 
 def coeff_avg(coeff_tables, outfile, logit_alpha):
     """
@@ -617,6 +642,51 @@ def coeff_avg(coeff_tables, outfile, logit_alpha):
     outfile.close()
 
 
+def format_assoc_bed(hpo_data, sig_df, outfile, statslist, 
+                     conf_pip=0.1, vconf_pip=0.9, cnv='NS'):
+    """
+    Format final list of significant gene-phenotype pairs with summary statistics
+    """
+
+    cols = 'chr start end gene cnv hpo case_freq control_freq or or_ci_lower ' + \
+            'or_ci_upper pvalue pip credible_set_id'
+    outfile.write('#' + '\t'.join(cols.split()) + '\n')
+
+    # Read gene coordinates from first input stats file
+    dummypath = open(statslist).readline().rstrip().split('\t')[1]
+    coords_df = pd.read_csv(dummypath, sep='\t').iloc[:, 0:4]
+    coords_df.index = coords_df.gene
+    coords = coords_df.rename(columns={'#chr' : 'chr'}).drop('gene', axis=1).to_dict(orient='index')
+
+    # Iterate over each gene with PIP >= conf_pip
+    for gdict in sig_df.loc[sig_df.PIP >= conf_pip, :].to_dict(orient='index').values():
+        # Get gene info
+        hpo = gdict['HPO']
+        gene = gdict['gene']
+        pip = gdict['PIP']
+        cred = gdict['credible_set']
+        chrom = str(coords[gene]['chr'])
+        start = str(coords[gene]['start'])
+        end = str(coords[gene]['end'])
+        case_freq = hpo_data[hpo]['all_genes'][gene]['case_freq']
+        control_freq = hpo_data[hpo]['all_genes'][gene]['control_freq']
+        lnor = hpo_data[hpo]['all_genes'][gene]['lnOR']
+        lnor_lower = hpo_data[hpo]['all_genes'][gene]['lnOR_lower']
+        lnor_upper = hpo_data[hpo]['all_genes'][gene]['lnOR_upper']
+        pval = hpo_data[hpo]['all_genes'][gene]['primary_p']
+        # If p-value was rounded to zero, modify by taking the unadjusted normal P-value
+        if pval == 0:
+            pval = norm.sf(hpo_data[hpo]['all_genes'][gene]['zscore'])
+
+        # Write gene-phenotype pair to file
+        outline = '\t'.join([chrom, start, end, gene, cnv, hpo])
+        outnums_fmt = '\t{:.2}\t{:.2E}\t{:.2}\t{:.2}\t{:.2}\t{:.2E}\t{:.2}'
+        outline += outnums_fmt.format(case_freq, control_freq, lnor, lnor_lower, 
+                                      lnor_upper, pval, pip)
+        outline += '\t' + cred + '\n'
+        outfile.write(outline)
+
+
 def main():
     """
     Command-line main block
@@ -635,6 +705,7 @@ def main():
                         'first three columns can be BED-like, and will be dropped.')
     parser.add_argument('--secondary-p-cutoff', help='Maximum secondary P-value to ' + 
                         'consider as significant. [default: 1]', default=1, type=float)
+    parser.add_argument('--cnv', help='Indicate CNV type. [default: NS]', default='NS')
     parser.add_argument('--min-nominal', help='Minimum number of individual cohorts ' + 
                         'required to be nominally significant to consider ' +
                         'significant. [default: 1]', default=1, type=int)
@@ -654,13 +725,27 @@ def main():
     parser.add_argument('--distance', help='Distance to pad each significant gene ' +
                         'prior to fine-mapping. [default: 1Mb]', default=1000000, 
                         type=int)
+    parser.add_argument('--confident-pip', default=0.1, type=float, help='Minimum ' +
+                        'PIP for classifying a gene as confidently fine-mapped. ' +
+                        '[default: 0.1]')
+    parser.add_argument('--very-confident-pip', default=0.9, type=float, help='Minimum ' +
+                        'PIP for classifying a gene as very confidently fine-mapped. ' +
+                        '[default: 0.9]')
     parser.add_argument('--known-causal-gene-lists', help='.tsv list of paths to ' +
                         '.txt lists of known causal genes. Used for estimating null ' +
                         'variance. Can be specified multiple times. [default: ' +
                         'no known causal genes]', dest='gs_list')
+    parser.add_argument('--finemap-secondary', action='store_true', default=False,
+                        help='Use secondary P-values for fine-mapping priors ' + 
+                        '[default: use primary P-values]')
     parser.add_argument('-o', '--outfile', default='stdout', help='Output tsv of ' +
                         'final fine-mapping results for significant genes and ' + 
                         'phenotypes.')
+    parser.add_argument('--sig-loci-bed', help='Output BED of significant genes ' +
+                        'and their overall association statistics.')
+    parser.add_argument('--sig-assoc-bed', help='Output BED of significant ' +
+                        'gene-phenotype pairs and their corresponding association ' +
+                        'statistics.')
     parser.add_argument('--all-genes-outfile', help='Output tsv of final ' +
                         'fine-mapping results for all genes and phenotypes.')
     parser.add_argument('--naive-outfile', help='Output tsv of naive results ' +
@@ -680,7 +765,7 @@ def main():
     # Process data per hpo
     hpo_data = load_all_hpos(args.statslist, args.secondary_p_cutoff, 
                              args.min_nominal, args.secondary_or_nom, 
-                             args.distance)
+                             args.distance, args.finemap_secondary)
 
     # Estimate null variance based on:
     #   1. most significant gene from each block
@@ -693,7 +778,7 @@ def main():
     Wsq = sorted(Wsq)
     print('Null variance estimates: ' + ', '.join([str(round(x, 3)) for x in Wsq]))
 
-    # Update original finemapping results with re-estimated null variance
+    # Update original finemapping results with re-estimated mean null variance
     hpo_data = update_finemap(hpo_data, np.nanmean(Wsq))
 
     # Write naive and/or genetics-only fine-mapping results (for ROC comparisons)
@@ -720,13 +805,24 @@ def main():
     bmavg(bms, hpo_data, outfile, sig_only=True)
     if args.all_genes_outfile is not None:
         all_genes_outfile = open(args.all_genes_outfile, 'w')
-        bmavg(bms, hpo_data, all_genes_outfile, cs_val=args.cs_val)
+        final_sig_df = bmavg(bms, hpo_data, all_genes_outfile, cs_val=args.cs_val)
 
     # If optioned, average logit coefficients across models and write to --coeffs-out
     if args.coeffs_out is not None:
         coeffs_out = open(args.coeffs_out, 'w')
         coeff_tables = [x[1] for x in finemap_res]
         coeff_avg(coeff_tables, coeffs_out, args.logit_alpha)
+
+    # Format & write final table of significant loci & associations
+    if args.sig_assoc_bed is not None:
+        sig_assoc_bed = open(args.sig_assoc_bed, 'w')
+        format_assoc_bed(hpo_data, final_sig_df, sig_assoc_bed, args.statslist,
+                         args.confident_pip, args.very_confident_pip, args.cnv)
+    # DEV NOTE: NOT YET IMPLEMENTED
+    # if args.sig_loci_bed is not None:
+    #     sig_loci_bed = open(args.sig_loci_bed, 'w')
+    #     format_loci_bed(hpo_data, final_sig_df, sig_loci_bed, args.confident_pip,
+    #                      args.very_confident_pip)
 
 
 if __name__ == '__main__':
