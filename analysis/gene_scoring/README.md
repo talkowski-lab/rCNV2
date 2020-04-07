@@ -97,9 +97,17 @@ Where `PO` is the prior odds of the null; _i.e._, the odds of any gene _not_ bei
 
 ### 4. Prediction of dosage sensitivity scores
 
-Using the BFDP values calculated for each gene [as described above](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/gene_scoring#3-bayes-factor-calculation-for-each-gene), we next trained and applied a regression model to predict the probability of a gene being haploinsufficient or triplosensitive based on [gene-level functional metadata](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene#gene-features) alone.  
+Using the BFDP values calculated for each gene [as described above](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/gene_scoring#3-bayes-factor-calculation-for-each-gene), we next trained and applied a battery of regression and machine learning models to predict the probability of a gene being haploinsufficient or triplosensitive based on [gene-level functional metadata](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene#gene-features) alone.  
 
-We first divided all 22 autosomes into 11 pairs while balancing the total number of genes per chromosome pair, as follows:  
+Specifically, we evaluated each of the following models using the same strategy (outlined below):  
+*  Logistic (logit) generalized linear model  
+*  Linear support vector machine (SVM)  
+*  Random forest  
+*  Linear discriminant analysis (LDA)  
+*  Naive Bayes  
+*  Logistic stochastic gradient descent (SGD)  
+
+For each model, we first divided all 22 autosomes into 11 pairs while balancing the total number of genes per chromosome pair, as follows:  
 
 | Chromosome #1 | Chromosome #2 | Genes |  
 | ---: | ---: | ---: |  
@@ -115,21 +123,23 @@ We first divided all 22 autosomes into 11 pairs while balancing the total number
 | 7 | 9 | 1,476 |  
 | 16 | 4 | 1,463 |  
 
-To predict gene-level scores for each pair of chromosomes, we used the other 10 pairs to train & cross-validate a regression model.  
+To predict gene-level scores for each pair of chromosomes, we used the other 10 pairs to train & cross-validate a classification model.  
 
 For each of 10 cross-validation iterations, we used 9/10 chromosome pairs for training and held out one pair for testing.  
 
 This process can be summarized as follows:
 
-1. Fit logit glm of `BFDP ~ features` for all genes from the 9/10 training pairs using light (alpha=0.1) L<sup>2</sup> regularization to protect against overfitting;  
+1. Fit classification model for all genes from the 9/10 training pairs;  
 2. Compute root mean-squared error (RMSE) of predicted and actual BFDPs for all genes on the 10<sup>th</sup> chromosome pair (held out from training); 
 3. Repeat steps [1-2] once for each of the 10 training pairs as the held-out test pair; 
-4. Select the most predictive model based on lowest RMSE; and 
+4. Select the most predictive CV fit based on lowest RMSE; and 
 5. Apply the most predictive model from [4] to predict BFDPs for the genes from the 11<sup>th</sup> pair of (completely held-out) prediction chromosomes.  
 
 After computing predicted BFDPs for all genes using this strategy described above, we subsequently standard-normalized the predicted BFDPs, and defined final gene scores as `1 – normal_cdf( normalized BFDP )`.  
 
-In practice we dubbed these final scores as:  
+Lastly, we compared each of the six models (logit, SVM, random forest, LDA, naive Bayes, and SGD) based on RMSE, AUROC, and AUPRC, and selected the overall best-performing model across deletions and duplications for our final analysis.  
+
+In practice we dubbed the final scores from our best-performing model as:  
 *  **pHI**: probability of haploinsufficiency; and
 *  **pTS**: probability of triplosensitivity.  
 

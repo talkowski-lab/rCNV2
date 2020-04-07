@@ -26,10 +26,10 @@ phenotype_list="test_phenotypes.list"
 metacohort_sample_table="HPOs_by_metacohort.table.tsv"
 # gtf="genes/gencode.v19.canonical.gtf.gz"
 rCNV_bucket="gs://rcnv_project"
-theta0_del=0.812
-theta0_dup=0.594
-theta1=1.620
-var=0.683
+theta0_del=1.161
+theta0_dup=0.837
+theta1=2.229
+var=1.294
 prior=0.115
 gene_features="gencode.v19.canonical.pext_filtered.all_features.eigenfeatures.bed.gz"
 raw_gene_features="gencode.v19.canonical.pext_filtered.all_features.bed.gz"
@@ -124,7 +124,7 @@ done
 
 
 # Manually assign best model
-best_model="logit"
+best_model="lda"
 
 
 # Merge scores
@@ -236,4 +236,20 @@ mkdir ${freq_code}_gene_scoring_QC_plots/
   DUP.roc_truth_sets.tsv \
   gold_standard.haplosufficient.genes.list \
   ${freq_code}_gene_scoring_QC_plots/${freq_code}_gene_score_qc
+
+
+### Reorganize all outputs, and copy to Google bucket (note: requires permissions)
+mkdir gene_scoring
+for subdir in plots all_models gene_lists data; do
+  mkdir gene_scoring/$subdir
+done
+mv *abfs.tsv gene_scoring/data/
+mv *gene_scores.*.tsv gene_scoring/all_models/
+mv *truth_set.*.tsv gene_scoring/gene_lists/
+mv gold_standard.*haplo*.list gene_scoring/gene_lists/
+mv rCNV_*_model_comparisons gene_scoring/plots/
+mv gene_score_corplots gene_scoring/plots/
+mv rCNV_gene_scoring_QC_plots gene_scoring/plots/
+gsutil -m cp -r gene_scoring ${rCNV_bucket}/analysis/
+gsutil -m cp rCNV.gene_scores.tsv.gz ${rCNV_bucket}/results/gene_scoring/
 
