@@ -724,6 +724,7 @@ def output_genes_bed(hpo_data, sig_df, outfile, ncase_dict,
         start = str(hpo_data[all_hpos[0]]['all_genes'][gene]['gene_bt'][0].start)
         end = str(hpo_data[all_hpos[0]]['all_genes'][gene]['gene_bt'][0].end)
         control_freq = hpo_data[all_hpos[0]]['all_genes'][gene]['control_freq']
+        best_pip = np.nanmax(genedf.PIP)
         cred_ids = sorted(genedf.credible_set.tolist())
 
         if n_hpos > 1:
