@@ -143,9 +143,9 @@ These files are stored in the same location as the per-metacohort analysis resul
 
 ### 4. Fine-map causal genes  
 
-### Clustering significant genes into "gene blocks"  
+#### Clustering significant genes into "gene blocks"  
 
-We clustered all significant genes per phenotype into "significant gene blocks" by merging all genes within ±500kb that were significantly associated with the same phenotype.  
+We clustered all significant genes per phenotype into "significant gene blocks" by grouping all genes within ±1Mb of an exome-wide significant gene.  
 
 In practice, we considered a gene to be exome-wide significant if its primary P-value exceeded the exome-wide significance threshold for that phenotype and CNV type, and it satisifed at least one of the following two criteria:
 1. Secondary P-value (as [described above](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/genes/#3-combine-association-statistics-across-metacohorts)) was also nominally significant (P < 0.05); and/or
@@ -153,21 +153,31 @@ In practice, we considered a gene to be exome-wide significant if its primary P-
 
 Absent a true replication sample, these _post hoc_ filters were applied to protect against Winner's Curse.  
 
-### Functional fine-mapping
+#### Functional fine-mapping
 
-Next, we aimed to define the minimal set of genes per block most likely to be causal for each phenotypic association.  
+Next, we aimed to prioritize individual likely causal genes, and to define the minimal set of genes per block that most confidently explains each phenotypic association.  
 
-To accomplish this, we adapted several GWAS fine-mapping algorithms, as follows:
+To accomplish this, we adapted several GWAS fine-mapping algorithms, as follows:  
 
-1. We transformed all association statistics for all genes per block (including non-significant genes) into approximate Bayes factors (ABFs) following the procedure specified by [Wakefield _et al._, _Genet. Epi._, 2009](https://onlinelibrary.wiley.com/doi/abs/10.1002/gepi.20359) and [Wakefield _et al._, _Am. J. Hum. Genet._, 2007](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1950810/). For these calculations, we used an empirical Bayes approach to estimate null variance based on the observed variances for all exome-wide significant genes pooled across all phenotypes.  
+1. We transformed all association statistics for all genes per block (including non-significant genes) into approximate Bayes factors (ABFs) following the procedure specified by [Wakefield _et al._, _Genet. Epi._, 2009](https://onlinelibrary.wiley.com/doi/abs/10.1002/gepi.20359) and [Wakefield _et al._, _Am. J. Hum. Genet._, 2007](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1950810/). For these calculations, we used an empirical Bayes approach to estimate null variance based on the observed variances for (i) all exome-wide significant genes pooled across all phenotypes, (ii) the most significant gene per gene block, and (iii) a small panel of curated gene lists with known or likely haploinsufficiency. We applied Bayesian Model Averaging (BMA) across these different null variance estimates.  
 
 2. We calculated posterior inclusion probabilities (PIPs) for each gene per block based on the ABFs from [1] while assuming a flat prior (_i.e._, each gene per block is equally likely to be causal).  
 
 3. We developed an adaptation of E-M algorithms described in [Kichaev _et al._, _PLOS Genet._, 2014](https://doi.org/10.1371/journal.pgen.1004722) and [Wen _et al._, _PLOS Genet._, 2017](https://doi.org/10.1371/journal.pgen.1006646) to iteratively update gene priors for each block based on functional enrichments in a logistic regression framework. For this purpose, we used all gene features [described elsewhere in this repository](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene#gene-features).
 
-4. Finally, we computed a 95% credible set of genes per block based on the cumulative sum of PIPs for genes ranked by causal likelihood.  
+4. Finally, we computed a 95% credible set of genes per block based on the cumulative sum of PIPs for genes ranked by causal likelihood. We only retained exome-wide significant genes after calculating each credible set (_i.e._, genes that were not originally exome-wide significant were included when calculating the 95% credible set, but were removed from the credible set after calculation).    
 
-For downstream analyses, we considered any gene with PIP ≥ 0.1 to be a "candidate" causal gene, and any gene with PIP ≥ 0.9 to be a "strong candidate" causal gene.  
+For downstream analyses, we considered any gene with PIP ≥ 0.1 to be a "confident" causal gene, and any gene with PIP ≥ 0.9 to be a "very confident" causal gene.  
+
+#### 5. Reporting of final association statistics  
+
+We reported significant genes in three formats:  
+
+1. Individual associated gene-phenotype pairs for genes with PIP ≥ 0.1; 
+2. Significant genes assocated with at least one phenotype, with pooled effect size estimates across all phenotypes; and 
+3. 95% credible sets for all gene blocks, with pooled effect sizes estimates across all genes.
+
+The pooled effect size estimates in `2.` and `3.` were computed as inverse-variance weighted means.  
 
 ---  
 

@@ -31,6 +31,8 @@ workflow gene_burden_analysis {
   Float finemap_elnet_alpha
   Float finemap_elnet_l1_l2_mix
   Int finemap_distance
+  Float finemap_conf_pip
+  Float finemap_vconf_pip
   File finemap_genomic_features
   File finemap_expression_features
   File finemap_constraint_features
@@ -158,6 +160,8 @@ workflow gene_burden_analysis {
         finemap_elnet_alpha=finemap_elnet_alpha,
         finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
         finemap_distance=finemap_distance,
+        finemap_conf_pip=finemap_conf_pip,
+        finemap_vconf_pip=finemap_vconf_pip,
         finemap_output_label="genomic_features",
         gene_features=finemap_genomic_features,
         rCNV_bucket=rCNV_bucket
@@ -177,6 +181,8 @@ workflow gene_burden_analysis {
         finemap_elnet_alpha=finemap_elnet_alpha,
         finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
         finemap_distance=finemap_distance,
+        finemap_conf_pip=finemap_conf_pip,
+        finemap_vconf_pip=finemap_vconf_pip,
         finemap_output_label="expression_features",
         gene_features=finemap_expression_features,
         rCNV_bucket=rCNV_bucket
@@ -196,6 +202,8 @@ workflow gene_burden_analysis {
         finemap_elnet_alpha=finemap_elnet_alpha,
         finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
         finemap_distance=finemap_distance,
+        finemap_conf_pip=finemap_conf_pip,
+        finemap_vconf_pip=finemap_vconf_pip,
         finemap_output_label="constraint_features",
         gene_features=finemap_constraint_features,
         rCNV_bucket=rCNV_bucket
@@ -215,10 +223,22 @@ workflow gene_burden_analysis {
         finemap_elnet_alpha=finemap_elnet_alpha,
         finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
         finemap_distance=finemap_distance,
+        finemap_conf_pip=finemap_conf_pip,
+        finemap_vconf_pip=finemap_vconf_pip,
         finemap_output_label="merged_features",
         gene_features=finemap_merged_features,
         rCNV_bucket=rCNV_bucket
     }
+  }
+
+  # Combine merged features BED files as final output
+  call merge_finemap_res {
+    input:
+      gene_beds=finemap_merged.sig_genes_bed,
+      assoc_beds=finemap_merged.sig_assocs_bed,
+      credset_beds=finemap_merged.cred_sets_bed,
+      freq_code="rCNV",
+      rCNV_bucket=rCNV_bucket
   }
 
   # Once complete, plot finemap results
@@ -235,9 +255,9 @@ workflow gene_burden_analysis {
   }
 
   output {
-    # Array[File] final_sig_genes = [finemap_merged.final_loci, finemap_merged.final_loci]
-    Array[File] final_sig_associations = finemap_merged.sig_loci_bed
-
+    File final_sig_genes = merge_finemap_res.final_genes
+    File final_sig_associations = merge_finemap_res.final_associations
+    File final_credible_sets = merge_finemap_res.final_credsets
   }
 }
 
@@ -603,7 +623,7 @@ task meta_analysis {
   }
 
   runtime {
-    # docker: "talkowski/rcnv@sha256:93ec0fee2b0ad415143eda627c2b3c8d2e1ef3c8ff4d3d620767637614fee5f8"
+    docker: "talkowski/rcnv@sha256:e91d9b5a78547e4572fa04366eb63de64b6f12ee99088c20ff017b4046fc8824"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -624,6 +644,8 @@ task finemap_genes {
   Float finemap_elnet_alpha
   Float finemap_elnet_l1_l2_mix
   Int finemap_distance
+  Float finemap_conf_pip
+  Float finemap_vconf_pip
   String finemap_output_label
   File gene_features
   String rCNV_bucket
@@ -686,16 +708,20 @@ task finemap_genes {
       --regularization-alpha ${finemap_elnet_alpha} \
       --regularization-l1-l2-mix ${finemap_elnet_l1_l2_mix} \
       --distance ${finemap_distance} \
+      --confident-pip ${finemap_conf_pip} \
+      --very-confident-pip ${finemap_vconf_pip} \
       --known-causal-gene-lists known_causal_gene_lists.tsv \
       --outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv \
-      --sig-loci-bed ${freq_code}.${CNV}.final_genes.loci.bed \
+      --sig-genes-bed ${freq_code}.${CNV}.final_genes.genes.bed \
       --sig-assoc-bed ${freq_code}.${CNV}.final_genes.associations.bed \
+      --sig-credsets-bed ${freq_code}.${CNV}.final_genes.credible_sets.bed \
       --all-genes-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.all_genes_from_blocks.tsv \
       --naive-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.tsv \
       --genetic-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.${finemap_output_label}.tsv \
       --coeffs-out ${freq_code}.${CNV}.gene_fine_mapping.logit_coeffs.${finemap_output_label}.tsv \
       ${freq_code}.${CNV}.gene_fine_mapping.stats_input.tsv \
-      ${gene_features}
+      ${gene_features} \
+      ${metacohort_sample_table}
 
     # Repeat functional fine-mapping with secondary association stats (for supplement)
     /opt/rCNV2/analysis/genes/finemap_genes.py \
@@ -710,7 +736,8 @@ task finemap_genes {
       --outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.secondary.tsv \
       --all-genes-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.all_genes_from_blocks.secondary.tsv \
       ${freq_code}.${CNV}.gene_fine_mapping.stats_input.tsv \
-      ${gene_features}
+      ${gene_features} \
+      ${metacohort_sample_table}
 
     # Copy results to output bucket
     gsutil -m cp \
@@ -727,17 +754,79 @@ task finemap_genes {
     File naive_output = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.tsv"
     File genetic_output = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.${finemap_output_label}.tsv"
     File logit_coeffs = "${freq_code}.${CNV}.gene_fine_mapping.logit_coeffs.${finemap_output_label}.tsv"
-    File finemapped_output = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.secondary.tsv"
-    File sig_loci_bed = "${freq_code}.${CNV}.final_genes.loci.bed"
+    File finemapped_output_secondary = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.secondary.tsv"
+    File finemapped_output_all_genes_secondary = "${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.all_genes_from_blocks.secondary.tsv"
+    File sig_genes_bed = "${freq_code}.${CNV}.final_genes.genes.bed"
+    File sig_assocs_bed = "${freq_code}.${CNV}.final_genes.associations.bed"
+    File cred_sets_bed = "${freq_code}.${CNV}.final_genes.credible_sets.bed"
     File completion_token = "completion.txt"
   }
 
   runtime {
-    # docker: "talkowski/rcnv@sha256:93ec0fee2b0ad415143eda627c2b3c8d2e1ef3c8ff4d3d620767637614fee5f8"
+    # TODO: bump docker
+    # docker: "talkowski/rcnv@sha256:e91d9b5a78547e4572fa04366eb63de64b6f12ee99088c20ff017b4046fc8824"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
     disks: "local-disk 50 HDD"
+  }
+}
+
+
+# Merge final gene association results for public export
+task merge_finemap_res {
+  Array[File] gene_beds
+  Array[File] assoc_beds
+  Array[File] credset_beds
+  String freq_code
+  String rCNV_bucket
+
+  command <<<
+    set -e 
+
+    # Get headers
+    sed -n '1p' ${gene_beds[0]} > gene_header.tsv
+    sed -n '1p' ${assoc_beds[0]} > assoc_header.tsv
+    sed -n '1p' ${credset_beds[0]} > credset_header.tsv
+
+    # Merge genes
+    grep -ve '^#' ${sep=" " gene_beds} \
+    | sort -Vk1,1 -k2,2n -k3,3n -k4,4V -k5,5V -k13,13V \
+    | cat gene_header.tsv - \
+    | bgzip -c \
+    > ${freq_code}.final_genes.genes.bed.gz
+
+    # Merge associations
+    grep -ve '^#' ${sep=" " assoc_beds} \
+    | sort -Vk1,1 -k2,2n -k3,3n -k4,4V -k5,5V -k6,6V \
+    | cat assoc_header.tsv - \
+    | bgzip -c \
+    > ${freq_code}.final_genes.associations.bed.gz
+
+    # Merge genes
+    grep -ve '^#' ${sep=" " credset_beds} \
+    | sort -Vk1,1 -k2,2n -k3,3n -k5,5V -k6,6V \
+    | cat credset_header.tsv - \
+    | bgzip -c \
+    > ${freq_code}.final_genes.credible_sets.bed.gz
+
+    # Copy final files to results bucket (note: requires permissions)
+    gsutil -m cp \
+      ${freq_code}.final_genes.*.bed.gz \
+      ${rCNV_bucket}/results/gene_association/
+  >>>
+
+  output {
+    File final_genes = "${freq_code}.final_genes.genes.bed.gz"
+    File final_associations = "${freq_code}.final_genes.associations.bed.gz"
+    File final_credsets = "${freq_code}.final_genes.credible_sets.bed.gz"
+  }
+
+  runtime {
+    # TODO: bump docker
+    # docker: "talkowski/rcnv@sha256:e91d9b5a78547e4572fa04366eb63de64b6f12ee99088c20ff017b4046fc8824"
+    preemptible: 1
+    bootDiskSizeGb: "20"
   }
 }
 
@@ -924,7 +1013,7 @@ task plot_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:93ec0fee2b0ad415143eda627c2b3c8d2e1ef3c8ff4d3d620767637614fee5f8"
+    docker: "talkowski/rcnv@sha256:e91d9b5a78547e4572fa04366eb63de64b6f12ee99088c20ff017b4046fc8824"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

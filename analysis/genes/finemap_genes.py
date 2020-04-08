@@ -139,7 +139,7 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
 
     stats_dict = {}
 
-    for chrom, start, end, gene, n_nominal, top_cohort, case_freq, control_freq,
+    for chrom, start, end, gene, n_nominal, top_cohort, case_freq, control_freq, \
         lnOR, lnOR_lower, lnOR_upper, zscore, primary_p, secondary_lnOR, \
         secondary_lnOR_lower, secondary_lnOR_upper, secondary_zscore, secondary_p \
         in reader:
@@ -531,7 +531,7 @@ def functional_finemap(hpo_data, gene_features_in, l1_l2_mix, logit_alpha,
 
         # Print iteration info
         if not quiet:
-            print('  {:,}\t{:.2E}\t{:.2E}'.format(k, rmse_PIP, rmse_coeffs))
+            print('  {:,}\t{:.3E}\t{:.3E}'.format(k, rmse_PIP, rmse_coeffs))
 
     # Report completion
     print('Converged after {:,} iterations'.format(k))
@@ -642,21 +642,14 @@ def coeff_avg(coeff_tables, outfile, logit_alpha):
     outfile.close()
 
 
-def format_assoc_bed(hpo_data, sig_df, outfile, statslist, 
-                     conf_pip=0.1, vconf_pip=0.9, cnv='NS'):
+def output_assoc_bed(hpo_data, sig_df, outfile, conf_pip=0.1, vconf_pip=0.9, cnv='NS'):
     """
     Format final list of significant gene-phenotype pairs with summary statistics
     """
 
-    cols = 'chr start end gene cnv hpo case_freq control_freq or or_ci_lower ' + \
-            'or_ci_upper pvalue pip credible_set_id'
+    cols = 'chr start end gene cnv hpo control_freq case_freq ln_or ln_or_ci_lower ' + \
+            'ln_or_ci_upper pvalue pip credible_set_id'
     outfile.write('#' + '\t'.join(cols.split()) + '\n')
-
-    # Read gene coordinates from first input stats file
-    dummypath = open(statslist).readline().rstrip().split('\t')[1]
-    coords_df = pd.read_csv(dummypath, sep='\t').iloc[:, 0:4]
-    coords_df.index = coords_df.gene
-    coords = coords_df.rename(columns={'#chr' : 'chr'}).drop('gene', axis=1).to_dict(orient='index')
 
     # Iterate over each gene with PIP >= conf_pip
     for gdict in sig_df.loc[sig_df.PIP >= conf_pip, :].to_dict(orient='index').values():
@@ -665,9 +658,9 @@ def format_assoc_bed(hpo_data, sig_df, outfile, statslist,
         gene = gdict['gene']
         pip = gdict['PIP']
         cred = gdict['credible_set']
-        chrom = str(coords[gene]['chr'])
-        start = str(coords[gene]['start'])
-        end = str(coords[gene]['end'])
+        chrom = str(hpo_data[hpo]['all_genes'][gene]['gene_bt'][0].chrom)
+        start = str(hpo_data[hpo]['all_genes'][gene]['gene_bt'][0].start)
+        end = str(hpo_data[hpo]['all_genes'][gene]['gene_bt'][0].end)
         case_freq = hpo_data[hpo]['all_genes'][gene]['case_freq']
         control_freq = hpo_data[hpo]['all_genes'][gene]['control_freq']
         lnor = hpo_data[hpo]['all_genes'][gene]['lnOR']
@@ -680,11 +673,165 @@ def format_assoc_bed(hpo_data, sig_df, outfile, statslist,
 
         # Write gene-phenotype pair to file
         outline = '\t'.join([chrom, start, end, gene, cnv, hpo])
-        outnums_fmt = '\t{:.2}\t{:.2E}\t{:.2}\t{:.2}\t{:.2}\t{:.2E}\t{:.2}'
-        outline += outnums_fmt.format(case_freq, control_freq, lnor, lnor_lower, 
+        outnums_fmt = '\t{:.3E}\t{:.3E}\t{:.3}\t{:.3}\t{:.3}\t{:.3E}\t{:.3}'
+        outline += outnums_fmt.format(control_freq, case_freq, lnor, lnor_lower, 
                                       lnor_upper, pval, pip)
         outline += '\t' + cred + '\n'
         outfile.write(outline)
+
+    outfile.close()
+
+
+def iv_mean(values, variances, conf=0.95):
+    """
+    Returns inverse-variance weighted mean of values and conf% confidence interval
+    """
+
+    weights = [1 / v for v in variances]
+
+    wsum = np.nansum(weights)
+
+    numerator = np.nansum([x / v for x, v in zip(values, variances)])
+
+    ivm = numerator / wsum
+
+    pooled_se = np.sqrt(1 / wsum)
+
+    ci_dist = norm.ppf(conf) * pooled_se
+
+    return ivm, (ivm - ci_dist, ivm + ci_dist)
+
+
+def output_genes_bed(hpo_data, sig_df, outfile, ncase_dict,
+                     conf_pip=0.1, vconf_pip=0.9, cnv='NS'):
+    """
+    Format final list of significant genes and compute pooled summary statistics
+    """
+
+    cols = 'chr start end gene cnv pooled_control_freq pooled_case_freq ' + \
+           'pooled_ln_or pooled_ln_or_ci_lower pooled_ln_or_ci_upper ' + \
+           'best_pip n_hpos all_hpos vconf_hpos conf_hpos credible_set_ids'
+    outfile.write('#' + '\t'.join(cols.split()) + '\n')
+
+    for gene in set(sig_df.loc[sig_df.PIP >= conf_pip, ].gene.tolist()):
+        # Get gene info
+        genedf = sig_df.loc[(sig_df.gene == gene) & (sig_df.PIP >= conf_pip), :]
+        all_hpos = sorted(genedf.HPO.tolist())
+        n_hpos = len(all_hpos)
+        vconf_hpos = sorted(genedf.HPO[sig_df.PIP >= vconf_pip].tolist())
+        conf_hpos = sorted(genedf.HPO[sig_df.PIP < vconf_pip].tolist())
+        chrom = str(hpo_data[all_hpos[0]]['all_genes'][gene]['gene_bt'][0].chrom)
+        start = str(hpo_data[all_hpos[0]]['all_genes'][gene]['gene_bt'][0].start)
+        end = str(hpo_data[all_hpos[0]]['all_genes'][gene]['gene_bt'][0].end)
+        control_freq = hpo_data[all_hpos[0]]['all_genes'][gene]['control_freq']
+        cred_ids = sorted(genedf.credible_set.tolist())
+
+        if n_hpos > 1:
+            # Compute pooled effect size as inverse-variance weighted average
+            lnors = []
+            variances = []
+            for hpo in all_hpos:
+                lnors.append(hpo_data[hpo]['all_genes'][gene]['lnOR'])
+                lower = hpo_data[hpo]['all_genes'][gene]['lnOR_lower']
+                upper = hpo_data[hpo]['all_genes'][gene]['lnOR_upper']
+                variances.append(ci2se((lower, upper)) ** 2)
+            lnor, lnor_ci = iv_mean(lnors, variances)
+            lnor_lower, lnor_upper = sorted(lnor_ci)
+
+            # Compute pooled case frequency as mean weighted by np.sqrt(N_cases)
+            cfreqs = [hpo_data[hpo]['all_genes'][gene]['case_freq'] for hpo in all_hpos]
+            cfreq_weights = [np.sqrt(ncase_dict[hpo]) for hpo in all_hpos]
+            case_freq = np.average(cfreqs, weights=cfreq_weights)
+
+        else:
+            lnor = hpo_data[all_hpos[0]]['all_genes'][gene]['lnOR']
+            lnor_lower = hpo_data[all_hpos[0]]['all_genes'][gene]['lnOR_lower']
+            lnor_upper = hpo_data[all_hpos[0]]['all_genes'][gene]['lnOR_upper']
+            case_freq = hpo_data[all_hpos[0]]['all_genes'][gene]['case_freq']
+
+        # Reassign empty variables for writing to outfile, if necessary
+        if len(vconf_hpos) == 0:
+            vconf_hpos = ['NA']
+        if len(conf_hpos) == 0:
+            conf_hpos = ['NA']
+
+        # Write gene stats to file
+        outline = '\t'.join([chrom, start, end, gene, cnv])
+        outnums_fmt = '\t{:.3E}\t{:.3E}\t{:.3}\t{:.3}\t{:.3}\t{:.3}'
+        outline += outnums_fmt.format(control_freq, case_freq, lnor, lnor_lower, 
+                                      lnor_upper, best_pip)
+        outline += '\t' + '\t'.join([str(n_hpos), ';'.join(all_hpos), ';'.join(vconf_hpos),
+                                     ';'.join(conf_hpos), ';'.join(cred_ids)]) + \
+                   '\n'
+        outfile.write(outline)
+
+    outfile.close()
+
+
+def output_credsets_bed(hpo_data, sig_df, outfile, conf_pip=0.1, vconf_pip=0.9, cnv='NS'):
+    """
+    Format final list of credible sets with summary statistics
+    """
+    
+    cols = 'chr start end credible_set_id cnv hpo mean_control_freq mean_case_freq ' + \
+           'pooled_ln_or pooled_ln_or_ci_lower pooled_ln_or_ci_upper ' + \
+           'best_pvalue n_genes all_genes top_gene vconf_genes conf_genes'
+    outfile.write('#' + '\t'.join(cols.split()) + '\n')
+
+    for cred in [x for x in set(sig_df.credible_set.tolist()) if x is not None]:
+        # Get basic credible set info
+        cred_df = sig_df.loc[sig_df.credible_set == cred, :]
+        hpo = cred_df.HPO.tolist()[0]
+        genes = sorted(list(set(cred_df.gene.tolist())))
+        vconf_genes = sorted(list(set(cred_df.gene[cred_df.PIP >= vconf_pip].tolist())))
+        conf_genes = sorted(list(set(cred_df.gene[(cred_df.PIP < vconf_pip) & \
+                                                  (cred_df.PIP >= conf_pip)].tolist())))
+        top_pip = np.nanmax(cred_df.PIP)
+        top_gene = sorted(list(set(cred_df.gene[cred_df.PIP == top_pip].tolist())))
+        top_gene = [g for g in top_gene if g in vconf_genes + conf_genes]
+        n_genes = len(genes)
+        gdat = hpo_data[hpo]['all_genes']
+        chrom = str(gdat[genes[0]]['gene_bt'][0].chrom)
+        start = str(np.nanmin([gdat[g]['gene_bt'][0].start for g in genes]))
+        end = str(np.nanmax([gdat[g]['gene_bt'][0].end for g in genes]))
+        best_p = np.nanmin([gdat[g]['primary_p'] for g in genes])
+        if best_p == 0:
+            best_z = np.nanmax([gdat[g]['zscore'] for g in genes])
+            best_p = norm.sf(best_z)
+        control_freq = np.nanmean([gdat[g]['control_freq'] for g in genes])
+        case_freq = np.nanmean([gdat[g]['case_freq'] for g in genes])
+
+        # Get pooled effect size as inverse-variance weighted mean of all genes
+        if n_genes > 1:
+            gors = [gdat[g]['lnOR'] for g in genes]
+            gvars = [ci2se((gdat[g]['lnOR_lower'], gdat[g]['lnOR_upper'])) ** 2 for g in genes]
+            lnor, lnor_ci = iv_mean(gors, gvars)
+            lnor_lower, lnor_upper = sorted(lnor_ci)
+
+        else:
+            lnor = gdat[genes[0]]['lnOR']
+            lnor_lower = gdat[genes[0]]['lnOR_lower']
+            lnor_upper = gdat[genes[0]]['lnOR_upper']
+
+        # Reassign empty variables for writing to outfile, if necessary
+        if len(vconf_genes) == 0:
+            vconf_genes = ['NA']
+        if len(conf_genes) == 0:
+            conf_genes = ['NA']
+        if len(top_gene) == 0:
+            top_gene = ['NA']
+
+        # Write gene stats to file
+        outline = '\t'.join([chrom, start, end, cred, cnv, hpo])
+        outnums_fmt = '\t{:.3E}\t{:.3E}\t{:.3}\t{:.3}\t{:.3}\t{:.3E}'
+        outline += outnums_fmt.format(control_freq, case_freq, lnor, lnor_lower, 
+                                      lnor_upper, best_p)
+        outline += '\t' + '\t'.join([str(n_genes), ';'.join(genes), ';'.join(top_gene),
+                                     ';'.join(vconf_genes), ';'.join(conf_genes)]) + \
+                   '\n'
+        outfile.write(outline)
+
+    outfile.close()
 
 
 def main():
@@ -703,6 +850,7 @@ def main():
                         'for functional fine-mapping. First column = gene name. ' +
                         'All other columns must be numeric features. Optionally, ' + 
                         'first three columns can be BED-like, and will be dropped.')
+    parser.add_argument('hpos_by_cohort', help='tsv of sample sizes per HPO.')
     parser.add_argument('--secondary-p-cutoff', help='Maximum secondary P-value to ' + 
                         'consider as significant. [default: 1]', default=1, type=float)
     parser.add_argument('--cnv', help='Indicate CNV type. [default: NS]', default='NS')
@@ -741,11 +889,14 @@ def main():
     parser.add_argument('-o', '--outfile', default='stdout', help='Output tsv of ' +
                         'final fine-mapping results for significant genes and ' + 
                         'phenotypes.')
-    parser.add_argument('--sig-loci-bed', help='Output BED of significant genes ' +
+    parser.add_argument('--sig-genes-bed', help='Output BED of significant genes ' +
                         'and their overall association statistics.')
     parser.add_argument('--sig-assoc-bed', help='Output BED of significant ' +
                         'gene-phenotype pairs and their corresponding association ' +
                         'statistics.')
+    parser.add_argument('--sig-credsets-bed', help='Output BED of credible sets ' +
+                        ' comprised of significant genes, and their corresponding ' +
+                        'association statistics.')
     parser.add_argument('--all-genes-outfile', help='Output tsv of final ' +
                         'fine-mapping results for all genes and phenotypes.')
     parser.add_argument('--naive-outfile', help='Output tsv of naive results ' +
@@ -813,16 +964,28 @@ def main():
         coeff_tables = [x[1] for x in finemap_res]
         coeff_avg(coeff_tables, coeffs_out, args.logit_alpha)
 
-    # Format & write final table of significant loci & associations
+    # Format & write final table of significant associations
     if args.sig_assoc_bed is not None:
         sig_assoc_bed = open(args.sig_assoc_bed, 'w')
-        format_assoc_bed(hpo_data, final_sig_df, sig_assoc_bed, args.statslist,
+        output_assoc_bed(hpo_data, final_sig_df, sig_assoc_bed,
                          args.confident_pip, args.very_confident_pip, args.cnv)
-    # DEV NOTE: NOT YET IMPLEMENTED
-    # if args.sig_loci_bed is not None:
-    #     sig_loci_bed = open(args.sig_loci_bed, 'w')
-    #     format_loci_bed(hpo_data, final_sig_df, sig_loci_bed, args.confident_pip,
-    #                      args.very_confident_pip)
+
+    # Read dict of N_case per HPO
+    ncase_df = pd.read_csv(args.hpos_by_cohort, sep='\t').loc[:, '#HPO Total'.split()]
+    ncase_df.index = ncase_df.iloc[:, 0]
+    ncase_dict = ncase_df.drop(columns='#HPO').transpose().to_dict(orient='records')[0]
+
+    # Format & write final table of significant genes
+    if args.sig_genes_bed is not None:
+        sig_genes_bed = open(args.sig_genes_bed, 'w')
+        output_genes_bed(hpo_data, final_sig_df, sig_genes_bed, ncase_dict,
+                         args.confident_pip, args.very_confident_pip, args.cnv)
+
+    # Format & write final table of credible sets (including sig. genes only)
+    if args.sig_credsets_bed is not None:
+        sig_credsets_bed = open(args.sig_credsets_bed, 'w')
+        output_credsets_bed(hpo_data, final_sig_df, sig_credsets_bed,
+                            args.confident_pip, args.very_confident_pip, args.cnv)
 
 
 if __name__ == '__main__':
