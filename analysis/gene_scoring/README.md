@@ -4,6 +4,8 @@ We developed a model to predict haploinsufficiency and triplosensitivity for eac
 
 The code to reproduce these analyses is contained in `gene_scoring_analysis.sh`.  
 
+In practice, this analysis was parallelized on [FireCloud/Terra](https://terra.bio) using `gene_scoring_analysis.wdl`.  
+
 ---  
 
 ## Dosage sensitivity scoring procedure

@@ -763,7 +763,7 @@ task finemap_genes {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b040d611a690a40c4a8cd11f158dad355a60ede74ebdf792a1ec3b68f22de9d4"
+    docker: "talkowski/rcnv@sha256:8506d9cd0b9635497055ceaf2d36c863456a432fa5b99a98e9dba77cadfdb292"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -789,21 +789,24 @@ task merge_finemap_res {
     sed -n '1p' ${credset_beds[0]} > credset_header.tsv
 
     # Merge genes
-    grep -ve '^#' ${sep=" " gene_beds} \
+    cat ${sep=" " gene_beds} \
+    | grep -ve '^#' \
     | sort -Vk1,1 -k2,2n -k3,3n -k4,4V -k5,5V -k13,13V \
     | cat gene_header.tsv - \
     | bgzip -c \
     > ${freq_code}.final_genes.genes.bed.gz
 
     # Merge associations
-    grep -ve '^#' ${sep=" " assoc_beds} \
+    cat ${sep=" " assoc_beds} \
+    | grep -ve '^#' \
     | sort -Vk1,1 -k2,2n -k3,3n -k4,4V -k5,5V -k6,6V \
     | cat assoc_header.tsv - \
     | bgzip -c \
     > ${freq_code}.final_genes.associations.bed.gz
 
     # Merge genes
-    grep -ve '^#' ${sep=" " credset_beds} \
+    cat ${sep=" " credset_beds} \
+    | grep -ve '^#' \
     | sort -Vk1,1 -k2,2n -k3,3n -k5,5V -k6,6V \
     | cat credset_header.tsv - \
     | bgzip -c \
@@ -822,7 +825,7 @@ task merge_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b040d611a690a40c4a8cd11f158dad355a60ede74ebdf792a1ec3b68f22de9d4"
+    docker: "talkowski/rcnv@sha256:8506d9cd0b9635497055ceaf2d36c863456a432fa5b99a98e9dba77cadfdb292"
     preemptible: 1
     bootDiskSizeGb: "20"
   }
@@ -1011,7 +1014,7 @@ task plot_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b040d611a690a40c4a8cd11f158dad355a60ede74ebdf792a1ec3b68f22de9d4"
+    docker: "talkowski/rcnv@sha256:8506d9cd0b9635497055ceaf2d36c863456a432fa5b99a98e9dba77cadfdb292"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

@@ -59,6 +59,7 @@ cat \
 | sort -k1,1V -k4,4n \
 | bgzip -c \
 > gencode.v19.canonical.gtf.gz
+tabix -f gencode.v19.canonical.gtf.gz
 
 
 # Apply pext filter to exons from canonical transcripts
@@ -84,6 +85,7 @@ tabix -f gnomad.v2.1.1.pext.bed.gz
   --lost-genes genes_lost_during_pext_filtering.genes.list \
   gencode.v19.canonical.gtf.gz \
   gnomad.v2.1.1.pext.bed.gz
+tabix -f gencode.v19.canonical.pext_filtered.gtf.gz
 
 
 # Make gene list of all canonical autosomal genes used in analysis
@@ -178,7 +180,7 @@ wget https://doi.org/10.1371/journal.pgen.1001154.s002
 
 
 # Copy canonical gene metadata to rCNV bucket (note: requires permissions)
-gsutil -m cp gencode.v19.canonical*.gz gs://rcnv_project/cleaned_data/genes/
+gsutil -m cp gencode.v19.canonical*.gz* gs://rcnv_project/cleaned_data/genes/
 gsutil -m cp gencode.v19.canonical*genes.list \
   gs://rcnv_project/cleaned_data/genes/gene_lists/
 gsutil -m cp genes_lost_during_pext_filtering.genes.list \

@@ -21,7 +21,7 @@ import subprocess
 import gzip
 
 
-def process_cnvs(bedpath, pad_controls, case_hpo, control_hpo):
+def process_cnvs(bedpath, pad_controls, case_hpo, control_hpo, max_size=None):
     """
     Read CNVs & extend control CNV breakpoints by a specified distance
     """
@@ -40,6 +40,10 @@ def process_cnvs(bedpath, pad_controls, case_hpo, control_hpo):
 
     cnvbt = cnvbt.each(_pad_control_cnv, pad_controls, control_hpo)
 
+    # Filter on max size, if optioned
+    if max_size is not None:
+        cnvbt = cnvbt.filter(lambda x: x.length <= max_size)
+
     def _filter_phenos(feature, case_hpo, control_hpo):
         """
         Filter CNVs based on phenotype
@@ -56,7 +60,7 @@ def process_cnvs(bedpath, pad_controls, case_hpo, control_hpo):
                 return False
 
     cnvbt = cnvbt.filter(_filter_phenos, case_hpo, control_hpo).saveas()
-
+    
     return cnvbt
 
 
@@ -336,6 +340,8 @@ def main():
     parser.add_argument('--min-cds-ovr', help='Minimum coding sequence overlap ' +
                         'to consider a CNV gene-overlapping. [default: 0.2]',
                         type=float, default=0.2)
+    parser.add_argument('--max-cnv-size', help='Maximum CNV size to be included. ' +
+                        '[default: No limit]', type=int, default=None)
     parser.add_argument('--max-genes', help='Maximum number of genes overlapped by ' + 
                         'a CNV before being the CNV is excluded. [default: 20000]',
                         type=int, default=20000)
@@ -386,7 +392,8 @@ def main():
         case_hpo = args.hpo
 
     # Process input CNV BED file
-    cnvbt = process_cnvs(args.cnvs, args.pad_controls, case_hpo, args.control_hpo)
+    cnvbt = process_cnvs(args.cnvs, args.pad_controls, case_hpo, args.control_hpo,
+                         args.max_cnv_size)
 
     if args.type is not None:
         if args.type != 'CNV':

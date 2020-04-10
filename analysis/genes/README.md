@@ -167,7 +167,7 @@ To accomplish this, we adapted several GWAS fine-mapping algorithms, as follows:
 
 4. Finally, we computed a 95% credible set of genes per block based on the cumulative sum of PIPs for genes ranked by causal likelihood. We only retained exome-wide significant genes after calculating each credible set (_i.e._, genes that were not originally exome-wide significant were included when calculating the 95% credible set, but were removed from the credible set after calculation).    
 
-For downstream analyses, we considered any gene with PIP ≥ 0.1 to be a "confident" causal gene, and any gene with PIP ≥ 0.9 to be a "very confident" causal gene.  
+For downstream analyses, we considered any gene with PIP ≥ 0.15 to be a "confident" causal gene, and any gene with PIP ≥ 0.85 to be a "very confident" causal gene.  
 
 #### 5. Reporting of final association statistics  
 
