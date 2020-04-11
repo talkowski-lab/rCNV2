@@ -23,6 +23,7 @@ workflow gene_burden_analysis {
   Float min_cds_ovr_dup
   Int max_genes_per_cnv
   String meta_model_prefix
+  Float prior_frac
   String rCNV_bucket
   File contiglist
 
@@ -249,6 +250,7 @@ task blacklist_priors_bfdp {
   String freq_code
   String rCNV_bucket
   Int cen_tel_dist
+  Float prior_frac
 
   command <<<
     set -e
@@ -271,9 +273,66 @@ task blacklist_priors_bfdp {
     | bgzip -c \
     > ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz
 
+    # Copy gene lists
+    gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes/gene_lists ./
 
+    # Define list of high-confidence dosage-sensitive genes
+    fgrep -wf gene_lists/DDG2P.hc_lof.genes.list \
+      gene_lists/ClinGen.hc_haploinsufficient.genes.list \
+    > gold_standard.ad_disease.genes.list
+    fgrep -wf gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
+      gold_standard.ad_disease.genes.list \
+    > gold_standard.haploinsufficient.genes.list
+
+    # Define list of high-confidence dosage-insensitive genes
+    cat gene_lists/HP0000118.HPOdb.genes.list \
+      gene_lists/DDG2P*.genes.list \
+      gene_lists/ClinGen*.genes.list \
+    | fgrep -wvf - gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
+    > gold_standard.no_disease_assoc.genes.list
+    fgrep -wf gene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list \
+      gold_standard.no_disease_assoc.genes.list \
+    > gold_standard.haplosufficient.genes.list
+
+    # Compute prior effect sizes
+    /opt/rCNV2/analysis/gene_scoring/estimate_prior_effect_sizes.R \
+      ${del_meta_stats} \
+      ${dup_meta_stats} \
+      ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+      gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
+      gold_standard.haploinsufficient.genes.list \
+      gold_standard.haplosufficient.genes.list \
+      ${freq_code}.prior_estimation
+    theta0_del=$( awk -v FS="\t" '{ if ($1=="theta0" && $2=="DEL") print $3 }' ${freq_code}.prior_estimation.empirical_prior_estimates.tsv )
+    theta0_dup=$( awk -v FS="\t" '{ if ($1=="theta0" && $2=="DUP") print $3 }' ${freq_code}.prior_estimation.empirical_prior_estimates.tsv )
+    theta1_del=$( awk -v FS="\t" '{ if ($1=="theta1" && $2=="DEL") print $3 }' ${freq_code}.prior_estimation.empirical_prior_estimates.tsv )
+    var1=$( awk -v FS="\t" '{ if ($1=="var1" && $2=="DEL") print $3 }' ${freq_code}.prior_estimation.empirical_prior_estimates.tsv )
+
+    # Compute BFDP per gene
+    for CNV in DEL DUP; do
+      # Set CNV-specific variables
+      case $CNV in
+        "DEL")
+          theta0=${theta0_del}
+          statsbed=${del_meta_stats}
+          ;;
+        "DUP")
+          theta0=${theta0_dup}
+          statsbed=${dup_meta_stats}
+          ;;
+      esac
+
+      # Compute BF & BFDR for all genes
+      /opt/rCNV2/analysis/gene_scoring/calc_gene_bfs.py \
+        --theta0 $theta0 \
+        --theta1 ${theta1} \
+        --var0 ${var1} \
+        --prior ${prior_frac} \
+        --blacklist ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+        --outfile ${freq_code}.$CNV.gene_abfs.tsv \
+        "$statsbed"
+    done
   >>>
-
 
   runtime {
     docker: "talkowski/rcnv@sha256:da2df0f4afcfa93d17e27ae5752f1665f0c53c8feed06d6d98d1da53144d8e1f"
@@ -284,5 +343,15 @@ task blacklist_priors_bfdp {
 
   output {
     File training_blacklist = "${freq_code}.gene_scoring.training_gene_blacklist.bed.gz"
+    File priors_tsv = "${freq_code}.prior_estimation.empirical_prior_estimates.tsv"
+    Float theta0_del = "$theta0_del"
+    Float theta0_dup = "$theta0_dup"
+    Float theta1 = "$theta1"
+    Float var0 = "$var1"
+    File del_bfdp = "${freq_code}.DEL.gene_abfs.tsv"
+    File dup_bfdp = "${freq_code}.DUP.gene_abfs.tsv"
+    Array[File] prior_plots = glob("${freq_code}.prior_estimation*pdf")
   }
+
+  
 }

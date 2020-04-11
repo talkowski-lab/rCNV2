@@ -84,10 +84,14 @@ def calc_bfdp(bf, prior):
     return bfdp
 
 
-def calc_all_bfs(sumstats, theta0, theta1, var0, prior):
+def calc_all_bfs(sumstats, theta0, theta1, var0, prior, blacklist=None):
     """
     Calculate BFs and BFDPs for all genes
     """
+
+    # Load gene blacklist, if optioned
+    if blacklist is not None:
+        bl_genes = sorted(list(set(pd.read_csv(blacklist, sep='\t').iloc[:, 3].tolist())))
 
     bfs = {}
     bfdps = {}
@@ -96,8 +100,12 @@ def calc_all_bfs(sumstats, theta0, theta1, var0, prior):
         bf = calc_bf(stats['lnOR'], stats['lnOR_lower'], stats['lnOR_upper'], 
                      theta0, theta1, var0)
         bfdp = calc_bfdp(bf, prior)
-        bfs[gene] = bf
-        bfdps[gene] = bfdp
+        if gene in bl_genes:
+            bfs[gene] = np.nan
+            bfdps[gene] = np.nan
+        else:
+            bfs[gene] = bf
+            bfdps[gene] = bfdp
 
     sumstats['bf'] = sumstats.index.map(bfs)
     sumstats['bfdp'] = sumstats.index.map(bfdps)
@@ -125,6 +133,8 @@ def main():
                         '[default: 1.467]', default=1.467, type=float)
     parser.add_argument('-p', '--prior', help='Prior probability of intolerance ' +
                         'per gene. [default: 0.115]', default=0.115, type=float)
+    parser.add_argument('-x', '--blacklist', help='BED of genes to exclude from ' +
+                        'calculations. [default: exclude no genes]')
     args = parser.parse_args()
 
     # Open connections to output files
@@ -137,7 +147,8 @@ def main():
     sumstats = load_sumstats(args.stats)
 
     # Calculate BFs and BFDPs
-    res = calc_all_bfs(sumstats, args.theta0, args.theta1, args.var0, args.prior)
+    res = calc_all_bfs(sumstats, args.theta0, args.theta1, args.var0, args.prior, 
+                       args.blacklist)
 
     res.to_csv(outfile, sep='\t', index=True, na_rep='NA')
 

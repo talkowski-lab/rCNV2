@@ -154,6 +154,7 @@ rCNV_bucket="gs://rcnv_project"
 del_meta_stats="HP0000118.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz"
 dup_meta_stats="HP0000118.rCNV.DUP.gene_burden.meta_analysis.stats.bed.gz"
 cen_tel_dist=1000000
+prior_frac=0.115
 
 
 # Create blacklist: Remove all genes within ±1Mb of a telomere/centromere, 
@@ -204,15 +205,34 @@ fgrep -wf gene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list \
   gold_standard.haploinsufficient.genes.list \
   gold_standard.haplosufficient.genes.list \
   ${freq_code}.prior_estimation
+theta0_del=$( awk -v FS="\t" '{ if ($1=="theta0" && $2=="DEL") print $3 }' ${freq_code}.prior_estimation.empirical_prior_estimates.tsv )
+theta0_dup=$( awk -v FS="\t" '{ if ($1=="theta0" && $2=="DUP") print $3 }' ${freq_code}.prior_estimation.empirical_prior_estimates.tsv )
+theta1_del=$( awk -v FS="\t" '{ if ($1=="theta1" && $2=="DEL") print $3 }' ${freq_code}.prior_estimation.empirical_prior_estimates.tsv )
+var1=$( awk -v FS="\t" '{ if ($1=="var1" && $2=="DEL") print $3 }' ${freq_code}.prior_estimation.empirical_prior_estimates.tsv )
 
-
-theta0_del=1.028
-theta0_dup=1.092
-theta1=2.825
-var=2.078
-prior=0.115
-
+# Compute BFDP per gene
 for CNV in DEL DUP; do
+  # Set CNV-specific variables
+  case $CNV in
+    "DEL")
+      theta0=${theta0_del}
+      statsbed=${del_meta_stats}
+      ;;
+    "DUP")
+      theta0=${theta0_dup}
+      statsbed=${dup_meta_stats}
+      ;;
+  esac
+
+  # Compute BF & BFDR for all genes
+  /opt/rCNV2/analysis/gene_scoring/calc_gene_bfs.py \
+    --theta0 $theta0 \
+    --theta1 ${theta1} \
+    --var0 ${var1} \
+    --prior ${prior_frac} \
+    --blacklist ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+    --outfile ${freq_code}.$CNV.gene_abfs.tsv \
+    "$statsbed"
 done
 
 
@@ -228,24 +248,6 @@ done
 
 # # Score all genes
 # for CNV in DEL DUP; do
-#   # Set CNV-specific variables
-  # case $CNV in
-  #   "DEL")
-  #     theta0=${theta0_del}
-  #     ;;
-  #   "DUP")
-  #     theta0=${theta0_dup}
-  #     ;;
-  # esac
-
-  # # Compute BF & BFDR for all genes
-  # /opt/rCNV2/analysis/gene_scoring/calc_gene_bfs.py \
-  #   --theta0 $theta0 \
-  #   --theta1 ${theta1} \
-  #   --var0 ${var} \
-  #   --prior ${prior} \
-  #   --outfile ${freq_code}.$CNV.gene_abfs.tsv \
-  #   stats/${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed.gz
 
 #   # Score all genes for each candidate model
 #   for model in logit svm randomforest lda naivebayes sgd; do
