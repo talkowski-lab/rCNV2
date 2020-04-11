@@ -51,7 +51,7 @@ meta_model_prefix="fe"
 for contig in $( seq 1 22 ); do
 
   # Extract contig of interest from GTF
-  tabix ${gtf} ${contig} | bgzip -c > subset.gtf.gz
+  tabix ${gtf} ${contig} | bgzip -c > ${contig}.gtf.gz
 
   # Iterate over metacohorts to compute single-cohort stats
   while read meta cohorts; do
@@ -87,10 +87,10 @@ for contig in $( seq 1 22 ); do
         --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
         -z \
         --verbose \
-        -o "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
+        -o "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.${contig}.bed.gz" \
         "$cnv_bed" \
-        subset.gtf.gz
-      tabix -f "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz"
+        ${contig}.gtf.gz
+      tabix -f "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.${contig}.bed.gz"
 
       # Perform burden test
       /opt/rCNV2/analysis/genes/gene_burden_test.R \
@@ -99,11 +99,11 @@ for contig in $( seq 1 22 ); do
         --cnv $CNV \
         --case-hpo ${hpo} \
         --bgzip \
-        "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
-        "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
-      tabix -f "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
+        "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.${contig}.bed.gz" \
+        "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.${contig}.bed.gz"
+      tabix -f "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.${contig}.bed.gz"
     done
-  done < ${metacohort_list}
+  done < <( fgrep -v "mega" ${metacohort_list} )
 
 done
 
@@ -111,99 +111,152 @@ done
 for CNV in DEL DUP; do
   echo $CNV
 
+  # Make list of stats files to be considered
+  find / -name "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.*.bed.gz" \
+  > stats.paths.list
+
+  # Merge burden stats per cohort
+  zcat $( sed -n '1p' stats.paths.list ) | sed -n '1p' > header.tsv
+  while read meta cohort; do
+    zcat $( fgrep $meta stats.paths.list ) \
+    | grep -ve '^#' \
+    | sort -Vk1,1 -k2,2n -k3,3n \
+    | cat header.tsv - \
+    | bgzip -c \
+    > "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
+    tabix -f "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
+  done < ${metacohort_list}
+
+  # Make input for meta-analysis
   while read meta cohorts; do
-    echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
+    echo -e "$meta\t$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
   done < <( fgrep -v mega ${metacohort_list} ) \
-  > ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt
+  > ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt
   
+  # Run meta-analysis
   /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
-    --or-corplot ${prefix}.${freq_code}.$CNV.gene_burden.or_corplot_grid.jpg \
     --model ${meta_model_prefix} \
     --p-is-phred \
     --spa \
-    ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
-    ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
-  bgzip -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
-  tabix -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed.gz
+    ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt \
+    ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed
+  bgzip -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed
+  tabix -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz
 done
 
 
+# The following code chunk performs three tasks in serial:
+# 1. Determine genes to blacklist during training
+# 2. Estimate effect size priors
+# 3. Compute BFDP per gene
+freq_code="rCNV"
+rCNV_bucket="gs://rcnv_project"
+del_meta_stats="HP0000118.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz"
+dup_meta_stats="HP0000118.rCNV.DUP.gene_burden.meta_analysis.stats.bed.gz"
+cen_tel_dist=1000000
+
+
+# Create blacklist: Remove all genes within ±1Mb of a telomere/centromere, 
+# or those within known genomic disorder regions
+gsutil -m cp ${rCNV_bucket}/refs/GRCh37.centromeres_telomeres.bed.gz ./
+zcat GRCh37.centromeres_telomeres.bed.gz \
+| awk -v FS="\t" -v OFS="\t" -v d=${cen_tel_dist} \
+  '{ if ($2-d<0) print $1, "0", $3+d; else print $1, $2-d, $3+d }' \
+| cat - <( zcat /opt/rCNV2/refs/UKBB_GD.Owen_2018.bed.gz | cut -f1-3 ) \
+| sort -Vk1,1 -k2,2n -k3,3n \
+| bedtools merge -i - \
+> ${freq_code}.gene_scoring.training_mask.bed.gz
+bedtools intersect -u \
+  -a ${del_meta_stats} \
+  -b ${freq_code}.gene_scoring.training_mask.bed.gz \
+| cut -f1-4 \
+| cat <( echo -e "#chr\tstart\tend\tgene" ) - \
+| bgzip -c \
+> ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz
+
+# Copy gene lists
+gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes/gene_lists ./
+
+# Define list of high-confidence dosage-sensitive genes
+fgrep -wf gene_lists/DDG2P.hc_lof.genes.list \
+  gene_lists/ClinGen.hc_haploinsufficient.genes.list \
+> gold_standard.ad_disease.genes.list
+fgrep -wf gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
+  gold_standard.ad_disease.genes.list \
+> gold_standard.haploinsufficient.genes.list
+
+# Define list of high-confidence dosage-insensitive genes
+cat gene_lists/HP0000118.HPOdb.genes.list \
+  gene_lists/DDG2P*.genes.list \
+  gene_lists/ClinGen*.genes.list \
+| fgrep -wvf - gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
+> gold_standard.no_disease_assoc.genes.list
+fgrep -wf gene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list \
+  gold_standard.no_disease_assoc.genes.list \
+> gold_standard.haplosufficient.genes.list
+
+# Compute prior effect sizes
+/opt/rCNV2/analysis/gene_scoring/estimate_prior_effect_sizes.R \
+  ${del_meta_stats} \
+  ${dup_meta_stats} \
+  ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+  gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
+  gold_standard.haploinsufficient.genes.list \
+  gold_standard.haplosufficient.genes.list \
+  ${freq_code}.prior_estimation
+
+
+theta0_del=1.028
+theta0_dup=1.092
+theta1=2.825
+var=2.078
+prior=0.115
+
+for CNV in DEL DUP; do
+done
+
+
+
+
 # # Test/dev parameters for gene scoring
-# theta0_del=1.161
-# theta0_dup=0.837
-# theta1=2.229
-# var=1.294
-# prior=0.115
-# gene_features="gencode.v19.canonical.pext_filtered.all_features.eigenfeatures.bed.gz"
-# raw_gene_features="gencode.v19.canonical.pext_filtered.all_features.bed.gz"
+# gene_features="gene_metadata/gencode.v19.canonical.pext_filtered.all_features.eigenfeatures.bed.gz"
+# raw_gene_features="gene_metadata/gencode.v19.canonical.pext_filtered.all_features.bed.gz"
 # elnet_alpha=0.1
 # elnet_l1_l2_mix=1
 
-
-# # Copy all gene lists, metadata, and rCNV association stats
-# gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes/gene_lists ./
-# mkdir gene_metadata && \
-#   gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes/metadata ./gene_metadata
-# mkdir stats && \
-#   gsutil -m cp -r \
-#     ${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/stats/**meta_analysis**bed.gz \
-#     ./stats/
-# gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/${phenotype_list} ./
-# gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/${metacohort_sample_table} ./
-# gsutil -m cp ${rCNV_bucket}/cleaned_data/genes/metadata/${gene_features} ./
-# gsutil -m cp ${rCNV_bucket}/cleaned_data/genes/metadata/${raw_gene_features} ./
-
-
-# # Define list of high-confidence dosage-sensitive genes
-# fgrep -wf gene_lists/DDG2P.hc_lof.genes.list \
-#   gene_lists/ClinGen.hc_haploinsufficient.genes.list \
-# > gold_standard.ad_disease.genes.list
-# fgrep -wf gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
-#   gold_standard.ad_disease.genes.list \
-# > gold_standard.haploinsufficient.genes.list
-
-
-# # Define list of high-confidence dosage-insensitive genes
-# cat gene_lists/HP0000118.HPOdb.genes.list \
-#   gene_lists/DDG2P*.genes.list \
-#   gene_lists/ClinGen*.genes.list \
-# | fgrep -wvf - gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
-# > gold_standard.no_disease_assoc.genes.list
-# fgrep -wf gene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list \
-#   gold_standard.no_disease_assoc.genes.list \
-# > gold_standard.haplosufficient.genes.list
 
 
 # # Score all genes
 # for CNV in DEL DUP; do
 #   # Set CNV-specific variables
-#   case $CNV in
-#     "DEL")
-#       theta0=${theta0_del}
-#       ;;
-#     "DUP")
-#       theta0=${theta0_dup}
-#       ;;
-#   esac
+  # case $CNV in
+  #   "DEL")
+  #     theta0=${theta0_del}
+  #     ;;
+  #   "DUP")
+  #     theta0=${theta0_dup}
+  #     ;;
+  # esac
 
-#   # Compute BF & BFDR for all genes
-#   /opt/rCNV2/analysis/gene_scoring/calc_gene_bfs.py \
-#     --theta0 $theta0 \
-#     --theta1 ${theta1} \
-#     --var0 ${var} \
-#     --prior ${prior} \
-#     --outfile ${freq_code}.$CNV.gene_abfs.tsv \
-#     stats/${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed.gz
+  # # Compute BF & BFDR for all genes
+  # /opt/rCNV2/analysis/gene_scoring/calc_gene_bfs.py \
+  #   --theta0 $theta0 \
+  #   --theta1 ${theta1} \
+  #   --var0 ${var} \
+  #   --prior ${prior} \
+  #   --outfile ${freq_code}.$CNV.gene_abfs.tsv \
+  #   stats/${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed.gz
 
 #   # Score all genes for each candidate model
 #   for model in logit svm randomforest lda naivebayes sgd; do
-#     /opt/rCNV2/analysis/gene_scoring/score_genes.py \
-#       --model ${model} \
-#       --regularization-alpha ${elnet_alpha} \
-#       --regularization-l1-l2-mix ${elnet_l1_l2_mix} \
-#       --outfile ${freq_code}.$CNV.gene_scores.${model}.tsv \
-#       ${freq_code}.$CNV.gene_abfs.tsv \
-#       ${gene_features}
+    /opt/rCNV2/analysis/gene_scoring/score_genes.py \
+      --centromeres GRCh37.centromeres_telomeres.bed.gz \
+      --model ${model} \
+      --regularization-alpha ${elnet_alpha} \
+      --regularization-l1-l2-mix ${elnet_l1_l2_mix} \
+      --outfile ${freq_code}.$CNV.gene_scores.${model}.tsv \
+      ${freq_code}.$CNV.gene_abfs.tsv \
+      ${gene_features}
 #   done
 
 #   # Compare models, and manually evaluate to determine best model

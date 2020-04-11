@@ -14,6 +14,7 @@ model_options = 'logit svm randomforest lda naivebayes sgd'.split()
 
 
 from os import path
+import pybedtools as pbt
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import scale, StandardScaler
@@ -27,6 +28,30 @@ from sklearn.linear_model import SGDClassifier as SGDC
 from scipy.stats import norm
 import argparse
 from sys import stdout
+
+
+def get_chrom_arms(features_in, centromeres_in):
+    """
+    Assign genes to chromosome arms based on centromere coordinates
+    Returns: dict of gene : chromosome arm
+    """
+
+    genes_bt = pbt.BedTool(features_in).cut(range(4)).saveas()
+    chroms = list(set([x.chrom for x in genes_bt]))
+    cen_bt = pbt.BedTool(centromeres_in).\
+                 filter(lambda x: x[3] == 'centromere' and x.chrom in chroms).\
+                 saveas()
+
+    arm_dict = {}
+
+    for x in genes_bt.closest(cen_bt, D='b'):
+        gene = x[3]
+        if int(x[-1]) >= 0:
+            arm_dict[gene] = x.chrom + 'p'
+        else:
+            arm_dict[gene] = x.chrom + 'q'
+
+    return arm_dict
 
 
 def load_stats(stats_in):
@@ -256,6 +281,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('stats', help='.tsv of stats with bfdp per gene.')
     parser.add_argument('features', help='.bed.gz of functional features per gene.')
+    parser.add_argument('-c', '--centromeres', help='Centromeres BED.')
     parser.add_argument('-m', '--model', choices=model_options, default='logit',
                         help='Choice of classifier. [default: logit]')
     parser.add_argument('--regularization-alpha', dest='logit_alpha', type=float,
@@ -275,12 +301,20 @@ def main():
     else:
         outfile = open(args.outfile, 'w')
 
+    # If centromeres BED file is specified, rewrite all gene chromosomes to also
+    # include p/q arm designation for train/test balancing
+    if args.centromeres is not None:
+        arm_dict = get_chrom_arms(args.features, args.centromeres)
+    else:
+        arm_dict = None
+    import pdb; pdb.set_trace()
+
     # Import gene stats
-    sumstats = load_stats(args.stats)
+    sumstats = load_stats(args.stats, args.centromeres)
     chroms = sorted(np.unique(sumstats.chrom.values))
 
-    # Pair all chromosomes
-    chrompairs = pair_chroms(sumstats, chroms)
+    # Pair all chromosomes (or group chromosome arms, if optioned)
+    chrompairs = pair_chroms(sumstats, chroms, args.centromeres)
 
     # Read gene features
     features = load_features(args.features)
