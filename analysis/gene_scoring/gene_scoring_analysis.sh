@@ -205,21 +205,29 @@ fgrep -wf gene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list \
   gold_standard.haploinsufficient.genes.list \
   gold_standard.haplosufficient.genes.list \
   ${freq_code}.prior_estimation
-theta0_del=$( awk -v FS="\t" '{ if ($1=="theta0" && $2=="DEL") print $3 }' ${freq_code}.prior_estimation.empirical_prior_estimates.tsv )
-theta0_dup=$( awk -v FS="\t" '{ if ($1=="theta0" && $2=="DUP") print $3 }' ${freq_code}.prior_estimation.empirical_prior_estimates.tsv )
-theta1_del=$( awk -v FS="\t" '{ if ($1=="theta1" && $2=="DEL") print $3 }' ${freq_code}.prior_estimation.empirical_prior_estimates.tsv )
-var1=$( awk -v FS="\t" '{ if ($1=="var1" && $2=="DEL") print $3 }' ${freq_code}.prior_estimation.empirical_prior_estimates.tsv )
+awk -v FS="\t" '{ if ($1=="theta0" && $2=="DEL") print $3 }' \
+  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+> theta0_del.tsv
+awk -v FS="\t" '{ if ($1=="theta0" && $2=="DUP") print $3 }' \
+  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+> theta0_dup.tsv
+awk -v FS="\t" '{ if ($1=="theta1" && $2=="DEL") print $3 }' \
+  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+> theta1.tsv
+awk -v FS="\t" '{ if ($1=="var1" && $2=="DEL") print $3 }' \
+  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+> var1.tsv
 
 # Compute BFDP per gene
 for CNV in DEL DUP; do
   # Set CNV-specific variables
   case $CNV in
     "DEL")
-      theta0=${theta0_del}
+      theta0=$( cat theta0_del.tsv )
       statsbed=${del_meta_stats}
       ;;
     "DUP")
-      theta0=${theta0_dup}
+      theta0=$( cat theta0_dup.tsv )
       statsbed=${dup_meta_stats}
       ;;
   esac
@@ -227,8 +235,8 @@ for CNV in DEL DUP; do
   # Compute BF & BFDR for all genes
   /opt/rCNV2/analysis/gene_scoring/calc_gene_bfs.py \
     --theta0 $theta0 \
-    --theta1 ${theta1} \
-    --var0 ${var1} \
+    --theta1 $( cat theta1.tsv ) \
+    --var0 $( cat var1.tsv ) \
     --prior ${prior_frac} \
     --blacklist ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
     --outfile ${freq_code}.$CNV.gene_abfs.tsv \
@@ -238,11 +246,32 @@ done
 
 
 
-# # Test/dev parameters for gene scoring
-# gene_features="gene_metadata/gencode.v19.canonical.pext_filtered.all_features.eigenfeatures.bed.gz"
+# Score genes for a single model & CNV type
+# Dev/test parameters
+freq_code="rCNV"
+rCNV_bucket="gs://rcnv_project"
+CNV="DEL"
+BFDP_stats="${freq_code}.${CNV}.gene_abfs.tsv"
+gene_features="gencode.v19.canonical.pext_filtered.all_features.eigenfeatures.bed.gz"
 # raw_gene_features="gene_metadata/gencode.v19.canonical.pext_filtered.all_features.bed.gz"
-# elnet_alpha=0.1
-# elnet_l1_l2_mix=1
+model="logit"
+elnet_alpha=0.1
+elnet_l1_l2_mix=1
+
+# Copy centromeres bed
+gsutil -m cp ${rCNV_bucket}/refs/GRCh37.centromeres_telomeres.bed.gz ./
+
+# Score genes
+/opt/rCNV2/analysis/gene_scoring/score_genes.py \
+  --centromeres GRCh37.centromeres_telomeres.bed.gz \
+  --model ${model} \
+  --regularization-alpha ${elnet_alpha} \
+  --regularization-l1-l2-mix ${elnet_l1_l2_mix} \
+  --outfile ${freq_code}.${CNV}.gene_scores.${model}.tsv \
+  ${freq_code}.$CNV.gene_abfs.tsv \
+  ${gene_features}
+
+
 
 
 
@@ -251,14 +280,6 @@ done
 
 #   # Score all genes for each candidate model
 #   for model in logit svm randomforest lda naivebayes sgd; do
-    /opt/rCNV2/analysis/gene_scoring/score_genes.py \
-      --centromeres GRCh37.centromeres_telomeres.bed.gz \
-      --model ${model} \
-      --regularization-alpha ${elnet_alpha} \
-      --regularization-l1-l2-mix ${elnet_l1_l2_mix} \
-      --outfile ${freq_code}.$CNV.gene_scores.${model}.tsv \
-      ${freq_code}.$CNV.gene_abfs.tsv \
-      ${gene_features}
 #   done
 
 #   # Compare models, and manually evaluate to determine best model

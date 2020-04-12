@@ -23,13 +23,19 @@ workflow gene_burden_analysis {
   Float min_cds_ovr_dup
   Int max_genes_per_cnv
   String meta_model_prefix
+  Int cen_tel_dist
   Float prior_frac
+  File gene_features
+  Float elnet_alpha
+  Float elnet_l1_l2_mix
   String rCNV_bucket
   File contiglist
 
   Array[Array[String]] contigs = read_tsv(contiglist)
 
   Array[String] cnv_types = ["DEL", "DUP"]
+
+  Array[String] models = ["logit", "svm", "randomforest", "lda", "naivebayes", "sgd"]
 
   # Scatter over contigs (for speed)
   scatter ( contig in contigs ) {
@@ -74,8 +80,36 @@ workflow gene_burden_analysis {
     input:
       del_meta_stats=rCNV_meta_analysis.meta_stats_bed[0],
       dup_meta_stats=rCNV_meta_analysis.meta_stats_bed[1],
+      freq_code="rCNV",
+      rCNV_bucket=rCNV_bucket,
+      cen_tel_dist=cen_tel_dist,
+      prior_frac=prior_frac
+  }
 
-
+  # Score genes for each model
+  scatter ( model in models ) {
+    call score_genes as score_genes_DEL {
+      input:
+        CNV="DEL",
+        BFDP_stats=blacklist_priors_bfdp.del_bfdp,
+        gene_features=gene_features,
+        model=model,
+        elnet_alpha=elnet_alpha,
+        elnet_l1_l2_mix=elnet_l1_l2_mix,
+        freq_code="rCNV",
+        rCNV_bucket=rCNV_bucket
+    }
+    call score_genes as score_genes_DUP {
+      input:
+        CNV="DUP",
+        BFDP_stats=blacklist_priors_bfdp.dup_bfdp,
+        gene_features=gene_features,
+        model=model,
+        elnet_alpha=elnet_alpha,
+        elnet_l1_l2_mix=elnet_l1_l2_mix,
+        freq_code="rCNV",
+        rCNV_bucket=rCNV_bucket
+    }
   }
 }
 
@@ -226,6 +260,11 @@ task merge_and_meta_analysis {
       ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed
     bgzip -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed
     tabix -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz
+
+    # Copy meta-analysis results to Google bucket
+    gsutil -m cp \
+      ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz* \
+      ${rCNV_bucket}/analysis/gene_scoring/data/
   >>>
 
   runtime {
@@ -303,21 +342,29 @@ task blacklist_priors_bfdp {
       gold_standard.haploinsufficient.genes.list \
       gold_standard.haplosufficient.genes.list \
       ${freq_code}.prior_estimation
-    theta0_del=$( awk -v FS="\t" '{ if ($1=="theta0" && $2=="DEL") print $3 }' ${freq_code}.prior_estimation.empirical_prior_estimates.tsv )
-    theta0_dup=$( awk -v FS="\t" '{ if ($1=="theta0" && $2=="DUP") print $3 }' ${freq_code}.prior_estimation.empirical_prior_estimates.tsv )
-    theta1_del=$( awk -v FS="\t" '{ if ($1=="theta1" && $2=="DEL") print $3 }' ${freq_code}.prior_estimation.empirical_prior_estimates.tsv )
-    var1=$( awk -v FS="\t" '{ if ($1=="var1" && $2=="DEL") print $3 }' ${freq_code}.prior_estimation.empirical_prior_estimates.tsv )
+    awk -v FS="\t" '{ if ($1=="theta0" && $2=="DEL") print $3 }' \
+      ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+    > theta0_del.tsv
+    awk -v FS="\t" '{ if ($1=="theta0" && $2=="DUP") print $3 }' \
+      ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+    > theta0_dup.tsv
+    awk -v FS="\t" '{ if ($1=="theta1" && $2=="DEL") print $3 }' \
+      ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+    > theta1.tsv
+    awk -v FS="\t" '{ if ($1=="var1" && $2=="DEL") print $3 }' \
+      ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+    > var1.tsv
 
     # Compute BFDP per gene
     for CNV in DEL DUP; do
       # Set CNV-specific variables
       case $CNV in
         "DEL")
-          theta0=${theta0_del}
+          theta0=$( cat theta0_del.tsv )
           statsbed=${del_meta_stats}
           ;;
         "DUP")
-          theta0=${theta0_dup}
+          theta0=$( cat theta0_dup.tsv )
           statsbed=${dup_meta_stats}
           ;;
       esac
@@ -325,17 +372,30 @@ task blacklist_priors_bfdp {
       # Compute BF & BFDR for all genes
       /opt/rCNV2/analysis/gene_scoring/calc_gene_bfs.py \
         --theta0 $theta0 \
-        --theta1 ${theta1} \
-        --var0 ${var1} \
+        --theta1 $( cat theta1.tsv ) \
+        --var0 $( cat var1.tsv ) \
         --prior ${prior_frac} \
         --blacklist ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
         --outfile ${freq_code}.$CNV.gene_abfs.tsv \
         "$statsbed"
     done
+
+    # Copy results to Google bucket
+    gsutil -m cp \
+      ${freq_code}.*.gene_abfs.tsv \
+      ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+      ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+      ${rCNV_bucket}/analysis/gene_scoring/data/
+    gsutil -m cp \
+      gold_standard.*.genes.list \
+      ${rCNV_bucket}/analysis/gene_scoring/gene_lists/
+    gsutil -m cp \
+      *.pdf \
+      ${rCNV_bucket}/analysis/gene_scoring/plots/
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:da2df0f4afcfa93d17e27ae5752f1665f0c53c8feed06d6d98d1da53144d8e1f"
+    docker: "talkowski/rcnv@sha256:0489fe64e3f34b3751a15930c2d85b5b7291fe5cdc0db98f3ba001d06f8f6617"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -344,14 +404,59 @@ task blacklist_priors_bfdp {
   output {
     File training_blacklist = "${freq_code}.gene_scoring.training_gene_blacklist.bed.gz"
     File priors_tsv = "${freq_code}.prior_estimation.empirical_prior_estimates.tsv"
-    Float theta0_del = "$theta0_del"
-    Float theta0_dup = "$theta0_dup"
-    Float theta1 = "$theta1"
-    Float var0 = "$var1"
+    Float theta0_del = read_float("theta0_del.tsv")
+    Float theta0_dup = read_float("theta0_dup.tsv")
+    Float theta1 = read_float("theta1.tsv")
+    Float var0 = read_float("var1.tsv")
     File del_bfdp = "${freq_code}.DEL.gene_abfs.tsv"
     File dup_bfdp = "${freq_code}.DUP.gene_abfs.tsv"
     Array[File] prior_plots = glob("${freq_code}.prior_estimation*pdf")
   }
-
-  
 }
+
+
+# Score all genes for one model & CNV type
+task score_genes {
+  String CNV
+  File BFDP_stats
+  File gene_features
+  String model
+  Float elnet_alpha
+  Float elnet_l1_l2_mix
+  String freq_code
+  String rCNV_bucket
+
+  command <<<
+    set -e
+
+    # Copy centromeres bed
+    gsutil -m cp ${rCNV_bucket}/refs/GRCh37.centromeres_telomeres.bed.gz ./
+
+    # Score genes
+    /opt/rCNV2/analysis/gene_scoring/score_genes.py \
+      --centromeres GRCh37.centromeres_telomeres.bed.gz \
+      --model ${model} \
+      --regularization-alpha ${elnet_alpha} \
+      --regularization-l1-l2-mix ${elnet_l1_l2_mix} \
+      --outfile ${freq_code}.${CNV}.gene_scores.${model}.tsv \
+      ${freq_code}.$CNV.gene_abfs.tsv \
+      ${gene_features}
+
+    # Copy scores to Google bucket
+    gsutil -m cp \
+      ${freq_code}.${CNV}.gene_scores.${model}.tsv \
+      ${rCNV_bucket}/analysis/gene_scoring/all_models/
+  >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:0489fe64e3f34b3751a15930c2d85b5b7291fe5cdc0db98f3ba001d06f8f6617"
+    preemptible: 1
+    memory: "8 GB"
+    bootDiskSizeGb: "20"
+  }
+
+  output {
+    File scores_tsv "${freq_code}.${CNV}.gene_scores.${model}.tsv"
+  }
+}
+

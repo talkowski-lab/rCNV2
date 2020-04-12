@@ -54,7 +54,7 @@ def get_chrom_arms(features_in, centromeres_in):
     return arm_dict
 
 
-def load_stats(stats_in):
+def load_stats(stats_in, arm_dict=None):
     """
     Load & format stats per gene
     """
@@ -65,15 +65,20 @@ def load_stats(stats_in):
     ss.set_axis(ss.gene, axis=0, inplace=True)
     ss.drop(labels='gene', axis=1, inplace=True)
 
+    # Rewrite gene chromosomes, if optioned
+    if arm_dict is not None:
+        ss['chrom'] = ss.index.map(arm_dict)
+
     # Convert bfdp to numeric
     ss['bfdp'] = pd.to_numeric(ss['bfdp'], errors='coerce')
 
     return ss
 
 
-def pair_chroms(sumstats, chroms, quiet=False):
+def pair_chroms(sumstats, chroms, n_pairs=11, quiet=False):
     """
     Divide all chromosomes into pairs based on total number of genes
+    Or, if --centromeres is provided, groups chromosome arms into 11 groups
     """
 
     # Count genes per chromosome and sort by number of genes
@@ -81,17 +86,20 @@ def pair_chroms(sumstats, chroms, quiet=False):
     gpc = {c : g for c, g in sorted(gpc.items(), key=lambda item: item[1], reverse=True)}
     sortchroms = list(gpc.keys())
 
-    chrompairs = []
-    for i in range(0, int(len(chroms) / 2) ):
-        topchrom = sortchroms[i]
-        bottomchrom = sortchroms[-(i+1)]
-        chrompairs.append((topchrom, bottomchrom))
+    chrompairs_dict = {x : {'chroms' : ( ), 'ngenes' : 0} for x in range(n_pairs)}
+    for chrom, ngenes in gpc.items():
+        target_pair = list(chrompairs_dict.keys())[0]
+        chrompairs_dict[target_pair]['chroms'] += (chrom, )
+        chrompairs_dict[target_pair]['ngenes'] += ngenes
+        chrompairs_dict = {c : n for c, n in sorted(chrompairs_dict.items(), key=lambda x: x[1]['ngenes'])}
+
+    chrompairs = [x['chroms'] for x in chrompairs_dict.values()]
 
     if not quiet:
-        print('\nChromosome pairings:\n\nchrA\tchrB\tgenes')
+        print('\nChromosome pairings:\n\ngenes\tchroms')
         for pair in chrompairs:
-            ngenes = gpc[pair[0]] + gpc[pair[1]]
-            print('{}\t{}\t{:,}'.format(pair[0], pair[1], ngenes))
+            ngenes = np.nansum([gpc[c] for c in pair])
+            print('{:,}\t{}'.format(ngenes, ', '.join(list(pair))))
 
     return chrompairs
 
@@ -211,6 +219,7 @@ def fit_model_cv(features, sumstats, all_pairs, model='logit', logit_alpha=0.1,
                  l1_l2_mix=1):
     """
     Fit model with N-fold CV 
+    Random = True will randomly subsample genes across all_pairs for train/test sets
     """
 
     models = []
@@ -243,12 +252,12 @@ def predict_bfdps(features, sumstats, chrompairs, model='logit', logit_alpha=0.1
         pred_genes = list(sumstats.index[sumstats.chrom.isin(pred_chroms)])
 
         if not quiet:
-            msg = 'Now scoring {:,} genes from chromsomes {} & {}'
-            print(msg.format(len(pred_genes), pred_chroms[0], pred_chroms[1]))
+            msg = 'Now scoring {:,} genes from chromsomes {}'
+            print(msg.format(len(pred_genes), ', '.join(pred_chroms)))
         
         # Fit model
         fitted_model, rmse = fit_model_cv(features, sumstats, train_pairs, model, 
-                                   logit_alpha, l1_l2_mix)
+                                          logit_alpha, l1_l2_mix)
 
         # Predict bfdps
         pred_df = features.loc[features.index.isin(pred_genes), :]
@@ -307,14 +316,13 @@ def main():
         arm_dict = get_chrom_arms(args.features, args.centromeres)
     else:
         arm_dict = None
-    import pdb; pdb.set_trace()
 
     # Import gene stats
-    sumstats = load_stats(args.stats, args.centromeres)
+    sumstats = load_stats(args.stats, arm_dict)
     chroms = sorted(np.unique(sumstats.chrom.values))
 
     # Pair all chromosomes (or group chromosome arms, if optioned)
-    chrompairs = pair_chroms(sumstats, chroms, args.centromeres)
+    chrompairs = pair_chroms(sumstats, chroms)
 
     # Read gene features
     features = load_features(args.features)
