@@ -17,12 +17,6 @@ options(stringsAsFactors=F, scipen=1000)
 #################
 ### FUNCTIONS ###
 #################
-# Load & clean original BFDPs
-load.orig.bfdps <- function(bfdps.in){
-  x <- read.table(bfdps.in, header=T, sep="\t", comment.char="")
-  x[, which(colnames(x) %in% c("gene", "bfdp"))]
-}
-
 # Load a single gene score .tsv
 load.stats <- function(path){
   x <- read.table(path, header=T, sep="\t", comment.char="")[, c(1, 3)]
@@ -64,12 +58,12 @@ prc <- function(stats, score, true.genes, false.genes, steps=seq(1, 0, -0.001)){
   return(prc_res)
 }
 
-# Compute RMSE vs original BFDPs
-calc.rmse <- function(stats, score, orig.bfdps){
-  x <- merge(stats, orig.bfdps, all=F, sort=F, by="gene")
-  keep.idx <- which(apply(x[, 2:3], 1, function(vals){all(!is.na(vals))}))
-  sqrt(sum((x[keep.idx, 2] - x[keep.idx, 3])^2, na.rm=T) / length(keep.idx))
-}
+# # Compute RMSE vs original BFDPs
+# calc.rmse <- function(stats, score, orig.bfdps){
+#   x <- merge(stats, orig.bfdps, all=F, sort=F, by="gene")
+#   keep.idx <- which(apply(x[, 2:3], 1, function(vals){all(!is.na(vals))}))
+#   sqrt(sum((x[keep.idx, 2] - x[keep.idx, 3])^2, na.rm=T) / length(keep.idx))
+# }
 
 # Wrapper to calculate all plotting data for a single model
 calc.plot.data <- function(stats, score, true.genes, false.genes){
@@ -77,16 +71,15 @@ calc.plot.data <- function(stats, score, true.genes, false.genes){
   roc.auc <- flux::auc(roc.res$frac_false, roc.res$frac_true)
   prc.res <- prc(stats, score, true.genes, false.genes)
   prc.auc <- flux::auc(prc.res$recall, prc.res$precision)
-  rmse <- calc.rmse(stats, score, orig.bfdps)
+  # rmse <- calc.rmse(stats, score, orig.bfdps)
   return(list("roc"=roc.res,
               "roc.auc"=roc.auc,
               "prc"=prc.res,
-              "prc.auc"=prc.auc,
-              "rmse"=rmse))
+              "prc.auc"=prc.auc))
 }
 
 # Wrapper to calculate all plotting data for all models
-load.all.models <- function(inlist.in, orig.bdfps, true.genes, false.genes){
+load.all.models <- function(inlist.in, true.genes, false.genes){
   inlist <- read.table(inlist.in, header=F, comment.char="", sep="\t")
   data <- lapply(1:nrow(inlist), function(i){
     stats <- load.stats(inlist[i, 2])
@@ -97,12 +90,21 @@ load.all.models <- function(inlist.in, orig.bdfps, true.genes, false.genes){
 }
 
 # Compile summary table of models
-get.sum.table <- function(data){
-  x <- do.call("rbind", lapply(data, function(l){c(l$rmse, l$roc.auc, l$prc.auc)}))
-  x <- as.data.frame(cbind(names(data), x))
-  colnames(x) <- c("model", "mean_rmse", "auroc", "auprc")
+get.sum.table <- function(del, dup){
+  sumdat <- t(sapply(names(del), function(model){
+    del.auroc <- del[[which(names(del)==model)]]$roc.auc
+    del.auprc <- del[[which(names(del)==model)]]$prc.auc
+    dup.auroc <- dup[[which(names(dup)==model)]]$roc.auc
+    dup.auprc <- dup[[which(names(dup)==model)]]$prc.auc
+    mean.auc <- harmonic.mean(c(del.auroc, del.auprc, dup.auroc, dup.auprc))
+    c(del.auroc, del.auprc, dup.auroc, dup.auprc, mean.auc)
+  }))
+  
+  x <- as.data.frame(cbind(names(del), sumdat))
+  x[, 2:ncol(x)] <- apply(x[, 2:ncol(x)], 2, as.numeric)
+  colnames(x) <- c("model", "del.auroc", "del.auprc", "dup.auroc", "dup.auprc", "mean.auc")
   rownames(x) <- NULL
-  return(x)
+  return(x[order(-x$mean.auc), ])
 }
 
 
@@ -161,59 +163,64 @@ plot.prc <- function(data, title="Precision/Recall"){
 require(optparse, quietly=T)
 require(flux, quietly=T)
 require(Hmisc, quietly=T)
+require(psych, quietly=T)
 require(viridisLite, quietly=T)
 
 # List of command-line options
 option_list <- list()
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage="%prog inputs.tsv orig_bfdps.tsv true_genes.txt false_genes.txt out.prefix",
+args <- parse_args(OptionParser(usage="%prog del.tsv dup.tsv true.genes false.genes out.prefix",
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Checks for appropriate positional arguments
 if(length(args$args) != 5){
-  stop("Three positional arguments: inputs.tsv, orig_bfdps.tsv, true_genes.txt, false_genes.txt, and out_prefix\n")
+  stop("Five positional arguments: del.tsv, dup.tsv, true.genes, false.genes, and out.prefix\n")
 }
 
 # Writes args & opts to vars
-inlist.in <- args$args[1]
-bfdps.in <- args$args[2]
+del.in <- args$args[1]
+dup.in <- args$args[2]
 true_genes.in <- args$args[3]
 false_genes.in <- args$args[4]
 out.prefix <- args$args[5]
 
 # # DEV PARAMTERS
 # setwd("~/scratch")
-# inlist.in <- "rCNV.DEL.model_evaluation.input.tsv"
-# bfdps.in <- "rCNV.DEL.gene_abfs.tsv"
+# del.in <- "rCNV.DEL.model_evaluation.input.tsv"
+# dup.in <- "rCNV.DUP.model_evaluation.input.tsv"
 # true_genes.in <- "gold_standard.haploinsufficient.genes.list"
 # false_genes.in <- "gold_standard.haplosufficient.genes.list"
 # out.prefix <- "rCNV_gene_scoring_model_comparison"
-
-# Load original BFDPs
-orig.bfdps <- load.orig.bfdps(bfdps.in)
 
 # Read gene lists
 true.genes <- read.table(true_genes.in, header=F)[, 1]
 false.genes <- read.table(false_genes.in, header=F)[, 1]
 
 # Load data
-data <- load.all.models(inlist.in, orig.bdfps, true.genes, false.genes)
+del <- load.all.models(del.in, true.genes, false.genes)
+dup <- load.all.models(dup.in, true.genes, false.genes)
 
-# Write table with stats
-write.table(get.sum.table(data),
+# Compute table with stats
+write.table(get.sum.table(del, dup),
             paste(out.prefix, "summary_table.tsv", sep="."), 
             col.names=T, row.names=F, sep="\t", quote=F)
 
-# Plot ROC
-pdf(paste(out.prefix, "roc.pdf", sep="."), height=4, width=4)
-plot.roc(data)
+# Plot ROCs
+pdf(paste(out.prefix, "del.roc.pdf", sep="."), height=4, width=4)
+plot.roc(del, title="Deletion ROC")
+dev.off()
+pdf(paste(out.prefix, "dup.roc.pdf", sep="."), height=4, width=4)
+plot.roc(dup, title="Duplication ROC")
 dev.off()
 
-# Plot PRC
-pdf(paste(out.prefix, "prc.pdf", sep="."), height=4, width=4)
-plot.prc(data)
+# Plot PRCs
+pdf(paste(out.prefix, "del.prc.pdf", sep="."), height=4, width=4)
+plot.prc(del, title="Deletion PRC")
+dev.off()
+pdf(paste(out.prefix, "dup.prc.pdf", sep="."), height=4, width=4)
+plot.prc(dup, title="Duplication PRC")
 dev.off()
 

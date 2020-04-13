@@ -65,6 +65,8 @@ RUN Rscript -e "sapply(c('optparse','metafor','KernSmooth','metap','MASS','flux'
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 RUN Rscript -e "sapply(c('beeswarm','Hmisc','EQL','vioplot'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
+RUN Rscript -e "sapply(c('psych'),\
+    function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 
 # Install Athena toolkit
 RUN git clone https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/athena /opt/athena \
@@ -77,7 +79,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 3bb195156e4a04511b85d3a4d6a8ca9b8e8eea04 && \
+    git checkout 6866e4beda8969966ade3bd317bbd42e3a49c12b && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)

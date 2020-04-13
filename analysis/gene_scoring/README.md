@@ -18,11 +18,16 @@ The steps of this model are described below:
 
 We counted CNVs per gene between all [cases and controls](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/) for each metacohort, and then [meta-analyzed](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/genes/#3-combine-association-statistics-across-metacohorts) those CNV counts to derive an odds ratio for each gene.  
 
-This process was executed identically to gene-level disease association analyses, described in detail [here](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/genes/#gene-based-burden-test-procedure).  
+This process was executed identically to gene-level disease association analyses, described in detail [here](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/genes/#gene-based-burden-test-procedure), with the following exceptions:  
+1. CNVs restricted to ≤5Mb and ≤10 genes to better isolate gene-specific effect sizes
+2. Deletion CDS overlap increased from 10% to 50% to enrich for true loss-of-function effects  
+3. Duplication CDS overlap increased from 75% to 100% to enrich for true copy-gain effects  
 
 ### 2a. Empirical Bayes estimation of prior effect sizes  
 
 We next empirically estimated the average effect size and variance expected for true dosage-sensitive genes and true dosage-insensitive genes based on the rCNV data in this study.  
+
+We computed the median odds ratio and variance across these gold-standard genes (described below), and used those values as priors for subsequent steps.
 
 We created these gene sets as follows:  
 
@@ -58,7 +63,15 @@ We defined `no known disease association` genes as those present in none of the 
 2. DECIPHER/DDG2P [DECIPHER/DDG2P (Wright _et al._, _Lancet_, 2015)](https://www.ncbi.nlm.nih.gov/pubmed/25529582); or
 3. ClinGen dosage sensitivity map [ClinGen (Strande _et al._, _Am. J. Hum. Genet._, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/28552198).  
 
-We computed the median odds ratio and variance across these gold-standard genes, and used those values as priors for subsequent steps.
+#### Gene blacklist for priors & training  
+
+To protect against certain regions of the genome with recurrent CNVs contributing noise to our effect size estimates for individual genes, we did not consider a subset of genes for any step of prior estimation or training.  
+
+Specifically, we blacklisted genes which:  
+1. Overlapped 54 known genomic disorder loci, as described in [Owen et al., 2018](https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-018-5292-7); or
+2. Were within 1Mb of any centromere or telomere.  
+
+This resulted in blacklisting a total of 1,067 genes for all prior estimation and model training (described below).  
 
 ### 2b. Estimation of prior fraction of dosage-sensitive genes  
 
@@ -108,38 +121,39 @@ Specifically, we evaluated each of the following models using the same strategy 
 *  Linear discriminant analysis (LDA)  
 *  Naive Bayes  
 *  Logistic stochastic gradient descent (SGD)  
+*  Neural network (MLP) with logistic activation  
 
-For each model, we first divided all 22 autosomes into 11 pairs while balancing the total number of genes per chromosome pair, as follows:  
+For each model, we first split each autosome into its respective p and q arms, then partitioned all chromsome arms into 11 groups while balancing the total number of non-blacklisted genes per group, as follows:  
 
-| Chromosome #1 | Chromosome #2 | Genes |  
+| Chromosome arms | Genes used in training | Blacklisted genes |  
 | ---: | ---: | ---: |  
-| 1 | 21 | 2,036 |  
-| 19 | 18 | 1,586 |  
-| 2 | 13 | 1,473 |  
-| 11 | 22 | 1,520 |  
-| 17 | 20 | 1,579 |  
-| 3 | 15 | 1,566 |  
-| 12 | 14 | 1,593 |  
-| 5 | 8 | 1,464 |  
-| 6 | 10 | 1,507 |  
-| 7 | 9 | 1,476 |  
-| 16 | 4 | 1,463 |  
+| 2q, 3p, 7p | 1,400 | 58 |  
+| 19q, 15q, 12p | 1,404 | 141 |  
+| 12q, 6p, 22q | 1,416 | 105 |  
+| 11q, 6q, 13q | 1,425 | 38 |  
+| 5q, 7q, 17p, 18p | 1,452 | 123 |  
+| 3q, 9q, 11p, 20p | 1,505 | 107 |  
+| 1p, 16q, 4p | 1,509 | 50 |  
+| 19p, 4q, 20q, 9p | 1,514 | 89 |  
+| 1q, 8q, 18q, 5p | 1,519 | 96 |  
+| 17q, 2p, 8p, 21q | 1,519 | 105 |  
+| 14q, 10q, 16p, 10p | 1,533 | 155 |  
 
-To predict gene-level scores for each pair of chromosomes, we used the other 10 pairs to train & cross-validate a classification model.  
+To predict gene-level scores for each group of chromosome arms, we used the other 10 groups to train & cross-validate a classification model.  
 
-For each of 10 cross-validation iterations, we used 9/10 chromosome pairs for training and held out one pair for testing.  
+For each of 10 cross-validation iterations, we randomly allocated 90% of genes for training and held out 10% for testing. All genes considered at this stage were only sampled from the 10 chromosome arm groups _not_ including the held-out 11<sup>th</sup> group to be used for prediction.    
 
 This process can be summarized as follows:
 
-1. Fit classification model for all genes from the 9/10 training pairs;  
-2. Compute root mean-squared error (RMSE) of predicted and actual BFDPs for all genes on the 10<sup>th</sup> chromosome pair (held out from training); 
-3. Repeat steps [1-2] once for each of the 10 training pairs as the held-out test pair; 
+1. Fit classification model to the 90% of genes allocated for training;  
+2. Compute root mean-squared error (RMSE) of predicted and actual BFDPs for the 10% of genes held out for testing; 
+3. Repeat steps [1-2] once for each of the 10 folds; 
 4. Select the most predictive CV fit based on lowest RMSE; and 
-5. Apply the most predictive model from [4] to predict BFDPs for the genes from the 11<sup>th</sup> pair of (completely held-out) prediction chromosomes.  
+5. Apply the most predictive model from [4] to predict BFDPs for the genes from the 11<sup>th</sup> group of (completely held-out) prediction chromosome arms.  
 
 After computing predicted BFDPs for all genes using this strategy described above, we subsequently standard-normalized the predicted BFDPs, and defined final gene scores as `1 – normal_cdf( normalized BFDP )`.  
 
-Lastly, we compared each of the six models (logit, SVM, random forest, LDA, naive Bayes, and SGD) based on RMSE, AUROC, and AUPRC, and selected the overall best-performing model across deletions and duplications for our final analysis.  
+Lastly, we compared each of the six models (logit, SVM, random forest, LDA, naive Bayes, SGD, neural net) based on AUROC and AUPRC, and selected the overall best-performing model based on the highest harmonic mean AUC across deletions and duplications for our final analysis.  
 
 In practice we dubbed the final scores from our best-performing model as:  
 *  **pHI**: probability of haploinsufficiency; and
