@@ -71,7 +71,8 @@ workflow gene_burden_analysis {
         CNV=CNV,
         metacohort_list=metacohort_list,
         meta_model_prefix=meta_model_prefix,
-        freq_code="rCNV"
+        freq_code="rCNV",
+        rCNV_bucket=rCNV_bucket
     }
   }
 
@@ -223,6 +224,7 @@ task merge_and_meta_analysis {
   File metacohort_list
   String meta_model_prefix
   String freq_code
+  String rCNV_bucket
 
   command <<<
     set -e
@@ -439,7 +441,7 @@ task score_genes {
       --regularization-alpha ${elnet_alpha} \
       --regularization-l1-l2-mix ${elnet_l1_l2_mix} \
       --outfile ${freq_code}.${CNV}.gene_scores.${model}.tsv \
-      ${freq_code}.$CNV.gene_abfs.tsv \
+      ${BFDP_stats} \
       ${gene_features}
 
     # Copy scores to Google bucket
@@ -449,14 +451,14 @@ task score_genes {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0489fe64e3f34b3751a15930c2d85b5b7291fe5cdc0db98f3ba001d06f8f6617"
+    docker: "talkowski/rcnv@sha256:93119ddeda0a96c18a815b1093af4270ad94060602e76987a63b425ecb4d16a7"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
   }
 
   output {
-    File scores_tsv "${freq_code}.${CNV}.gene_scores.${model}.tsv"
+    File scores_tsv = "${freq_code}.${CNV}.gene_scores.${model}.tsv"
   }
 }
 

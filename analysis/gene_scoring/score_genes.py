@@ -10,7 +10,7 @@ Fit model & score dosage sensitivity for all genes based on BFDP
 """
 
 
-model_options = 'logit svm randomforest lda naivebayes sgd'.split()
+model_options = 'logit svm randomforest lda naivebayes sgd neuralnet'.split()
 
 
 from os import path
@@ -20,12 +20,15 @@ import numpy as np
 from sklearn.preprocessing import scale, StandardScaler
 from statsmodels.genmod.generalized_linear_model import GLM
 from statsmodels.genmod import families
+# from sklearn.model_selection import GridSearchCV
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier as RFC
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDAC
 from sklearn.naive_bayes import GaussianNB as GNBC
 from sklearn.linear_model import SGDClassifier as SGDC
+from sklearn.neural_network import MLPClassifier as MLPC
 from scipy.stats import norm
+from random import seed, shuffle
 import argparse
 from sys import stdout
 
@@ -75,14 +78,22 @@ def load_stats(stats_in, arm_dict=None):
     return ss
 
 
-def pair_chroms(sumstats, chroms, n_pairs=11, quiet=False):
+def pair_chroms(sumstats, chroms, xbed=None, n_pairs=11, quiet=False):
     """
     Divide all chromosomes into pairs based on total number of genes
     Or, if --centromeres is provided, groups chromosome arms into 11 groups
+    Removes genes in xbed from calculations, if provided
     """
 
+    # Load blacklist, if any provided
+    if xbed is not None:
+        xgenes = pd.read_csv(xbed, sep='\t').iloc[:, 3].values.tolist()
+    else:
+        xgenes = []
+
     # Count genes per chromosome and sort by number of genes
-    gpc = {chrom : sum(sumstats.chrom == chrom) for chrom in chroms}
+    gpc = {chrom : sum((sumstats.chrom == chrom) & ~(sumstats.index.isin(xgenes))) for chrom in chroms}
+    xgpc = {chrom : sum((sumstats.chrom == chrom) & (sumstats.index.isin(xgenes))) for chrom in chroms}
     gpc = {c : g for c, g in sorted(gpc.items(), key=lambda item: item[1], reverse=True)}
     sortchroms = list(gpc.keys())
 
@@ -96,10 +107,11 @@ def pair_chroms(sumstats, chroms, n_pairs=11, quiet=False):
     chrompairs = [x['chroms'] for x in chrompairs_dict.values()]
 
     if not quiet:
-        print('\nChromosome pairings:\n\ngenes\tchroms')
+        print('\nChromosome pairings:\n\ngenes\tbl_genes\tchroms')
         for pair in chrompairs:
             ngenes = np.nansum([gpc[c] for c in pair])
-            print('{:,}\t{}'.format(ngenes, ', '.join(list(pair))))
+            nxgenes = np.nansum([xgpc[c] for c in pair])
+            print('{:,}\t{:,}\t{}'.format(ngenes, nxgenes, ', '.join(list(pair))))
 
     return chrompairs
 
@@ -145,32 +157,22 @@ def rmse(pairs):
     return np.sqrt(np.sum(mse) / len(pairs))
 
 
-def fit_model(features, sumstats, train_pairs, test_pairs, model='logit', 
-              logit_alpha=0.1, l1_l2_mix=1):
+def fit_model(features, sumstats, train_genes, test_genes,  
+              model='logit', logit_alpha=0.1, l1_l2_mix=1):
     """
-    Fit classifier to genes on train_chroms and calculate RMSE on test_chroms
-    Note: train_pairs and test_pairs are tuples of chromosome names
+    Fit classifier to train_genes and calculate RMSE on test_genes
     """
 
-    # Format chromosomes
-    if type(train_pairs) is list:
-        trainchroms = sorted(list(sum(train_pairs, ())))
-    else:
-        trainchroms = sorted(list(train_pairs))
-    if type(test_pairs) is list:
-        testchroms = sorted(list(sum(test_pairs, ())))
-    else:
-        testchroms = sorted(list(test_pairs))
-    allchroms = sorted(trainchroms + testchroms)
+    all_genes = train_genes + test_genes
 
     # Join sumstats with features for logistic regression, subset to 
-    # chromosomes of interest, and drop genes with NaN bfdps
+    # genes of interest, and drop genes with NaN BFDPs 
     full_df = sumstats.merge(features, how='left', left_index=True, 
                               right_index=True)
-    full_df = full_df.loc[full_df.chrom.isin(allchroms), :].dropna()
-    train_df = full_df.loc[full_df.chrom.isin(trainchroms), :].\
+    full_df = full_df.loc[full_df.index.isin(all_genes), :].dropna()
+    train_df = full_df.loc[full_df.index.isin(train_genes), :].\
                    drop(labels='chrom', axis=1)
-    test_df = full_df.loc[full_df.chrom.isin(testchroms), :].\
+    test_df = full_df.loc[full_df.index.isin(test_genes), :].\
                   drop(labels='chrom', axis=1)
 
     # Fit according to specified model
@@ -188,8 +190,8 @@ def fit_model(features, sumstats, train_pairs, test_pairs, model='logit',
     else:
         # Instantiate classifier, depending on model
         if model == 'svm':
-            classifier = SVC(random_state=0, max_iter=10000, probability=True, 
-                             class_weight='balanced', kernel='linear')
+            classifier = SVC(C=logit_alpha, random_state=0, max_iter=1000, 
+                             probability=True, kernel='linear', break_ties=True)
         elif model == 'randomforest':
             classifier = RFC(random_state=0)
         elif model == 'lda':
@@ -197,15 +199,18 @@ def fit_model(features, sumstats, train_pairs, test_pairs, model='logit',
         elif model == 'naivebayes':
             classifier = GNBC()
         elif model == 'sgd':
-            classifier = SGDC(loss='log', l1_ratio=1 - l1_l2_mix, max_iter=10000,
-                              random_state=0, class_weight='balanced')
+            classifier = SGDC(loss='modified_huber', penalty='elasticnet', 
+                              alpha=logit_alpha, l1_ratio=1 - l1_l2_mix, 
+                              random_state=0)
+        elif model == 'neuralnet':
+            classifier = MLPC(hidden_layer_sizes=(10, 5, 2), activation='logistic',
+                              solver='adam', alpha=logit_alpha, random_state=0)
 
         # Fit sklearn model & predict on test set
         fitted_model = classifier.fit(train_df.drop(labels='bfdp', axis=1), 
                                       np.round(train_df.bfdp))
         test_bfdps = pd.Series(fitted_model.predict_proba(test_df.drop(labels='bfdp', axis=1))[:, 1],
                                name='pred', index=test_df.index)
-        
 
     # Compute RMSE of bfdps for test set
     test_vals = test_df.merge(test_bfdps, left_index=True, right_index=True).\
@@ -215,21 +220,56 @@ def fit_model(features, sumstats, train_pairs, test_pairs, model='logit',
     return fitted_model, test_rmse
 
 
-def fit_model_cv(features, sumstats, all_pairs, model='logit', logit_alpha=0.1, 
-                 l1_l2_mix=1):
+def split_genes(genes, n_splits=10, random_seed=2020):
+    """
+    Randomly partition a list of genes into n equal groups
+    """
+
+    target = int(np.ceil(len(genes) / float(n_splits)))
+
+    seed(random_seed)
+    shuffle(genes)
+
+    return [genes[int(i * target):int((i + 1) * target)] for i in range(n_splits)]
+
+
+def fit_model_cv(features, sumstats, all_pairs, xgenes=[], model='logit', 
+                 logit_alpha=0.1, l1_l2_mix=1, random=True):
     """
     Fit model with N-fold CV 
-    Random = True will randomly subsample genes across all_pairs for train/test sets
+    
     """
 
     models = []
-    for i in range(len(all_pairs)):
-        train_pairs = [x for k, x in enumerate(all_pairs) if k != i]
-        test_pairs = all_pairs[i]
-        model_fit, test_rmse = \
-            fit_model(features, sumstats, train_pairs, test_pairs, model, 
-                      logit_alpha, l1_l2_mix)
-        models.append((test_rmse, model_fit))
+
+    # Randomly subsample genes across all_pairs for train/test sets, if specified
+    if random:
+        all_chroms = [c for s in all_pairs for c in s]
+        all_genes = list(sumstats.index[(sumstats.chrom.isin(all_chroms)) & \
+                                        ~(sumstats.index.isin(xgenes))])
+        gene_splits = split_genes(all_genes)
+        for i in range(10):
+            train_splits = [s for k, s in enumerate(gene_splits) if k != i]
+            train_genes = [g for s in train_splits for g in s]
+            test_genes = gene_splits[i]
+            model_fit, test_rmse = \
+                fit_model(features, sumstats, train_genes, test_genes, model, 
+                          logit_alpha, l1_l2_mix)
+            models.append((test_rmse, model_fit))
+
+    # Otherwise, partition train/test sets based on chromosome pairs
+    else:
+        for i in range(len(all_pairs)):
+            train_pairs = [x for k, x in enumerate(all_pairs) if k != i]
+            train_chroms = [c for s in train_pairs for c in s]
+            train_genes = list(sumstats.index[(sumstats.chrom.isin(train_chroms)) & \
+                                              ~(sumstats.index.isin(xgenes))])
+            test_genes = list(sumstats.index[(sumstats.chrom.isin(list(all_pairs[i]))) & \
+                                             ~(sumstats.index.isin(xgenes))])
+            model_fit, test_rmse = \
+                fit_model(features, sumstats, train_genes, test_genes, model, 
+                          logit_alpha, l1_l2_mix)
+            models.append((test_rmse, model_fit))
 
     best_rmse, best_model = \
         [(r, m) for r, m in sorted(models, key=lambda x: x[0])][0]
@@ -237,13 +277,19 @@ def fit_model_cv(features, sumstats, all_pairs, model='logit', logit_alpha=0.1,
     return best_model, best_rmse
 
 
-def predict_bfdps(features, sumstats, chrompairs, model='logit', logit_alpha=0.1, 
-                  l1_l2_mix=1, quiet=False):
+def predict_bfdps(features, sumstats, chrompairs, xbed=None, model='logit', 
+                  logit_alpha=0.1, l1_l2_mix=1, random=True, quiet=False):
     """
     Predicts bfdps for all genes with N-fold CV
     """
 
     pred_bfdps = pd.DataFrame(columns=['pred_bfdp'], index=features.index)
+
+    # Load gene blacklist, if any provided
+    if xbed is not None:
+        xgenes = pd.read_csv(xbed, sep='\t').iloc[:, 3].values.tolist()
+    else:
+        xgenes = []
 
     # Generate predictions for each pair of chromosomes in serial
     for i in range(len(chrompairs)):
@@ -256,8 +302,9 @@ def predict_bfdps(features, sumstats, chrompairs, model='logit', logit_alpha=0.1
             print(msg.format(len(pred_genes), ', '.join(pred_chroms)))
         
         # Fit model
-        fitted_model, rmse = fit_model_cv(features, sumstats, train_pairs, model, 
-                                          logit_alpha, l1_l2_mix)
+        fitted_model, rmse = \
+            fit_model_cv(features, sumstats, train_pairs, xgenes, model, 
+                         logit_alpha, l1_l2_mix, random)
 
         # Predict bfdps
         pred_df = features.loc[features.index.isin(pred_genes), :]
@@ -291,8 +338,12 @@ def main():
     parser.add_argument('stats', help='.tsv of stats with bfdp per gene.')
     parser.add_argument('features', help='.bed.gz of functional features per gene.')
     parser.add_argument('-c', '--centromeres', help='Centromeres BED.')
+    parser.add_argument('-x', '--blacklist', help='Training blacklist BED.')
     parser.add_argument('-m', '--model', choices=model_options, default='logit',
                         help='Choice of classifier. [default: logit]')
+    parser.add_argument('--chromsplit', action='store_true', default=False,
+                        help='Use chromsome partitions for train/test sets. ' +
+                        '[default: randomly sample from chromosome partitions]')
     parser.add_argument('--regularization-alpha', dest='logit_alpha', type=float,
                         help='Regularization penalty weight for logit glm. Must ' +
                         'be in ~ [0, 1]. [default: no regularization]', default=0.1)
@@ -322,14 +373,15 @@ def main():
     chroms = sorted(np.unique(sumstats.chrom.values))
 
     # Pair all chromosomes (or group chromosome arms, if optioned)
-    chrompairs = pair_chroms(sumstats, chroms)
+    chrompairs = pair_chroms(sumstats, chroms, args.blacklist)
 
     # Read gene features
     features = load_features(args.features)
 
     # Predict bfdps for all genes
-    pred_bfdps = predict_bfdps(features, sumstats, chrompairs, args.model, 
-                               args.logit_alpha, args.l1_l2_mix)
+    pred_bfdps = predict_bfdps(features, sumstats, chrompairs, args.blacklist,
+                               args.model, args.logit_alpha, args.l1_l2_mix,
+                               random=(not args.chromsplit))
 
     # Write predicted BFDPs to outfile, along with scaled score & quantile
     pred_bfdps.to_csv(outfile, sep='\t', index=True, na_rep='NA')

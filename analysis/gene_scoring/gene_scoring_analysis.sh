@@ -252,8 +252,9 @@ freq_code="rCNV"
 rCNV_bucket="gs://rcnv_project"
 CNV="DEL"
 BFDP_stats="${freq_code}.${CNV}.gene_abfs.tsv"
+blacklist="${freq_code}.gene_scoring.training_gene_blacklist.bed.gz"
 gene_features="gencode.v19.canonical.pext_filtered.all_features.eigenfeatures.bed.gz"
-# raw_gene_features="gene_metadata/gencode.v19.canonical.pext_filtered.all_features.bed.gz"
+raw_gene_features="gencode.v19.canonical.pext_filtered.all_features.bed.gz"
 model="logit"
 elnet_alpha=0.1
 elnet_l1_l2_mix=1
@@ -264,171 +265,150 @@ gsutil -m cp ${rCNV_bucket}/refs/GRCh37.centromeres_telomeres.bed.gz ./
 # Score genes
 /opt/rCNV2/analysis/gene_scoring/score_genes.py \
   --centromeres GRCh37.centromeres_telomeres.bed.gz \
+  --blacklist ${blacklist} \
   --model ${model} \
   --regularization-alpha ${elnet_alpha} \
   --regularization-l1-l2-mix ${elnet_l1_l2_mix} \
   --outfile ${freq_code}.${CNV}.gene_scores.${model}.tsv \
-  ${freq_code}.$CNV.gene_abfs.tsv \
+  ${BFDP_stats} \
   ${gene_features}
 
 
 
 
-
-# # Score all genes
-# for CNV in DEL DUP; do
-
-#   # Score all genes for each candidate model
-#   for model in logit svm randomforest lda naivebayes sgd; do
-#   done
-
-#   # Compare models, and manually evaluate to determine best model
-#   compdir=${freq_code}_"$CNV"_model_comparisons
-#   if ! [ -e $compdir ]; then
-#     mkdir $compdir
-#   fi
-#   for wrapper in 1; do
-#     for model in logit svm randomforest lda naivebayes sgd; do
-#       echo $model
-#       echo ${freq_code}.$CNV.gene_scores.${model}.tsv
-#     done | paste - -
-#   done > ${freq_code}.$CNV.model_evaluation.input.tsv
-#   /opt/rCNV2/analysis/gene_scoring/compare_models.R \
-#     ${freq_code}.$CNV.model_evaluation.input.tsv \
-#     ${freq_code}.$CNV.gene_abfs.tsv \
-#     gold_standard.haploinsufficient.genes.list \
-#     gold_standard.haplosufficient.genes.list \
-#     $compdir/${freq_code}_"$CNV"_model_comparison
-# done
+# TODO: automate this and add to workflow
+  # Compare models, and manually evaluate to determine best model
+for CNV in DEL DUP; do
+  compdir=${freq_code}_"$CNV"_model_comparisons
+  if ! [ -e $compdir ]; then
+    mkdir $compdir
+  fi
+  for wrapper in 1; do
+    for model in logit svm randomforest lda naivebayes sgd; do
+      echo $model
+      echo ${freq_code}.$CNV.gene_scores.${model}.tsv
+    done | paste - -
+  done > ${freq_code}.$CNV.model_evaluation.input.tsv
+  /opt/rCNV2/analysis/gene_scoring/compare_models.R \
+    ${freq_code}.$CNV.model_evaluation.input.tsv \
+    ${freq_code}.$CNV.gene_abfs.tsv \
+    gold_standard.haploinsufficient.genes.list \
+    gold_standard.haplosufficient.genes.list \
+    $compdir/${freq_code}_"$CNV"_model_comparison
+done
 
 
-# # Manually assign best model
-# best_model="lda"
+# Manually assign best model
+best_model="lda"
 
 
-# # Merge scores
-# /opt/rCNV2/analysis/gene_scoring/merge_del_dup_scores.R \
-#   ${freq_code}.DEL.gene_scores.${best_model}.tsv \
-#   ${freq_code}.DUP.gene_scores.${best_model}.tsv \
-#   ${freq_code}.gene_scores.tsv
-# gzip -f ${freq_code}.gene_scores.tsv
+# Merge scores
+/opt/rCNV2/analysis/gene_scoring/merge_del_dup_scores.R \
+  ${freq_code}.DEL.gene_scores.${best_model}.tsv \
+  ${freq_code}.DUP.gene_scores.${best_model}.tsv \
+  ${freq_code}.gene_scores.tsv
+gzip -f ${freq_code}.gene_scores.tsv
 
 
-# #### Quality assessment of gene scores ####
+#### Quality assessment of gene scores ####
 
-# # Plot correlations of raw features vs scores
-# mkdir gene_score_corplots
-# /opt/rCNV2/analysis/gene_scoring/plot_score_feature_cors.R \
-#   ${freq_code}.gene_scores.tsv.gz \
-#   ${raw_gene_features} \
-#   gene_score_corplots/${freq_code}.gene_scores.raw_feature_cors
+# Plot correlations of raw features vs scores
+mkdir gene_score_corplots
+/opt/rCNV2/analysis/gene_scoring/plot_score_feature_cors.R \
+  ${freq_code}.gene_scores.tsv.gz \
+  ${raw_gene_features} \
+  gene_score_corplots/${freq_code}.gene_scores.raw_feature_cors
 
-# # Make all gene truth sets
-# gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes/gene_lists ./
+# Make all gene truth sets
+gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes/gene_lists ./
 
-# # Make CNV type-dependent truth sets
-# for CNV in DEL DUP; do
-#   case $CNV in
-#     "DEL")
-#       # Union (ClinGen HI + DDG2P dominant LoF)
-#       cat gene_lists/ClinGen.hmc_haploinsufficient.genes.list \
-#           gene_lists/DDG2P.hmc_lof.genes.list \
-#       | sort -Vk1,1 | uniq \
-#       > union_truth_set.lof.tsv
+# Make CNV type-dependent truth sets
+for CNV in DEL DUP; do
+  case $CNV in
+    "DEL")
+      # Union (ClinGen HI + DDG2P dominant LoF)
+      cat gene_lists/ClinGen.hmc_haploinsufficient.genes.list \
+          gene_lists/DDG2P.hmc_lof.genes.list \
+      | sort -Vk1,1 | uniq \
+      > union_truth_set.lof.tsv
 
-#       # Intersection (ClinGen HI + DDG2P dominant LoF)
-#       fgrep -wf \
-#         gene_lists/ClinGen.hmc_haploinsufficient.genes.list \
-#         gene_lists/DDG2P.hmc_lof.genes.list \
-#       | sort -Vk1,1 | uniq \
-#       > intersection_truth_set.lof.tsv
+      # Intersection (ClinGen HI + DDG2P dominant LoF)
+      fgrep -wf \
+        gene_lists/ClinGen.hmc_haploinsufficient.genes.list \
+        gene_lists/DDG2P.hmc_lof.genes.list \
+      | sort -Vk1,1 | uniq \
+      > intersection_truth_set.lof.tsv
 
-#       # ClinGen HI alone
-#       cat gene_lists/ClinGen.all_haploinsufficient.genes.list \
-#       | sort -Vk1,1 | uniq \
-#       > clingen_truth_set.lof.tsv
+      # ClinGen HI alone
+      cat gene_lists/ClinGen.all_haploinsufficient.genes.list \
+      | sort -Vk1,1 | uniq \
+      > clingen_truth_set.lof.tsv
 
-#       # DDG2P lof + other alone
-#       cat gene_lists/DDG2P.all_lof.genes.list \
-#           gene_lists/DDG2P.all_other.genes.list \
-#       | sort -Vk1,1 | uniq \
-#       > ddg2p_truth_set.lof.tsv
+      # DDG2P lof + other alone
+      cat gene_lists/DDG2P.all_lof.genes.list \
+          gene_lists/DDG2P.all_other.genes.list \
+      | sort -Vk1,1 | uniq \
+      > ddg2p_truth_set.lof.tsv
 
-#       # Combine all truth sets into master union
-#       cat union_truth_set.lof.tsv \
-#           clingen_truth_set.lof.tsv \
-#           ddg2p_truth_set.lof.tsv \
-#       | sort -Vk1,1 | uniq \
-#       > master_union_truth_set.lof.tsv
+      # Combine all truth sets into master union
+      cat union_truth_set.lof.tsv \
+          clingen_truth_set.lof.tsv \
+          ddg2p_truth_set.lof.tsv \
+      | sort -Vk1,1 | uniq \
+      > master_union_truth_set.lof.tsv
 
-#       # Write truth set input tsv
-#       for wrapper in 1; do
-#         echo -e "Union truth set\tmaster_union_truth_set.lof.tsv\tgrey25"
-#         echo -e "ClinGen & DECIPHER (union)\tunion_truth_set.lof.tsv\t#9F2B1C"
-#         echo -e "ClinGen & DECIPHER (int.)\tintersection_truth_set.lof.tsv\t#D43925"
-#         echo -e "ClinGen dom. HI\tclingen_truth_set.lof.tsv\t#DD6151"
-#         echo -e "DECIPHER dom. LoF/unk.\tddg2p_truth_set.lof.tsv\t#E5887C"
-#       done > DEL.roc_truth_sets.tsv
-#       ;;
+      # Write truth set input tsv
+      for wrapper in 1; do
+        echo -e "Union truth set\tmaster_union_truth_set.lof.tsv\tgrey25"
+        echo -e "ClinGen & DECIPHER (union)\tunion_truth_set.lof.tsv\t#9F2B1C"
+        echo -e "ClinGen & DECIPHER (int.)\tintersection_truth_set.lof.tsv\t#D43925"
+        echo -e "ClinGen dom. HI\tclingen_truth_set.lof.tsv\t#DD6151"
+        echo -e "DECIPHER dom. LoF/unk.\tddg2p_truth_set.lof.tsv\t#E5887C"
+      done > DEL.roc_truth_sets.tsv
+      ;;
 
-#     "DUP")
-#       # Union (ClinGen HI + DDG2P dominant CG)
-#       cat gene_lists/ClinGen.hmc_triplosensitive.genes.list \
-#           gene_lists/DDG2P.hmc_gof.genes.list \
-#       | sort -Vk1,1 | uniq \
-#       > union_truth_set.gof.tsv
+    "DUP")
+      # Union (ClinGen HI + DDG2P dominant CG)
+      cat gene_lists/ClinGen.hmc_triplosensitive.genes.list \
+          gene_lists/DDG2P.hmc_gof.genes.list \
+      | sort -Vk1,1 | uniq \
+      > union_truth_set.gof.tsv
 
-#       # ClinGen triplo alone
-#       cat gene_lists/ClinGen.all_triplosensitive.genes.list \
-#       | sort -Vk1,1 | uniq \
-#       > clingen_truth_set.triplo.tsv
+      # ClinGen triplo alone
+      cat gene_lists/ClinGen.all_triplosensitive.genes.list \
+      | sort -Vk1,1 | uniq \
+      > clingen_truth_set.triplo.tsv
 
-#       # DDG2P gof + other alone
-#       cat gene_lists/DDG2P.all_gof.genes.list \
-#           gene_lists/DDG2P.all_other.genes.list \
-#       | sort -Vk1,1 | uniq \
-#       > ddg2p_truth_set.gof.tsv
+      # DDG2P gof + other alone
+      cat gene_lists/DDG2P.all_gof.genes.list \
+          gene_lists/DDG2P.all_other.genes.list \
+      | sort -Vk1,1 | uniq \
+      > ddg2p_truth_set.gof.tsv
 
-#       # Combine all truth sets into master union
-#       cat union_truth_set.gof.tsv \
-#           clingen_truth_set.triplo.tsv \
-#           ddg2p_truth_set.gof.tsv \
-#       | sort -Vk1,1 | uniq \
-#       > master_union_truth_set.gof.tsv
+      # Combine all truth sets into master union
+      cat union_truth_set.gof.tsv \
+          clingen_truth_set.triplo.tsv \
+          ddg2p_truth_set.gof.tsv \
+      | sort -Vk1,1 | uniq \
+      > master_union_truth_set.gof.tsv
 
-#       # Write truth set input tsv
-#       for wrapper in 1; do
-#         echo -e "Union truth set\tmaster_union_truth_set.gof.tsv\tgrey25"
-#         echo -e "ClinGen & DECIPHER GoF (union)\tunion_truth_set.gof.tsv\t#1A5985"
-#         echo -e "ClinGen dom. TS\tclingen_truth_set.triplo.tsv\t#2376B2"
-#         echo -e "DECIPHER dom. GoF/unk.\tddg2p_truth_set.gof.tsv\t#4F91C1"
-#       done > DUP.roc_truth_sets.tsv
-#       ;;
-#   esac    
-# done
+      # Write truth set input tsv
+      for wrapper in 1; do
+        echo -e "Union truth set\tmaster_union_truth_set.gof.tsv\tgrey25"
+        echo -e "ClinGen & DECIPHER GoF (union)\tunion_truth_set.gof.tsv\t#1A5985"
+        echo -e "ClinGen dom. TS\tclingen_truth_set.triplo.tsv\t#2376B2"
+        echo -e "DECIPHER dom. GoF/unk.\tddg2p_truth_set.gof.tsv\t#4F91C1"
+      done > DUP.roc_truth_sets.tsv
+      ;;
+  esac    
+done
 
-# # Plot ROC, PRC, and enrichments
-# mkdir ${freq_code}_gene_scoring_QC_plots/
-# /opt/rCNV2/analysis/gene_scoring/plot_gene_score_qc.R \
-#   ${freq_code}.gene_scores.tsv.gz \
-#   DEL.roc_truth_sets.tsv \
-#   DUP.roc_truth_sets.tsv \
-#   gold_standard.haplosufficient.genes.list \
-#   ${freq_code}_gene_scoring_QC_plots/${freq_code}_gene_score_qc
-
-
-# ### Reorganize all outputs, and copy to Google bucket (note: requires permissions)
-# mkdir gene_scoring
-# for subdir in plots all_models gene_lists data; do
-#   mkdir gene_scoring/$subdir
-# done
-# mv *abfs.tsv gene_scoring/data/
-# mv *gene_scores.*.tsv gene_scoring/all_models/
-# mv *truth_set.*.tsv gene_scoring/gene_lists/
-# mv gold_standard.*haplo*.list gene_scoring/gene_lists/
-# mv rCNV_*_model_comparisons gene_scoring/plots/
-# mv gene_score_corplots gene_scoring/plots/
-# mv rCNV_gene_scoring_QC_plots gene_scoring/plots/
-# gsutil -m cp -r gene_scoring ${rCNV_bucket}/analysis/
-# gsutil -m cp rCNV.gene_scores.tsv.gz ${rCNV_bucket}/results/gene_scoring/
+# Plot ROC, PRC, and enrichments
+mkdir ${freq_code}_gene_scoring_QC_plots/
+/opt/rCNV2/analysis/gene_scoring/plot_gene_score_qc.R \
+  ${freq_code}.gene_scores.tsv.gz \
+  DEL.roc_truth_sets.tsv \
+  DUP.roc_truth_sets.tsv \
+  gold_standard.haplosufficient.genes.list \
+  ${freq_code}_gene_scoring_QC_plots/${freq_code}_gene_score_qc
 
