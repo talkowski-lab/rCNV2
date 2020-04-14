@@ -114,7 +114,7 @@ def refine(window_priors, window_info, null_variance=0.42 ** 2, cs_val=0.95):
         for window in windows:
             # From Wakefield, 2009
             theta = window_info[window]['lnOR']
-            se = ci2se((window_info[window]['lnOR_upper'], window_info[window]['lnOR_lower']))
+            se = ci2se((window_info[window]['lnOR_lower'], window_info[window]['lnOR_upper']))
             V = se ** 2
             if V > 0:
                 zsq = (theta ** 2) / V
@@ -401,19 +401,20 @@ def estimate_null_variance_gs(gs_lists, statslist, refine_secondary=False):
     return var
 
 
-def update_refine(hpo_data, W, cs_val=0.95):
+def update_refine(hpo_data, Wsq, cs_val=0.95):
     """
-    Update initial refinement results (flat prior) with a new null variance
+    Update initial refinement results (flat prior) with null variances
+    If multiple Wsqs are provided, uses Bayesian model averaging across them
     """
 
+    # TODO: implement BMA over multiple Wsq values
+    import pdb; pdb.set_trace()
     for hpo, hdat in hpo_data.items():
         for block_id, bdat in hdat['blocks'].items():
             windows = list(bdat['refine_res'].keys())
             window_priors = {window : 1 / len(windows) for window in windows}
             refine_res, credset_coords, credset_bt, credset_windows \
                 = refine(window_priors, hpo_data[hpo]['all_windows'], W, cs_val)
-            if block_id == 'HP:0000707_window_block_1':
-                import pdb; pdb.set_trace()
             hpo_data[hpo]['blocks'][block_id] = {'refine_res' : refine_res,
                                                  'credset_coords' : credset_coords,
                                                  'credset_bt' : credset_bt,
@@ -485,9 +486,6 @@ def output_assoc_bed(hpo_data, outfile, cnv='NS'):
                 best_z = np.nanmax([wdat[w]['zscore'] for w in windows])
                 best_p = norm.sf(best_z)
 
-            if block_id == 'HP:0000707_window_block_1':
-                import pdb; pdb.set_trace()
-
             # Write window stats to file
             outline = '\t'.join([chrom, start, end, block_id, cnv, hpo])
             outnums_fmt = '\t{:.3E}\t{:.3E}\t{:.3}\t{:.3}\t{:.3}\t{:.3E}'
@@ -498,6 +496,24 @@ def output_assoc_bed(hpo_data, outfile, cnv='NS'):
             outfile.write(outline)
 
     outfile.close()
+
+
+def cluster_credsets(hpo_data):
+    """
+    Cluster credible sets across HPOs to collapse overlapping regions
+    """
+
+    # Pool credible sets, tagged with block ID
+    pooled_creds_str = ''
+    for hdat in hpo_data.values():
+        for bid, binfo in hdat['blocks'].items():
+            for ci in binfo['credset_bt']:
+                pooled_creds_str += '\t'.join([ci.chrom, str(ci.start), 
+                                               str(ci.end), bid]) + '\n'
+    merged_creds_bt = pbt.BedTool(pooled_creds_str, from_string=True).sort().\
+                          merge(c=4, o='distinct')
+
+    import pdb; pdb.set_trace()
 
 
 def main():
@@ -549,34 +565,35 @@ def main():
 
     # Estimate null variance based on:
     #   1. all significant windows
-    #   2. known causal regions (optional; can be multiple lists)
-    Wsq = [estimate_null_variance_basic(hpo_data)[1]]
+    #   2. most significant window per block
+    #   3. known causal regions (optional; can be multiple lists)
+    Wsq = estimate_null_variance_basic(hpo_data)
     if args.gs_list is not None:
         with open(args.gs_list) as gsf:
             Wsq += estimate_null_variance_gs(gsf.read().splitlines(), args.statslist)
     Wsq = sorted(Wsq)
     print('Null variance estimates: ' + ', '.join([str(round(x, 3)) for x in Wsq]))
 
-    # Update original refinement results with re-estimated mean null variance
-    hpo_data = update_refine(hpo_data, np.nanmean(Wsq), args.cs_val)
+    # Update original refinement results with BMA of re-estimated null variances
+    hpo_data = update_refine(hpo_data, Wsq, args.cs_val)
 
     # Format & write final table of significant associations
     if args.sig_assoc_bed is not None:
         sig_assoc_bed = open(args.sig_assoc_bed, 'w')
         output_assoc_bed(hpo_data, sig_assoc_bed, args.cnv)
 
-    # TODO: Cluster credible sets across HPOs
+    # # Cluster credible sets across HPOs
+    # final_loci = cluster_credsets(hpo_data)
 
-    # Read dict of N_case per HPO
-    ncase_df = pd.read_csv(args.hpos_by_cohort, sep='\t').loc[:, '#HPO Total'.split()]
-    ncase_df.index = ncase_df.iloc[:, 0]
-    ncase_dict = ncase_df.drop(columns='#HPO').transpose().to_dict(orient='records')[0]
+    # # Read dict of N_case per HPO
+    # ncase_df = pd.read_csv(args.hpos_by_cohort, sep='\t').loc[:, '#HPO Total'.split()]
+    # ncase_df.index = ncase_df.iloc[:, 0]
+    # ncase_dict = ncase_df.drop(columns='#HPO').transpose().to_dict(orient='records')[0]
 
     # # Format & write final table of significant windows
-    # if args.sig_windows_bed is not None:
-    #     sig_windows_bed = open(args.sig_windows_bed, 'w')
-    #     output_windows_bed(hpo_data, final_sig_df, sig_windows_bed, ncase_dict,
-    #                      args.confident_pip, args.very_confident_pip, args.cnv)
+    # if args.sig_loci_bed is not None:
+    #     sig_loci_bed = open(args.sig_loci_bed, 'w')
+    #     output_loci_bed(hpo_data, sig_loci_bed, ncase_dict, args.cnv)
 
 
 if __name__ == '__main__':

@@ -71,7 +71,7 @@ RUN Rscript -e "sapply(c('psych'),\
 # Install Athena toolkit
 RUN git clone https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/athena /opt/athena \
     && cd /opt/athena \
-    && git checkout c2c1f4981c0b978275f3ce3e4b82d2e98a1989ef \
+    && git checkout 5890d1875be44136085e9dd1c6a94f750db2fe7d \
     && cd -
 RUN cd /opt/athena \
     && pip install -e .
@@ -79,7 +79,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout be70f31575a08703ef31393da79a6319b52675fe && \
+    git checkout a82e6c3189e9d7e5d48ff77b12947e4486eb1317 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)

@@ -78,7 +78,7 @@ task create_raw_bins {
       -x refs/GRCh37.Nmask.autosomes.bed.gz \
       -x refs/GRCh37.somatic_hypermutable_sites.bed.gz \
       -s ${stepsize}000 \
-      --buffer ${binsize}000 \
+      --blacklist-cov 0.3 \
       refs/GRCh37.autosomes.genome \
       ${binsize}000 \
       GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz
