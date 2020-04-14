@@ -511,171 +511,226 @@ freq_code="rCNV"
 CNV="DEL"
 phenotype_list="refs/test_phenotypes.list"
 metacohort_list="refs/rCNV_metacohort_list.txt"
-binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
+metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
+# binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
-meta_p_cutoff=0.00000385862
+meta_p_cutoffs_tsv="refs/sliding_window.rCNV.DEL.empirical_genome_wide_pval.hpo_cutoffs.tsv"
 meta_secondary_p_cutoff=0.05
-meta_or_cutoff=1
+# meta_or_cutoff=1
 meta_nominal_cohorts_cutoff=2
-meta_model_prefix="fe"
+# meta_model_prefix="fe"
 sig_window_pad=1000000
-refine_max_cnv_size=3000000
+# refine_max_cnv_size=3000000
+credset=0.95
+
 
 # Download all meta-analysis stats files and necessary data
-mkdir cleaned_cnv/
-gsutil -m cp -r ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
+# mkdir cleaned_cnv/
+# gsutil -m cp -r ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
 mkdir stats/
 gsutil -m cp \
   ${rCNV_bucket}/analysis/sliding_windows/**.${freq_code}.**.sliding_window.meta_analysis.stats.bed.gz \
   stats/
 mkdir refs/
 gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/* refs/
-mkdir phenos/
-gsutil -m cp ${rCNV_bucket}/cleaned_data/phenotypes/filtered/* phenos/
+# mkdir phenos/
+# gsutil -m cp ${rCNV_bucket}/cleaned_data/phenotypes/filtered/* phenos/
 
-# Iterate over phenotypes and make matrix of p-values, odds ratios (lower 95% CI), and nominal sig cohorts
-mkdir pvals/
-mkdir secondary_pvals/
-mkdir ors/
-mkdir nomsig/
-while read pheno hpo; do
-  stats=stats/$pheno.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.bed.gz
-  p_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
-         | awk -v OFS="\t" '{ if ($1=="meta_phred_p") print NR }' )
-  secondary_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
-                   | awk -v OFS="\t" '{ if ($1=="meta_phred_p_secondary") print NR }' )
-  lnor_lower_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
-                    | awk -v OFS="\t" '{ if ($1=="meta_lnOR_lower") print NR }' )
-  nom_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
-             | awk -v OFS="\t" '{ if ($1=="n_nominal_cohorts") print NR }' )
-  zcat $stats | awk -v FS="\t" -v idx=$p_idx '{ if ($1 !~ "#") print $(idx) }' \
-  | cat <( echo "$pheno.${CNV}" ) - \
-  > pvals/$pheno.${CNV}.pvals.txt
-  zcat $stats | awk -v FS="\t" -v idx=$secondary_idx '{ if ($1 !~ "#") print $(idx) }' \
-  | cat <( echo "$pheno.${CNV}" ) - \
-  > pvals/$pheno.${CNV}.secondary_pvals.txt
-  zcat $stats | awk -v FS="\t" -v idx=$lnor_lower_idx '{ if ($1 !~ "#") print $(idx) }' \
-  | cat <( echo "$pheno.${CNV}" ) - \
-  > ors/$pheno.${CNV}.lnOR_lower.txt
-  zcat $stats | awk -v FS="\t" -v idx=$nom_idx '{ if ($1 !~ "#") print $(idx) }' \
-  | cat <( echo "$pheno.${CNV}" ) - \
-  > nomsig/$pheno.${CNV}.nomsig_counts.txt
+# Apply an initial loose mask per HPO to P<0.01 regions ±sig_window_pad 
+# to reduce I/O time reading sumstats files in refinement
+# Also add all known GD regions for null variance estimation
+while read prefix hpo; do
+  echo -e "Subsetting $prefix summary stats prior to refinement"
+  allstats="stats/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.bed.gz"
+  primary_p_idx=$( zcat $allstats | sed -n '1p' | sed 's/\t/\n/g' \
+                   | awk -v FS="\t" '{ if ($1=="meta_phred_p") print NR }' )
+  zcat $allstats \
+  | grep -ve '^#' \
+  | awk -v FS="\t" -v OFS="\t" -v idx=$primary_p_idx \
+    '{ if ($(idx) >= 2 && $(idx) != "NA") print $1, $2, $3 }' \
+  | cat - <( zcat /opt/rCNV2/refs/UKBB_GD.Owen_2018.bed.gz \
+             | grep -ve '^#' | cut -f1-3 ) \
+  | sort -Vk1,1 -k2,2n -k3,3n \
+  | bedtools merge -i - \
+  | awk -v OFS="\t" -v dist=${sig_window_pad} \
+    '{ if ($2-dist < 1) print $1, "1", $3+dist; else print $1, $2-dist, $3+dist }' \
+  | bedtools intersect -wa -u -header \
+    -a $allstats \
+    -b - \
+  | bgzip -c \
+  > stats/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.subset.bed.gz
+  tabix -f stats/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.subset.bed.gz
 done < ${phenotype_list}
-paste <( zcat ${binned_genome} | cut -f1-3 ) \
-      pvals/*.${CNV}.pvals.txt \
-| bgzip -c \
-> ${CNV}.pval_matrix.bed.gz
-paste <( zcat ${binned_genome} | cut -f1-3 ) \
-      pvals/*.${CNV}.secondary_pvals.txt \
-| bgzip -c \
-> ${CNV}.secondary_pval_matrix.bed.gz
-paste <( zcat ${binned_genome} | cut -f1-3 ) \
-      ors/*.${CNV}.lnOR_lower.txt \
-| bgzip -c \
-> ${CNV}.lnOR_lower_matrix.bed.gz
-paste <( zcat ${binned_genome} | cut -f1-3 ) \
-      nomsig/*.${CNV}.nomsig_counts.txt \
-| bgzip -c \
-> ${CNV}.nominal_cohort_counts.bed.gz
 
-# Get matrix of window significance labels
-/opt/rCNV2/analysis/sliding_windows/get_significant_windows.R \
-  --pvalues ${CNV}.pval_matrix.bed.gz \
-  --secondary-pvalues ${CNV}.secondary_pval_matrix.bed.gz \
-  --p-is-phred \
-  --p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv \
-  --odds-ratios ${CNV}.lnOR_lower_matrix.bed.gz \
-  --or-is-ln \
-  --min-secondary-p ${meta_secondary_p_cutoff} \
-  --min-or ${meta_or_cutoff} \
-  --nominal-counts ${CNV}.nominal_cohort_counts.bed.gz \
+# Write tsv inputs
+while read prefix hpo; do
+  for wrapper in 1; do
+    echo "$hpo"
+    echo "stats/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.subset.bed.gz"
+    awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' \
+      ${meta_p_cutoffs_tsv}
+  done | paste -s
+done < ${phenotype_list} \
+> ${freq_code}.${CNV}.segment_refinement.stats_input.tsv
+echo "/opt/rCNV2/refs/UKBB_GD.Owen_2018.${CNV}.bed.gz" \
+> known_causal_loci_lists.${CNV}.tsv
+
+# Refine significant segments
+/opt/rCNV2/analysis/sliding_windows/refine_significant_segments_v2.py \
+  --cnv ${CNV} \
+  --secondary-p-cutoff ${meta_secondary_p_cutoff} \
   --min-nominal ${meta_nominal_cohorts_cutoff} \
-  --secondary-or-nom \
-  --out-prefix ${freq_code}.${CNV}. \
-  ${binned_genome}
-bgzip -f ${freq_code}.${CNV}.all_windows_labeled.bed
-bgzip -f ${freq_code}.${CNV}.significant_windows.bed
+  --secondary-or-nominal \
+  --distance ${sig_window_pad} \
+  --known-causal-loci-list known_causal_loci_lists.${CNV}.tsv \
+  --sig-loci-bed ${freq_code}.${CNV}.final_segments.loci.bed \
+  --sig-assoc-bed ${freq_code}.${CNV}.final_segments.associations.bed \
+  ${freq_code}.${CNV}.segment_refinement.stats_input.tsv \
+  ${metacohort_sample_table}
 
-# Define regions to be refined (sig windows padded by $sig_window_pad and merged)
-zcat ${freq_code}.${CNV}.significant_windows.bed.gz \
-| fgrep -v "#" \
-| awk -v buf=${sig_window_pad} -v OFS="\t" '{ print $1, $2-buf, $3+buf }' \
-| awk -v OFS="\t" '{ if ($2<0) $2=0; print $1, $2, $3 }' \
-| sort -Vk1,1 -k2,2V -k3,3V \
-| bedtools merge -i - \
-| bgzip -c \
-> ${freq_code}.${CNV}.sig_regions_to_refine.bed.gz
+# # Iterate over phenotypes and make matrix of p-values, odds ratios (lower 95% CI), and nominal sig cohorts
+# mkdir pvals/
+# mkdir secondary_pvals/
+# mkdir ors/
+# mkdir nomsig/
+# while read pheno hpo; do
+#   stats=stats/$pheno.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.bed.gz
+#   p_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
+#          | awk -v OFS="\t" '{ if ($1=="meta_phred_p") print NR }' )
+#   secondary_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
+#                    | awk -v OFS="\t" '{ if ($1=="meta_phred_p_secondary") print NR }' )
+#   lnor_lower_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
+#                     | awk -v OFS="\t" '{ if ($1=="meta_lnOR_lower") print NR }' )
+#   nom_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
+#              | awk -v OFS="\t" '{ if ($1=="n_nominal_cohorts") print NR }' )
+#   zcat $stats | awk -v FS="\t" -v idx=$p_idx '{ if ($1 !~ "#") print $(idx) }' \
+#   | cat <( echo "$pheno.${CNV}" ) - \
+#   > pvals/$pheno.${CNV}.pvals.txt
+#   zcat $stats | awk -v FS="\t" -v idx=$secondary_idx '{ if ($1 !~ "#") print $(idx) }' \
+#   | cat <( echo "$pheno.${CNV}" ) - \
+#   > pvals/$pheno.${CNV}.secondary_pvals.txt
+#   zcat $stats | awk -v FS="\t" -v idx=$lnor_lower_idx '{ if ($1 !~ "#") print $(idx) }' \
+#   | cat <( echo "$pheno.${CNV}" ) - \
+#   > ors/$pheno.${CNV}.lnOR_lower.txt
+#   zcat $stats | awk -v FS="\t" -v idx=$nom_idx '{ if ($1 !~ "#") print $(idx) }' \
+#   | cat <( echo "$pheno.${CNV}" ) - \
+#   > nomsig/$pheno.${CNV}.nomsig_counts.txt
+# done < ${phenotype_list}
+# paste <( zcat ${binned_genome} | cut -f1-3 ) \
+#       pvals/*.${CNV}.pvals.txt \
+# | bgzip -c \
+# > ${CNV}.pval_matrix.bed.gz
+# paste <( zcat ${binned_genome} | cut -f1-3 ) \
+#       pvals/*.${CNV}.secondary_pvals.txt \
+# | bgzip -c \
+# > ${CNV}.secondary_pval_matrix.bed.gz
+# paste <( zcat ${binned_genome} | cut -f1-3 ) \
+#       ors/*.${CNV}.lnOR_lower.txt \
+# | bgzip -c \
+# > ${CNV}.lnOR_lower_matrix.bed.gz
+# paste <( zcat ${binned_genome} | cut -f1-3 ) \
+#       nomsig/*.${CNV}.nomsig_counts.txt \
+# | bgzip -c \
+# > ${CNV}.nominal_cohort_counts.bed.gz
 
-# Prep input file
-while read meta; do
-  echo -e "$meta\tcleaned_cnv/$meta.${freq_code}.bed.gz\tphenos/$meta.cleaned_phenos.txt"
-done < <( cut -f1 ${metacohort_list} | fgrep -v "mega" )\
-> window_refinement.${freq_code}_metacohort_info.tsv
+# # Get matrix of window significance labels
+# /opt/rCNV2/analysis/sliding_windows/get_significant_windows.R \
+#   --pvalues ${CNV}.pval_matrix.bed.gz \
+#   --secondary-pvalues ${CNV}.secondary_pval_matrix.bed.gz \
+#   --p-is-phred \
+#   --p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv \
+#   --odds-ratios ${CNV}.lnOR_lower_matrix.bed.gz \
+#   --or-is-ln \
+#   --min-secondary-p ${meta_secondary_p_cutoff} \
+#   --min-or ${meta_or_cutoff} \
+#   --nominal-counts ${CNV}.nominal_cohort_counts.bed.gz \
+#   --min-nominal ${meta_nominal_cohorts_cutoff} \
+#   --secondary-or-nom \
+#   --out-prefix ${freq_code}.${CNV}. \
+#   ${binned_genome}
+# bgzip -f ${freq_code}.${CNV}.all_windows_labeled.bed
+# bgzip -f ${freq_code}.${CNV}.significant_windows.bed
 
-# Refine associations within regions from above
-for CNV in DEL DUP; do
-  # Dev parameters (do not copy to WDL)
-  regions_to_refine=${freq_code}.${CNV}.sig_regions_to_refine.bed.gz
-  pval_matrix=${CNV}.pval_matrix.bed.gz
-  labeled_windows=${freq_code}.${CNV}.all_windows_labeled.bed.gz
+# # Define regions to be refined (sig windows padded by $sig_window_pad and merged)
+# zcat ${freq_code}.${CNV}.significant_windows.bed.gz \
+# | fgrep -v "#" \
+# | awk -v buf=${sig_window_pad} -v OFS="\t" '{ print $1, $2-buf, $3+buf }' \
+# | awk -v OFS="\t" '{ if ($2<0) $2=0; print $1, $2, $3 }' \
+# | sort -Vk1,1 -k2,2V -k3,3V \
+# | bedtools merge -i - \
+# | bgzip -c \
+# > ${freq_code}.${CNV}.sig_regions_to_refine.bed.gz
 
-  for contig in $( seq 1 22 ); do
-    # Tabix input to single chromosome
-    tabix -f ${regions_to_refine}
-    tabix -h ${regions_to_refine} ${contig} | bgzip -c > regions_to_refine.bed.gz
-    tabix -f ${pval_matrix}
-    tabix -h ${pval_matrix} ${contig} | bgzip -c > pval_matrix.bed.gz
-    tabix -f ${labeled_windows}
-    tabix -h ${labeled_windows} ${contig} | bgzip -c > labeled_windows.bed.gz
+# # Prep input file
+# while read meta; do
+#   echo -e "$meta\tcleaned_cnv/$meta.${freq_code}.bed.gz\tphenos/$meta.cleaned_phenos.txt"
+# done < <( cut -f1 ${metacohort_list} | fgrep -v "mega" )\
+# > window_refinement.${freq_code}_metacohort_info.tsv
+
+# # Refine associations within regions from above
+# for CNV in DEL DUP; do
+#   # Dev parameters (do not copy to WDL)
+#   regions_to_refine=${freq_code}.${CNV}.sig_regions_to_refine.bed.gz
+#   pval_matrix=${CNV}.pval_matrix.bed.gz
+#   labeled_windows=${freq_code}.${CNV}.all_windows_labeled.bed.gz
+
+#   for contig in $( seq 1 22 ); do
+#     # Tabix input to single chromosome
+#     tabix -f ${regions_to_refine}
+#     tabix -h ${regions_to_refine} ${contig} | bgzip -c > regions_to_refine.bed.gz
+#     tabix -f ${pval_matrix}
+#     tabix -h ${pval_matrix} ${contig} | bgzip -c > pval_matrix.bed.gz
+#     tabix -f ${labeled_windows}
+#     tabix -h ${labeled_windows} ${contig} | bgzip -c > labeled_windows.bed.gz
     
-    # Perform refinement
-    if [ $( zcat regions_to_refine.bed.gz | fgrep -v "#" | wc -l ) -gt 0 ]; then
-      /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
-        --cnv-type ${CNV} \
-        --model ${meta_model_prefix} \
-        --hpo-p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv \
-        --p-cutoff-ladder sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.ncase_cutoff_ladder.tsv \
-        --p-is-phred \
-        --secondary-p-cutoff ${meta_secondary_p_cutoff} \
-        --min-or-lower ${meta_or_cutoff} \
-        --retest-min-or-lower ${meta_or_cutoff} \
-        --max-cnv-size ${refine_max_cnv_size} \
-        --min-nominal ${meta_nominal_cohorts_cutoff} \
-        --secondary-or-nom \
-        --credible-interval ${credible_interval} \
-        --prefix "${freq_code}_${CNV}" \
-        --log ${freq_code}.${CNV}.region_refinement.${contig}.log \
-        regions_to_refine.bed.gz \
-        ${metacohort_info_tsv} \
-        pval_matrix.bed.gz \
-        labeled_windows.bed.gz \
-        ${freq_code}.${CNV}.final_regions.associations.${contig}.bed \
-        ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
-    else
-      touch ${freq_code}.${CNV}.final_regions.associations.${contig}.bed
-      touch ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
-      touch ${freq_code}.${CNV}.region_refinement.${contig}.log
-    fi
-    bgzip -f ${freq_code}.${CNV}.final_regions.associations.${contig}.bed
-    bgzip -f ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
-  done
-done
+#     # Perform refinement
+#     if [ $( zcat regions_to_refine.bed.gz | fgrep -v "#" | wc -l ) -gt 0 ]; then
+#       /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
+#         --cnv-type ${CNV} \
+#         --model ${meta_model_prefix} \
+#         --hpo-p-cutoffs sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv \
+#         --p-cutoff-ladder sliding_window.${freq_code}.${CNV}.empirical_genome_wide_pval.ncase_cutoff_ladder.tsv \
+#         --p-is-phred \
+#         --secondary-p-cutoff ${meta_secondary_p_cutoff} \
+#         --min-or-lower ${meta_or_cutoff} \
+#         --retest-min-or-lower ${meta_or_cutoff} \
+#         --max-cnv-size ${refine_max_cnv_size} \
+#         --min-nominal ${meta_nominal_cohorts_cutoff} \
+#         --secondary-or-nom \
+#         --credible-interval ${credible_interval} \
+#         --prefix "${freq_code}_${CNV}" \
+#         --log ${freq_code}.${CNV}.region_refinement.${contig}.log \
+#         regions_to_refine.bed.gz \
+#         ${metacohort_info_tsv} \
+#         pval_matrix.bed.gz \
+#         labeled_windows.bed.gz \
+#         ${freq_code}.${CNV}.final_regions.associations.${contig}.bed \
+#         ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
+#     else
+#       touch ${freq_code}.${CNV}.final_regions.associations.${contig}.bed
+#       touch ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
+#       touch ${freq_code}.${CNV}.region_refinement.${contig}.log
+#     fi
+#     bgzip -f ${freq_code}.${CNV}.final_regions.associations.${contig}.bed
+#     bgzip -f ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
+#   done
+# done
 
-# Annotate final regions with genes
-gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
-for CNV in DEL DUP; do
-  /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
-    -o ${freq_code}.$CNV.final_regions.loci.bed \
-    ${freq_code}.$CNV.final_regions.loci.bed.gz \
-    genes/gencode.v19.canonical.gtf.gz
-    bgzip -f ${freq_code}.$CNV.final_regions.loci.bed
-done
+# # Annotate final regions with genes
+# gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
+# for CNV in DEL DUP; do
+#   /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
+#     -o ${freq_code}.$CNV.final_regions.loci.bed \
+#     ${freq_code}.$CNV.final_regions.loci.bed.gz \
+#     genes/gencode.v19.canonical.gtf.gz
+#     bgzip -f ${freq_code}.$CNV.final_regions.loci.bed
+# done
 
-# Plot summary figures for final regions
-/opt/rCNV2/analysis/sliding_windows/regions_summary.plot.R \
-  -o "${freq_code}.final_regions." \
-  ${freq_code}.DEL.final_regions.loci.bed.gz \
-  ${freq_code}.DUP.final_regions.loci.bed.gz
+# # Plot summary figures for final regions
+# /opt/rCNV2/analysis/sliding_windows/regions_summary.plot.R \
+#   -o "${freq_code}.final_regions." \
+#   ${freq_code}.DEL.final_regions.loci.bed.gz \
+#   ${freq_code}.DUP.final_regions.loci.bed.gz
 
 
 

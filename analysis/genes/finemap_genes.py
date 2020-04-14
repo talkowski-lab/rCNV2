@@ -79,8 +79,6 @@ def finemap(gene_priors, gene_info, null_variance=0.42 ** 2):
         null_se : float, variance of OR estimates under the null. By default,
                   this value is set to a 5% chance that ORs are > 2, as suggested
                   by Wakefield 2009
-    Returns two objects:
-    
     """
 
     genes = list(gene_priors.keys())
@@ -103,7 +101,11 @@ def finemap(gene_priors, gene_info, null_variance=0.42 ** 2):
 
                 # Wakefield 2009 formulates BF relative to H0. We need to invert to 
                 # obtain evidence & posterior for H1 (i.e., true non-zero effect)
-                ABF = 1 / ABF
+                # However, we also are only testing for a _positive_ effect in cases,
+                # so we will only invert ABF if theta >= 0. This is necessary to
+                # prevent sites with enrichments in controls being scored with high ABF
+                if theta >= 0:
+                    ABF = 1 / ABF
 
             else:
                 ABF = 0

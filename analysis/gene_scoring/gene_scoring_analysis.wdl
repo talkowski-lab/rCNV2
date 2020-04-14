@@ -26,6 +26,7 @@ workflow gene_burden_analysis {
   Int cen_tel_dist
   Float prior_frac
   File gene_features
+  File raw_gene_features
   Float elnet_alpha
   Float elnet_l1_l2_mix
   String rCNV_bucket
@@ -113,6 +114,20 @@ workflow gene_burden_analysis {
         freq_code="rCNV",
         rCNV_bucket=rCNV_bucket
     }
+  }
+
+  # Determine best model & QC final scores
+  call qc_scores {
+    input:
+      del_scores=score_genes_DEL.scores_tsv,
+      dup_scores=score_genes_DUP.scores_tsv,
+      raw_gene_features=raw_gene_features,
+      freq_code="rCNV",
+      rCNV_bucket=rCNV_bucket
+  }
+
+  output {
+    File gene_scores = qc_scores.final_scores
   }
 }
 
@@ -471,11 +486,19 @@ task score_genes {
 task qc_scores {
   Array[File] del_scores
   Array[File] dup_scores
+  File raw_gene_features
   String freq_code
   String rCNV_bucket
 
   command <<<
     set -e
+
+    # Localize scores to working directory
+    find / -name "*.gene_scores.*.tsv" | xargs -I {} mv {} ./
+
+    # Copy gene lists
+    gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes/gene_lists ./
+    gsutil -m cp ${rCNV_bucket}/analysis/gene_scoring/gene_lists/* ./gene_lists/
 
     # Evaluate every model to determine best overall predictor
     compdir=${freq_code}_gene_scoring_model_comparisons
@@ -486,15 +509,15 @@ task qc_scores {
       for wrapper in 1; do
         for model in logit svm randomforest lda naivebayes sgd neuralnet; do
           echo $model
-          echo ${freq_code}.$CNV.gene_scores.${model}.tsv
+          echo ${freq_code}.$CNV.gene_scores.$model.tsv
         done | paste - -
       done > ${freq_code}.$CNV.model_evaluation.input.tsv
     done
     /opt/rCNV2/analysis/gene_scoring/compare_models.R \
       ${freq_code}.DEL.model_evaluation.input.tsv \
       ${freq_code}.DUP.model_evaluation.input.tsv \
-      gold_standard.haploinsufficient.genes.list \
-      gold_standard.haplosufficient.genes.list \
+      gene_lists/gold_standard.haploinsufficient.genes.list \
+      gene_lists/gold_standard.haplosufficient.genes.list \
       $compdir/${freq_code}_gene_scoring_model_comparisons
 
     # Merge scores from best model (highest harmonic mean AUC)
@@ -502,8 +525,8 @@ task qc_scores {
     | cut -f1 > best_model.tsv
     best_model=$( cat best_model.tsv )
     /opt/rCNV2/analysis/gene_scoring/merge_del_dup_scores.R \
-      ${freq_code}.DEL.gene_scores.${best_model}.tsv \
-      ${freq_code}.DUP.gene_scores.${best_model}.tsv \
+      ${freq_code}.DEL.gene_scores.$best_model.tsv \
+      ${freq_code}.DUP.gene_scores.$best_model.tsv \
       ${freq_code}.gene_scores.tsv
     gzip -f ${freq_code}.gene_scores.tsv
 
@@ -513,9 +536,6 @@ task qc_scores {
       ${freq_code}.gene_scores.tsv.gz \
       ${raw_gene_features} \
       gene_score_corplots/${freq_code}.gene_scores.raw_feature_cors
-
-    # Make all gene truth sets
-    gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes/gene_lists ./
 
     # Make CNV type-dependent truth sets
     for CNV in DEL DUP; do
@@ -604,32 +624,32 @@ task qc_scores {
       ${freq_code}.gene_scores.tsv.gz \
       DEL.roc_truth_sets.tsv \
       DUP.roc_truth_sets.tsv \
-      gold_standard.haplosufficient.genes.list \
+      gene_lists/gold_standard.haplosufficient.genes.list \
       ${freq_code}_gene_scoring_QC_plots/${freq_code}_gene_score_qc
 
     # Copy all results to Google bucket
-    gsutil cp -m \
+    gsutil -m cp \
       ${freq_code}_gene_scoring_model_comparisons/* \
       ${rCNV_bucket}/analysis/gene_scoring/model_comparisons/
-    gsutil cp -m \
+    gsutil -m cp \
       gene_score_corplots/* \
       ${rCNV_bucket}/analysis/gene_scoring/plots/
-    gsutil cp -m \
+    gsutil -m cp \
       ${freq_code}_gene_scoring_QC_plots/* \
       ${rCNV_bucket}/analysis/gene_scoring/plots/
-    gsutil cp -m \
+    gsutil -m cp \
       ${freq_code}.gene_scores.tsv.gz \
       ${rCNV_bucket}/results/gene_scoring/
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:ab9eeb96ddc5a72af3c3c67d2ea82bd3410dfe6e4ece81b7660868b1c546846d"
+    docker: "talkowski/rcnv@sha256:bde36542e44b22b1cc17940a4faa3ec79a386e8e3d7f7214e0b8d5c6150fed58"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
   }
 
-  ouput {
+  output {
     String best_model = read_string("best_model.tsv")
     File final_scores = "${freq_code}.gene_scores.tsv.gz"
   }

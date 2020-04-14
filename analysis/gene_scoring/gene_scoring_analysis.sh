@@ -276,6 +276,10 @@ gsutil -m cp ${rCNV_bucket}/refs/GRCh37.centromeres_telomeres.bed.gz ./
 
 
 
+# Copy gene lists
+gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes/gene_lists ./
+gsutil -m cp ${rCNV_bucket}/analysis/gene_scoring/gene_lists/* ./gene_lists/
+
 # Evaluate every model to determine best overall predictor
 compdir=${freq_code}_gene_scoring_model_comparisons
 if ! [ -e $compdir ]; then
@@ -285,15 +289,15 @@ for CNV in DEL DUP; do
   for wrapper in 1; do
     for model in logit svm randomforest lda naivebayes sgd neuralnet; do
       echo $model
-      echo ${freq_code}.$CNV.gene_scores.${model}.tsv
+      echo ${freq_code}.$CNV.gene_scores.$model.tsv
     done | paste - -
   done > ${freq_code}.$CNV.model_evaluation.input.tsv
 done
 /opt/rCNV2/analysis/gene_scoring/compare_models.R \
   ${freq_code}.DEL.model_evaluation.input.tsv \
   ${freq_code}.DUP.model_evaluation.input.tsv \
-  gold_standard.haploinsufficient.genes.list \
-  gold_standard.haplosufficient.genes.list \
+  gene_lists/gold_standard.haploinsufficient.genes.list \
+  gene_lists/gold_standard.haplosufficient.genes.list \
   $compdir/${freq_code}_gene_scoring_model_comparisons
 
 # Merge scores from best model (highest harmonic mean AUC)
@@ -301,8 +305,8 @@ sed -n '2p' $compdir/${freq_code}_gene_scoring_model_comparisons.summary_table.t
 | cut -f1 > best_model.tsv
 best_model=$( cat best_model.tsv )
 /opt/rCNV2/analysis/gene_scoring/merge_del_dup_scores.R \
-  ${freq_code}.DEL.gene_scores.${best_model}.tsv \
-  ${freq_code}.DUP.gene_scores.${best_model}.tsv \
+  ${freq_code}.DEL.gene_scores.$best_model.tsv \
+  ${freq_code}.DUP.gene_scores.$best_model.tsv \
   ${freq_code}.gene_scores.tsv
 gzip -f ${freq_code}.gene_scores.tsv
 
@@ -312,9 +316,6 @@ mkdir gene_score_corplots
   ${freq_code}.gene_scores.tsv.gz \
   ${raw_gene_features} \
   gene_score_corplots/${freq_code}.gene_scores.raw_feature_cors
-
-# Make all gene truth sets
-gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes/gene_lists ./
 
 # Make CNV type-dependent truth sets
 for CNV in DEL DUP; do
@@ -403,6 +404,6 @@ mkdir ${freq_code}_gene_scoring_QC_plots/
   ${freq_code}.gene_scores.tsv.gz \
   DEL.roc_truth_sets.tsv \
   DUP.roc_truth_sets.tsv \
-  gold_standard.haplosufficient.genes.list \
+  gene_lists/gold_standard.haplosufficient.genes.list \
   ${freq_code}_gene_scoring_QC_plots/${freq_code}_gene_score_qc
 
