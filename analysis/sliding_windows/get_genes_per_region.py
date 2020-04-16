@@ -16,6 +16,8 @@ from sys import stdout
 from os import path
 import gzip
 import csv
+import pandas as pd
+import re
 import subprocess
 import gzip
 
@@ -70,6 +72,40 @@ def process_gtf(gtf_in):
     return gtfbt, genes, transcripts
 
 
+def annotate_regions(regions_path, gtfbt):
+    """
+    Load regions and annotate with genes
+    """
+
+    regions = pd.read_csv(regions_path, sep='\t')
+    # regions.rename(columns={regions.columns.tolist()[0] : \
+    #                         regions.columns.tolist()[0].replace('#', '')},
+    #                inplace=True)
+
+    intervals_dict = {rid : i.split(';') for rid, i in regions.iloc[:, [3, -2]].values}
+
+    intervals_str = ''
+    for rid, ints in intervals_dict.items():
+        for i in ints:
+            intervals_str += '\t'.join([re.sub(':|-', '\t', i), rid]) + '\n'
+    intervals_bt = pbt.BedTool(intervals_str, from_string=True)
+
+    genes_dict = {x : [] for x in regions.iloc[:, 3].values}
+    for x in intervals_bt.intersect(gtfbt, wa=True, wb=True):
+        gene = str([f.split()[1].replace('"', '') for f in x[-1].split(';') \
+                    if f.startswith('gene_name')][0])
+        genes_dict[x.name].append(gene)
+    
+    genes_dict = {rid : sorted(list(set(g))) for rid, g in genes_dict.items()}
+    ngenes_dict = {rid : len(g) for rid, g in genes_dict.items()}
+    genes_str_dict = {rid : ';'.join(g) for rid, g in genes_dict.items()}
+
+    regions['n_genes'] = regions.iloc[:, 3].map(ngenes_dict)
+    regions['genes'] = regions.iloc[:, 3].map(genes_str_dict)
+
+    return regions.sort_values(by=regions.columns[0:3].tolist(), axis=0)
+
+
 def main():
     """
     Main block
@@ -79,7 +115,10 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('regions', help='CNV BED file to compare vs windows.')
+    parser.add_argument('regions', help='BED file of final regions after refinement. ' +
+                        'Fourth column must be unique row name and wecond-to-last ' +
+                        'column must be a semicolon-delimited list of chr:start-end ' +
+                        'intervals to compare vs gtf.')
     parser.add_argument('gtf', help='GTF of genes to consider.')
     parser.add_argument('-o', '--outbed', help='Path to output file. ' +
                         '[default: stdout]')
@@ -102,32 +141,14 @@ def main():
     # Extract canonical transcripts from input GTF
     gtfbt, genes, transcripts = process_gtf(args.gtf)
 
-    # Intersect transcripts with regions
-    regbt = pbt.BedTool(args.regions).each(lambda x: x[0:4]).saveas()
-    intbt = regbt.intersect(gtfbt, wa=True, wb=True).saveas()
-    genedict = {}
-    for reg in regbt:
-        genes = []
-        for info in [x.fields[-1] for x in intbt if x.name == reg.name]:
-            genes.append(str([x.split()[1].replace('"', '') for x in info.split(';') \
-                         if x.startswith('gene_name')][0]))
-        genes = sorted(list(set(genes)))
-        genedict[reg.name] = genes
+    # Load regions & annotate with genes
+    regions = annotate_regions(args.regions, gtfbt)
 
-    # Write original bed out to file with extra column for genes
-    if path.splitext(args.regions)[-1] in '.gz .bz .bgz .bgzip .gzip'.split():
-        csvin = gzip.open(args.regions, 'rt')
-    else:
-        csvin = open(args.regions)
-    reader = csv.reader(csvin, delimiter='\t')
-    for row in reader:
-        if row[0].startswith('#'):
-            newline = '\t'.join(row + ['genes']) + '\n'
-        else:
-            newline = '\t'.join(row + [';'.join(genedict.get(row[3], []))]) + '\n'
-        outbed.write(newline)
+    # Sort & write original bed out to file with extra columns for n_genes and genes
+    regions.to_csv(outbed, sep='\t', na_rep='NA', header=True, index=False)
+    outbed.close()
 
-    # Format output table and write to outfile
+    # Bgzip output, if optioned
     if args.outbed is not None \
     and args.outbed not in 'stdout -'.split() \
     and args.bgzip:

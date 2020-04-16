@@ -26,9 +26,10 @@ logscale.size.labels <- c("100kb", "1Mb", "10Mb")
 # Load a BED file of loci
 load.loci <- function(path){
   dat <- read.table(path, header=T, sep="\t", comment.char="")
-  dat$npheno <- unlist(lapply(strsplit(dat$hpos, split=";", fixed=T), length))
-  dat$ngenes <- unlist(lapply(strsplit(dat$genes, split=";", fixed=T), length))
   colnames(dat)[1] <- "chr"
+  colnames(dat)[which(colnames(dat)=="cred_intervals_size")] <- "size"
+  colnames(dat)[which(colnames(dat)=="n_genes")] <- "ngenes"
+  colnames(dat)[which(colnames(dat)=="n_hpos")] <- "nphenos"
   return(dat)
 }
 
@@ -183,8 +184,8 @@ DUP.in <- args$args[2]
 out.prefix <- opts$`out-prefix`
 
 # # DEV PARAMETERS:
-# DEL.in <- "~/scratch/rCNV.DEL.final_regions.loci.bed.gz"
-# DUP.in <- "~/scratch/rCNV.DUP.final_regions.loci.bed.gz"
+# DEL.in <- "~/scratch/rCNV.DEL.final_segments.loci.bed.gz"
+# DUP.in <- "~/scratch/rCNV.DUP.final_segments.loci.bed.gz"
 # out.prefix <- "~/scratch/sig_regions.test."
 
 # Load data

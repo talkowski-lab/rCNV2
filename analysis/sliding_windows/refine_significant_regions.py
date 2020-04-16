@@ -59,7 +59,6 @@ def is_window_sig(primary_p, secondary_p, n_nominal, primary_p_cutoff,
     return True
 
 
-
 def ci2se(ci):
     """
     Converts a tuple of (lower, upper) confidence interval bounds to standard error

@@ -14,7 +14,7 @@ Skipping ahead to the final outcome of this analysis, we identified a set of reg
 
 The details of this procedure are described below, but summary plots for the final results can be generated using `regions_summary.plot.R`, which includes the following multi-panel figure:  
 
-![rCNV Region Summary Stats](https://storage.googleapis.com/rcnv_project/public/rCNV.final_regions.multipanel_summary.jpg)  
+![rCNV Region Summary Stats](https://storage.googleapis.com/rcnv_project/public/rCNV.final_segments.multipanel_summary.jpg)  
 
 ---  
 
