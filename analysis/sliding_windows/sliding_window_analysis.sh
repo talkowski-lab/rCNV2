@@ -36,8 +36,8 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
-p_cutoff=0.00000385862
-meta_p_cutoff=0.00000385862
+p_cutoff=0.000003715428
+meta_p_cutoff=0.000003715428
 meta_model_prefix="fe"
 bin_overlap=0.5
 pad_controls=50000
@@ -155,7 +155,7 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
-p_cutoff=0.00000385862
+p_cutoff=0.000003715428
 n_pheno_perms=50
 meta_model_prefix="fe"
 i=1
@@ -331,8 +331,8 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
-p_cutoff=0.00000385862
-meta_p_cutoff=0.00000385862
+p_cutoff=0.000003715428
+meta_p_cutoff=0.000003715428
 meta_model_prefix="fe"
 bin_overlap=0.5
 pad_controls=50000
@@ -519,9 +519,10 @@ meta_secondary_p_cutoff=0.05
 # meta_or_cutoff=1
 meta_nominal_cohorts_cutoff=2
 # meta_model_prefix="fe"
-sig_window_pad=1000000
+sig_window_pad=200000
 # refine_max_cnv_size=3000000
-credset=0.95
+credset=0.99
+genes_gtf=""
 
 
 # Download all meta-analysis stats files and necessary data
@@ -532,7 +533,13 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/sliding_windows/**.${freq_code}.**.sliding_window.meta_analysis.stats.bed.gz \
   stats/
 mkdir refs/
-gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/* refs/
+gsutil -m cp \
+  ${rCNV_bucket}/analysis/analysis_refs/* \
+  ${rCNV_bucket}/refs/GRCh37.cytobands.bed.gz \
+  refs/
+# gsutil -m cp \
+#   ${rCNV_bucket}/cleaned_data/cnv/mega.${freq_code}.bed.gz \
+#   ./
 # mkdir phenos/
 # gsutil -m cp ${rCNV_bucket}/cleaned_data/phenotypes/filtered/* phenos/
 
@@ -581,12 +588,21 @@ echo "/opt/rCNV2/refs/UKBB_GD.Owen_2018.${CNV}.bed.gz" \
   --secondary-p-cutoff ${meta_secondary_p_cutoff} \
   --min-nominal ${meta_nominal_cohorts_cutoff} \
   --secondary-or-nominal \
+  --credible-sets ${credset} \
   --distance ${sig_window_pad} \
   --known-causal-loci-list known_causal_loci_lists.${CNV}.tsv \
+  --cytobands refs/GRCh37.cytobands.bed.gz \
   --sig-loci-bed ${freq_code}.${CNV}.final_segments.loci.bed \
   --sig-assoc-bed ${freq_code}.${CNV}.final_segments.associations.bed \
   ${freq_code}.${CNV}.segment_refinement.stats_input.tsv \
   ${metacohort_sample_table}
+
+# Annotate final regions with genes
+/opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
+  -o ${freq_code}.${CNV}.final_regions.loci.bed \
+  ${freq_code}.${CNV}.final_regions.loci.bed.gz \
+  genes/gencode.v19.canonical.gtf.gz
+  bgzip -f ${freq_code}.${CNV}.final_regions.loci.bed
 
 # # Iterate over phenotypes and make matrix of p-values, odds ratios (lower 95% CI), and nominal sig cohorts
 # mkdir pvals/
@@ -714,16 +730,6 @@ echo "/opt/rCNV2/refs/UKBB_GD.Owen_2018.${CNV}.bed.gz" \
 #     bgzip -f ${freq_code}.${CNV}.final_regions.associations.${contig}.bed
 #     bgzip -f ${freq_code}.${CNV}.final_regions.loci.${contig}.bed
 #   done
-# done
-
-# # Annotate final regions with genes
-# gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
-# for CNV in DEL DUP; do
-#   /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
-#     -o ${freq_code}.$CNV.final_regions.loci.bed \
-#     ${freq_code}.$CNV.final_regions.loci.bed.gz \
-#     genes/gencode.v19.canonical.gtf.gz
-#     bgzip -f ${freq_code}.$CNV.final_regions.loci.bed
 # done
 
 # # Plot summary figures for final regions

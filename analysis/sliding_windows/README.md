@@ -58,7 +58,7 @@ Furthermore, for each pair of phenotype group & metacohort, two additional files
 
 All `.png` plots are annotated with 54 known genomic disorder loci (adapted from [Owen _et al._, _BMC Genomics_, 2018](https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-018-5292-7)), for reference.  
 
-All plots also feature a horizontal dashed line indicating Bonferroni-corrected significance threshold (P ≤ 3.86x10<sup>-6</sup>) for all non-overlapping 200kb windows tested.  
+All plots also feature a horizontal dashed line indicating Bonferroni-corrected significance threshold (P ≤ 3.72x10<sup>-6</sup>) for all non-overlapping 200kb windows tested.  
 
 These files are stored in a protected Google Cloud bucket with one subdirectory per HPO group, here:  
 ```
@@ -116,7 +116,7 @@ We next controlled false discovery rate (FDR) across all sliding window meta-ana
 
 Estimating the number of independent tests performed across all windows, phenotypes, and CNV types is difficult due to numerous necessary assumptions, such as the independence of samples between phenotypes, or the local correlation structure of CNV counts between neighboring windows, among others.    
 
-Instead, we targeted an "genome-wide" significance threshold of P ≤ 3.86x10<sup>-6</sup>, which corresonds to a Bonferroni correction if applied to the number of non-overlapping 200kb windows tested in our analysis.  
+Instead, we targeted an "genome-wide" significance threshold of P ≤ 3.71x10<sup>-6</sup>, which corresonds to a Bonferroni correction if applied to the number of non-overlapping 200kb windows tested in our analysis.  
 
 We empirically determined the primary P-value threshold for each CNV type that matched our desired genome-wide FDR as follows:  
 

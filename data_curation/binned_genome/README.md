@@ -21,11 +21,11 @@ gs://rcnv_project/cleaned_data/binned_genome/GRCh37.200kb_bins_10kb_steps.annota
 
 ### Bin creation & annotation
 
-We created sliding windows for all autosomes at 200kb resolution and 10kb step size, and excluded any bins within ±200kb of any N-masked sequence or known somatically hypermutable site (as applied in [Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674)).  
+We created sliding windows for all autosomes at 200kb resolution and 10kb step size, and excluded any bins with ≥30% coverage by N-masked sequences or known somatically hypermutable site (as applied in [Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674)).  
 
 The window size of 200kb was selected to approximately match the median size of rare CNVs for most cohorts following [our CNV filtering protocol](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/).  
 
-After filtering, we retained a final set of 256,329 bins for analysis.  
+After filtering, we retained a final set of 267,237 bins for analysis.  
 
 To control for technical and genomic covariates, we annotated all bins against a suite of features, then performed Eigendecomposition to control for the inherent correlation structure of most genomic annotation tracks.  
 
@@ -88,7 +88,9 @@ Commands:
   annotate-bins  Annotate bins
   count-sv       Intersect SV and bins
   eigen-bins     Eigendecomposition of annotations
+  feature-hists  Plot bin annotation distributions
   make-bins      Create sequential bins
+  pair-bins      Create pairs of bins
   query          Mutation rate lookup
   vcf-filter     Filter an input VCF
   vcf-stats      Get SV size & spacing

@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens in sliding windows, genome-wide
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/18/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/19/plain-WDL/descriptor" as scattered_perm
 
 
 workflow sliding_window_analysis {
@@ -131,24 +131,24 @@ workflow sliding_window_analysis {
     }
   }
 
-  # Refine minimal credible regions
-  scatter ( cnv in cnv_types ) {
-    call prep_refinement {
-      input:
-        completion_tokens=rCNV_meta_analysis.completion_token,
-        phenotype_list=phenotype_list,
-        metacohort_list=metacohort_list,
-        binned_genome=binned_genome,
-        freq_code="rCNV",
-        CNV=cnv,
-        meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
-        meta_secondary_p_cutoff=meta_secondary_p_cutoff,
-        meta_or_cutoff=meta_or_cutoff,
-        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
-        sig_window_pad=sig_window_pad,
-        rCNV_bucket=rCNV_bucket
-    }
-  }
+  # # Refine minimal credible regions
+  # scatter ( cnv in cnv_types ) {
+  #   call prep_refinement {
+  #     input:
+  #       completion_tokens=rCNV_meta_analysis.completion_token,
+  #       phenotype_list=phenotype_list,
+  #       metacohort_list=metacohort_list,
+  #       binned_genome=binned_genome,
+  #       freq_code="rCNV",
+  #       CNV=cnv,
+  #       meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+  #       meta_secondary_p_cutoff=meta_secondary_p_cutoff,
+  #       meta_or_cutoff=meta_or_cutoff,
+  #       meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+  #       sig_window_pad=sig_window_pad,
+  #       rCNV_bucket=rCNV_bucket
+  #   }
+  # }
   # scatter ( contig in contigs ) {
   #   # DEL
   #   call refine_regions as refine_rCNV_regions_DEL {
@@ -345,7 +345,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:93ec0fee2b0ad415143eda627c2b3c8d2e1ef3c8ff4d3d620767637614fee5f8"
+    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -421,7 +421,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:93ec0fee2b0ad415143eda627c2b3c8d2e1ef3c8ff4d3d620767637614fee5f8"
+    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
     preemptible: 1
     memory: "32 GB"
     disks: "local-disk 275 HDD"
@@ -562,7 +562,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e91d9b5a78547e4572fa04366eb63de64b6f12ee99088c20ff017b4046fc8824"
+    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -692,7 +692,7 @@ task prep_refinement {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e91d9b5a78547e4572fa04366eb63de64b6f12ee99088c20ff017b4046fc8824"
+    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -788,7 +788,7 @@ task refine_regions {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e91d9b5a78547e4572fa04366eb63de64b6f12ee99088c20ff017b4046fc8824"
+    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -848,7 +848,7 @@ task merge_refinements {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e91d9b5a78547e4572fa04366eb63de64b6f12ee99088c20ff017b4046fc8824"
+    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -883,7 +883,7 @@ task plot_region_summary {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e91d9b5a78547e4572fa04366eb63de64b6f12ee99088c20ff017b4046fc8824"
+    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
     preemptible: 1
   }
 }

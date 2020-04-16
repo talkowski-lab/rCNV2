@@ -2,7 +2,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-2020 Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -11,6 +11,7 @@
 workflow create_genome_bins {
   Int binsize
   Int stepsize
+  Float blacklist_cov
   File contiglist
   String rCNV_bucket
 
@@ -21,6 +22,7 @@ workflow create_genome_bins {
     input:
       binsize=binsize,
       stepsize=stepsize,
+      bl_cov=blacklist_cov,
       rCNV_bucket=rCNV_bucket
   }
 
@@ -64,6 +66,7 @@ workflow create_genome_bins {
 task create_raw_bins {
   Int binsize
   Int stepsize
+  Float bl_cov
   String rCNV_bucket
 
   command <<<
@@ -78,7 +81,7 @@ task create_raw_bins {
       -x refs/GRCh37.Nmask.autosomes.bed.gz \
       -x refs/GRCh37.somatic_hypermutable_sites.bed.gz \
       -s ${stepsize}000 \
-      --blacklist-cov 0.3 \
+      --blacklist-cov ${bl_cov} \
       refs/GRCh37.autosomes.genome \
       ${binsize}000 \
       GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz
@@ -89,7 +92,7 @@ task create_raw_bins {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:c1803b167628b6fa5bd04e7d993706c9ef579f53c4e0e187e808791cf61c04f9"
+    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
     preemptible: 1
     disks: "local-disk 50 SSD"
   }
@@ -128,7 +131,7 @@ task annotate_bins {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:c1803b167628b6fa5bd04e7d993706c9ef579f53c4e0e187e808791cf61c04f9"
+    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 30 SSD"
@@ -168,7 +171,7 @@ task cat_annotated_bins {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:c1803b167628b6fa5bd04e7d993706c9ef579f53c4e0e187e808791cf61c04f9"
+    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
     preemptible: 1
   }
 
@@ -217,7 +220,7 @@ task decompose_annotations {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:c1803b167628b6fa5bd04e7d993706c9ef579f53c4e0e187e808791cf61c04f9"
+    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
     preemptible: 1
     memory: "8 GB"
   }
