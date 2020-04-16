@@ -589,8 +589,8 @@ echo "/opt/rCNV2/refs/UKBB_GD.Owen_2018.${CNV}.bed.gz" \
 # Annotate final regions with genes & sort by coordinates
 for entity in loci associations; do
   /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
-    -o ${freq_code}.${CNV}.final_segments.${entity}.bed.gz \
-    ${freq_code}.${CNV}.final_segments.${entity}.pregenes.bed \
+    -o ${freq_code}.${CNV}.final_segments.$entity.bed \
+    ${freq_code}.${CNV}.final_segments.$entity.pregenes.bed \
     ${gtf}
 done
 

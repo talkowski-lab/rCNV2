@@ -137,9 +137,9 @@ Unlike the plots from Step 2, the dashed lines from Step 3 correspond to empiric
 
 These files are stored in the same location as the per-metacohort analysis results.  
 
-### 4. Collapse associations across phenotypes & refine loci to minimal credible regions  
+### 4. Refine associations to minimal credible regions & merge across phenotypes  
 
-Lastly, we collapsed all significant windows across phenotypes and refined them to discrete intervals.  
+Lastly, we refined each association to the minimum interval(s) predicted to contain the causal factor(s).  
 
 In practice, we considered a window to be genome-wide significant if its primary P-value P exceeded the genome-wide significance threshold for that phenotype and CNV type, and it satisifed at least one of the following two criteria:
 1. Secondary P-value (as [described above](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/sliding_windows/#3-combine-association-statistics-across-metacohorts)) was also nominally significant (P < 0.05); and/or
@@ -147,48 +147,39 @@ In practice, we considered a window to be genome-wide significant if its primary
 
 Absent a true replication sample, these _post hoc_ filters were required to protect against Winner's Curse.  
 
-Next, for each locus with a significant association between rCNVs and one or more phenotypes, we aimed to identify:  
-1. all statistically independent associations that were _individually_ genome-wide significant; and
-3. refine these associations to the minimal interval that contained the causal element(s) with 90% confidence (_i.e._, analogous to 90% credible sets from GWAS).  
+Next, for each locus with a significant association between rCNVs and one or more phenotypes, we aimed to identify the minimal interval(s) that contained the causal element(s) with 99% confidence.  
 
 This procedure is described below, and was performed separately for deletions and duplications using `refine_significant_regions.py`.  
 
-First, all windows significant in at least one phenotype were collapsed into a list of larger nonredundant `query regions` by merging overlapping significant windows and clustering all merged windows within ±1Mb. The boundaries of these query regions were extended by +1Mb on each side such that no significant window was closer than 1Mb to the boundary of its query region.  
+First, per phenotype, all significant windows were collapsed into nonredundant `blocks` by merging all windows within ±200kb of any significant window.  
 
-Next, for each query region, we performed the following steps:
-1. Designated the significant window with strongest P-value from any phenotype as the `sentinel window`.  
-2. Designated all phenotypes with at least one significant association in the region as the `sentinel phenotypes`.  
-3. Gathered all rCNVs overlapping the sentinel window in sentinel phenotypes & controls.  
-4. Ordered all case CNVs based on the smallest max breakpoint distance to middle of sentinel window.  
-5. Added case CNVs one at a time (in order) and rerun meta-analysis with Sweeting correction against all control CNVs until the window reached genome-wide signififance (using the criteria listed above).  
-  * _Note: Step 5 was attempted first with CNVs covering at least 50% of the sentinel window, and restricted to case CNVs ≤ 3Mb in size. If genome-wide significance was not achieved for this smaller subset of case CNVs, the test was expanded to include all CNVs overlapping the sentinel window irrespective of size or fracion of the window overlapped._  
-6. When the M-H test reached significance, we defined the `minimal credible region` as the middle 90% of the CNV density over the minimal set of case CNVs required to achieve genome-wide significance for the sentinel window.  
-7. Exclude all sentinel case CNVs and other case CNVs at least 50% covered by the minimal credible region from step 6.  
-8. Recompute all association statistics for each phenotype at every window within the query region after conditioning on the case CNVs excluded in step 7. Repeat steps 1-7 as needed until no more genome-wide significant windows exist within the query region.  
+Next, for each block, we performed the following steps:
+1. Compute an approximate Bayes factor (ABF) for each window following the procedure specified by [Wakefield _et al._, _Genet. Epi._, 2009](https://onlinelibrary.wiley.com/doi/abs/10.1002/gepi.20359); 
+2. Identify the set of windows that captured at least 99% of the total ABF for the block (_i.e._, define the 99% credible set); and
+3. Merge all windows in the 99% credible set (with ±200kb padding) to define the set of credible intervals comprising the 99% credible set.  
 
-The output of this process was a set of minimal credible regions, where each credible region contained at least one genome-wide significant association between rCNVs and a phenotype group, and each minimal credible region was:
-1. 90% confident to contain the causal element(s) for that association, and 
-2. Statistically independent from all other minimal credible regions.  
+For each refined association, we reported the following:  
+* Case and control CNV frequencies were computed as the mean CNV carrier rate across all windows in the 99% credible set; and
+* Pooled effect sizes were computed as the inverse variance-weighted mean across all windows in the 99% credible set.
 
-For each minimal credible region, we re-computed an odds ratio, 95% confidence interval, and P-value using the same meta-analysis procedure for **all rCNVs that overlap the region**, not just those that overlapped the sentinel window. Thus, it was frequently the case that the estimated odds ratio or significance of the minimal credible region was reduced compared to the sentinel window, although the sentinel window was used to declare a genome-wide significant association at that locus.  
+After credible intervals were defined for each association, we collapsed associations across phenotypes to derive a final set of nonredundant disease-associated segments for downstream analyses.  
+
+To reduce associations to loci, we clustered any overlapping credible intervals of the same CNV type (deletion or duplication) from different phenotypes. For each locus, we reported the following:  
+* Case and control CNV frequencies were computed as the weighted mean CNV carrier rate per 99% credible set, where the weights corresponded to the square root of the sample size for each phenotype; and  
+* Pooled effect sizes were computed as the inverse variance-weighted mean across all significant phenotypes.  
 
 #### Output files  
 
-For each CNV type, we generated three files:  
-1. `rCNV.$CNV.final_regions.loci.bed.gz`: a bgzipped BED file containing one row for each minimal credible region, including with summary association statistics pooled across all associated phenotype groups.  
-2. `rCNV.$CNV.final_regions.associations.bed.gz`: a bgzipped BED file containing one row for each phenotype-region pair, including association statistics for that specific phenotype versus (i) the entire minimal credible region and (ii) the sentinel (peak) window within the credible region.  
-3. `rCNV.$CNV.region_refinement.log`: a flat text log file containing details about the refinement process for each query region.  
+From this analysis, we generated two files:  
+1. `rCNV.final_segments.loci.bed.gz`: a bgzipped BED file containing one row for each disease-associated locus, including summary association statistics pooled across all significant phenotypes.  
+2. `rCNV.final_segments.associations.bed.gz`: a bgzipped BED file containing one row for each phenotype-locus pair, including association statistics for that specific phenotype.  
 
 These files are stored in a protected Google Cloud bucket, here:
 ```
-$ gsutil ls gs://rcnv_project/results/sliding_windows/
+$ gsutil ls gs://rcnv_project/results/segment_association/
 
-gs://rcnv_project/results/sliding_windows/rCNV.DEL.final_regions.loci.bed.gz
-gs://rcnv_project/results/sliding_windows/rCNV.DEL.final_regions.associations.bed.gz
-gs://rcnv_project/results/sliding_windows/rCNV.DEL.region_refinement.log
-gs://rcnv_project/results/sliding_windows/rCNV.DUP.final_regions.loci.bed.gz
-gs://rcnv_project/results/sliding_windows/rCNV.DUP.final_regions.associations.bed.gz
-gs://rcnv_project/results/sliding_windows/rCNV.DUP.region_refinement.log
+gs://rcnv_project/results/segment_association/rCNV.final_segments.associations.bed.gz
+gs://rcnv_project/results/segment_association/rCNV.final_segments.loci.bed.gz
 ```
 
 ---  

@@ -621,20 +621,19 @@ task refine_regions {
     # Annotate final regions with genes & sort by coordinates
     for entity in loci associations; do
       /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
-        -o ${freq_code}.${CNV}.final_segments.${entity}.bed.gz \
-        ${freq_code}.${CNV}.final_segments.${entity}.pregenes.bed \
+        -o ${freq_code}.${CNV}.final_segments.$entity.bed \
+        ${freq_code}.${CNV}.final_segments.$entity.pregenes.bed \
         ${gtf}
     done
   >>>
 
   output {
-    File loci = "${freq_code}.${CNV}.final_regions.loci.${contig}.bed.gz"
-    File associations = "${freq_code}.${CNV}.final_regions.associations.${contig}.bed.gz"
-    File logfile = "${freq_code}.${CNV}.region_refinement.${contig}.log"
+    File loci = "${freq_code}.${CNV}.final_segments.loci.bed"
+    File associations = "${freq_code}.${CNV}.final_segments.associations.bed"
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
+    docker: "talkowski/rcnv@sha256:da1326355b9df88da7cb38e2de955a39807c429c59f711dc7f33647f11869c4d"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -680,11 +679,11 @@ task merge_refined_regions {
 
   output {
     File final_associations = "${freq_code}.final_segments.associations.bed.gz"
-    File final_loci = "${freq_code}.final_segments.credible_sets.bed.gz"
+    File final_loci = "${freq_code}.final_segments.loci.bed.gz"
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:6e98f93c88fdebaa197dc6000c91fa9bcccd4b2a2b26fc6e42f4d3cc67a2c8ba"
+    docker: "talkowski/rcnv@sha256:da1326355b9df88da7cb38e2de955a39807c429c59f711dc7f33647f11869c4d"
     preemptible: 1
     bootDiskSizeGb: "20"
   }
@@ -699,7 +698,7 @@ task plot_region_summary {
 
   command <<<
     /opt/rCNV2/analysis/sliding_windows/regions_summary.plot.R \
-      -o "${freq_code}.final_regions." \
+      -o "${freq_code}.final_segments." \
       ${DEL_regions} \
       ${DUP_regions}
 
@@ -707,17 +706,17 @@ task plot_region_summary {
       ./*.jpg \
       "${rCNV_bucket}/results/sliding_windows/plots/"
     gsutil -m cp \
-      "${freq_code}.final_regions.multipanel_summary.jpg" \
+      "${freq_code}.final_segments.multipanel_summary.jpg" \
       ${rCNV_bucket}/public/
     gsutil acl ch -u AllUsers:R ${rCNV_bucket}/public/*.jpg
   >>>
 
   output {
-    File summary_plot = "${freq_code}.final_regions.multipanel_summary.jpg"
+    File summary_plot = "${freq_code}.final_segments.multipanel_summary.jpg"
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
+    docker: "talkowski/rcnv@sha256:da1326355b9df88da7cb38e2de955a39807c429c59f711dc7f33647f11869c4d"
     preemptible: 1
   }
 }
