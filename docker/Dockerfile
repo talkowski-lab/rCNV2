@@ -17,7 +17,7 @@ RUN conda create --name=rcnv python=3.7
 RUN conda config --set ssl_verify no
 RUN conda install -n rcnv -y r-base
 RUN conda install -n rcnv -y -c bioconda numpy scipy pandas scikit-learn
-RUN conda install -n rcnv -y -c bioconda pysam samtools
+RUN conda install -n rcnv -y -c bioconda samtools=1.9 pysam=0.15.3
 RUN conda install -n rcnv -y -c bioconda pybedtools bedtools=2.27.1
 RUN conda install -n rcnv -y -c bioconda bzip2
 RUN conda install -n rcnv -y -c bioconda click
@@ -79,7 +79,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 64c995622da327587a8118639cde08c051b29963 && \
+    git checkout cc0474df42db9ecf1a1fa8e7d8d158c445018924 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)

@@ -702,9 +702,9 @@ task plot_region_summary {
       ${DEL_regions} \
       ${DUP_regions}
 
-    gsutil -m cp \
-      ./*.jpg \
-      "${rCNV_bucket}/results/sliding_windows/plots/"
+    # gsutil -m cp \
+    #   ./*.jpg \
+    #   "${rCNV_bucket}/results/sliding_windows/plots/"
     gsutil -m cp \
       "${freq_code}.final_segments.multipanel_summary.jpg" \
       ${rCNV_bucket}/public/
