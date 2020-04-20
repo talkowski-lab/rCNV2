@@ -39,12 +39,16 @@ find meta_stats/ -name "*meta_analysis.stats.bed.gz" \
 | xargs -I {} tabix -f {}
 
 
-# Compute effect size per phenotype per final segment
-/opt/rCNV2/analysis/paper/scripts/large_segments/calc_all_seg_lnors.py \
-  -o rCNV.final_segments.loci.all_effect_sizes.tsv \
+# Compute effect size and max P-value per phenotype per final segment
+/opt/rCNV2/analysis/paper/scripts/large_segments/calc_all_seg_stats.py \
+  --lnors-out rCNV.final_segments.loci.all_effect_sizes.tsv \
+  --pvals-out rCNV.final_segments.loci.all_pvalues.tsv \
   rCNV.final_segments.loci.bed.gz \
   refs/test_phenotypes.list \
   meta_stats
 gzip -f rCNV.final_segments.loci.all_effect_sizes.tsv
+gzip -f rCNV.final_segments.loci.all_pvalues.tsv
 
 
+# Plot master grid summarizing segment association across all phenotypes
+/opt/rCNV2/analysis/paper/plot/large_segments/plot_association_grid.R

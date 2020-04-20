@@ -6,7 +6,7 @@
 # Distributed under terms of the MIT license.
 
 """
-Calculate inverse variance-weighted effect sizes per phenotype per segment
+Calculate inverse variance-weighted effect sizes and max p-values per phenotype per segment
 """
 
 
@@ -18,7 +18,6 @@ import numpy as np
 from pysam import TabixFile
 from scipy.stats import norm
 import argparse
-from sys import stdout
 
 np.seterr(all='raise')
 
@@ -93,11 +92,13 @@ def iv_mean(values, variances, conf=0.95):
 
 def calc_all_effects(cs_dict, phenos, ssdir):
     """
-    Compute inverse variance-weighted mean effect size for each phenotype for each segment
-    Returns: flattened pd.DataFrame (one row per segment-phenotype-CNV pair)
+    Compute inverse variance-weighted mean effect size and max p-value for each phenotype for each segment
+    Returns: two flattened pd.DataFrames (one row per segment-phenotype-CNV pair)
+             (one DataFrame each for effect sizes and p-values)
     """
 
     fx_df = pd.DataFrame(columns='region_id hpo cnv lnor lnor_lower lnor_upper'.split())
+    pval_df = pd.DataFrame(columns='region_id hpo cnv pvalue pvalue_secondary'.split())
 
     for seg_id, seg_bt in cs_dict.items():
         for pheno, hpo in phenos:
@@ -127,7 +128,10 @@ def calc_all_effects(cs_dict, phenos, ssdir):
                 fx_df = fx_df.append(pd.Series(newvals, index=fx_df.columns),
                                                ignore_index=True)
 
-    return fx_df
+                # Gathers peak primary and secondary p-values
+                import pdb; pdb.set_trace()
+
+    return fx_df, pval_df
 
 
 def main():
@@ -144,15 +148,15 @@ def main():
     parser.add_argument('sumstats_dir', help='path to directory containing ' +
                         'meta-analysis summary statistics for all phenotypes and ' +
                         'CNV types.')
-    parser.add_argument('-o', '--outfile', default='stdout', help='Output tsv of ' +
-                        'effect sizes per segment per phenotype per CNV.')
+    parser.add_argument('--lnors-out', help='Output tsv of effect sizes per ' +
+                        'segment per phenotype per CNV.')
+    parser.add_argument('--pvals-out', help='Output tsv of P-values per segment ' +
+                        'per phenotype per CNV.')
     args = parser.parse_args()
 
     # Open connections to output files
-    if args.outfile in 'stdout - /dev/stdout'.split():
-        outfile = stdout
-    else:
-        outfile = open(args.outfile, 'w')
+    lnors_out = open(args.lnors_out, 'w')
+    pvals_out = open(args.pvals_out, 'w')
 
     # Load segments
     segs_df, cs_dict = load_segs(args.loci)
@@ -161,10 +165,11 @@ def main():
     phenos = [tuple(x.rstrip().split('\t')) for x in open(args.phenos, 'r').readlines()]
 
     # Calculate effects for each segment for each phenotype
-    effects_df = calc_all_effects(cs_dict, phenos, args.sumstats_dir)
+    effects_df, pvals_df = calc_all_effects(cs_dict, phenos, args.sumstats_dir)
 
     # Write results to outfile
-    effects_df.to_csv(outfile, sep='\t', na_rep='NA', index=False)
+    effects_df.to_csv(lnors_out, sep='\t', na_rep='NA', index=False)
+    effects_df.to_csv(pvals_out, sep='\t', na_rep='NA', index=False)
 
 
 if __name__ == '__main__':
