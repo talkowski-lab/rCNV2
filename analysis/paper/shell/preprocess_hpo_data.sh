@@ -8,7 +8,7 @@
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Miscellaneous setup tasks for rCNV formal analyses
+# Miscellaneous preprocessing tasks of HPO data for rCNV formal analyses
 
 
 # Launch docker image & authenticate GCP credentials
@@ -35,9 +35,9 @@ gsutil -m cp \
 
 # Compute Jaccard similarity index for all pairs of phenotypes
 /opt/rCNV2/analysis/paper/scripts/misc_setup/hpo_jaccard.py \
-  --jaccardfile rCNV.hpo_jaccard_matrix.tsv \
-  --countsfile rCNV.hpo_sample_overlap_counts_matrix.tsv \
-  --asymfile rCNV.hpo_sample_overlap_fraction_matrix.tsv \
+  --jaccardfile ${prefix}.hpo_jaccard_matrix.tsv \
+  --countsfile ${prefix}.hpo_sample_overlap_counts_matrix.tsv \
+  --asymfile ${prefix}.hpo_sample_overlap_fraction_matrix.tsv \
   refs/test_phenotypes.list \
   phenos/mega.cleaned_phenos.txt
 
@@ -46,5 +46,14 @@ gsutil -m cp \
 /opt/rCNV2/analysis/paper/scripts/misc_setup/reorder_hpo_terms.py \
   --outfile ${prefix}.reordered_hpos.txt \
   refs/phenotype_groups.HPO_metadata.txt \
-  rCNV.hpo_sample_overlap_fraction_matrix.tsv
+  ${prefix}.hpo_sample_overlap_fraction_matrix.tsv
+
+
+# Copy HPO sample overlap matrices and reordered HPO list to GCP (note: requires permissions)
+gsutil -m cp \
+  ${prefix}.hpo_jaccard_matrix.tsv \
+  ${prefix}.hpo_sample_overlap_counts_matrix.tsv \
+  ${prefix}.hpo_sample_overlap_fraction_matrix.tsv \
+  ${prefix}.reordered_hpos.txt \
+  ${rCNV_bucket}/analysis/paper/hpo/
 
