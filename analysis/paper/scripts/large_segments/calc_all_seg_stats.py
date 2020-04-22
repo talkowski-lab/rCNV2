@@ -18,6 +18,8 @@ import numpy as np
 from pysam import TabixFile
 from scipy.stats import norm
 import argparse
+from sys import stdout
+
 
 np.seterr(all='raise')
 
@@ -93,12 +95,11 @@ def iv_mean(values, variances, conf=0.95):
 def calc_all_effects(cs_dict, phenos, ssdir):
     """
     Compute inverse variance-weighted mean effect size and max p-value for each phenotype for each segment
-    Returns: two flattened pd.DataFrames (one row per segment-phenotype-CNV pair)
-             (one DataFrame each for effect sizes and p-values)
+    Returns: flattened pd.DataFrame (one row per segment-phenotype-CNV pair)
     """
 
-    fx_df = pd.DataFrame(columns='region_id hpo cnv lnor lnor_lower lnor_upper'.split())
-    pval_df = pd.DataFrame(columns='region_id hpo cnv pvalue pvalue_secondary'.split())
+    outcols = 'region_id hpo cnv lnor lnor_lower lnor_upper pvalue pvalue_secondary'
+    fx_df = pd.DataFrame(columns=outcols.split())
 
     for seg_id, seg_bt in cs_dict.items():
         for pheno, hpo in phenos:
@@ -123,15 +124,23 @@ def calc_all_effects(cs_dict, phenos, ssdir):
                     lnor_vars = [ci2se(ci) for ci in lnor_cis]
                     iv_lnor, (iv_lnor_lower, iv_lnor_upper) = iv_mean(lnors, lnor_vars)
 
-                # Add OR estimate to fx_df
-                newvals = [seg_id, hpo, cnv, iv_lnor, iv_lnor_lower, iv_lnor_upper]
+                # Gathers peak primary and secondary p-values
+                if np.all(np.isnan(wdf.meta_phred_p)):
+                    best_p_primary = 0
+                else:
+                    best_p_primary = np.nanmax(wdf.meta_phred_p)
+                if np.all(np.isnan(wdf.meta_phred_p_secondary)):
+                    best_p_secondary = 0
+                else:
+                    best_p_secondary = np.nanmax(wdf.meta_phred_p_secondary)
+
+                # Add OR estimate and peak pvalues to fx_df
+                newvals = [seg_id, hpo, cnv, iv_lnor, iv_lnor_lower, iv_lnor_upper,
+                           best_p_primary, best_p_secondary]
                 fx_df = fx_df.append(pd.Series(newvals, index=fx_df.columns),
                                                ignore_index=True)
 
-                # Gathers peak primary and secondary p-values
-                import pdb; pdb.set_trace()
-
-    return fx_df, pval_df
+    return fx_df
 
 
 def main():
@@ -148,15 +157,16 @@ def main():
     parser.add_argument('sumstats_dir', help='path to directory containing ' +
                         'meta-analysis summary statistics for all phenotypes and ' +
                         'CNV types.')
-    parser.add_argument('--lnors-out', help='Output tsv of effect sizes per ' +
-                        'segment per phenotype per CNV.')
-    parser.add_argument('--pvals-out', help='Output tsv of P-values per segment ' +
-                        'per phenotype per CNV.')
+    parser.add_argument('-o', '--outfile', help='Output tsv of summary stats per ' +
+                        'segment per phenotype per CNV. [default: stdout]',
+                        default='stdout')
     args = parser.parse_args()
-
+    
     # Open connections to output files
-    lnors_out = open(args.lnors_out, 'w')
-    pvals_out = open(args.pvals_out, 'w')
+    if args.outfile in 'stdout - /dev/stdout'.split():
+        outfile = stdout
+    else:
+        outfile = open(args.outfile, 'w')
 
     # Load segments
     segs_df, cs_dict = load_segs(args.loci)
@@ -165,11 +175,10 @@ def main():
     phenos = [tuple(x.rstrip().split('\t')) for x in open(args.phenos, 'r').readlines()]
 
     # Calculate effects for each segment for each phenotype
-    effects_df, pvals_df = calc_all_effects(cs_dict, phenos, args.sumstats_dir)
+    effects_df = calc_all_effects(cs_dict, phenos, args.sumstats_dir)
 
     # Write results to outfile
-    effects_df.to_csv(lnors_out, sep='\t', na_rep='NA', index=False)
-    effects_df.to_csv(pvals_out, sep='\t', na_rep='NA', index=False)
+    effects_df.to_csv(outfile, sep='\t', na_rep='NA', index=False)
 
 
 if __name__ == '__main__':

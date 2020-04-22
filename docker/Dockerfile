@@ -67,6 +67,8 @@ RUN Rscript -e "sapply(c('beeswarm','Hmisc','EQL','vioplot'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 RUN Rscript -e "sapply(c('psych'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
+RUN Rscript -e \
+    "install.packages('https://cran.r-project.org/src/contrib/Archive/plotrix/plotrix_3.6-6.tar.gz')"
 
 # Install Athena toolkit
 RUN git clone https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/athena /opt/athena \
@@ -79,7 +81,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout da27d6cf27c73a239e31a2e2f039435ee0ed02eb && \
+    git checkout e555ff7f8ea3111b26538ed57b8bad6b27c1e1ea && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)
