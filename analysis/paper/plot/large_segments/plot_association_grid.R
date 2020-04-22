@@ -194,7 +194,7 @@ rcnv.config <- opts$`rcnv-config`
 # # DEV PARAMETERS
 # loci.in <- "~/scratch/rCNV.final_segments.loci.bed.gz"
 # sumstats.in <- "~/scratch/rCNV.final_segments.loci.all_sumstats.tsv.gz"
-# hpos.in <- "~/scratch/hpos.txt"
+# hpos.in <- "~/scratch/rCNV2_analysis_d1.reordered_hpos.txt"
 # clusters.in <- "~/scratch/locus_clusters.txt"
 # rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
 # outfile <- "~/scratch/test.pdf"

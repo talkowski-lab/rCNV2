@@ -25,6 +25,7 @@ export plot_prefix="rCNV2_analysis_d1"
 mkdir refs/ 
 gsutil -m cp \
    ${rCNV_bucket}/analysis/analysis_refs/** \
+   ${rCNV_bucket}/analysis/paper/data/hpo/${prefix}.reordered_hpos.txt \
    refs/
 mkdir meta_stats/
 gsutil -m cp \
@@ -45,7 +46,10 @@ find meta_stats/ -name "*meta_analysis.stats.bed.gz" | xargs -I {} tabix -f {}
   rCNV.final_segments.loci.bed.gz \
   refs/test_phenotypes.list \
   meta_stats
-gzip -f rCNV.final_segments.loci.all_sumstats.tsv
+gzip -f ${prefix}.final_segments.loci.all_sumstats.tsv
+gsutil -m cp \
+  ${prefix}.final_segments.loci.all_sumstats.tsv.gz \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/
 
 
 # Collapse overlapping DEL/DUP segments for sake of plotting
@@ -61,12 +65,15 @@ done < <( zcat rCNV.final_segments.loci.bed.gz | grep -ve '^#' \
 
 
 # Plot master grid summarizing segment association across all phenotypes
-cut -f2 refs/test_phenotypes.list > phenotypes.list
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_association_grid.R \
   --clusters locus_clusters.txt \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.final_segments.loci.bed.gz \
-  rCNV.final_segments.loci.all_sumstats.tsv.gz \
-  phenotypes.list \
+  ${prefix}.final_segments.loci.all_sumstats.tsv.gz \
+  refs/${prefix}.reordered_hpos.txt \
   ${plot_prefix}.large_segments.association_grid.pdf
+gsutil -m cp \
+  ${plot_prefix}.large_segments.association_grid.pdf \
+  ${rCNV_bucket}/analysis/paper/plots/large_segments/
+
 

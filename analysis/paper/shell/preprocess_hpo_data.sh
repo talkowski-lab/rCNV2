@@ -55,5 +55,5 @@ gsutil -m cp \
   ${prefix}.hpo_sample_overlap_counts_matrix.tsv \
   ${prefix}.hpo_sample_overlap_fraction_matrix.tsv \
   ${prefix}.reordered_hpos.txt \
-  ${rCNV_bucket}/analysis/paper/hpo/
+  ${rCNV_bucket}/analysis/paper/data/hpo/
 
