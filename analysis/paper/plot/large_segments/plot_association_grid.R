@@ -180,7 +180,7 @@ opts <- args$options
 
 # Checks for appropriate positional arguments
 if(length(args$args) != 4){
-  stop(paste("Seven positional arguments: loci.bed, sumstats.tsv, hpos.tsv, output.pdf\n", sep=" "))
+  stop(paste("Four positional arguments required: loci.bed, sumstats.tsv, hpos.tsv, output.pdf\n", sep=" "))
 }
 
 # Writes args & opts to vars
