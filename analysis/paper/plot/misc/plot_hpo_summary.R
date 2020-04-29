@@ -78,22 +78,22 @@ load.ovr <- function(ovr.in, hpos){
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Plot a vertical dendrogram
-plot.dendro <- function(meta, lwd=1, color="black"){
+plot.dendro <- function(meta, lwd=1, color="black", y.top=-0.6){
   # Get basic plotting info
   ntiers <- max(meta$HPO_tier, na.rm=T)
   nhpos <- nrow(meta)
   y.at <- (1:nhpos)-0.5
   
   # Prep plot area
-  plot(x=NA, y=NA, xlim=c(0, ntiers), ylim=c(nhpos, 0),
+  plot(x=NA, y=NA, xlim=c(0, ntiers+1), ylim=c(nhpos, y.top),
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
   
   # Draw horizontal segments
   segments(x0=meta$HPO_tier-1, x1=ntiers,
            y0=y.at, y1=y.at,
-           lwd=lwd, col=color)
+           lwd=lwd, col=color, lend="round")
   
-  # Draw vertical segments
+  # Draw vertical segments & colored boxes for leaves
   sapply(1:nhpos, function(i){
     direct.children <- which(sapply(meta$parent_terms, 
                                     function(parents){meta$HPO[i] %in% parents})
@@ -103,12 +103,18 @@ plot.dendro <- function(meta, lwd=1, color="black"){
                y0=y.at[i], y1=y.at[max(direct.children)],
                lwd=lwd, col=color)
     }
+    hpo.color <- get.hpo.color(meta$HPO[i])
+    if(!is.na(meta$HPO_tier[i])){
+      rect(xleft=ntiers, xright=ntiers+1,
+           ybottom=y.at[i]-0.35, ytop=y.at[i]+0.35,
+           xpd=T, border=color, col=hpo.color)
+    }
   })
 }
 
 # Plot descriptive text columns
 plot.text.columns <- function(hpos, meta, x.at=c(0, 2, 8), y.lab.buffer=0.05, 
-                              background=T, y.buffer=0.1){
+                              background=T, y.buffer=0.1, y.top=-0.6){
   # Get basic plotting info
   nhpos <- nrow(meta)
   y.at <- (1:nhpos)-0.5
@@ -117,13 +123,14 @@ plot.text.columns <- function(hpos, meta, x.at=c(0, 2, 8), y.lab.buffer=0.05,
   abbrevs <- hpo.abbrevs[match(meta$HPO, names(hpo.abbrevs), nomatch="")]
   
   # Prep plot area & add y-axis titles
-  plot(x=NA, y=NA, xlim=c(0, 10), ylim=c(nhpos, 0),
+  plot(x=NA, y=NA, xlim=c(0, 10), ylim=c(nhpos, y.top),
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
   sapply(1:length(x.at), function(i){
     axis(3, at=c(x.at[i]+0.125, (c(x.at[-1], par("usr")[2]) - 0.25)[i]), 
-         tck=0, labels=NA, xpd=T, col=blueblack, line=0.1)
+         tck=0, labels=NA, xpd=T, col=blueblack, line=0.1+y.top)
   })
-  text(x=x.at, y=par("usr")[4]+(y.lab.buffer*(par("usr")[4]-par("usr")[3])),
+  height <- par("usr")[4]-par("usr")[3]
+  text(x=x.at, y=par("usr")[4]+(y.lab.buffer*height)+(y.top*(sum(par("mar")[c(1,3)])/height)),
        labels=c("HPO", "Description", "Abbreviation"), 
        xpd=T, font=2, pos=4)
   
@@ -141,7 +148,8 @@ plot.text.columns <- function(hpos, meta, x.at=c(0, 2, 8), y.lab.buffer=0.05,
 # Plot bars of samples per HPO, colored by cohort
 plot.count.bars <- function(hpos, meta, scaled=F, title=NULL,
                             x.scalar=1.01, y.buffer=0.1, end.labels=F,
-                            y.lab.buffer=0.05, background=T, x.axis=T){
+                            y.lab.buffer=0.05, background=T, x.axis=T,
+                            y.top=-0.6){
   # Get basic plotting info
   counts <- meta[, grep("meta", colnames(meta), fixed=T)]
   counts$total <- apply(counts, 1, sum, na.rm=T)
@@ -157,7 +165,7 @@ plot.count.bars <- function(hpos, meta, scaled=F, title=NULL,
   ytops <- sapply(y.at, function(y){rep(y+0.5-y.buffer, ncol(counts)-1)})
   
   # Prep plot area
-  plot(x=NA, y=NA, xlim=c(0, x.max), ylim=c(nhpos, 0),
+  plot(x=NA, y=NA, xlim=c(0, x.max), ylim=c(nhpos, y.top),
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
   if(background==T){
     rect(xleft=par("usr")[1], xright=par("usr")[2],
@@ -186,15 +194,16 @@ plot.count.bars <- function(hpos, meta, scaled=F, title=NULL,
       ax.lab <- paste(ax.at / 1000, "k", sep="")
       ax.lab[1] <- 0
     }
-    axis(3, at=ax.at, labels=NA, line=0.1, col=blueblack)
+    axis(3, at=ax.at, labels=NA, line=0.1+y.top, col=blueblack)
     sapply(1:length(ax.at), function(x){
-      axis(3, at=ax.at[x], tick=F, line=-0.4, labels=ax.lab[x], cex=0.8)
+      axis(3, at=ax.at[x], tick=F, line=-0.4+y.top, labels=ax.lab[x], cex=0.8)
     })
     title.line <- 0.04
   }else{
     title.line <- 0
   }
-  text(x=mean(par("usr")[1:2]), y=par("usr")[4]+((y.lab.buffer+title.line)*(par("usr")[4]-par("usr")[3])),
+  height <- par("usr")[4]-par("usr")[3]
+  text(x=mean(par("usr")[1:2]), y=par("usr")[4]+((y.lab.buffer+title.line)*height)+(y.top*(sum(par("mar")[c(1,3)])/height)),
        labels=title, xpd=T, font=2)
   if(end.labels==T){
     text(x=counts$total, y=y.at, pos=4, xpd=T,
@@ -203,7 +212,7 @@ plot.count.bars <- function(hpos, meta, scaled=F, title=NULL,
 }
 
 # Heatmap of sample overlap
-plot.overlaps <- function(hpos, ovr, max.ovr=0.2, title.y.scalar=0.25){
+plot.overlaps <- function(hpos, ovr, max.ovr=0.2, title.y.scalar=0.25, y.top=-0.6){
   # Get basic plotting info
   plot.ovr <- as.data.frame(t(apply(ovr, 1, function(vals){
     vals[which(vals>=max.ovr)] <- max.ovr
@@ -213,10 +222,15 @@ plot.overlaps <- function(hpos, ovr, max.ovr=0.2, title.y.scalar=0.25){
   nhpos.y <- nrow(ovr)
   
   # Prep plot area
-  plot(x=NA, y=NA, xlim=c(0, nhpos), ylim=c(nhpos.y, 0),
+  plot(x=NA, y=NA, xlim=c(0, nhpos), ylim=c(nhpos.y, y.top),
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
   axis(3, at=(1:nhpos)-0.5, tick=F, line=-0.7, las=2,
        labels=hpo.abbrevs[match(colnames(ovr), names(hpo.abbrevs), nomatch="")])
+  
+  # Add top X-axis legend rectangles
+  rect(xleft=(1:nhpos)-0.5-0.35, (1:nhpos)-0.5+0.35,
+       ytop=y.top, ybottom=-0.2, border=blueblack,
+       col=sapply(colnames(ovr), get.hpo.color))
   
   # Plot rectangles
   sapply(1:nhpos.y, function(row){
@@ -224,7 +238,7 @@ plot.overlaps <- function(hpos, ovr, max.ovr=0.2, title.y.scalar=0.25){
     row.colors <- percentile.palette[as.numeric(round(100*row.vals, 0) + 1)]
     rect(xleft=(1:nhpos)-1, xright=1:nhpos,
          ybottom=row, ytop=row-1, 
-         col=row.colors, border=row.colors)
+         col=row.colors, border=row.colors, xpd=T)
   })
   abline(v=1:nhpos, h=1:nhpos.y, col=bluewhite)
   
@@ -232,7 +246,7 @@ plot.overlaps <- function(hpos, ovr, max.ovr=0.2, title.y.scalar=0.25){
   na.rows <- which(!(rownames(ovr) %in% hpos))
   sapply(1:length(na.rows), function(i){
     rect(xleft=0, xright=nhpos, ybottom=na.rows[i]-1, ytop=na.rows[i], 
-         col="white", border=NA, bty="n", xpd=T)
+         col="white", border="white", bty="n", xpd=T)
   })
   sapply(0:length(na.rows), function(i){
     rect(xleft=0, xright=nhpos, ybottom=c(0, na.rows)[i+1], ytop=c(na.rows, nhpos.y+1)[i+1]-1, 
@@ -295,6 +309,19 @@ plot.cohort.legend <- function(){
        ybottom=y.at-0.3, ytop=y.at+0.3,
        col=cohort.colors, border=blueblack)
   text(x=x.at+0.2, y=y.at, pos=4, labels=cohort.abbrevs)
+}
+
+# Plot phenotype legend
+plot.pheno.legend <- function(){
+  par(mar=c(0.1, 0.1, 0.1, 0.1), bty="n")
+  plot(x=NA, y=NA, xlim=c(0, 3), ylim=c(4, 0),
+       xaxt="n", yaxt="n", xlab="", ylab="")
+  x.at <- rep(1, 3)
+  y.at <- 1:3
+  rect(xleft=x.at-0.3, xright=x.at+0.3,
+       ybottom=y.at-0.3, ytop=y.at+0.3,
+       col=pheno.colors, border=blueblack)
+  text(x=x.at+0.2, y=y.at, pos=4, labels=pheno.abbrevs)
 }
 
 # Plot overlap legend
@@ -366,22 +393,26 @@ ovr <- load.ovr(ovr.in, hpos)
 # Plot figure
 max.ovr <- 0.2
 vertical.scale <- 0.65
-panel.widths <- c(0.7, 7.5, 1.75, 2.3, 6)
+panel.widths <- c(0.8, 7.5, 1.75, 2.3, 6)
 pdf(paste(out.prefix, "pdf", sep="."), 
-    height=vertical.scale*9.6, 
+    height=vertical.scale*9.75, 
     width=vertical.scale*sum(panel.widths))
 plot.hpos(hpos, meta, ovr, panel.widths, 
-          parmar=c(0.2, 0.1, 10, 0.1), y.lab.buffer=0.02,
+          parmar=c(0.2, 0.1, 10, 0.1), y.lab.buffer=0.01,
           max.ovr=max.ovr)
 dev.off()
 
 # Plot legends
-pdf(paste(out.prefix, "cohort_legend.pdf", sep="."), 
-    height=1.75, width=1.5)
-plot.cohort.legend()
-dev.off()
+# pdf(paste(out.prefix, "cohort_legend.pdf", sep="."), 
+#     height=1.75, width=1.5)
+# plot.cohort.legend()
+# dev.off()
 pdf(paste(out.prefix, "overlap_legend.pdf", sep="."), 
     height=0.6, width=2.1)
 plot.overlap.legend(max.ovr, title.line=2.7)
 dev.off()
+# pdf(paste(out.prefix, "pheno_legend.pdf", sep="."), 
+#     height=1.75, width=1.7)
+# plot.pheno.legend()
+# dev.off()
 

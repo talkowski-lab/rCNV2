@@ -169,7 +169,7 @@ get.2d.data <- function(stats, metacohorts, log=F){
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Plot horizontal grouped dotplots of CNVs per sample
-plot.persample <- function(stats, metacohorts, xlims=NULL, title=NULL){
+plot.persample <- function(stats, metacohorts, xlims=NULL, title=NULL, y.axis="left"){
   # Collect plot data
   del <- get.cnv.persample(stats, unlist(metacohorts), "DEL", log=T)
   dup <- get.cnv.persample(stats, unlist(metacohorts), "DUP", log=T)
@@ -181,6 +181,9 @@ plot.persample <- function(stats, metacohorts, xlims=NULL, title=NULL){
   
   # Prep plot area
   par(mar=c(2.2, 7.25, 1.2, 0.3), bty="n")
+  if(y.axis == "right"){
+    par(mar=c(2.2, 0.3, 1.2, 7.25))
+  }
   plot(x=NA, y=NA, xlim=xlims, ylim=c(n.cohorts + n.meta - 1, 0),
        xaxt="n", yaxt="n", xlab="", ylab="", yaxs="i")
   axis(1, at=log10(logscale.minor), labels=NA, tck=-0.015, col=blueblack, lwd=0.75)
@@ -212,12 +215,17 @@ plot.persample <- function(stats, metacohorts, xlims=NULL, title=NULL){
          ybottom=rows.plotted, ytop=rows.plotted+length(cohorts),
          col=NA, bty="o", border=blueblack, xpd=T)
     # Add Y-axis labels & metacohort grouping
-    axis(2, at=apply(pdat$rects[, 3:4], 1, mean, na.rm=T),
+    if(y.axis=="right"){
+      y.axis.side <- 4
+    }else{
+      y.axis.side <- 2
+    }
+    axis(y.axis.side, at=apply(pdat$rects[, 3:4], 1, mean, na.rm=T),
          las=2, tick=F, line=-0.8, labels=cohorts, col.axis=blueblack)
     left.mar.grouping.at <- c(rows.plotted-0.025, rows.plotted+length(cohorts)+0.025)
-    axis(2, at=left.mar.grouping.at,
+    axis(y.axis.side, at=left.mar.grouping.at,
          labels=NA, tck=0.015, col=blueblack, line=3.65, xpd=T)
-    axis(2, at=mean(left.mar.grouping.at), tick=F, line=2.85, las=2,
+    axis(y.axis.side, at=mean(left.mar.grouping.at), tick=F, line=2.85, las=2,
          labels=cohort.abbrevs[which(names(cohort.abbrevs) == names(metacohorts)[m])])
     rows.plotted <- rows.plotted + length(cohorts) + 1
   }
@@ -247,7 +255,7 @@ plot.boxes <- function(cohort.sizes, y, y.buffer=0.05, row.width=1){
 }
 
 # Plot horizontal boxplots of CNV size per cohort
-plot.size <- function(sizes, metacohorts, xlims=NULL, title=NULL){
+plot.size <- function(sizes, metacohorts, xlims=NULL, title=NULL, y.axis="left"){
   if(is.null(xlims)){
     xlims <- range(log10(as.numeric(unlist(unlist(sizes)))), na.rm=T)
   }
@@ -256,6 +264,9 @@ plot.size <- function(sizes, metacohorts, xlims=NULL, title=NULL){
   
   # Prep plot area
   par(mar=c(2.2, 7.25, 1.2, 0.6), bty="n")
+  if(y.axis=="right"){
+    par(mar=c(2.2, 0.6, 1.2, 7.25))
+  }
   plot(x=NA, y=NA, xlim=xlims, ylim=c(n.cohorts + n.meta - 1, 0),
        xaxt="n", yaxt="n", xlab="", ylab="", yaxs="i")
   axis(1, at=log10(logscale.minor), labels=NA, tck=-0.015, col=blueblack, lwd=0.75)
@@ -286,12 +297,17 @@ plot.size <- function(sizes, metacohorts, xlims=NULL, title=NULL){
          ybottom=rows.plotted, ytop=rows.plotted+length(cohorts),
          col=NA, bty="o", border=blueblack, xpd=T)
     # Add Y-axis labels & metacohort grouping
-    axis(2, at=(1:length(cohorts))+rows.plotted-0.5,
+    if(y.axis=="right"){
+      y.axis.side <- 4
+    }else{
+      y.axis.side <- 2
+    }
+    axis(y.axis.side, at=(1:length(cohorts))+rows.plotted-0.5,
          las=2, tick=F, line=-0.8, labels=cohorts, col.axis=blueblack)
     left.mar.grouping.at <- c(rows.plotted-0.025, rows.plotted+length(cohorts)+0.025)
-    axis(2, at=left.mar.grouping.at,
+    axis(y.axis.side, at=left.mar.grouping.at,
          labels=NA, tck=0.015, col=blueblack, line=3.65, xpd=T)
-    axis(2, at=mean(left.mar.grouping.at), tick=F, line=2.85, las=2,
+    axis(y.axis.side, at=mean(left.mar.grouping.at), tick=F, line=2.85, las=2,
          labels=cohort.abbrevs[which(names(cohort.abbrevs) == names(metacohorts)[m])])
     rows.plotted <- rows.plotted + length(cohorts) + 1
   }
@@ -299,7 +315,7 @@ plot.size <- function(sizes, metacohorts, xlims=NULL, title=NULL){
 
 # Plot 2d scatterplot of CNVs per sample vs median CNV size
 plot.2dscatter <- function(stats, metacohorts, persample.lims=NULL, size.lims=NULL,
-                           background=TRUE, title=NULL){
+                           background=TRUE, title=NULL, y.axis="left"){
   # Collect plot data
   pdat <- get.2d.data(stats, metacohorts, log=T)
   if(is.null(size.lims)){
@@ -315,6 +331,9 @@ plot.2dscatter <- function(stats, metacohorts, persample.lims=NULL, size.lims=NU
   
   # Prep plot area
   par(mar=c(2.5, 2.5, 1.2, 1.2), bty="n")
+  if(y.axis=="right"){
+    par(mar=c(2.5, 1.2, 1.2, 2.5))
+  }
   plot(x=NA, y=NA, xlim=xlims, ylim=ylims,
        xaxt="n", yaxt="n", xlab="", ylab="")
   mtext(3, line=0.1, text=title, font=2)
@@ -337,12 +356,17 @@ plot.2dscatter <- function(stats, metacohorts, persample.lims=NULL, size.lims=NU
   mtext(1, line=1.15, text="Median CNV Size")
   
   # Add Y axis
-  axis(2, at=log10(logscale.minor), labels=NA, tck=-0.015, col=blueblack, lwd=0.75)
-  axis(2, at=log10(logscale.demi), labels=NA, tck=-0.03, col=blueblack, lwd=1.25)
+  if(y.axis=="right"){
+    y.axis.side <- 4
+  }else{
+    y.axis.side <- 2
+  }
+  axis(y.axis.side, at=log10(logscale.minor), labels=NA, tck=-0.015, col=blueblack, lwd=0.75)
+  axis(y.axis.side, at=log10(logscale.demi), labels=NA, tck=-0.03, col=blueblack, lwd=1.25)
   sapply(logscale.demi, function(x){
-    axis(2, at=log10(x), labels=prettyNum(x, big.mark=","), tick=F, line=-0.6, las=2)
+    axis(y.axis.side, at=log10(x), labels=prettyNum(x, big.mark=","), tick=F, line=-0.6, las=2)
   })
-  mtext(2, line=1.6, text="CNVs per Sample")
+  mtext(y.axis.side, line=1.6, text="CNVs per Sample")
   
   # Add points
   points(x=pdat$x, y=pdat$y, pch=18, col=pdat$color)
@@ -419,7 +443,7 @@ plot.persample(raw, metacohorts, xlims=persamp.xlims, title="Raw Data")
 dev.off()
 pdf(paste(out.prefix, "cnv_per_sample.filtered.pdf", sep="."), 
     height=persamp.pdf.dims[1], width=persamp.pdf.dims[2])
-plot.persample(rcnv, metacohorts, xlims=persamp.xlims, title="Harmonized Data")
+plot.persample(rcnv, metacohorts, xlims=persamp.xlims, title="Harmonized Data", y.axis="right")
 dev.off()
 
 # Plot CNV sizes
@@ -432,7 +456,7 @@ plot.size(raw.sizes, metacohorts, xlims=size.xlims, title="Raw Data")
 dev.off()
 pdf(paste(out.prefix, "sizes.filtered.pdf", sep="."), 
     height=size.pdf.dims[1], width=size.pdf.dims[2])
-plot.size(rcnv.sizes, metacohorts, xlims=size.xlims, title="Harmonized Data")
+plot.size(rcnv.sizes, metacohorts, xlims=size.xlims, title="Harmonized Data", y.axis="right")
 dev.off()
 
 # Plot 2d scatter of CNVs per sample vs median CNV size
@@ -450,5 +474,5 @@ dev.off()
 pdf(paste(out.prefix, "size_vs_per_sample.filtered.pdf", sep="."), 
     height=scatter.pdf.dim, width=scatter.pdf.dim)
 plot.2dscatter(rcnv, size.lims=medsize.xlims, metacohorts, persample.lims=persamp.xlims,
-               title="Harmonized Data")
+               title="Harmonized Data", y.axis="right")
 dev.off()

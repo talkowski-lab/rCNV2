@@ -65,26 +65,35 @@ somatic.hpos <- c("HP:0000152", "HP:0003011", "HP:0001507",
                   "HP:0025031", "HP:0001626", "HP:0001627", 
                   "HP:0002597", "HP:0100545", "HP:0001197")
 
+pheno.abbrevs <- c("Mixed", "Neuro.", "Non-Neuro.")
+
 
 ##########
 # COLORS #
 ##########
+blueblack <- "#003F6A"
+bluewhite <- "#E8F3FB"
+
 cnv.colors <- c("DEL" = "#D43925",
                 "DUP" = "#2376B2")
 
 control.cnv.colors <- c("DEL" = "#E69186",
                         "DUP" = "#79AACC")
 
+cnv.color.palettes <- list("DEL" = colorRampPalette(c("gray95", cnv.colors[1]))(101),
+                           "DUP" = colorRampPalette(c("gray95", cnv.colors[2]))(101))
+
 require(viridisLite)
 percentile.palette <- viridis(101)
-
-blueblack <- "#003F6A"
-bluewhite <- "#E8F3FB"
 
 cohort.colors <- c("meta1" = "#0A5180",
                    "meta2" = "#1174B9",
                    "meta3" = "#51ACE8",
                    "meta4" = "#A3D3F2")
+
+pheno.colors <- c("all" = "#808080",
+                  "neuro" = "#F58F38",
+                  "somatic" = "#854614")
 
 
 ##########
@@ -105,5 +114,18 @@ logscale.demi.bp.labels <- c(paste(c(1, 5, 10, 50, 100, 500), "bp", sep=""),
 
 logscale.minor <- as.numeric(sapply(logscale.major, function(e){(1:9)*e}))
 
-  
-  
+
+#############
+# FUNCTIONS #
+#############
+# Return hex color code for phenotype by HPO
+get.hpo.color <- function(hpo){
+  if(hpo %in% neuro.hpos){
+    pheno.colors[which(names(pheno.colors) == "neuro")]
+  }else if(hpo %in% somatic.hpos){
+    pheno.colors[which(names(pheno.colors) == "somatic")]
+  }else{
+    pheno.colors[which(names(pheno.colors) == "all")]
+  }
+}
+

@@ -2,7 +2,7 @@
 
 Aggregation and analyses of rare CNVs across human disease phenotypes  
 
-Copyright (c) 2019, [Ryan L. Collins](mailto:rlcollins@g.harvard.edu) and the Talkowski Laboratory.  
+Copyright (c) 2019-Present, [Ryan L. Collins](mailto:rlcollins@g.harvard.edu) and the Talkowski Laboratory.  
 Distributed under terms of the [MIT License](/LICENSE) (see `LICENSE`).  
 
 
