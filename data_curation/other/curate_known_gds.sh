@@ -15,3 +15,73 @@
 docker run --rm -it talkowski/rcnv
 gcloud auth login
 
+
+# Set global parameters
+export rCNV_bucket="gs://rcnv_project"
+
+
+# Download necessary reference files
+mkdir refs
+gsutil -m cp \
+  ${rCNV_bucket}/refs/*bed.gz \
+  ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
+  ${rCNV_bucket}/refs/GRCh37.autosomes.genome \
+  refs/
+wget ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/genomicSuperDups.txt.gz
+
+
+# Reformat segdup file to collapse overlapping intervals
+zcat genomicSuperDups.txt.gz \
+| cut -f2-4 \
+| sed 's/^chr//g' \
+| grep -e '^[0-9]' \
+| sort -Vk1,1 -k2,2n -k3,3n \
+| bedtools merge -i - \
+| bgzip -c \
+> segdups.merged.bed.gz
+bedtools merge -d 10000 -i segdups.merged.bed.gz \
+| bgzip -c \
+> segdups.merged.10kb_slop.bed.gz 
+
+
+# Download & parse ClinGen CNV regions
+wget ftp://ftp.clinicalgenome.org/ClinGen_region_curation_list_GRCh37.tsv
+/opt/rCNV2/data_curation/other/parse_clingen_regions.R \
+  ClinGen_region_curation_list_GRCh37.tsv \
+  ./clingen_regions
+for conf in hmc all; do
+  cat <( grep -e '^#' ./clingen_regions.DEL_GD_${conf}.bed ) \
+      <( cat ./clingen_regions.*_GD_${conf}.bed | fgrep -v "#" | grep -e '^[0-9]' \
+         | sort -Vk1,1 -k2,2n -k3,3n -k5,5V ) \
+  | bgzip -c \
+  > ClinGen_GD.${conf}.bed.gz
+done
+
+
+# Integrate DECIPHER, ClinGen, Owen, Girirajan, and Dittwald
+TAB=$( printf '\t' )
+cat << EOF > cluster_gds.input.tsv
+DECIPHER${TAB}/opt/rCNV2/refs/Decipher_GD.bed.gz
+ClinGen${TAB}/ClinGen_GD.hmc.bed.gz
+Owen${TAB}/opt/rCNV2/refs/UKBB_GD.Owen_2018.bed.gz
+Girirajan${TAB}/opt/rCNV2/refs/Girirajan_2012_GD.bed.gz
+Dittwald${TAB}/opt/rCNV2/refs/Dittwald_2013_GD.bed.gz
+EOF
+/opt/rCNV2/data_curation/other/cluster_gds.py \
+  --hc-outfile lit_GDs.hc.bed.gz \
+  --lc-outfile lit_GDs.lc.bed.gz \
+  --hc-cutoff 4 \
+  --lc-cutoff 2 \
+  --genome refs/GRCh37.autosomes.genome \
+  --segdups segdups.merged.10kb_slop.bed.gz \
+  --bgzip \
+  cluster_gds.input.tsv
+
+
+# Annotate GDs with genes and segmental duplications
+
+
+
+# Build comparison table of predicted NAHR-mediated CNVs
+/opt/rCNV2/data_curation/other/predict_nahr_cnvs.sh
+
