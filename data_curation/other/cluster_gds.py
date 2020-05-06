@@ -147,6 +147,11 @@ def main():
     hc_gds.saveas(hc_outfile, trackline=out_header)
     lc_gds.saveas(lc_outfile, trackline=out_header)
 
+    # Bgzip, if optioned
+    if args.bgzip:
+        bgzip(hc_outfile)
+        bgzip(lc_outfile)
+
 
 if __name__ == '__main__':
     main()
