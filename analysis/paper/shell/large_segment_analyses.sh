@@ -34,6 +34,10 @@ gsutil -m cp \
 gsutil -m cp \
   ${rCNV_bucket}/results/segment_association/* \
   ./
+gsutil -m cp \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
+  refs/
 
 
 # Tabix all meta-analysis stats
@@ -50,6 +54,7 @@ gzip -f ${prefix}.final_segments.loci.all_sumstats.tsv
 gsutil -m cp \
   ${prefix}.final_segments.loci.all_sumstats.tsv.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/
+
 
 
 # Collapse overlapping DEL/DUP segments for sake of plotting

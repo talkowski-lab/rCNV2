@@ -57,8 +57,25 @@ def density_map(sources, resolution=10000):
     return count_bts[0].cat(*count_bts[0:], postmerge=False).sort().saveas()
 
 
+def get_cytobands(bt, cyto_bed):
+    """
+    Return cytoband nomenclature for all cytobands overlapped by bt
+    Note: assumes all entries in bt are on the same chromosome
+    """
+
+    chrom = bt[0].chrom
+    bands = sorted(list(set([x[-2] for x in bt.intersect(cyto_bed, wb=True)])))
+    if len(bands) > 1:
+        bandrange = '{}{}-{}'.format(chrom, bands[0], bands[-1])
+    else:
+        bandrange = chrom + bands[0]
+
+    return bandrange
+
+
 def finalize_regions(maps, cnv, min_score=0, max_score=10e10, min_size=200000, 
-                     max_size=10000000, gfile=None, segdups=None):
+                     max_size=10000000, gfile=None, segdups=None, cyto_bed=None,
+                     id_prefix='region', annoprep=False):
     """
     Merge final regions based on count and trim flanking segdups
     """
@@ -75,10 +92,24 @@ def finalize_regions(maps, cnv, min_score=0, max_score=10e10, min_size=200000,
     sd_hits = pbt.BedTool(segdups).intersect(ends, u=True, wa=True)
     regions = regions.subtract(sd_hits).filter(lambda x: len(x) >= min_size and len(x) <= max_size)
 
-    # Add CNV annotation as fourth column
-    all_str = '\n'.join(['\t'.join([x.chrom, str(x.start), str(x.end), cnv]) \
-                         for x in regions])
-    
+    # Add cytoband range as region name and CNV type as fifth column
+    all_str = ''
+    k = 1
+    for gd in regions:
+        gd_coord_str = '\t'.join([gd.chrom, str(gd.start), str(gd.end)])
+        gd_bt = pbt.BedTool(gd_coord_str, from_string=True)
+        if cyto_bed is not None:
+            bandrange = get_cytobands(gd_bt, cyto_bed)
+            gd_id = '_'.join([id_prefix, cnv, bandrange])
+        else:
+            gd_id = '_'.join([id_prefix, cnv, str(k)])
+        gd_str = '\t'.join([gd_coord_str, gd_id, cnv])
+        # Add extra two columns for gene annotation, if optioned
+        if annoprep:
+            gd_str += '\t{}:{}-{}\t.'.format(gd.chrom, gd.start, gd.end)
+        all_str += gd_str + '\n'
+        k += 1
+        
     return pbt.BedTool(all_str, from_string=True)
 
 
@@ -105,10 +136,13 @@ def main():
                         'low-confidence GDs')
     parser.add_argument('-g', '--genome', help='Genome file (for sorting outputs).')
     parser.add_argument('--segdups', help='BED file of segdups (for trimming ends of GDs).')
+    parser.add_argument('--cytobands', help='BED file of cytobands (for assigning GD names).')
     parser.add_argument('--minsize', type=int, default=200000, help='Minimum GD ' +
                         'size to report.')
     parser.add_argument('--maxsize', type=int, default=10000000, help='Maximum GD ' +
                         'size to report.')
+    parser.add_argument('--prep-for-gene-anno', action='store_true', help='Format ' + 
+                        'output BED files with extra columns for gene annotation.')
     parser.add_argument('-z', '--bgzip', action='store_true', help='Compress ' + 
                         'output BED files with bgzip. [Default: do not compress]')
     args = parser.parse_args()
@@ -133,19 +167,25 @@ def main():
     # Consolidate hc/lc regions, trim flanking segdups, and write to outfiles
     hc_gd_bts = [finalize_regions(maps, cnv, min_score=args.hc_cutoff,
                                   min_size=args.minsize, max_size=args.maxsize,
-                                  gfile=args.genome, segdups=args.segdups) \
+                                  gfile=args.genome, segdups=args.segdups, 
+                                  cyto_bed=args.cytobands, id_prefix='HC_GD',
+                                  annoprep=args.prep_for_gene_anno) \
                  for cnv in cnvtypes]
     hc_gds = hc_gd_bts[0].cat(hc_gd_bts[1], postmerge=False).sort(g=args.genome)
     lc_gd_bts = [finalize_regions(maps, cnv, min_score=args.lc_cutoff,
                                   max_score=args.hc_cutoff, min_size=args.minsize, 
                                   max_size=args.maxsize, gfile=args.genome, 
-                                  segdups=args.segdups) for cnv in cnvtypes]
+                                  segdups=args.segdups, cyto_bed=args.cytobands,
+                                  id_prefix='LC_GD', annoprep=args.prep_for_gene_anno) \
+                 for cnv in cnvtypes]
     lc_gds = lc_gd_bts[0].cat(lc_gd_bts[1], postmerge=False).sort(g=args.genome)
 
     # Write to outfiles
-    out_header = '#chr\tstart\tend\tcnv\n'
-    hc_gds.saveas(hc_outfile, trackline=out_header)
-    lc_gds.saveas(lc_outfile, trackline=out_header)
+    out_header = '\t'.join('#chr start end gd_id cnv'.split())
+    if args.prep_for_gene_anno:
+        out_header += '\tcoords\tdummy'
+    hc_gds.saveas(hc_outfile, trackline=out_header + '\n')
+    lc_gds.saveas(lc_outfile, trackline=out_header + '\n')
 
     # Bgzip, if optioned
     if args.bgzip:

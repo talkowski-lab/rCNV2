@@ -12,11 +12,14 @@ Below, we describe curation steps for other datasets not already listed in a dif
 
 We curated lists of previously reported genomic disorders (GDs), defined as genomic intervals where rare CNVs have been associated with one or more diseases.  
 
+The code for this process is provided in `curate_known_gds.sh`.  
+
 For this purpose, we integrated lists of GDs from the following publications and public resources:  
+
 | Resource | Deletion GDs | Duplication GDs | Citation |  
 | :--- | ---: | ---: | --- |  
 | DECIPHER CNV Syndromes | 40 | 14 | [Firth _et al._, _Am. H. Hum. Genet._ (2009)](http://dx.doi.org/10.1016/j.ajhg.2009.03.010) |  
-| ClinGen Pathogenic CNV Regions | 43\* | 26\*  | [Riggs _et al._, _Clin. Genet._ (2012)](https://www.ncbi.nlm.nih.gov/pubmed/22097934) |  
+| ClinGen Pathogenic CNV Regions\* | 43\* | 26\*  | [Riggs _et al._, _Clin. Genet._ (2012)](https://www.ncbi.nlm.nih.gov/pubmed/22097934) |  
 | UK BioBank | 24 | 30 | [Owen _et al._, _BMC Genomics_ (2018)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6278042/) |  
 | Girirajan _et al._ | 39 | 33 | [Girirajan _et al._, _New Engl. J. Med._ (2012)](https://www.nejm.org/doi/full/10.1056/NEJMoa1200395) |  
 | Dittwald _et al._ | 48 | 18 | [Dittwald _et al._, _Genome Res._ (2013)](https://www.ncbi.nlm.nih.gov/pubmed/23657883) |  
@@ -25,8 +28,8 @@ _\* Note: ClinGen counts represent regions scored at high and medium confidence 
 
 From these existing datasets, we curated two distinct GD lists for the analyses in this study:  
 
-1. **Established GDs**: regions included by at least four sources.  
-2. **Candidate GDs**: regions included by two or three sources.  
+1. **Established GDs**: regions covered by at least four sources.  
+2. **Candidate GDs**: regions covered by two or three sources.  
 
 ---  
 
@@ -47,6 +50,6 @@ To build this set of loci, we first defined pairs of [segmental duplications](ht
 
 After defining candidate pairs of segmental duplications (above), we collapsed overlapping pairs into predicted NAHR-mediated CNV loci while requiring:
 1. Both ends of their respective intervals to be within 1Mb of each other  
-2. >50% reciprocal overlap of intervening sequence  
+2. \>50% reciprocal overlap of intervening sequence  
 
 For each cluster of segmental duplication pairs, we retained the pair with the smallest intervening (_i.e._, spanning) distance, and used the innermost coordinates for analysis purposes.  

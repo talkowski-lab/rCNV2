@@ -116,7 +116,7 @@ def main():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('regions', help='BED file of final regions after refinement. ' +
-                        'Fourth column must be unique row name and wecond-to-last ' +
+                        'Fourth column must be unique row name and second-to-last ' +
                         'column must be a semicolon-delimited list of chr:start-end ' +
                         'intervals to compare vs gtf.')
     parser.add_argument('gtf', help='GTF of genes to consider.')
