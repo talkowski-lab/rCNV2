@@ -18,7 +18,7 @@ gcloud auth login
 
 # Set global parameters
 export rCNV_bucket="gs://rcnv_project"
-export plot_prefix="rCNV2_analysis_d1"
+export prefix="rCNV2_analysis_d1"
 
 
 # Localize all analysis refs, sliding window meta-analysis stats, and large segment results
@@ -46,7 +46,7 @@ find meta_stats/ -name "*meta_analysis.stats.bed.gz" | xargs -I {} tabix -f {}
 
 # Compute effect size and max P-value per phenotype per final segment
 /opt/rCNV2/analysis/paper/scripts/large_segments/calc_all_seg_stats.py \
-  -o rCNV.final_segments.loci.all_sumstats.tsv \
+  -o ${prefix}.final_segments.loci.all_sumstats.tsv \
   rCNV.final_segments.loci.bed.gz \
   refs/test_phenotypes.list \
   meta_stats
@@ -55,6 +55,24 @@ gsutil -m cp \
   ${prefix}.final_segments.loci.all_sumstats.tsv.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/
 
+
+# Build master BED of all regions, including final segments, known GDs, and 
+# other predicted NAHR-mediated CNVs
+cat <( echo -e "#chr\tstart\tend\tnahr_id\tcnv\tn_genes\tgenes" ) \
+    <( zcat refs/clustered_nahr_regions.bed.gz | grep -ve '^#' \
+       | awk -v FS="\t" -v OFS="\t" \
+         '{ print $1, $2, $3, $4"_DEL", "DEL", $5, $6"\n"$1, $2, $3, $4"_DUP", "DUP", $5, $6 }' ) \
+| bgzip -c \
+> clustered_nahr_regions.reformatted.bed.gz
+/opt/rCNV2/analysis/paper/scripts/large_segments/compile_segment_table.py \
+  --final-loci rCNV.final_segments.loci.bed.gz \
+  --hc-gds refs/lit_GDs.hc.bed.gz \
+  --lc-gds refs/lit_GDs.lc.bed.gz \
+  --nahr-cnvs clustered_nahr_regions.reformatted.bed.gz \
+  --outfile ${prefix}.master_segments.bed.gz \
+  --gd-recip "10e-10" \
+  --nahr-recip 0.2 \
+  --bgzip
 
 
 # Collapse overlapping DEL/DUP segments for sake of plotting
@@ -76,9 +94,9 @@ done < <( zcat rCNV.final_segments.loci.bed.gz | grep -ve '^#' \
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.final_segments.loci.all_sumstats.tsv.gz \
   refs/${prefix}.reordered_hpos.txt \
-  ${plot_prefix}.large_segments.association_grid.pdf
+  ${prefix}.large_segments.association_grid.pdf
 gsutil -m cp \
-  ${plot_prefix}.large_segments.association_grid.pdf \
+  ${prefix}.large_segments.association_grid.pdf \
   ${rCNV_bucket}/analysis/paper/plots/large_segments/
 
 

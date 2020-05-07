@@ -12,9 +12,14 @@
 # Note: assumes running in Docker image with local files per curate_known_gds.sh
 
 
-# Download segdups file, if needed
+# Download segdups file and GTF, if needed
 if ! [ -e genomicSuperDups.txt.gz ]; then
   wget ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/genomicSuperDups.txt.gz
+fi
+if ! [ -e gencode.v19.canonical.pext_filtered.gtf.gz ]; then
+  gsutil -m cp \
+  ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
+  ./
 fi
 
 
@@ -48,13 +53,22 @@ zcat genomicSuperDups.txt.gz \
 # To cluster, candidate pairs must:
 # 1. Have both ends within 1Mb of each other, and
 # 2. Have >50% reciprocal overlap of intervening sequence
+# Also pre-formats for gene annotation
 /opt/rCNV2/data_curation/other/collapse_segdup_pairs.py \
   --distance 1000000 \
   --recip 0.5 \
   candidate_segdup_pairs.bedpe \
 | sort -Vk1,1 -k2,2n -k3,3n \
-| awk -v FS="\t" -v OFS="\t" '{ print $0, "nahr_region_"NR }' \
-| cat <( echo -e "#chr\tstart\tend\tid" ) - \
-| bgzip -c \
-> clustered_nahr_regions.bed.gz
+| awk -v FS="\t" -v OFS="\t" '{ print $0, "nahr_region_"NR, $1":"$2"-"$3, "." }' \
+| cat <( echo -e "#chr\tstart\tend\tnahr_id\tcoords\tdummy" ) - \
+> clustered_nahr_regions.no_genes.bed
+
+
+# Annotate vs genes
+/opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
+    -o clustered_nahr_regions.w_genes.bed \
+    clustered_nahr_regions.no_genes.bed \
+    gencode.v19.canonical.pext_filtered.gtf.gz
+cut -f1-4,7-8 clustered_nahr_regions.w_genes.bed \
+| bgzip -c > clustered_nahr_regions.bed.gz
 
