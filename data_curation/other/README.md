@@ -31,7 +31,9 @@ From these existing datasets, we curated two distinct GD lists for the analyses 
 1. **Established GDs**: regions covered by at least four sources.  
 2. **Candidate GDs**: regions covered by two or three sources.  
 
-After overlapping reported GDs from the sources above, we further excluded all consensus GDs with ≥30% coverage by common CNVs (while matching the CNV type of the GD), and trimmed overlapping segmental duplications overlapping the boundaries of the GD interval.  
+After overlapping reported GDs from the sources above, we further:
+1. excluded all consensus GDs with ≥30% coverage by common CNVs from three WGS-based resources as [described elsewhere](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/#curation-steps-rare-cnvs) or by common CNVs in [control samples from any metacohort in this study](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/#case-control-metacohorts), and
+2. trimmed overlapping segmental duplications overlapping the boundaries of the GD interval.  
 
 ---  
 

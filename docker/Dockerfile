@@ -73,7 +73,7 @@ RUN Rscript -e \
 # Install Athena toolkit
 RUN git clone https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/athena /opt/athena \
     && cd /opt/athena \
-    && git checkout f05b35ad859a8ca8cf640c7e54842a0c6b886da7 \
+    && git checkout b66722aa3b0329d21a8f0c2446159d999c8ddd03 \
     && cd -
 RUN cd /opt/athena \
     && pip install -e .
@@ -81,7 +81,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 5afa4a0c576406de2ebff6b3268ef44885bb877b && \
+    git checkout 9c7751c95799946f552cdf6c3604e77ba9f48d06 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)

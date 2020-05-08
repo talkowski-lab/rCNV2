@@ -87,6 +87,56 @@ for CNV in DEL DUP; do
 done
 
 
+# Create common CNV blacklist from raw rCNV2 controls 
+# (because curated rCNV2 controls are frequency-filtered)
+mkdir raw_cnvs/
+gsutil -m cp ${rCNV_bucket}/raw_data/cnv/*bed.gz raw_cnvs/
+gsutil -m cp \
+  ${rCNV_bucket}/cleaned_data/binned_genome/GRCh37.200kb_bins_10kb_steps.raw.bed.gz \
+  refs/
+for CNV in DEL DUP; do
+  while read meta cohorts; do
+    echo -e "$meta\t$CNV"
+    # Pool control CNVs
+    while read cohort; do
+      zcat raw_cnvs/$cohort.raw.bed.gz \
+      | fgrep -w "HEALTHY_CONTROL" \
+      | fgrep -w $CNV
+    done < <( echo -e "$cohorts" | sed 's/;/\n/g' ) \
+    | sort -Vk1,1 -k2,2n -k3,3n \
+    | bgzip -c \
+    > $meta.raw_control_cnvs.$CNV.bed.gz
+    # Count CNVs per window
+    /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
+      --fraction 0.5 \
+      -t $CNV \
+      -o $meta.raw_control_cnv_counts.$CNV.bed.gz \
+      --bgzip \
+      $meta.raw_control_cnvs.$CNV.bed.gz \
+      refs/GRCh37.200kb_bins_10kb_steps.raw.bed.gz
+  done < <( fgrep meta refs/rCNV_metacohort_list.txt )
+done
+for cnv in DEL DUP; do
+  while read cohort; do
+    cohort_idx=$( head -n1 refs/HPOs_by_metacohort.table.tsv | sed 's/\t/\n/g' \
+                  | awk -v cohort=$cohort '{ if ($1==cohort) print NR }' )
+    n_controls=$( awk -v FS="\t" -v idx=$cohort_idx \
+                  '{ if ($1=="HEALTHY_CONTROL") print $idx }' \
+                  refs/HPOs_by_metacohort.table.tsv )
+    /opt/rCNV2/data_curation/other/get_common_control_cnv_regions.py \
+      --n-controls $n_controls \
+      --min-freq 0.01 \
+      --genome refs/GRCh37.autosomes.genome \
+      $cohort.raw_control_cnv_counts.$CNV.bed.gz
+  done < <( fgrep meta refs/rCNV_metacohort_list.txt | cut -f1 ) \
+  | sort -Vk1,1 -k2,2n -k3,3n \
+  | grep -ve '^#' \
+  | cat <( echo -e "#chr\tstart\tend" ) - \
+  | bgzip -c \
+  > rCNV2_common_cnvs.${cnv}.bed.gz
+done
+
+
 # Download & parse ClinGen CNV regions
 wget ftp://ftp.clinicalgenome.org/ClinGen_region_curation_list_GRCh37.tsv
 /opt/rCNV2/data_curation/other/parse_clingen_regions.R \
@@ -131,14 +181,11 @@ EOF
 
 
 # Annotate GDs with genes
-gsutil -m cp \
-  ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
-  ./
 for conf in hc lc; do
   /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
       -o lit_GDs.${conf}.w_genes.bed \
       lit_GDs.${conf}.no_genes.bed.gz \
-      gencode.v19.canonical.pext_filtered.gtf.gz
+      refs/gencode.v19.canonical.pext_filtered.gtf.gz
   cut -f1-5,8-9 lit_GDs.${conf}.w_genes.bed \
   | bgzip -c > lit_GDs.${conf}.bed.gz
 done
@@ -151,6 +198,7 @@ done
 # Copy all files to analysis data bucket
 gsutil -m cp \
   wgs_common_cnvs.*.bed.gz \
+  rCNV2_common_cnvs.*.bed.gz \
   lit_GDs.hc.bed.gz \
   lit_GDs.lc.bed.gz \
   clustered_nahr_regions.bed.gz \

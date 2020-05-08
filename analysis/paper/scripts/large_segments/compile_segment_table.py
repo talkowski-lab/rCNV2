@@ -72,6 +72,21 @@ def find_overlap(bta, btb, r=0.01):
     return ids_a, ids_b
 
 
+def overlap_common_cnvs(all_bt, common_cnvs, cnv, min_cov):
+    """
+    Overlap regions with a BED of common CNVs, and return list of IDs ≥ min_cov
+    """
+
+    if common_cnvs is not None:
+        bt_cov = all_bt.coverage(common_cnvs)
+        ids = [x[3] for x in bt_cov if x[4] == cnv and float(x[-1]) >= min_cov]
+
+    else:
+        ids = []
+
+    return ids
+
+
 def main():
     """
     Main block
@@ -91,6 +106,10 @@ def main():
                         'mediated CNVs. Required.')
     parser.add_argument('-o', '--outfile', help='Path to output BED file. [default: ' +
                         'stdout]', default='stdout')
+    parser.add_argument('--common-dels', help='BED of common deletions.')
+    parser.add_argument('--common-dups', help='BED of common duplications.')
+    parser.add_argument('--common-cnv-cov', type=float, default=0.3, help='Coverage ' +
+                        'of common CNVs required to label as "benign". [default: 0.3]')
     parser.add_argument('--gd-recip', type=float, default=0.2, help='Reciprocal ' +
                         'overlap required for GD match. [default: 0.2]')
     parser.add_argument('--nahr-recip', type=float, default=0.5, help='Reciprocal ' +
@@ -139,6 +158,11 @@ def main():
     nahr_ids = nahr_df.iloc[:, 3].tolist()
     all_ids_in_nahr, nahr_ids_in_all = find_overlap(all_bt, nahr_bt, r=args.nahr_recip)
     all_df = pd.concat([all_df, nahr_df.loc[~nahr_df.region_id.isin(nahr_ids_in_all), :]], axis=0)
+    all_bt = pbt.BedTool().from_dataframe(all_df)
+
+    # Find regions overlapping common CNVs, if optioned
+    benign_del_ids = overlap_common_cnvs(all_bt, args.common_dels, "DEL", args.common_cnv_cov)
+    benign_dup_ids = overlap_common_cnvs(all_bt, args.common_dups, "DUP", args.common_cnv_cov)
 
     # Annotate merged df
     all_df['gw_sig'] = pd.get_dummies(all_df.region_id.isin(loci_ids), drop_first=True)
@@ -151,6 +175,8 @@ def main():
                                       drop_first=True)
     all_df['pathogenic'] = pd.get_dummies(all_df.region_id.isin(loci_ids + hc_gd_ids + lc_gd_ids), 
                                           drop_first=True)
+    all_df['benign'] = pd.get_dummies(all_df.region_id.isin(benign_del_ids + benign_dup_ids) & \
+                                      ~all_df.region_id.isin(loci_ids), drop_first=True)
     all_df['nahr'] = pd.get_dummies(all_df.region_id.isin(set(nahr_ids + all_ids_in_nahr)), 
                                     drop_first=True)
     

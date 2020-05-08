@@ -37,6 +37,7 @@ gsutil -m cp \
 gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/wgs_common_cnvs.*.bed.gz \
   refs/
 
 
@@ -70,6 +71,9 @@ cat <( echo -e "#chr\tstart\tend\tnahr_id\tcnv\tn_genes\tgenes" ) \
   --lc-gds refs/lit_GDs.lc.bed.gz \
   --nahr-cnvs clustered_nahr_regions.reformatted.bed.gz \
   --outfile ${prefix}.master_segments.bed.gz \
+  --common-dels refs/wgs_common_cnvs.DEL.bed.gz \
+  --common-dups refs/wgs_common_cnvs.DUP.bed.gz \
+  --common-cnv-cov 0.5 \
   --gd-recip "10e-10" \
   --nahr-recip 0.2 \
   --bgzip
