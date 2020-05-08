@@ -149,6 +149,8 @@ def main():
     all_df['any_gd'] = pd.get_dummies(all_df.region_id.isin(set(hc_gd_ids + all_ids_in_hc_gd + \
                                                                 lc_gd_ids + all_ids_in_lc_gd)), 
                                       drop_first=True)
+    all_df['pathogenic'] = pd.get_dummies(all_df.region_id.isin(loci_ids + hc_gd_ids + lc_gd_ids), 
+                                          drop_first=True)
     all_df['nahr'] = pd.get_dummies(all_df.region_id.isin(set(nahr_ids + all_ids_in_nahr)), 
                                     drop_first=True)
     

@@ -113,6 +113,19 @@ def finalize_regions(maps, cnv, min_score=0, max_score=10e10, min_size=200000,
     return pbt.BedTool(all_str, from_string=True)
 
 
+def cnv_filter(gd_bt, cnv_path, cnv, max_cov):
+    """
+    Exclude GDs based on overlap by common CNVs (while matching on CNV type)
+    """
+
+    gd_wcov = gd_bt.coverage(cnv_path)
+
+    gd_bt_filt = gd_wcov.filter(lambda x: x[4] != cnv or float(x[-1]) <= max_cov).\
+                         cut(range(len(gd_bt[0].fields))).saveas()
+
+    return gd_bt_filt
+
+
 def main():
     """
     Main block
@@ -137,6 +150,12 @@ def main():
     parser.add_argument('-g', '--genome', help='Genome file (for sorting outputs).')
     parser.add_argument('--segdups', help='BED file of segdups (for trimming ends of GDs).')
     parser.add_argument('--cytobands', help='BED file of cytobands (for assigning GD names).')
+    parser.add_argument('--common-dels', help='BED file of common deletions ' +
+                        '(for filtering weak-effect GDs).')
+    parser.add_argument('--common-dups', help='BED file of common duplications ' +
+                        '(for filtering weak-effect GDs).')
+    parser.add_argument('--common-cnv-cov', type=float, default=0.3, help='Minimum ' +
+                        'coverage by common CNVs before discarding GDs.')
     parser.add_argument('--minsize', type=int, default=200000, help='Minimum GD ' +
                         'size to report.')
     parser.add_argument('--maxsize', type=int, default=10000000, help='Maximum GD ' +
@@ -179,6 +198,14 @@ def main():
                                   id_prefix='LC_GD', annoprep=args.prep_for_gene_anno) \
                  for cnv in cnvtypes]
     lc_gds = lc_gd_bts[0].cat(lc_gd_bts[1], postmerge=False).sort(g=args.genome)
+
+    # Filter vs common CNVs, if optioned
+    if args.common_dels is not None:
+        hc_gds = cnv_filter(hc_gds, args.common_dels, "DEL", args.common_cnv_cov)
+        lc_gds = cnv_filter(lc_gds, args.common_dels, "DEL", args.common_cnv_cov)
+    if args.common_dups is not None:
+        hc_gds = cnv_filter(hc_gds, args.common_dups, "DUP", args.common_cnv_cov)
+        lc_gds = cnv_filter(lc_gds, args.common_dups, "DUP", args.common_cnv_cov)
 
     # Write to outfiles
     out_header = '\t'.join('#chr start end gd_id cnv'.split())

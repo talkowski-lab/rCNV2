@@ -24,6 +24,7 @@ export rCNV_bucket="gs://rcnv_project"
 mkdir refs
 gsutil -m cp \
   ${rCNV_bucket}/refs/*bed.gz \
+  ${rCNV_bucket}/refs/*vcf.gz* \
   ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
   ${rCNV_bucket}/refs/GRCh37.autosomes.genome \
   refs/
@@ -44,6 +45,48 @@ bedtools merge -d 10000 -i segdups.merged.bed.gz \
 > segdups.merged.10kb_slop.bed.gz 
 
 
+# Create common CNV blacklist from 1000Genomes, gnomAD, and CCDG
+for CNV in DEL DUP; do
+  for af_label in AF EAS_AF EUR_AF AFR_AF AMR_AF SAS_AF; do
+    athena vcf-filter \
+      --minAF 0.01 \
+      --minAC 1 \
+      --include-chroms $( seq 1 22 | paste -s -d, ) \
+      --svtypes ${CNV},CNV,MCNV \
+      --vcf-filters PASS,MULTIALLELIC \
+      --af-field $af_label \
+      --bgzip \
+      refs/1000Genomes_phase3.sites.vcf.gz \
+      1000Genomes_phase3.$af_label.common_cnvs.${CNV}.vcf.gz
+  done
+  athena vcf-filter \
+    --minAF 0.01 \
+    --minAC 1 \
+    --include-chroms $( seq 1 22 | paste -s -d, ) \
+    --svtypes ${CNV},CNV,MCNV \
+    --vcf-filters PASS,MULTIALLELIC \
+    --af-field POPMAX_AF \
+    --bgzip \
+    refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
+    gnomAD.common_cnvs.${CNV}.vcf.gz
+  athena vcf-filter \
+    --minAF 0.01 \
+    --minAC 1 \
+    --include-chroms $( seq 1 22 | paste -s -d, ) \
+    --svtypes ${CNV},CNV,MCNV \
+    --vcf-filters PASS \
+    --af-field AF \
+    --bgzip \
+    refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
+    CCDG.common_cnvs.${CNV}.vcf.gz
+  # Merge filtered VCFs and convert to BED
+  /opt/rCNV2/data_curation/other/vcf2bed_merge.py \
+    --genome refs/GRCh37.autosomes.genome \
+    --outfile wgs_common_cnvs.${CNV}.bed.gz \
+    *.common_cnvs.${CNV}.vcf.gz
+done
+
+
 # Download & parse ClinGen CNV regions
 wget ftp://ftp.clinicalgenome.org/ClinGen_region_curation_list_GRCh37.tsv
 /opt/rCNV2/data_curation/other/parse_clingen_regions.R \
@@ -59,6 +102,7 @@ done
 
 
 # Integrate DECIPHER, ClinGen, Owen, Girirajan, and Dittwald
+# Prep input files
 TAB=$( printf '\t' )
 cat << EOF > cluster_gds.input.tsv
 DECIPHER${TAB}/opt/rCNV2/refs/Decipher_GD.bed.gz
@@ -76,6 +120,9 @@ EOF
   --genome refs/GRCh37.autosomes.genome \
   --segdups segdups.merged.10kb_slop.bed.gz \
   --cytobands refs/GRCh37.cytobands.bed.gz \
+  --common-dels wgs_common_cnvs.DEL.bed.gz \
+  --common-dups wgs_common_cnvs.DUP.bed.gz \
+  --common-cnv-cov 0.3 \
   --minsize 200000 \
   --maxsize 10000000 \
   --prep-for-gene-anno \
@@ -103,6 +150,7 @@ done
 
 # Copy all files to analysis data bucket
 gsutil -m cp \
+  wgs_common_cnvs.*.bed.gz \
   lit_GDs.hc.bed.gz \
   lit_GDs.lc.bed.gz \
   clustered_nahr_regions.bed.gz \

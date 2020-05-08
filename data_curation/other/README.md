@@ -31,6 +31,8 @@ From these existing datasets, we curated two distinct GD lists for the analyses 
 1. **Established GDs**: regions covered by at least four sources.  
 2. **Candidate GDs**: regions covered by two or three sources.  
 
+After overlapping reported GDs from the sources above, we further excluded all consensus GDs with ≥30% coverage by common CNVs (while matching the CNV type of the GD), and trimmed overlapping segmental duplications overlapping the boundaries of the GD interval.  
+
 ---  
 
 ## Predicted NAHR-mediated CNVs  
