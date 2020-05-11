@@ -19,6 +19,7 @@ import pybedtools as pbt
 import argparse
 from os.path import splitext
 from sys import stdout
+import csv
 from athena.utils import bgzip
 
 
@@ -87,6 +88,29 @@ def overlap_common_cnvs(all_bt, common_cnvs, cnv, min_cov):
     return ids
 
 
+def annotate_genelist(df, genes, glname):
+    """
+    Annotates overlap of regions with a specified genelist
+    Returns: input df, with two extra columns:
+               1. n_glname_genes = number of genes in region also present in genelist
+               2. glname_genes = gene symbols of genes in region also present in genelist
+    """
+
+    def _subset_genes(gstr):
+        hits = [g for g in str(gstr).split(';') if g in genes]
+        if len(hits) == 0 or hits[0] == '':
+            return 'NA'
+        else:
+            return ';'.join(sorted(hits))
+
+    df[glname + '_genes'] = df.genes.apply(_subset_genes)
+
+    df['n_' + glname + '_genes'] = \
+        df[glname + '_genes'].apply(lambda gstr: len([g for g in str(gstr).split(';') if g != 'NA']))
+
+    return df
+
+
 def main():
     """
     Main block
@@ -110,6 +134,8 @@ def main():
     parser.add_argument('--common-dups', help='BED of common duplications.')
     parser.add_argument('--common-cnv-cov', type=float, default=0.3, help='Coverage ' +
                         'of common CNVs required to label as "benign". [default: 0.3]')
+    parser.add_argument('--genelists', help='Tsv of genelists to annotate. Two ' +
+                        'columns expected: genelist name, and path to genelist.')
     parser.add_argument('--gd-recip', type=float, default=0.2, help='Reciprocal ' +
                         'overlap required for GD match. [default: 0.2]')
     parser.add_argument('--nahr-recip', type=float, default=0.5, help='Reciprocal ' +
@@ -179,6 +205,14 @@ def main():
                                       ~all_df.region_id.isin(loci_ids), drop_first=True)
     all_df['nahr'] = pd.get_dummies(all_df.region_id.isin(set(nahr_ids + all_ids_in_nahr)), 
                                     drop_first=True)
+
+    # Annotate genelists
+    if args.genelists is not None:
+        with open(args.genelists) as genetsv:
+            reader = csv.reader(genetsv, delimiter='\t')
+            for glname, glpath in reader:
+                genes = [g.rstrip() for g in open(glpath).readlines()]
+                all_df = annotate_genelist(all_df, genes, glname)
     
     # Sort & write out merged BED
     all_df.sort_values(by='chr start end cnv region_id'.split(), inplace=True)

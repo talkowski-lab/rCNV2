@@ -16,26 +16,21 @@
 if ! [ -e genomicSuperDups.txt.gz ]; then
   wget ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/genomicSuperDups.txt.gz
 fi
-if ! [ -e gencode.v19.canonical.pext_filtered.gtf.gz ]; then
-  gsutil -m cp \
-  ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
-  ./
-fi
 
 
 # Find pairs of segdups with the following criteria:
 # 1. Same chromosome
-# 2. Distance ≥ 200kb & ≤ 10Mb
+# 2. Distance ≥ 100kb & ≤ 10Mb
 # 3. Both segdups ≥ 1kb
 # 4. Strict homology ≥ 95%
 # 5. Direct orentation of repeats (i.e., same strand)
 # 6. Total intervening sequence ≤30% covered by rCNV blacklist 
 #    (including segdup/simple repeat/satellites/Nmask/somatic hypermutable)
-# 7. At least 200kb of intervening sequence after subtracting blacklist regions
+# 7. At least 100kb of intervening sequence after subtracting blacklist regions
 zcat genomicSuperDups.txt.gz \
 | awk -v FS="\t" -v OFS="\t" \
   '{ if ($2==$8 && $7=="+" && $4-$3>=1000 && $10-$9>=1000 && \
-         $9-$4>=200000 && $9-$4<=10000000 && $27>=0.95) \
+         $9-$4>=100000 && $9-$4<=10000000 && $27>=0.95) \
      print $2, $4, $9, $2, $3, $4, $8, $9, $10 }' \
 | sed 's/chr//g' \
 | grep -e '^[0-9]' \
@@ -45,7 +40,7 @@ zcat genomicSuperDups.txt.gz \
              refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
         | cut -f1-3 | sort -Vk1,1 -k2,2n -k3,3n | bedtools merge -i - ) \
 | awk -v FS="\t" -v OFS="\t" \
-  '{ if ($NF<=0.3 && $12-$11>=200000) print $4, $5, $6, $7, $8, $9 }' \
+  '{ if ($NF<=0.3 && $12-$11>=100000) print $4, $5, $6, $7, $8, $9 }' \
 | sort -Vk1,1 -k2,2n -k3,3n -k5,5n -k6,6n \
 | awk -v FS="\t" -v OFS="\t" '{ print $0, "candidate_segdup_pair_"NR }' \
 > candidate_segdup_pairs.bedpe
@@ -68,7 +63,7 @@ zcat genomicSuperDups.txt.gz \
 /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
     -o clustered_nahr_regions.w_genes.bed \
     clustered_nahr_regions.no_genes.bed \
-    gencode.v19.canonical.pext_filtered.gtf.gz
+    refs/gencode.v19.canonical.pext_filtered.gtf.gz
 cut -f1-4,7-8 clustered_nahr_regions.w_genes.bed \
 | bgzip -c > clustered_nahr_regions.bed.gz
 

@@ -32,7 +32,7 @@ From these existing datasets, we curated two distinct GD lists for the analyses 
 2. **Candidate GDs**: regions covered by two or three sources.  
 
 After overlapping reported GDs from the sources above, we further:
-1. excluded all consensus GDs with ≥30% coverage by common CNVs from three WGS-based resources as [described elsewhere](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/#curation-steps-rare-cnvs) or by common CNVs in [control samples from any metacohort in this study](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/#case-control-metacohorts), and
+1. excluded all consensus GDs with ≥50% coverage by common CNVs from three WGS-based resources as [described elsewhere](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/#curation-steps-rare-cnvs) or by common CNVs in [control samples from any metacohort in this study](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/#case-control-metacohorts) (prior to [CNV frequency filtering](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/#curation-steps-rare-cnvs)), and
 2. trimmed overlapping segmental duplications overlapping the boundaries of the GD interval.  
 
 ---  
@@ -45,12 +45,12 @@ The code for this process is provided in `predict_nahr_cnvs.sh`.
 
 To build this set of loci, we first defined pairs of [segmental duplications](https://genome.ucsc.edu/cgi-bin/hgTables) meeting the following criteria:  
 1. Same chromosome
-2. Distance ≥ 200kb & ≤ 10Mb
+2. Distance ≥ 100kb & ≤ 10Mb
 3. Both segmental duplications ≥ 1kb
 4. Strict homology (no indels) ≥ 95%
 5. Direct orentation of repeats (_i.e._, same strand)
 6. Total intervening sequence has ≤30% coverage by the blacklist used [during CNV curation](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs)  
-7. At least 200kb of intervening sequence remaining after subtracting blacklist regions
+7. At least 100kb of intervening sequence remaining after subtracting blacklist regions
 
 After defining candidate pairs of segmental duplications (above), we collapsed overlapping pairs into predicted NAHR-mediated CNV loci while requiring:
 1. Both ends of their respective intervals to be within 1Mb of each other  

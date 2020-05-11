@@ -38,7 +38,11 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/wgs_common_cnvs.*.bed.gz \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/rCNV2_common_cnvs.*.bed.gz \
   refs/
+gsutil -m cp -r \
+  ${rCNV_bucket}/cleaned_data/genes/gene_lists \
+  ./
 
 
 # Tabix all meta-analysis stats
@@ -65,18 +69,44 @@ cat <( echo -e "#chr\tstart\tend\tnahr_id\tcnv\tn_genes\tgenes" ) \
          '{ print $1, $2, $3, $4"_DEL", "DEL", $5, $6"\n"$1, $2, $3, $4"_DUP", "DUP", $5, $6 }' ) \
 | bgzip -c \
 > clustered_nahr_regions.reformatted.bed.gz
+for CNV in DEL DUP; do
+  zcat refs/wgs_common_cnvs.$CNV.bed.gz refs/rCNV2_common_cnvs.$CNV.bed.gz \
+  | grep -ve '^#' \
+  | cut -f1-3 \
+  | sort -Vk1,1 -k2,2n -k3,3n \
+  | bedtools merge -i -\
+  | bgzip -c \
+  > combined_common_cnvs.$CNV.bed.gz
+done
+TAB=$( printf '\t' )
+cat << EOF > genelists_to_annotate.tsv
+gnomAD_constrained${TAB}gene_lists/gnomad.v2.1.1.lof_constrained.genes.list
+gnomAD_tolerant${TAB}gene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list
+CLinGen_HI${TAB}gene_lists/ClinGen.hmc_haploinsufficient.genes.list
+CLinGen_TS${TAB}gene_lists/ClinGen.hmc_triplosensitive.genes.list
+DECIPHER_LoF${TAB}gene_lists/DDG2P.hmc_lof.genes.list
+DECIPHER_GoF${TAB}gene_lists/DDG2P.hmc_gof.genes.list
+OMIM${TAB}gene_lists/HP0000118.HPOdb.genes.list
+EOF
 /opt/rCNV2/analysis/paper/scripts/large_segments/compile_segment_table.py \
   --final-loci rCNV.final_segments.loci.bed.gz \
   --hc-gds refs/lit_GDs.hc.bed.gz \
   --lc-gds refs/lit_GDs.lc.bed.gz \
   --nahr-cnvs clustered_nahr_regions.reformatted.bed.gz \
   --outfile ${prefix}.master_segments.bed.gz \
-  --common-dels refs/wgs_common_cnvs.DEL.bed.gz \
-  --common-dups refs/wgs_common_cnvs.DUP.bed.gz \
+  --common-dels combined_common_cnvs.DEL.bed.gz \
+  --common-dups combined_common_cnvs.DUP.bed.gz \
   --common-cnv-cov 0.5 \
+  --genelists genelists_to_annotate.tsv \
   --gd-recip "10e-10" \
   --nahr-recip 0.2 \
   --bgzip
+
+
+# Permute all segments 100,000 times
+
+/opt/rCNV2/analysis/paper/scripts/large_segmetns/shuffle_segs.py \
+  --whitelist
 
 
 # Collapse overlapping DEL/DUP segments for sake of plotting

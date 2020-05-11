@@ -8,7 +8,10 @@
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Curate list of previously reported genomic disorder regions for rCNV2 analyses
+# Curate files related to genomic disorder analyses for rCNV2 paper, including:
+#   1. List of previously reported genomic disorder regions
+#   2. List of predicted NAHR-mediated CNVs
+#   3. List of regions with common (freq ≥ 1%) control CNVs
 
 
 # Launch docker image & authenticate GCP credentials
@@ -27,6 +30,8 @@ gsutil -m cp \
   ${rCNV_bucket}/refs/*vcf.gz* \
   ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
   ${rCNV_bucket}/refs/GRCh37.autosomes.genome \
+  ${rCNV_bucket}/analysis/analysis_refs/rCNV_metacohort_list.txt \
+  ${rCNV_bucket}/analysis/analysis_refs/HPOs_by_metacohort.table.tsv \
   refs/
 wget ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/genomicSuperDups.txt.gz
 
@@ -88,12 +93,13 @@ done
 
 
 # Create common CNV blacklist from raw rCNV2 controls 
-# (because curated rCNV2 controls are frequency-filtered)
+# (raw CNVs are necessary because curated rCNV2 controls are frequency-filtered)
 mkdir raw_cnvs/
 gsutil -m cp ${rCNV_bucket}/raw_data/cnv/*bed.gz raw_cnvs/
 gsutil -m cp \
   ${rCNV_bucket}/cleaned_data/binned_genome/GRCh37.200kb_bins_10kb_steps.raw.bed.gz \
   refs/
+# Step 1: count raw control CNVs per 200kb window per metacohort
 for CNV in DEL DUP; do
   while read meta cohorts; do
     echo -e "$meta\t$CNV"
@@ -116,7 +122,8 @@ for CNV in DEL DUP; do
       refs/GRCh37.200kb_bins_10kb_steps.raw.bed.gz
   done < <( fgrep meta refs/rCNV_metacohort_list.txt )
 done
-for cnv in DEL DUP; do
+# Step 2: normalize CNV counts by control sample size and reduce to nonredundant intervals
+for CNV in DEL DUP; do
   while read cohort; do
     cohort_idx=$( head -n1 refs/HPOs_by_metacohort.table.tsv | sed 's/\t/\n/g' \
                   | awk -v cohort=$cohort '{ if ($1==cohort) print NR }' )
@@ -133,7 +140,7 @@ for cnv in DEL DUP; do
   | grep -ve '^#' \
   | cat <( echo -e "#chr\tstart\tend" ) - \
   | bgzip -c \
-  > rCNV2_common_cnvs.${cnv}.bed.gz
+  > rCNV2_common_cnvs.${CNV}.bed.gz
 done
 
 
@@ -161,6 +168,15 @@ Owen${TAB}/opt/rCNV2/refs/UKBB_GD.Owen_2018.bed.gz
 Girirajan${TAB}/opt/rCNV2/refs/Girirajan_2012_GD.bed.gz
 Dittwald${TAB}/opt/rCNV2/refs/Dittwald_2013_GD.bed.gz
 EOF
+for CNV in DEL DUP; do
+  zcat wgs_common_cnvs.$CNV.bed.gz rCNV2_common_cnvs.$CNV.bed.gz \
+  | grep -ve '^#' \
+  | cut -f1-3 \
+  | sort -Vk1,1 -k2,2n -k3,3n \
+  | bedtools merge -i -\
+  | bgzip -c \
+  > combined_common_cnvs.$CNV.bed.gz
+done
 # Clusters GDs (and formats them in preparation for gene annotation, below)
 /opt/rCNV2/data_curation/other/cluster_gds.py \
   --hc-outfile lit_GDs.hc.no_genes.bed.gz \
@@ -170,9 +186,9 @@ EOF
   --genome refs/GRCh37.autosomes.genome \
   --segdups segdups.merged.10kb_slop.bed.gz \
   --cytobands refs/GRCh37.cytobands.bed.gz \
-  --common-dels wgs_common_cnvs.DEL.bed.gz \
-  --common-dups wgs_common_cnvs.DUP.bed.gz \
-  --common-cnv-cov 0.3 \
+  --common-dels combined_common_cnvs.DEL.bed.gz \
+  --common-dups combined_common_cnvs.DUP.bed.gz \
+  --common-cnv-cov 0.5 \
   --minsize 200000 \
   --maxsize 10000000 \
   --prep-for-gene-anno \
