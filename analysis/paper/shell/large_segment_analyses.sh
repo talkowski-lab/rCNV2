@@ -24,9 +24,11 @@ export prefix="rCNV2_analysis_d1"
 # Localize all analysis refs, sliding window meta-analysis stats, and large segment results
 mkdir refs/ 
 gsutil -m cp \
-   ${rCNV_bucket}/analysis/analysis_refs/** \
-   ${rCNV_bucket}/analysis/paper/data/hpo/${prefix}.reordered_hpos.txt \
-   refs/
+  ${rCNV_bucket}/analysis/analysis_refs/** \
+  ${rCNV_bucket}/analysis/paper/data/hpo/${prefix}.reordered_hpos.txt \
+  ${rCNV_bucket}/cleaned_data/binned_genome/GRCh37.200kb_bins_10kb_steps.raw.bed.gz \
+  ${rCNV_bucket}/refs/GRCh37.autosomes.genome \
+  refs/
 mkdir meta_stats/
 gsutil -m cp \
   ${rCNV_bucket}/analysis/sliding_windows/**.rCNV.**.sliding_window.meta_analysis.stats.bed.gz \
@@ -42,6 +44,9 @@ gsutil -m cp \
   refs/
 gsutil -m cp -r \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists \
+  ./
+gsutil -m cp \
+  ${rCNV_bucket}/analysis/paper/data/hpo/rCNV2_analysis_d1.hpo_jaccard_matrix.tsv \
   ./
 
 
@@ -88,6 +93,10 @@ DECIPHER_LoF${TAB}gene_lists/DDG2P.hmc_lof.genes.list
 DECIPHER_GoF${TAB}gene_lists/DDG2P.hmc_gof.genes.list
 OMIM${TAB}gene_lists/HP0000118.HPOdb.genes.list
 EOF
+while read nocolon hpo; do
+  echo -e "${hpo}\tgene_lists/${nocolon}.HPOdb.genes.list"
+done < refs/test_phenotypes.list \
+> hpo_genelists.tsv
 /opt/rCNV2/analysis/paper/scripts/large_segments/compile_segment_table.py \
   --final-loci rCNV.final_segments.loci.bed.gz \
   --hc-gds refs/lit_GDs.hc.bed.gz \
@@ -98,15 +107,29 @@ EOF
   --common-dups combined_common_cnvs.DUP.bed.gz \
   --common-cnv-cov 0.5 \
   --genelists genelists_to_annotate.tsv \
+  --hpo-genelists hpo_genelists.tsv \
   --gd-recip "10e-10" \
   --nahr-recip 0.2 \
   --bgzip
+gsutil -m cp \
+  ${prefix}.master_segments.bed.gz \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/
 
 
-# Permute all segments 100,000 times
+# DEV: Permute all segments 100 times
+bedtools merge -i refs/GRCh37.200kb_bins_10kb_steps.raw.bed.gz > whitelist.bed
+/opt/rCNV2/analysis/paper/scripts/large_segments/shuffle_segs.py \
+  --genome refs/GRCh37.autosomes.genome \
+  --whitelist whitelist.bed \
+  --n-perms 100 \
+  --first-seed 1 \
+  --outfile test_perms.bed.gz \
+  --bgzip \
+  <( zcat rCNV.final_segments.loci.bed.gz | cut -f1-5,19 )
 
-/opt/rCNV2/analysis/paper/scripts/large_segmetns/shuffle_segs.py \
-  --whitelist
+
+# Plot effect size covariates
+
 
 
 # Collapse overlapping DEL/DUP segments for sake of plotting

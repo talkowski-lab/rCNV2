@@ -17,35 +17,6 @@ options(stringsAsFactors=F, scipen=1000)
 ######################
 ### DATA FUNCTIONS ###
 ######################
-# Load summary dataframe for loci
-load.loci <- function(loci.in){
-  # Read data
-  loci <- read.table(loci.in, sep="\t", header=T, comment.char="")
-  colnames(loci)[1] <- "chr"
-  
-  # Split list-style columns
-  loci$hpos <- strsplit(loci$hpos, split=";")
-  loci$constituent_assocs <- strsplit(loci$constituent_assocs, split=";")
-  loci$cred_interval_coords <- strsplit(loci$cred_interval_coords, split=";")
-  loci$genes <- strsplit(loci$genes, split=";")
-  
-  # Convert numeric columns to numerics
-  numeric.cols <- c("start_min", "end_max", "pooled_control_freq", "pooled_case_freq",
-                    "pooled_ln_or", "pooled_ln_or_ci_lower", "pooled_ln_or_ci_upper", 
-                    "min_ln_or", "max_ln_or", "n_hpos", "n_constituent_assocs", 
-                    "n_cred_intervals", "cred_intervals_size", "n_genes")
-  for(col in numeric.cols){
-    cidx <- which(colnames(loci) == col)
-    loci[, cidx] <- as.numeric(loci[, cidx])
-  }
-  
-  # Add formatted locus names and sizes
-  loci$name <- sapply(strsplit(loci$region_id, split="_"), function(parts){parts[4]})
-  loci$size <- paste(prettyNum(round(loci$cred_intervals_size/1000, 0), big.mark=","), "kb", sep=" ")
-  
-  return(loci)
-}
-
 # Load flat table of effect sizes and P-values per region per phenotype per CNV
 load.sumstats <- function(sumstats.in){
   sumstats <- read.table(sumstats.in, header=T, sep="\t")
@@ -178,8 +149,9 @@ plot.all.loci <- function(loci, clusters, sumstats, hpos,
 #####################
 ### RSCRIPT BLOCK ###
 #####################
-require(optparse)
-require(plotrix)
+require(optparse, quietly=T)
+require(plotrix, quietly=T)
+require(funr, quietly=T)
 
 # List of command-line options
 option_list <- list(
@@ -218,6 +190,10 @@ rcnv.config <- opts$`rcnv-config`
 if(!is.null(rcnv.config)){
   source(rcnv.config)
 }
+
+# Source common functions
+script.dir <- funr::get_script_path()
+source(paste(script.dir, "common_functions.R", sep="/"))
 
 # Read data
 loci <- load.loci(loci.in)

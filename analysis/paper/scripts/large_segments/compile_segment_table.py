@@ -23,7 +23,7 @@ import csv
 from athena.utils import bgzip
 
 
-def read_bed_as_df(bed):
+def read_bed_as_df(bed, output_hpos=False):
     """
     Reads a BED file as a pd.DataFrame and reformats data as needed
     """
@@ -31,6 +31,12 @@ def read_bed_as_df(bed):
     df = pd.read_csv(bed, sep='\t')
     c1h = list(df.columns)[0]
     df.rename(columns={c1h : c1h.replace('#', '')}, inplace=True)
+
+    # Extract hpos as dictionary, if optioned
+    if output_hpos:
+        hpo_df = df['hpos']
+        hpo_df.index = df['region_id']
+        hpo_dict = {r : h.split(';') for r, h in hpo_df.to_dict().items()}
 
     # Subset columns of interest
     keep_cols = 'cred_interval_coords cred_intervals_size n_genes genes'.split()
@@ -53,8 +59,11 @@ def read_bed_as_df(bed):
     if 'size' not in df.columns:
         df['size'] = df.end - df.start
 
-    cols_ordered = 'chr start end region_id cnv coords size n_genes genes'.split()    
-    return df.loc[:, cols_ordered]
+    cols_ordered = 'chr start end region_id cnv coords size n_genes genes'.split()
+    if output_hpos:
+        return df.loc[:, cols_ordered], hpo_dict
+    else:
+        return df.loc[:, cols_ordered]
 
 
 def find_overlap(bta, btb, r=0.01):
@@ -88,6 +97,20 @@ def overlap_common_cnvs(all_bt, common_cnvs, cnv, min_cov):
     return ids
 
 
+def _subset_genes(gstr, genes):
+    """
+    Helper function to subset a semicolon-delimited string of genes on a second set of genes
+    """
+
+    hits = [g for g in str(gstr).split(';') if g in genes]
+    
+    if len(hits) == 0 or hits[0] == '':
+        return 'NA'
+    
+    else:
+        return ';'.join(sorted(hits))
+
+
 def annotate_genelist(df, genes, glname):
     """
     Annotates overlap of regions with a specified genelist
@@ -96,17 +119,55 @@ def annotate_genelist(df, genes, glname):
                2. glname_genes = gene symbols of genes in region also present in genelist
     """
 
-    def _subset_genes(gstr):
-        hits = [g for g in str(gstr).split(';') if g in genes]
-        if len(hits) == 0 or hits[0] == '':
-            return 'NA'
-        else:
-            return ';'.join(sorted(hits))
-
-    df[glname + '_genes'] = df.genes.apply(_subset_genes)
+    df[glname + '_genes'] = df.genes.apply(_subset_genes, genes=genes)
 
     df['n_' + glname + '_genes'] = \
         df[glname + '_genes'].apply(lambda gstr: len([g for g in str(gstr).split(';') if g != 'NA']))
+
+    return df
+
+
+def load_hpo_genelists(tsv_in):
+    """
+    Load HPO-specific gene lists
+    Returns: dict of HPO : [genes] pairings
+    """
+
+    hpo_genes = {}
+
+    with open(tsv_in) as fin:
+        reader = csv.reader(fin, delimiter='\t')
+        for hpo, path in reader:
+            hpo_genes[hpo] = [g.rstrip() for g in open(path).readlines()]
+
+    return hpo_genes
+
+
+def annotate_hpo_genes(df, loci_hpos, hpo_genes):
+    """
+    Annotates overlap of regions with HPO-specific genelists
+    Returns: input df, with two extra columns:
+               1. n_HPOmatched_genes = number of genes in region also present in HPO-matched genelist(s)
+               2. HPOmatched_genes = gene symbols of genes in region also present in HPO-matched genelist(s)
+    """
+
+    # Make list of eligible OMIM genes per region
+    region_targets = {}
+    for rid, hpos in loci_hpos.items():
+        region_targets[rid] = \
+            sorted(list(set([g for s in [hpo_genes[h] for h in hpos] for g in s])))
+
+    # Find list of hits for each region
+    region_hits = {}
+    hit_counts = {}
+    for rid, targets in region_targets.items():
+        region_hits[rid] = \
+            _subset_genes(df.genes[df['region_id'] == rid].tolist()[0], targets)
+        hit_counts[rid] = \
+            len([g for g in str(region_hits[rid]).split(';') if g != 'NA'])
+
+    df['HPOmatched_genes'] = df.region_id.map(region_hits)
+    df['n_HPOmatched_genes'] = df.region_id.map(hit_counts)
 
     return df
 
@@ -136,6 +197,9 @@ def main():
                         'of common CNVs required to label as "benign". [default: 0.3]')
     parser.add_argument('--genelists', help='Tsv of genelists to annotate. Two ' +
                         'columns expected: genelist name, and path to genelist.')
+    parser.add_argument('--hpo-genelists', help='Tsv of HPO-specific genelists to ' +
+                        'annotate. Will match on segment HPO. Two columns ' +
+                        'expected: HPO, and path to genelist.')
     parser.add_argument('--gd-recip', type=float, default=0.2, help='Reciprocal ' +
                         'overlap required for GD match. [default: 0.2]')
     parser.add_argument('--nahr-recip', type=float, default=0.5, help='Reciprocal ' +
@@ -157,7 +221,7 @@ def main():
 
     # Load final significant loci
     loci_bt = pbt.BedTool(args.final_loci).cut(range(5))
-    loci_df = read_bed_as_df(args.final_loci)
+    loci_df, loci_hpos = read_bed_as_df(args.final_loci, output_hpos=True)
     loci_ids = loci_df.iloc[:, 3].tolist()
     all_df = loci_df.copy(deep=True)
     all_bt = loci_bt.saveas()
@@ -213,6 +277,11 @@ def main():
             for glname, glpath in reader:
                 genes = [g.rstrip() for g in open(glpath).readlines()]
                 all_df = annotate_genelist(all_df, genes, glname)
+
+    # Annotate with HPO-specific gene lists, if optioned
+    if args.hpo_genelists is not None:
+        hpo_genes = load_hpo_genelists(args.hpo_genelists)
+        all_df = annotate_hpo_genes(all_df, loci_hpos, hpo_genes)
     
     # Sort & write out merged BED
     all_df.sort_values(by='chr start end cnv region_id'.split(), inplace=True)
