@@ -139,11 +139,16 @@ def main():
                         'columns: source name and path to BED.')
     parser.add_argument('--hc-outfile', required=True, help='Output BED file for ' +
                         'high-confidence GDs. Required.')
+    parser.add_argument('--mc-outfile', required=True, help='Output BED file for ' +
+                        'medium-confidence GDs. Required.')
     parser.add_argument('--lc-outfile', required=True, help='Output BED file for ' +
                         'low-confidence GDs. Required.')
-    parser.add_argument('--hc-cutoff', type=int, default=2,
+    parser.add_argument('--hc-cutoff', type=int, default=3,
                         help='Minimum number of sources required for ' +
                         'high-confidence GDs')
+    parser.add_argument('--mc-cutoff', type=int, default=2,
+                        help='Minimum number of sources required for ' +
+                        'medium-confidence GDs')
     parser.add_argument('--lc-cutoff', type=int, default=1,
                         help='Minimum number of sources required for ' +
                         'low-confidence GDs')
@@ -172,6 +177,10 @@ def main():
         hc_outfile = path.splitext(args.hc_outfile)[0]
     else:
         hc_outfile = args.hc_outfile
+    if path.splitext(args.mc_outfile)[-1].replace('.' ,'') in gz_suf:
+        mc_outfile = path.splitext(args.mc_outfile)[0]
+    else:
+        mc_outfile = args.mc_outfile
     if path.splitext(args.lc_outfile)[-1].replace('.' ,'') in gz_suf:
         lc_outfile = path.splitext(args.lc_outfile)[0]
     else:
@@ -183,7 +192,7 @@ def main():
     # Build map of GD density per CNV type
     maps = {cnv : density_map(sources[cnv]) for cnv in cnvtypes}
 
-    # Consolidate hc/lc regions, trim flanking segdups, and write to outfiles
+    # Consolidate hc/mc/lc regions, trim flanking segdups, and write to outfiles
     hc_gd_bts = [finalize_regions(maps, cnv, min_score=args.hc_cutoff,
                                   min_size=args.minsize, max_size=args.maxsize,
                                   gfile=args.genome, segdups=args.segdups, 
@@ -191,8 +200,15 @@ def main():
                                   annoprep=args.prep_for_gene_anno) \
                  for cnv in cnvtypes]
     hc_gds = hc_gd_bts[0].cat(hc_gd_bts[1], postmerge=False).sort(g=args.genome)
-    lc_gd_bts = [finalize_regions(maps, cnv, min_score=args.lc_cutoff,
+    mc_gd_bts = [finalize_regions(maps, cnv, min_score=args.mc_cutoff,
                                   max_score=args.hc_cutoff, min_size=args.minsize, 
+                                  max_size=args.maxsize, gfile=args.genome, 
+                                  segdups=args.segdups, cyto_bed=args.cytobands,
+                                  id_prefix='MC_GD', annoprep=args.prep_for_gene_anno) \
+                 for cnv in cnvtypes]
+    mc_gds = mc_gd_bts[0].cat(mc_gd_bts[1], postmerge=False).sort(g=args.genome)
+    lc_gd_bts = [finalize_regions(maps, cnv, min_score=args.lc_cutoff,
+                                  max_score=args.mc_cutoff, min_size=args.minsize, 
                                   max_size=args.maxsize, gfile=args.genome, 
                                   segdups=args.segdups, cyto_bed=args.cytobands,
                                   id_prefix='LC_GD', annoprep=args.prep_for_gene_anno) \
@@ -202,9 +218,11 @@ def main():
     # Filter vs common CNVs, if optioned
     if args.common_dels is not None:
         hc_gds = cnv_filter(hc_gds, args.common_dels, "DEL", args.common_cnv_cov)
+        mc_gds = cnv_filter(mc_gds, args.common_dels, "DEL", args.common_cnv_cov)
         lc_gds = cnv_filter(lc_gds, args.common_dels, "DEL", args.common_cnv_cov)
     if args.common_dups is not None:
         hc_gds = cnv_filter(hc_gds, args.common_dups, "DUP", args.common_cnv_cov)
+        mc_gds = cnv_filter(mc_gds, args.common_dups, "DUP", args.common_cnv_cov)
         lc_gds = cnv_filter(lc_gds, args.common_dups, "DUP", args.common_cnv_cov)
 
     # Write to outfiles
@@ -212,11 +230,13 @@ def main():
     if args.prep_for_gene_anno:
         out_header += '\tcoords\tdummy'
     hc_gds.saveas(hc_outfile, trackline=out_header + '\n')
+    mc_gds.saveas(mc_outfile, trackline=out_header + '\n')
     lc_gds.saveas(lc_outfile, trackline=out_header + '\n')
 
     # Bgzip, if optioned
     if args.bgzip:
         bgzip(hc_outfile)
+        bgzip(mc_outfile)
         bgzip(lc_outfile)
 
 

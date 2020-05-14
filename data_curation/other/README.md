@@ -26,14 +26,13 @@ For this purpose, we integrated lists of GDs from the following publications and
 
 _\* Note: ClinGen counts represent regions scored at high and medium confidence only._  
 
-From these existing datasets, we curated two distinct GD lists for the analyses in this study:  
+From these existing datasets, we curated three distinct GD lists for the analyses in this study:  
 
-1. **Established GDs**: regions covered by at least four sources.  
-2. **Candidate GDs**: regions covered by two or three sources.  
+1. **High-confidence GDs**: regions covered by at least four sources.  
+2. **Medium-confidence GDs**: regions covered by two or three sources.  
+3. **Low-confidence GDs**: regions covered by only one source  
 
-After overlapping reported GDs from the sources above, we further:
-1. excluded all consensus GDs with ≥50% coverage by common CNVs from three WGS-based resources as [described elsewhere](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/#curation-steps-rare-cnvs) or by common CNVs in [control samples from any metacohort in this study](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/#case-control-metacohorts) (prior to [CNV frequency filtering](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/#curation-steps-rare-cnvs)), and
-2. trimmed overlapping segmental duplications overlapping the boundaries of the GD interval.  
+After overlapping reported GDs from the sources above, we trimmed overlapping segmental duplications overlapping the boundaries of the GD interval.  
 
 ---  
 
