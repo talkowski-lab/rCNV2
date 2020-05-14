@@ -8,7 +8,7 @@
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Master parameters for rCNV2 manuscript formalized secondary analyses
+# Master parameters and common functions for rCNV2 manuscript formalized secondary analyses
 
 options(scipen=1000, stringsAsFactors=F)
 
@@ -127,5 +127,18 @@ get.hpo.color <- function(hpo){
   }else{
     pheno.colors[which(names(pheno.colors) == "all")]
   }
+}
+
+# Fit a robust linear regression with confidence interval
+robust.lm <- function(x, y, conf=0.95){
+  require(MASS, quietly=T)
+  fit.df <- data.frame("Y"=y, "X"=x)
+  xrange <- range(x[which(!is.infinite(x))], na.rm=T)
+  xspan <- xrange[2] - xrange[1]
+  fit <- MASS::rlm(Y ~ X, data=fit.df)
+  pred.df <- data.frame("X"=seq(xrange[1] - 2*xspan, xrange[2] + 2*xspan, length.out=1000))
+  pred <- predict(fit, pred.df, interval="confidence", level=conf)
+  pred.out <- data.frame("x"=pred.df$X, "lower"=pred[, 2], "upper"=pred[, 3])
+  return(list("fit" = fit, "ci" = pred.out))
 }
 
