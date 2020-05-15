@@ -72,10 +72,14 @@ pheno.abbrevs <- c("Mixed", "Neuro.", "Non-Neuro.")
 # COLORS #
 ##########
 blueblack <- "#003F6A"
+redblack <- "#4F1C14"
 bluewhite <- "#E8F3FB"
 
 cnv.colors <- c("DEL" = "#D43925",
                 "DUP" = "#2376B2")
+
+cnv.blacks <- c("DEL" = redblack,
+                "DUP" = blueblack)
 
 control.cnv.colors <- c("DEL" = "#E69186",
                         "DUP" = "#79AACC")
@@ -126,6 +130,20 @@ get.hpo.color <- function(hpo){
     pheno.colors[which(names(pheno.colors) == "somatic")]
   }else{
     pheno.colors[which(names(pheno.colors) == "all")]
+  }
+}
+
+# Format p-value for printing to plots
+format.pval <- function(p, nsmall=2, max.decimal=3){
+  if(-log10(p)>100){
+    bquote(italic(P) < 10 ^ -100)
+  }else if(ceiling(-log10(p)) > max.decimal){
+    parts <- unlist(strsplit(format(p, scientific=T), split="e"))
+    base <- formatC(round(as.numeric(parts[1]), nsmall), digits=nsmall)
+    exp <- as.numeric(parts[2])
+    bquote(italic(P) == .(base) ~ "x" ~ 10 ^ .(exp))
+  }else{
+    bquote(italic(P) == .(formatC(round(p, max.decimal), digits=max.decimal)))
   }
 }
 

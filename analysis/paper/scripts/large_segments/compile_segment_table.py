@@ -16,6 +16,7 @@ cnvtypes = 'DEL DUP'.split()
 
 import pandas as pd
 import pybedtools as pbt
+from itertools import combinations
 import argparse
 from os.path import splitext
 from sys import stdout
@@ -97,6 +98,37 @@ def overlap_common_cnvs(all_bt, common_cnvs, cnv, min_cov):
     return ids
 
 
+def score_pleiotropy(df, loci_hpos, jaccard_matrix_in, min_jaccard_sum=2.0):
+    """
+    Score genome-wide significant loci for pleiotropic effects based on the
+    sum of (1 - Jaccard index) for all pairs of associated HPOs
+
+    Note that 1 - Jaccard is necessary because we are interested in the fraction 
+    of samples that _don't_ overlap (whereas Jaccard index measures fraction overlap)
+
+    Returns: a list of dummy indicator variables
+    """
+
+    jac = pd.read_csv(jaccard_matrix_in, sep='\t')
+    if 'HPO' in jac.columns:
+        jac.index = jac['HPO']
+        jac.drop('HPO', axis=1, inplace=True)
+
+    def _calc_pleio(rid):
+        pleio_sum = 0
+        if rid in loci_hpos.keys():
+            for hpoA, hpoB in combinations(loci_hpos[rid], 2):
+                pleio_sum += (1 - jac.loc[hpoA, hpoB])
+            if pleio_sum >= min_jaccard_sum:
+                return 1
+            else:
+                return 0
+        else:
+            return 0
+
+    return [_calc_pleio(rid) for rid in df['region_id'].tolist()]
+
+
 def _subset_genes(gstr, genes):
     """
     Helper function to subset a semicolon-delimited string of genes on a second set of genes
@@ -109,6 +141,7 @@ def _subset_genes(gstr, genes):
     
     else:
         return ';'.join(sorted(hits))
+
 
 
 def annotate_genelist(df, genes, glname):
@@ -185,6 +218,8 @@ def main():
                         'segment loci from association testing. Required.')
     parser.add_argument('--hc-gds', required=True, help='BED of high-confidence GDs. ' +
                         'Required.')
+    parser.add_argument('--mc-gds', required=True, help='BED of medium-confidence GDs. ' +
+                        'Required.')
     parser.add_argument('--lc-gds', required=True, help='BED of low-confidence GDs. ' +
                         'Required.')
     parser.add_argument('--nahr-cnvs', required=True, help='BED of predicted NAHR-' +
@@ -195,6 +230,8 @@ def main():
     parser.add_argument('--common-dups', help='BED of common duplications.')
     parser.add_argument('--common-cnv-cov', type=float, default=0.3, help='Coverage ' +
                         'of common CNVs required to label as "benign". [default: 0.3]')
+    parser.add_argument('--hpo-jaccard-matrix', help='Tsv of Jaccard indexes ' +
+                        'between HPOs. Will be used to label pleiotropic loci.')
     parser.add_argument('--genelists', help='Tsv of genelists to annotate. Two ' +
                         'columns expected: genelist name, and path to genelist.')
     parser.add_argument('--hpo-genelists', help='Tsv of HPO-specific genelists to ' +
@@ -204,6 +241,9 @@ def main():
                         'overlap required for GD match. [default: 0.2]')
     parser.add_argument('--nahr-recip', type=float, default=0.5, help='Reciprocal ' +
                         'overlap required for NAHR CNV match. [default: 0.5]')
+    parser.add_argument('--min-jaccard-sum', type=float, default=2.0, help='Minimum ' +
+                        'sum of Jaccard indexes to consider a locus as pleiotropic. ' +
+                        '[default: 2.0]')
     parser.add_argument('-z', '--bgzip', action='store_true', help='Compress ' + 
                         'output BED files with bgzip. [Default: do not compress]')
     args = parser.parse_args()
@@ -234,6 +274,14 @@ def main():
     all_df = pd.concat([all_df, hc_gd_df.loc[~hc_gd_df.region_id.isin(hc_gd_ids_in_all), :]], axis=0)
     all_bt = pbt.BedTool().from_dataframe(all_df)
 
+    # Load medium-confidence GDs and merge into master df
+    mc_gd_bt = pbt.BedTool(args.mc_gds).cut(range(5))
+    mc_gd_df = read_bed_as_df(args.mc_gds)
+    mc_gd_ids = mc_gd_df.iloc[:, 3].tolist()
+    all_ids_in_mc_gd, mc_gd_ids_in_all = find_overlap(all_bt, mc_gd_bt, r=args.gd_recip)
+    all_df = pd.concat([all_df, mc_gd_df.loc[~mc_gd_df.region_id.isin(mc_gd_ids_in_all), :]], axis=0)
+    all_bt = pbt.BedTool().from_dataframe(all_df)
+
     # Load low-confidence GDs and merge into master df
     lc_gd_bt = pbt.BedTool(args.lc_gds).cut(range(5))
     lc_gd_df = read_bed_as_df(args.lc_gds)
@@ -258,17 +306,28 @@ def main():
     all_df['gw_sig'] = pd.get_dummies(all_df.region_id.isin(loci_ids), drop_first=True)
     all_df['hc_gd'] = pd.get_dummies(all_df.region_id.isin(set(hc_gd_ids + all_ids_in_hc_gd)), 
                                      drop_first=True)
+    all_df['mc_gd'] = pd.get_dummies(all_df.region_id.isin(set(mc_gd_ids + all_ids_in_mc_gd)), 
+                                     drop_first=True)
     all_df['lc_gd'] = pd.get_dummies(all_df.region_id.isin(set(lc_gd_ids + all_ids_in_lc_gd)), 
                                      drop_first=True)
     all_df['any_gd'] = pd.get_dummies(all_df.region_id.isin(set(hc_gd_ids + all_ids_in_hc_gd + \
+                                                                mc_gd_ids + all_ids_in_mc_gd + \
                                                                 lc_gd_ids + all_ids_in_lc_gd)), 
                                       drop_first=True)
-    all_df['pathogenic'] = pd.get_dummies(all_df.region_id.isin(loci_ids + hc_gd_ids + lc_gd_ids), 
-                                          drop_first=True)
-    all_df['benign'] = pd.get_dummies(all_df.region_id.isin(benign_del_ids + benign_dup_ids) & \
-                                      ~all_df.region_id.isin(loci_ids), drop_first=True)
+    benign_ids = benign_del_ids + benign_dup_ids
+    cand_path_ids = loci_ids + hc_gd_ids + mc_gd_ids + lc_gd_ids
+    path_ids = [i for i in cand_path_ids if i not in benign_ids]
+    all_df['pathogenic'] = pd.get_dummies(all_df.region_id.isin(path_ids), drop_first=True)
+    if args.common_dels is not None and args.common_dups is not None:
+        all_df['benign'] = pd.get_dummies(all_df.region_id.isin(benign_ids), drop_first=True)
     all_df['nahr'] = pd.get_dummies(all_df.region_id.isin(set(nahr_ids + all_ids_in_nahr)), 
                                     drop_first=True)
+
+    # Label pleiotropic loci based on HPO overlap, if optioned
+    if args.hpo_jaccard_matrix is not None:
+        all_df['pleiotropic'] = score_pleiotropy(all_df, loci_hpos, 
+                                                 args.hpo_jaccard_matrix,
+                                                 args.min_jaccard_sum)
 
     # Annotate genelists
     if args.genelists is not None:

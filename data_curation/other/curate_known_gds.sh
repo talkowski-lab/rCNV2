@@ -53,25 +53,23 @@ bedtools merge -d 10000 -i segdups.merged.bed.gz \
 # Create common CNV blacklist from 1000Genomes, gnomAD, and CCDG
 while read af suffix; do
   for CNV in DEL DUP; do
-    for af_label in AF EAS_AF EUR_AF AFR_AF AMR_AF SAS_AF; do
-      athena vcf-filter \
-        --minAF $af \
-        --minAC 1 \
-        --include-chroms $( seq 1 22 | paste -s -d, ) \
-        --svtypes ${CNV},CNV,MCNV \
-        --vcf-filters PASS,MULTIALLELIC \
-        --af-field $af_label \
-        --bgzip \
-        refs/1000Genomes_phase3.sites.vcf.gz \
-        1000Genomes_phase3.$af_label.common_cnvs.${CNV}.$suffix.vcf.gz
-    done
     athena vcf-filter \
       --minAF $af \
       --minAC 1 \
       --include-chroms $( seq 1 22 | paste -s -d, ) \
       --svtypes ${CNV},CNV,MCNV \
       --vcf-filters PASS,MULTIALLELIC \
-      --af-field POPMAX_AF \
+      --af-field AF \
+      --bgzip \
+      refs/1000Genomes_phase3.sites.vcf.gz \
+      1000Genomes_phase3.common_cnvs.${CNV}.$suffix.vcf.gz
+    athena vcf-filter \
+      --minAF $af \
+      --minAC 1 \
+      --include-chroms $( seq 1 22 | paste -s -d, ) \
+      --svtypes ${CNV},CNV,MCNV \
+      --vcf-filters PASS,MULTIALLELIC \
+      --af-field AF \
       --bgzip \
       refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
       gnomAD.common_cnvs.${CNV}.$suffix.vcf.gz

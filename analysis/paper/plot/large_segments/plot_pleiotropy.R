@@ -9,6 +9,8 @@
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
 # Plot panels involving pleiotropy for large segments
+# Note: does not use HPO clustering-based definition of pleiotropy
+# Instead, uses simpler definition of ≥2 associated HPOs
 
 
 options(stringsAsFactors=F, scipen=1000)
@@ -66,77 +68,108 @@ segs <- load.segment.table(segs.in)
 # Merge loci & segment data for genome-wide significant sites only
 gw <- merge.loci.segs(loci, segs)
 
+# Set global plotting values
+parmar <- c(2.3, 3.0, 1.5, 0.5)
+
 # Plot pleiotropy vs region size
 pdf(paste(out.prefix, "pleiotropy_vs_size.pdf", sep="."),
-    height=2.25, width=2.5)
+    height=2.25, width=2)
 gw.swarm(gw,
-         x.bool=gw$n_hpos>1,
+         x.bool=gw$n_hpos > 1,
          y=log10(gw$size),
-         xtitle="Phenotypes",
+         cnv.split=F,
+         add.pvalue=T,
+         alternative="less",
+         xtitle="Associated Phenos.",
          x.labs=c("One", "Multiple"), 
          y.at=log10(logscale.minor), 
          y.labs=logscale.demi.bp.labels, 
          y.labs.at=log10(logscale.demi.bp),
-         ytitle=expression(italic("log")[10] * "(Size)"))
+         ytitle=expression(italic("log")[10] * "(Size)"),
+         parmar=parmar)
 dev.off()
 
 # Plot pleiotropy vs. number of genes & gene density
 pdf(paste(out.prefix, "pleiotropy_vs_genes.pdf", sep="."),
-    height=2.25, width=2.5)
+    height=2.25, width=2)
 gw.swarm(gw,
-         x.bool=gw$n_hpos>1,
+         x.bool=gw$n_hpos > 1,
          y=gw$n_genes,
-         xtitle="Phenotypes",
+         cnv.split=F,
+         add.pvalue=T,
+         alternative="less",
+         xtitle="Associated Phenos.",
          x.labs=c("One", "Multiple"), 
-         ytitle="Genes Overlapped")
+         ytitle="Genes Overlapped",
+         parmar=parmar)
 dev.off()
 pdf(paste(out.prefix, "pleiotropy_vs_gene_density.pdf", sep="."),
-    height=2.25, width=2.5)
+    height=2.25, width=2)
 gw.swarm(gw,
-         x.bool=gw$n_hpos>1,
+         x.bool=gw$n_hpos > 1,
          y=100000 * gw$n_genes / gw$size,
-         xtitle="Phenotypes",
+         cnv.split=F,
+         add.pvalue=T,
+         alternative="less",
+         xtitle="Associated Phenos.",
          x.labs=c("One", "Multiple"), 
-         ytitle="Genes per 100kb")
+         ytitle="Genes per 100kb",
+         parmar=parmar)
 dev.off()
 
 # Plot pleiotropy vs. constrained genes & gene density
 pdf(paste(out.prefix, "pleiotropy_vs_constrained_genes.pdf", sep="."),
-    height=2.25, width=2.5)
+    height=2.25, width=2)
 gw.swarm(gw,
-         x.bool=gw$n_hpos>1,
+         x.bool=gw$n_hpos > 1,
          y=gw$n_gnomAD_constrained_genes,
-         xtitle="Phenotypes",
+         cnv.split=F,
+         add.pvalue=T,
+         alternative="less",
+         xtitle="Associated Phenos.",
          x.labs=c("One", "Multiple"), 
-         ytitle="Constrained Genes")
+         ytitle="Constrained Genes",
+         parmar=parmar)
 dev.off()
 pdf(paste(out.prefix, "pleiotropy_vs_constrained_gene_density.pdf", sep="."),
-    height=2.25, width=2.5)
+    height=2.25, width=2)
 gw.swarm(gw,
-         x.bool=gw$n_hpos>1,
+         x.bool=gw$n_hpos > 1,
          y=1000000 * gw$n_gnomAD_constrained_genes / gw$size,
-         xtitle="Phenotypes",
+         cnv.split=F,
+         add.pvalue=T,
+         alternative="less",
+         xtitle="Associated Phenos.",
          x.labs=c("One", "Multiple"), 
-         ytitle="Constr. Genes per 1Mb")
+         ytitle="Constr. Genes per 1Mb",
+         parmar=parmar)
 dev.off()
 
 # Plot pleiotropy vs. OMIM genes & gene density
 pdf(paste(out.prefix, "pleiotropy_vs_OMIM_genes.pdf", sep="."),
-    height=2.25, width=2.5)
+    height=2.25, width=2)
 gw.swarm(gw,
-         x.bool=gw$n_hpos>1,
+         x.bool=gw$n_hpos > 1,
          y=gw$n_OMIM_genes,
-         xtitle="Phenotypes",
+         cnv.split=F,
+         add.pvalue=T,
+         alternative="less",
+         xtitle="Associated Phenos.",
          x.labs=c("One", "Multiple"), 
-         ytitle="OMIM Genes")
+         ytitle="OMIM Genes",
+         parmar=parmar)
 dev.off()
 pdf(paste(out.prefix, "pleiotropy_vs_OMIM_gene_density.pdf", sep="."),
-    height=2.25, width=2.5)
+    height=2.25, width=2)
 gw.swarm(gw,
-         x.bool=gw$n_hpos>1,
+         x.bool=gw$n_hpos > 1,
          y=1000000 * gw$n_OMIM_genes / gw$size,
-         xtitle="Phenotypes",
+         cnv.split=F,
+         add.pvalue=T,
+         alternative="less",
+         xtitle="Associated Phenos.",
          x.labs=c("One", "Multiple"), 
-         ytitle="OMIM Genes per 1Mb")
+         ytitle="OMIM Genes per 1Mb",
+         parmar=parmar)
 dev.off()
 

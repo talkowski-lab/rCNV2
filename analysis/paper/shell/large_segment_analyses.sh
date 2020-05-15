@@ -28,6 +28,7 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/hpo/${prefix}.reordered_hpos.txt \
   ${rCNV_bucket}/cleaned_data/binned_genome/GRCh37.200kb_bins_10kb_steps.raw.bed.gz \
   ${rCNV_bucket}/refs/GRCh37.autosomes.genome \
+  ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
   refs/
 mkdir meta_stats/
 gsutil -m cp \
@@ -74,14 +75,17 @@ cat <( echo -e "#chr\tstart\tend\tnahr_id\tcnv\tn_genes\tgenes" ) \
          '{ print $1, $2, $3, $4"_DEL", "DEL", $5, $6"\n"$1, $2, $3, $4"_DUP", "DUP", $5, $6 }' ) \
 | bgzip -c \
 > clustered_nahr_regions.reformatted.bed.gz
+af_suffix="01pct"
 for CNV in DEL DUP; do
-  zcat refs/wgs_common_cnvs.$CNV.bed.gz refs/rCNV2_common_cnvs.$CNV.bed.gz \
+  zcat \
+    refs/wgs_common_cnvs.$CNV.$af_suffix.bed.gz \
+    refs/rCNV2_common_cnvs.$CNV.$af_suffix.bed.gz \
   | grep -ve '^#' \
   | cut -f1-3 \
   | sort -Vk1,1 -k2,2n -k3,3n \
   | bedtools merge -i -\
   | bgzip -c \
-  > combined_common_cnvs.$CNV.bed.gz
+  > combined_common_cnvs.$CNV.$af_suffix.bed.gz
 done
 TAB=$( printf '\t' )
 cat << EOF > genelists_to_annotate.tsv
@@ -100,36 +104,85 @@ done < refs/test_phenotypes.list \
 /opt/rCNV2/analysis/paper/scripts/large_segments/compile_segment_table.py \
   --final-loci rCNV.final_segments.loci.bed.gz \
   --hc-gds refs/lit_GDs.hc.bed.gz \
+  --mc-gds refs/lit_GDs.mc.bed.gz \
   --lc-gds refs/lit_GDs.lc.bed.gz \
   --nahr-cnvs clustered_nahr_regions.reformatted.bed.gz \
   --outfile ${prefix}.master_segments.bed.gz \
-  --common-dels combined_common_cnvs.DEL.bed.gz \
-  --common-dups combined_common_cnvs.DUP.bed.gz \
+  --common-dels combined_common_cnvs.DEL.$af_suffix.bed.gz \
+  --common-dups combined_common_cnvs.DUP.$af_suffix.bed.gz \
   --common-cnv-cov 0.5 \
+  --hpo-jaccard-matrix rCNV2_analysis_d1.hpo_jaccard_matrix.tsv \
+  --min-jaccard-sum 1.0 \
   --genelists genelists_to_annotate.tsv \
   --hpo-genelists hpo_genelists.tsv \
   --gd-recip "10e-10" \
-  --nahr-recip 0.2 \
+  --nahr-recip 0.25 \
   --bgzip
 gsutil -m cp \
   ${prefix}.master_segments.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/
 
 
-# DEV: Permute all segments 100 times
+# DEV: segment permutation testing
+perm_prefix="test_perms"
+# Create whitelist
 bedtools merge -i refs/GRCh37.200kb_bins_10kb_steps.raw.bed.gz > whitelist.bed
+# Permute segments
 /opt/rCNV2/analysis/paper/scripts/large_segments/shuffle_segs.py \
   --genome refs/GRCh37.autosomes.genome \
   --whitelist whitelist.bed \
   --n-perms 100 \
   --first-seed 1 \
-  --outfile test_perms.bed.gz \
+  --outfile ${perm_prefix}.bed.gz \
   --bgzip \
   <( zcat rCNV.final_segments.loci.bed.gz | cut -f1-5,19 )
+# Annotate with genes
+/opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
+  --bgzip \
+  --outbed ${perm_prefix}.w_genes.bed.gz \
+  ${perm_prefix}.bed.gz \
+  refs/gencode.v19.canonical.pext_filtered.gtf.gz
+# Reformat to match original locus association stats file (add effect sizes, etc)
+/opt/rCNV2/analysis/paper/scripts/large_segments/reformat_shuffled_sig_segs.R \
+  --bgzip \
+  ${perm_prefix}.w_genes.bed.gz \
+  rCNV.final_segments.loci.bed.gz \
+  ${perm_prefix}.reformatted.permuted_loci.bed.gz
+# Compile new segment table with existing GDs and NAHR regions
+/opt/rCNV2/analysis/paper/scripts/large_segments/compile_segment_table.py \
+  --final-loci ${perm_prefix}.reformatted.permuted_loci.bed.gz \
+  --hc-gds refs/lit_GDs.hc.bed.gz \
+  --mc-gds refs/lit_GDs.mc.bed.gz \
+  --lc-gds refs/lit_GDs.lc.bed.gz \
+  --nahr-cnvs clustered_nahr_regions.reformatted.bed.gz \
+  --outfile ${perm_prefix}.master_segments.bed.gz \
+  --gd-recip "10e-10" \
+  --nahr-recip 0.25 \
+  --bgzip
 
 
 # Plot effect size covariates
+if [ -e effect_size_plots ]; then
+  rm -rf effect_size_plots
+fi
+mkdir effect_size_plots
+/opt/rCNV2/analysis/paper/plot/large_segments/plot_effect_sizes.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  rCNV.final_segments.loci.bed.gz \
+  ${prefix}.master_segments.bed.gz \
+  effect_size_plots/${prefix}
 
+
+# Plot pleiotropy covariates
+if [ -e pleiotropy_plots ]; then
+  rm -rf pleiotropy_plots
+fi
+mkdir pleiotropy_plots
+/opt/rCNV2/analysis/paper/plot/large_segments/plot_pleiotropy.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  rCNV.final_segments.loci.bed.gz \
+  ${prefix}.master_segments.bed.gz \
+  pleiotropy_plots/${prefix}
 
 
 # Collapse overlapping DEL/DUP segments for sake of plotting

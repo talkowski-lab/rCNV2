@@ -24,6 +24,7 @@ def load_segs(segs_in):
     """
 
     segs_df = pd.read_csv(segs_in,  delimiter='\t').iloc[:, :6]
+    coord_colname = segs_df.columns.tolist()[5]
 
     def _normalize_intervals(row):
         start = int(row[1])
@@ -32,24 +33,30 @@ def load_segs(segs_in):
         norm_intervals = []
         for x in intervals_str.split(';'):
             icoords = [int(n) for n in x.split(':')[1].split('-')]
-            norm_intervals.append('-'.join([str(icoords[0] - start), str(icoords[1] - icoords[0])]))
+            norm_intervals.append('-'.join([str(icoords[0] - start), str(icoords[1] - start)]))
         return ';'.join(norm_intervals)
 
-    segs_df['coords'] = segs_df.apply(_normalize_intervals, axis=1)
+    segs_df[coord_colname] = segs_df.apply(_normalize_intervals, axis=1)
 
-    return pbt.BedTool().from_dataframe(segs_df)
+    return pbt.BedTool().from_dataframe(segs_df), coord_colname
 
 
-def custom_shuffle(segs, seed, genome, whitelist=None):
+def custom_shuffle(segs, seed, genome, whitelist=None, coords_colname='coords'):
     """
     Customized implementation of bedtools shuffle
     """
 
+    def _seed_prefix(x, seed):
+        x.name = '_'.join(['perm' + str(seed), x.name])
+        return x
+
     if whitelist is not None:
-        shuf = segs.shuffle(g=genome, incl=args.whitelist, seed=seed, f=1.0, 
-                            noOverlapping=True)
+        shuf = segs.shuffle(g=genome, incl=whitelist, seed=seed, f=1.0, 
+                            noOverlapping=True).sort(g=genome).\
+                    each(_seed_prefix, seed=seed).saveas()
     else:
-        shuf = segs.shuffle(g=genome, seed=seed, f=1.0, noOverlapping=True)
+        shuf = segs.shuffle(g=genome, seed=seed, f=1.0, noOverlapping=True).\
+                    sort(g=genome).each(_seed_prefix, seed=seed).saveas()
 
     def _unnormalize_intervals(row):
         chrom = row.chrom
@@ -66,9 +73,9 @@ def custom_shuffle(segs, seed, genome, whitelist=None):
 
     unnorm_intervals = [_unnormalize_intervals(x) for x in shuf]
 
-    shuf_bt = shuf.sort(g=genome).\
-                   to_dataframe(names='chr start end region_id cnv coords'.split())
-    shuf_bt['coords'] = unnorm_intervals
+    bt_colnames = 'chr start end region_id cnv'.split() + [coords_colname]
+    shuf_bt = shuf.to_dataframe(names=bt_colnames)
+    shuf_bt[coords_colname] = unnorm_intervals
     shuf_bt['perm'] = seed
 
     return shuf_bt
@@ -117,13 +124,14 @@ def main():
         outfile = open(outfile_path, 'w')
 
     # Load and reformat segments to prepare for permutation
-    segs = load_segs(args.segs)
+    segs, coords_colname = load_segs(args.segs)
 
     # Shuffle intervals for each of --n-perms permutations
     for seed in range(args.first_seed, args.first_seed + args.n_perms):
         if not args.quiet:
             print('Starting permutation {}'.format(seed))
-        shuffled_bt = custom_shuffle(segs, seed, args.genome)
+        shuffled_bt = custom_shuffle(segs, seed, args.genome, args.whitelist, 
+                                     coords_colname=coords_colname)
         if seed == args.first_seed:
             shuffled_bt.to_csv(outfile, sep='\t', na_rep='NA', header=True, 
                                index=False, mode='w')
