@@ -123,42 +123,50 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/
 
 
-# DEV: segment permutation testing
-perm_prefix="test_perms"
-# Create whitelist
-bedtools merge -i refs/GRCh37.200kb_bins_10kb_steps.raw.bed.gz > whitelist.bed
-# Permute segments
-/opt/rCNV2/analysis/paper/scripts/large_segments/shuffle_segs.py \
+# Run segment permutation tests
+# Note: in practice, this is parallelized in the cloud using segment_permutation.wdl
+# The code to execute these permutation tests is contained elsewhere
+# Copy results of segment permutation tests (note: requires permissions)
+n_seg_perms=10000
+gsutil -m cp \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/permutations/${prefix}.${n_seg_perms}_permuted_segments.bed.gz \
+  ./
+
+
+# Plot segment permutation results
+if [ -e perm_test_plots ]; then
+  rm -rf perm_test_plots
+fi
+mkdir perm_test_plots
+/opt/rCNV2/analysis/paper/plot/large_segments/plot_segment_permutations.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  rCNV.final_segments.loci.bed.gz \
+  ${prefix}.master_segments.bed.gz \
+  ${prefix}.${n_seg_perms}_permuted_segments.bed.gz \
+  perm_test_plots/${prefix}
+
+
+# DEV: Run gene set permutation tests
+n_perms=100
+seed=1
+perm_prefix="gene_perm_test"
+# Download & format gene coordinates (note: requires permissions)
+gsutil -m cp \
+  ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.all_features.bed.gz \
+  refs/
+zcat refs/gencode.v19.canonical.pext_filtered.all_features.bed.gz \
+| cut -f1-4 \
+| bgzip -c \
+> refs/gencode.v19.canonical.pext_filtered.bed.gz
+/opt/rCNV2/analysis/paper/scripts/gene_association/shuffle_gene_blocks.py \
   --genome refs/GRCh37.autosomes.genome \
-  --whitelist whitelist.bed \
-  --n-perms 100 \
-  --first-seed 1 \
+  --n-perms ${n_perms} \
+  --first-seed ${seed} \
   --outfile ${perm_prefix}.bed.gz \
   --bgzip \
-  <( zcat rCNV.final_segments.loci.bed.gz | cut -f1-5,19 )
-# Annotate with genes
-/opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
-  --bgzip \
-  --outbed ${perm_prefix}.w_genes.bed.gz \
-  ${perm_prefix}.bed.gz \
-  refs/gencode.v19.canonical.pext_filtered.gtf.gz
-# Reformat to match original locus association stats file (add effect sizes, etc)
-/opt/rCNV2/analysis/paper/scripts/large_segments/reformat_shuffled_sig_segs.R \
-  --bgzip \
-  ${perm_prefix}.w_genes.bed.gz \
-  rCNV.final_segments.loci.bed.gz \
-  ${perm_prefix}.reformatted.permuted_loci.bed.gz
-# Compile new segment table with existing GDs and NAHR regions
-/opt/rCNV2/analysis/paper/scripts/large_segments/compile_segment_table.py \
-  --final-loci ${perm_prefix}.reformatted.permuted_loci.bed.gz \
-  --hc-gds refs/lit_GDs.hc.bed.gz \
-  --mc-gds refs/lit_GDs.mc.bed.gz \
-  --lc-gds refs/lit_GDs.lc.bed.gz \
-  --nahr-cnvs clustered_nahr_regions.reformatted.bed.gz \
-  --outfile ${perm_prefix}.master_segments.bed.gz \
-  --gd-recip "10e-10" \
-  --nahr-recip 0.25 \
-  --bgzip
+  <( zcat rCNV.final_segments.loci.bed.gz \
+     | awk -v FS="\t" -v OFS="\t" '{ print $4, $5, $NF }' ) \
+  refs/gencode.v19.canonical.pext_filtered.bed.gz
 
 
 # Plot effect size covariates

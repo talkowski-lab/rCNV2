@@ -79,7 +79,9 @@ load.segment.table <- function(segs.in){
 # Merge locus association data with master segments table
 merge.loci.segs <- function(loci, segs){
   shared.columns <- intersect(colnames(loci), colnames(segs))
-  gw <- merge(loci, segs, by=shared.columns, all.x=T, all.y=F, 
+  shared.to.drop.from.segs <- shared.columns[which(shared.columns != "region_id")]
+  segs.sub <- segs[, -which(colnames(segs) %in% shared.to.drop.from.segs)]
+  gw <- merge(loci, segs.sub, by="region_id", all.x=T, all.y=F, 
               sort=F, suffixes=c(".l", ".s"))
   gw$color <- cnv.colors[sapply(gw$cnv, function(cnv){which(names(cnv.colors)==cnv)})]
   gw$black <- cnv.blacks[sapply(gw$cnv, function(cnv){which(names(cnv.blacks)==cnv)})]
@@ -229,7 +231,7 @@ gw.swarm <- function(gw, x.bool, y, cnv.split=TRUE, ylims=NULL,
   sapply(1:length(y.vals), function(i){
     beeswarm(y.vals[[i]], add=T, at=x.at[i], pch=21,
              pwbg=pt.color.list[[i]], pwcol=pt.border.list[[i]],
-             corral="wrap", corralWidth=width)
+             corral="random", corralWidth=width)
   })
   
   # Add x-axis
@@ -361,8 +363,8 @@ plot.seg.perms <- function(gw, perms, feature, measure, n.bins=100,
     points(x=obs.val, y=y.at, pch=23, bg=obs.color, 
            col=obs.border, cex=diamond.cex)
     if(!is.null(y.title)){
-      axis(2, at=y.at, line=-0.8, tick=F, las=2, labels=y.title)
-      axis(2, at=c(y.at-(width/2), y.at+(width/2)), tck=0, labels=NA, col=blueblack)
+      axis(2, at=y.at, line=-0.9, tick=F, las=2, labels=y.title)
+      # axis(2, at=c(y.at-(width/2), y.at+(width/2)), tck=0, labels=NA, col=blueblack)
     }
   }
   vio.colors <- rep(bluewhite, 3)

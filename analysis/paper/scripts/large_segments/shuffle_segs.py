@@ -50,14 +50,24 @@ def custom_shuffle(segs, seed, genome, whitelist=None, coords_colname='coords'):
         x.name = '_'.join(['perm' + str(seed), x.name])
         return x
 
+    # Use +seed for DEL and -seed for DUP
+    # This ensures non-overlapping intervals within CNV types (DEL vs DEL)
+    # But allows for overlapping CNV intervalls between CNV types (DEL vs DUP)
     if whitelist is not None:
-        shuf = segs.shuffle(g=genome, incl=whitelist, seed=seed, f=1.0, 
-                            noOverlapping=True).sort(g=genome).\
-                    each(_seed_prefix, seed=seed).saveas()
+        shuf_del = segs.filter(lambda x: x[4] == 'DEL').\
+                        shuffle(g=genome, incl=whitelist, seed=seed, f=1.0, 
+                                noOverlapping=True)
+        shuf_dup = segs.filter(lambda x: x[4] == 'DUP').\
+                        shuffle(g=genome, incl=whitelist, seed=-seed, f=1.0, 
+                                noOverlapping=True)
     else:
-        shuf = segs.shuffle(g=genome, seed=seed, f=1.0, noOverlapping=True).\
-                    sort(g=genome).each(_seed_prefix, seed=seed).saveas()
-
+        shuf_del = segs.filter(lambda x: x[4] == 'DEL').\
+                        shuffle(g=genome, seed=seed, f=1.0, noOverlapping=True)
+        shuf_dup = segs.filter(lambda x: x[4] == 'DUP').\
+                        shuffle(g=genome, seed=-seed, f=1.0, noOverlapping=True)
+    shuf = shuf_del.cat(shuf_dup, postmerge=False).sort(g=genome).\
+                    each(_seed_prefix, seed=seed).saveas()
+                        
     def _unnormalize_intervals(row):
         chrom = row.chrom
         start = row.start
