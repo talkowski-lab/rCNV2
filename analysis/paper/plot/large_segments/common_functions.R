@@ -55,7 +55,7 @@ load.segment.table <- function(segs.in){
   # Split list-style columns
   listcol.idxs <- c(which(colnames(segs) %in% c("coords", "genes")),
                     intersect(grep("^n_", colnames(segs), invert=T, fixed=F),
-                            grep("_genes$", colnames(segs), fixed=F)))
+                              grep("_genes$", colnames(segs), fixed=F)))
   segs[, listcol.idxs] <- apply(segs[, listcol.idxs], 2, strsplit, split=";")
   
   # Convert numeric columns to numerics
@@ -210,7 +210,7 @@ gw.swarm <- function(gw, x.bool, y, cnv.split=TRUE, ylims=NULL,
     pt.color.list <- list(gw$color[which(!x.bool)],
                           gw$color[which(x.bool)])
     pt.border.list <- list(gw$black[which(!x.bool)],
-                          gw$black[which(x.bool)])
+                           gw$black[which(x.bool)])
     boxplot.colors <- rep(blueblack, 2)
     boxplot.fill <- rep(bluewhite, 2)
   }
@@ -274,4 +274,129 @@ gw.swarm <- function(gw, x.bool, y, cnv.split=TRUE, ylims=NULL,
       mtext(3, text=format.pval(pval), line=0.5)
     }
   }
+}
+
+# Function to plot segment permutation test results
+plot.seg.perms <- function(gw, perms, feature, measure, n.bins=100, 
+                           x.title=NULL, xlims=NULL,
+                           diamond.cex=1.5, parmar=c(2.25, 2, 0.5, 0.5)){
+  # Get plot data
+  perm.dat <- do.call("rbind", lapply(perms, function(df){
+    if(measure == "mean"){
+      c("ALL" = mean(df[, which(colnames(df)==feature)], na.rm=T),
+        "DEL" = mean(df[which(df$cnv=="DEL"), 
+                        which(colnames(df)==feature)], na.rm=T),
+        "DUP" = mean(df[which(df$cnv=="DUP"), 
+                        which(colnames(df)==feature)], na.rm=T))
+    }else if(measure == "median"){
+      c("ALL" = median(df[, which(colnames(df)==feature)], na.rm=T),
+        "DEL" = median(df[which(df$cnv=="DEL"), 
+                        which(colnames(df)==feature)], na.rm=T),
+        "DUP" = median(df[which(df$cnv=="DUP"), 
+                        which(colnames(df)==feature)], na.rm=T))
+    }else if(measure == "sum"){
+      c("ALL" = sum(df[, which(colnames(df)==feature)]),
+        "DEL" = sum(df[which(df$cnv=="DEL"), 
+                       which(colnames(df)==feature)]),
+        "DUP" = sum(df[which(df$cnv=="DUP"), 
+                       which(colnames(df)==feature)]))
+    }
+  }))
+  # Convert boolean gw.dat column back to numeric, if needed
+  gw.vals <- gw[, which(colnames(gw)==feature)]
+  if(all(sapply(gw.vals, function(x){is.logical(x) | is.na(x)}))){
+    gw.vals <- sapply(gw.vals, function(x){if(is.na(x)){NA}else if(x==T){1}else if(x==F){0}else{NA}})
+  }
+  if(measure == "mean"){
+    gw.dat <- c("ALL" = mean(gw.vals, na.rm=T),
+                "DEL" = mean(gw.vals[which(gw$cnv=="DEL")], na.rm=T),
+                "DUP" = mean(gw.vals[which(gw$cnv=="DUP")], na.rm=T))
+  }else if(measure == "median"){
+    gw.dat <- c("ALL" = median(gw.vals, na.rm=T),
+                "DEL" = median(gw.vals[which(gw$cnv=="DEL")], na.rm=T),
+                "DUP" = median(gw.vals[which(gw$cnv=="DUP")], na.rm=T))
+  }else if(measure == "sum"){
+    gw.dat <- c("ALL" = sum(gw.vals, na.rm=T),
+                "DEL" = sum(gw.vals[which(gw$cnv=="DEL")], na.rm=T),
+                "DUP" = sum(gw.vals[which(gw$cnv=="DUP")], na.rm=T))
+  }
+  val.range <- range(rbind(perm.dat, gw.dat), na.rm=T)
+  val.range <- c(floor(val.range[1]), ceiling(1.25*val.range[2]))
+  if(val.range[2] - val.range[1] <= n.bins & 
+     length(unique(as.numeric(perm.dat))) <= n.bins){
+    bins <- val.range[1]:val.range[2]
+  }else{
+    bins <- seq(val.range[1], val.range[2], length.out=n.bins)
+  }
+  bin.width <- bins[2]-bins[1]
+  if(is.null(xlims)){
+    xlims <- range(bins)
+  }
+  perm.means <- apply(perm.dat, 2, mean, na.rm=T)
+  perm.hists <- as.data.frame(apply(perm.dat, 2, function(vals){hist(vals, breaks=bins, plot=F)$counts}))
+  perm.pvals <- sapply(1:3, function(i){calc.perm.p(perm.vals=perm.dat[, i], obs.val=gw.dat[i])})
+  
+  # Helper function to add a single mirrored violin-histogram hybrid of values to an existing plot
+  plot.viohist <- function(values, bins, y.at, width=0.8, 
+                           obs.val=NA, obs.color=NA, obs.border=NA, 
+                           color=bluewhite, border=blueblack,
+                           diamond.cex=4, y.title=NULL){
+    values[which(values==0)] <- NA
+    values <- values / (max(values, na.rm=T) * 2/width)
+    rect(xleft=bins[-length(bins)], xright=bins[-1],
+         ybottom=-values + y.at, ytop=values + y.at, 
+         col=color, border="white")
+    segments(x0=rep(bins[-length(bins)], 2),
+             x1=rep(bins[-1], 2),
+             y0=c(values + y.at, -values + y.at), 
+             y1=c(values + y.at, -values + y.at),
+             col=border)
+    segments(x0=rep(bins, 2), x1=rep(bins, 2),
+             y0=c(y.at, values + y.at, y.at, -values + y.at),
+             y1=c(values + y.at, y.at, -values + y.at, y.at),
+             col=border)
+    segments(x0=obs.val, x1=obs.val, 
+             y0=y.at - 0.2, y1=y.at + 0.2, 
+             col=obs.color, lwd=3, lend="round")
+    points(x=obs.val, y=y.at, pch=23, bg=obs.color, 
+           col=obs.border, cex=diamond.cex)
+    if(!is.null(y.title)){
+      axis(2, at=y.at, line=-0.8, tick=F, las=2, labels=y.title)
+      axis(2, at=c(y.at-(width/2), y.at+(width/2)), tck=0, labels=NA, col=blueblack)
+    }
+  }
+  vio.colors <- rep(bluewhite, 3)
+  vio.borders <- rep(blueblack, 3)
+  # vio.colors <- c(purplewhite, redwhite, bluewhite)
+  # vio.borders <- c(purpleblack, redblack, blueblack)
+  row.colors <- c(cnv.colors[c(3, 1:2)])
+  row.borders <- rep("black", 3)
+  # row.borders <- c(purpleblack, redblack, blueblack)
+  row.labels <- c("All\nCNV", "DEL", "DUP")
+  stats.cex <- 0.85
+  
+  # Prep global plot area
+  par(bty="n", mar=parmar)
+  plot(NA, xlim=xlims, ylim=c(3, 0), type="n",
+       xaxt="n", yaxt="n", xlab="", ylab="")
+  sapply(1:3, function(i){
+    plot.viohist(perm.hists[, i], bins, i-0.5,
+                 color=vio.colors[i], border=vio.borders[i],
+                 y.title=row.labels[i], diamond.cex=diamond.cex, obs.val=gw.dat[i], 
+                 obs.color=row.colors[i], obs.border=row.borders[i])
+    segments(x0=perm.means[i], x1=perm.means[i],
+             y0=i-0.7, y1=i-0.3, lwd=3, 
+             col=vio.borders[i], lend="round")
+    text(x=gw.dat[i]-(0.03*(par("usr")[2]-par("usr")[1])), y=i-0.7, pos=4, 
+         labels=perm.pvals[2, ][[i]], xpd=T, cex=stats.cex)
+    # text(x=gw.dat[i]-(0.03*(par("usr")[2]-par("usr")[1])), y=i-0.7, pos=4, 
+    #      labels=paste(prettyNum(round(1.73233, 1), small.interval=1), "fold", sep="-"),
+    #      xpd=T, cex=stats.cex)
+    print(paste(prettyNum(round(gw.dat[i]/mean(perm.dat[, i], na.rm=T), 1), small.interval=1), "fold", sep="-"))
+  })
+  axis(1, at=unique(c(0, axTicks(1))), labels=NA, col=blueblack, tck=-0.03)
+  sapply(1:length(axTicks(1)), function(i){
+    axis(1, at=axTicks(1)[i], labels=prettyNum(axTicks(1)[i], big.mark=","), line=-0.65, tick=F)
+  })
+  mtext(1, text=x.title, line=1.2)
 }

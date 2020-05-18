@@ -73,19 +73,30 @@ pheno.abbrevs <- c("Mixed", "Neuro.", "Non-Neuro.")
 ##########
 blueblack <- "#003F6A"
 redblack <- "#4F1C14"
+purpleblack <- "#3F2759"
 bluewhite <- "#E8F3FB"
+redwhite <- "#F0D6D3"
+purplewhite <- "#EADFF5"
 
 cnv.colors <- c("DEL" = "#D43925",
-                "DUP" = "#2376B2")
+                "DUP" = "#2376B2",
+                "CNV" = "#7E4EB2")
 
 cnv.blacks <- c("DEL" = redblack,
-                "DUP" = blueblack)
+                "DUP" = blueblack,
+                "CNV" = purpleblack)
+
+cnv.whites <- c("DEL" = redwhite,
+                "DUP" = bluewhite,
+                "CNV" = purplewhite)
 
 control.cnv.colors <- c("DEL" = "#E69186",
-                        "DUP" = "#79AACC")
+                        "DUP" = "#79AACC",
+                        "CNV" = "#B488A1")
 
 cnv.color.palettes <- list("DEL" = colorRampPalette(c("gray95", cnv.colors[1]))(101),
-                           "DUP" = colorRampPalette(c("gray95", cnv.colors[2]))(101))
+                           "DUP" = colorRampPalette(c("gray95", cnv.colors[2]))(101),
+                           "CNV" = colorRampPalette(c("gray95", cnv.colors[3]))(101))
 
 require(viridisLite)
 percentile.palette <- viridis(101)
@@ -134,17 +145,32 @@ get.hpo.color <- function(hpo){
 }
 
 # Format p-value for printing to plots
-format.pval <- function(p, nsmall=2, max.decimal=3){
+format.pval <- function(p, nsmall=2, max.decimal=3, equality="="){
   if(-log10(p)>100){
     bquote(italic(P) < 10 ^ -100)
   }else if(ceiling(-log10(p)) > max.decimal){
     parts <- unlist(strsplit(format(p, scientific=T), split="e"))
-    base <- formatC(round(as.numeric(parts[1]), nsmall), digits=nsmall)
-    exp <- as.numeric(parts[2])
-    bquote(italic(P) == .(base) ~ "x" ~ 10 ^ .(exp))
+    base <- gsub(" ", "", formatC(round(as.numeric(parts[1]), nsmall), digits=nsmall), fixed=T)
+    exp <- gsub(" ", "", as.numeric(parts[2]), fixed=T)
+    bquote(italic(P) ~ .(equality) ~ .(base) ~ "x" ~ 10 ^ .(exp))
   }else{
-    bquote(italic(P) == .(formatC(round(p, max.decimal), digits=max.decimal)))
+    bquote(italic(P) ~ .(equality) ~ .(formatC(round(p, max.decimal), digits=max.decimal)))
   }
+}
+
+# Calculate & format permuted P-value
+calc.perm.p <- function(perm.vals, obs.val, alternative="greater"){
+  if(alternative=="greater"){
+    p <- length(which(perm.vals >= obs.val)) / length(perm.vals) 
+  }else{
+    p <- length(which(perm.vals <= obs.val)) / length(perm.vals)
+  }
+  if(p==0){
+    p.fmt <- format.pval(1/length(perm.vals), equality="<")
+  }else{
+    p.fmt <- format.pval(p)
+  }
+  return(list("p" = p, "formatted" = p.fmt))
 }
 
 # Fit a robust linear regression with confidence interval
