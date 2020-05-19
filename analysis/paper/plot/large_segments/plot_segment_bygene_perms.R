@@ -8,7 +8,7 @@
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Plot large segment permutation results (bedtools shuffle)
+# Plot large segment permutation results (gene set-based test)
 
 
 options(stringsAsFactors=F, scipen=1000)
@@ -21,12 +21,8 @@ options(stringsAsFactors=F, scipen=1000)
 load.perms <- function(perm.res.in){
   # Read full permutation table
   perms <- read.table(perm.res.in, header=T, sep="\t", check.names=F, comment.char="")
-  perms$perm_idx <- as.numeric(perms$perm_idx)
+  colnames(perms)[1] <- gsub("#", "", colnames(perms)[1], fixed=T)
   perm.range <- sort(unique(perms$perm_idx))
-  
-  # Drop unnecessary columns
-  cols.to.drop <- c("#chr", "start", "end", "coords", "size", "genes")
-  perms <- perms[, -which(colnames(perms) %in% cols.to.drop)]
   
   # Split each permutation into a list of dfs (one per perm)
   lapply(perm.range, function(i){
@@ -48,14 +44,14 @@ option_list <- list(
 )
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage=paste("%prog loci.bed segs.tsv perm_res.bed out_prefix", sep=" "),
+args <- parse_args(OptionParser(usage=paste("%prog loci.bed segs.tsv perm_res.tsv out_prefix", sep=" "),
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Checks for appropriate positional arguments
 if(length(args$args) != 4){
-  stop(paste("Four positional arguments required: loci.bed, segs.tsv, perm_res.bed, output_prefix\n", sep=" "))
+  stop(paste("Four positional arguments required: loci.bed, segs.tsv, perm_res.tsv, output_prefix\n", sep=" "))
 }
 
 # Writes args & opts to vars
@@ -68,8 +64,8 @@ rcnv.config <- opts$`rcnv-config`
 # # DEV PARAMETERS
 # loci.in <- "~/scratch/rCNV.final_segments.loci.bed.gz"
 # segs.in <- "~/scratch/rCNV2_analysis_d1.master_segments.bed.gz"
-# perm.res.in <- "~/scratch/rCNV2_analysis_d1.10000_permuted_segments.bed.gz"
-# out.prefix <- "~/scratch/test_effect_sizes"
+# perm.res.in <- "~/scratch/gene_perm_test.annotated.tsv.gz"
+# out.prefix <- "~/scratch/test_perm_bygene"
 # rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
 # script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
 
@@ -92,24 +88,10 @@ gw <- merge.loci.segs(loci, segs)
 # Load permutation results
 perms <- load.perms(perm.res.in)
 
-# Plot overlap with known genomic disorders
-pdf(paste(out.prefix, "seg_permutations.gd_overlap.pdf", sep="."),
-    height=2.2, width=2.6)
-plot.seg.perms(gw, perms, feature="any_gd", measure="sum", n.bins=50,
-               x.title="Known Genomic Disorders",
-               diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.6))
-dev.off()
 
-# Plot number of genes
-pdf(paste(out.prefix, "seg_permutations.n_genes.mean.pdf", sep="."),
-    height=2.2, width=2.4)
-plot.seg.perms(gw, perms, feature="n_genes", measure="mean", n.bins=50, 
-               x.title="Mean Genes per Segment", 
-               diamond.cex=1.25, parmar=c(2.2, 2, 0, 0.6))
-dev.off()
-pdf(paste(out.prefix, "seg_permutations.n_genes.median.pdf", sep="."),
-    height=2.2, width=2.4)
-plot.seg.perms(gw, perms, feature="n_genes", measure="median", n.bins=50, 
-               x.title="Median Genes per Segment", 
-               diamond.cex=1.25, parmar=c(2.2, 2, 0, 0.6))
-dev.off()
+plot.seg.perms(gw, perms, feature="n_HPOmatched_genes", measure="sum", n.bins=50,
+               x.title="HPO-Matched Genes",
+               diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.6))
+
+
+

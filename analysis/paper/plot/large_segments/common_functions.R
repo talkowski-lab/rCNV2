@@ -302,6 +302,12 @@ plot.seg.perms <- function(gw, perms, feature, measure, n.bins=100,
                        which(colnames(df)==feature)]),
         "DUP" = sum(df[which(df$cnv=="DUP"), 
                        which(colnames(df)==feature)]))
+    }else if(measure == "frac.any"){
+      c("ALL" = length(df[, which(colnames(df)==feature)] > 0) / nrow(df),
+        "DEL" = length(df[which(df$cnv=="DEL"), 
+                       which(colnames(df)==feature)] > 0) / length(which(df$cnv=="DEL")),
+        "DUP" = length(df[which(df$cnv=="DUP"), 
+                       which(colnames(df)==feature)] > 0) / length(which(df$cnv=="DUP")))
     }
   }))
   # Convert boolean gw.dat column back to numeric, if needed
@@ -321,6 +327,10 @@ plot.seg.perms <- function(gw, perms, feature, measure, n.bins=100,
     gw.dat <- c("ALL" = sum(gw.vals, na.rm=T),
                 "DEL" = sum(gw.vals[which(gw$cnv=="DEL")], na.rm=T),
                 "DUP" = sum(gw.vals[which(gw$cnv=="DUP")], na.rm=T))
+  }else if(measure == "frac.any"){
+    gw.dat <- c("ALL" = length(which(gw.vals > 0)) / length(gw.vals),
+                "DEL" = length(which(gw.vals[which(gw$cnv=="DEL")] > 0)) / length(which(gw$cnv=="DEL")),
+                "DUP" = length(which(gw.vals[which(gw$cnv=="DUP")] > 0)) / length(which(gw$cnv=="DUP")))
   }
   val.range <- range(rbind(perm.dat, gw.dat), na.rm=T)
   val.range <- c(floor(val.range[1]), ceiling(1.25*val.range[2]))

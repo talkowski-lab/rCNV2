@@ -50,7 +50,7 @@ def custom_shuffle(segs, seed, genome, whitelist=None, coords_colname='coords'):
         x.name = '_'.join(['perm' + str(seed), x.name])
         return x
 
-    # Use +seed for DEL and -seed for DUP
+    # Shuffle DEL and DUP separately using +seed for DEL and -seed for DUP
     # This ensures non-overlapping intervals within CNV types (DEL vs DEL)
     # But allows for overlapping CNV intervalls between CNV types (DEL vs DUP)
     if whitelist is not None:

@@ -15,7 +15,7 @@ import pybedtools as pbt
 import argparse
 from os.path import splitext
 from sys import stdout
-from athena.utils import bgzip
+import subprocess
 
 
 def load_blocks(blocks_in):
@@ -38,27 +38,55 @@ def load_blocks(blocks_in):
     return blocks_dict
 
 
-def shuffle_blocks(blocks, univ_df, univ_bt, seed):
+def shuffle_blocks(blocks, univ_df, univ_bt, seed, genome=None, quiet=False):
     """
     Randomly shuffle a dict of colinear gene blocks (output by load_blocks)
     Return: pd.DataFrame of shuffled blocks (matches args.blocks format)
     """
 
-    # Defines 2 x len(blocks) candidate starting points for seed
-    index_genes = univ_df.sample(n=2*len(blocks), random_state=seed)
-    used_del_genes = []
-    used_dup_genes = []
+    dist_bt_colnames = 'chrom start end gene chromB startB endB geneB dist'.split()
+    newgene_dict = {bid : {'cnv' : bvals['cnv']} for bid, bvals in blocks.items()}
+
+    # Defines 4 x len(blocks) candidate starting points for seed
+    # (Need to sample more than len(blocks) due to possibility of collisions)
+    index_genes = univ_df.sample(n=4*len(blocks), random_state=seed)
+    index_genes.reset_index(inplace=True)
+    index_genes.drop(columns='index', inplace=True)
+    used_genes = {'DEL' : [], 'DUP' : []}
+    k=0
 
     for bid, bvals in blocks.items():
+        cnv = bvals['cnv']
         ngenes = bvals['n_genes']
-        # Select new index gene
-        blocks.sample
+        
+        if ngenes == 0:
+            newgene_dict[bid]['genes'] = ''
+            continue
 
-    # def _seed_prefix(x, seed):
-    #     x.name = '_'.join(['perm' + str(seed), x.name])
-    #     return x
+        keep_sampling = True
+        while keep_sampling:
+            index_gene_bt = pbt.BedTool.from_dataframe(index_genes.loc[[k]])
+            k += 1
+            if genome is not None:
+                cbt = index_gene_bt.closest(univ_bt, k=ngenes, g=genome)
+            else:
+                ichrom = index_gene_bt[0].chrom
+                cbt = index_gene_bt.closest(univ_bt.filter(lambda x: x.chrom == ichrom), k=ngenes)
+            newgenes = [x[7] for x in cbt]
 
-    import pdb; pdb.set_trace()
+            if len(set(newgenes).intersection(set(used_genes[cnv]))) > 0:
+                if not quiet:
+                    print('Overlapping gene collision for ' + bid + '; retrying...')
+            else:
+                keep_sampling = False
+
+        used_genes[cnv] += newgenes
+        newgene_dict[bid]['genes'] = ';'.join(sorted(newgenes))
+
+    newgenes_df = pd.DataFrame.from_dict(newgene_dict, orient='index')
+    newgenes_df['#region_id'] = newgenes_df.index.map(lambda x: '_'.join(['perm' + str(seed), x]))
+
+    return newgenes_df.reset_index().loc[:, '#region_id cnv genes'.split()]
 
 
 def main():
@@ -70,7 +98,7 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('blocks', help='TSV of gene blocks to be shuffled. Requires ' +
+    parser.add_argument('blocks', help='tsv of gene blocks to be shuffled. Requires ' +
                         'three columns: block id, cnv type, and semicolon-delimited ' +
                         'list of the genes to be shuffled.')
     parser.add_argument('genes', help='BED4 of all genes with coordinates.')
@@ -81,10 +109,10 @@ def main():
     parser.add_argument('-s', '--first-seed', type=int, default=1, help='Integer ' +
                         'seed passed to the first permutation. Will be incremented ' +
                         'successively for each subsequent permutation.')
-    parser.add_argument('-o', '--outfile', help='Path to output BED file. [default: ' +
+    parser.add_argument('-o', '--outfile', help='Path to output tsv file. [default: ' +
                         'stdout]', default='stdout')
-    parser.add_argument('-z', '--bgzip', action='store_true', help='Compress ' + 
-                        'output BED files with bgzip. [Default: do not compress]')
+    parser.add_argument('-z', '--gzip', action='store_true', help='Compress ' + 
+                        'output tsv file with gzip. [Default: do not compress]')
     parser.add_argument('-q', '--quiet', action='store_true', help='Suppress ' +
                         'verbose output.')
     args = parser.parse_args()
@@ -109,20 +137,19 @@ def main():
     for seed in range(args.first_seed, args.first_seed + args.n_perms):
         if not args.quiet:
             print('Starting permutation {}'.format(seed))
-        shuffled_blocks = shuffle_blocks(blocks, univ_df, univ_bt, seed=seed)
-    #     shuffled_bt = custom_shuffle(segs, seed, args.genome, args.whitelist, 
-    #                                  coords_colname=coords_colname)
-    #     if seed == args.first_seed:
-    #         shuffled_bt.to_csv(outfile, sep='\t', na_rep='NA', header=True, 
-    #                            index=False, mode='w')
-    #     else:
-    #         shuffled_bt.to_csv(outfile, sep='\t', na_rep='NA', header=False, 
-    #                            index=False, mode='a')
-    # outfile.close()
+        shuffled_blocks = shuffle_blocks(blocks, univ_df, univ_bt, seed=seed,
+                                         genome=args.genome, quiet=args.quiet)
+        if seed == args.first_seed:
+            shuffled_blocks.to_csv(outfile, sep='\t', na_rep='NA', header=True, 
+                                   index=False, mode='w')
+        else:
+            shuffled_blocks.to_csv(outfile, sep='\t', na_rep='NA', header=False, 
+                                   index=False, mode='a')
+    outfile.close()
 
-    # # Bgzip, if optioned
-    # if args.bgzip:
-    #     bgzip(outfile_path)
+    # Gzip, if optioned
+    if args.gzip:
+        subprocess.run(['gzip', '-f', outfile_path])
 
 
 if __name__ == '__main__':
