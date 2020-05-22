@@ -64,7 +64,7 @@ rcnv.config <- opts$`rcnv-config`
 # # DEV PARAMETERS
 # loci.in <- "~/scratch/rCNV.final_segments.loci.bed.gz"
 # segs.in <- "~/scratch/rCNV2_analysis_d1.master_segments.bed.gz"
-# perm.res.in <- "~/scratch/gene_perm_test.annotated.tsv.gz"
+# perm.res.in <- "~/scratch/rCNV2_analysis_d1.10000_permuted_segments_bygene.tsv.gz"
 # out.prefix <- "~/scratch/test_perm_bygene"
 # rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
 # script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
@@ -88,10 +88,54 @@ gw <- merge.loci.segs(loci, segs)
 # Load permutation results
 perms <- load.perms(perm.res.in)
 
+# Fraction of segments with at least one HPO-matched gene & avg. HPO-matched genes per seg
+print("Fraction of segments with at least one HPO-matched gene:")
+pdf(paste(out.prefix, "seg_permutations.HPOmatched_genes.frac_any.pdf", sep="."),
+    height=2.2, width=2.4)
+plot.seg.perms(gw, perms, feature="n_HPOmatched_genes", measure="frac.any", n.bins=15,
+               x.title="Pct. w/HPO-Matched Gene", 
+               diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.8))
+dev.off()
+print("Mean HPO-matched genes per segment:")
+pdf(paste(out.prefix, "seg_permutations.HPOmatched_genes.mean.pdf", sep="."),
+    height=2.2, width=2.4)
+plot.seg.perms(gw, perms, feature="n_HPOmatched_genes", measure="mean", n.bins=30,
+               x.title="Mean HPO-Matched Genes", 
+               diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.8))
+dev.off()
 
-plot.seg.perms(gw, perms, feature="n_HPOmatched_genes", measure="sum", n.bins=50,
-               x.title="HPO-Matched Genes",
-               diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.6))
+# Fraction of segments with at least one constrained gene
+print("Fraction of segments with at least one constrained gene:")
+pdf(paste(out.prefix, "seg_permutations.constrained_genes.frac_any.pdf", sep="."),
+    height=2.2, width=2.4)
+plot.seg.perms(gw, perms, feature="n_gnomAD_constrained_genes", measure="frac.any", n.bins=15,
+               x.title="Pct. w/Constrained Gene", 
+               diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.8))
+dev.off()
+print("Mean constrained genes per segment:")
+pdf(paste(out.prefix, "seg_permutations.constrained_genes.mean.pdf", sep="."),
+    height=2.2, width=2.4)
+plot.seg.perms(gw, perms, feature="n_gnomAD_constrained_genes", measure="mean", n.bins=30,
+               x.title="Mean Constrained Genes", 
+               diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.8))
+dev.off()
 
-
+# Fraction of neuro segments with at least one DECIPHER gene
+neuro.seg.ids <- gw$region_id[which(unlist(lapply(gw$hpos, function(hpos){any(hpos %in% neuro.hpos)})))]
+print("Fraction of neuro segments with at least one DECIPHER LoF gene:")
+pdf(paste(out.prefix, "seg_permutations.neuro_only.DECIPHER_LoF_genes.frac_any.pdf", sep="."),
+    height=2.2, width=2.4)
+plot.seg.perms(gw, perms, feature="n_DECIPHER_LoF_genes", measure="frac.any", 
+               subset_to_regions=neuro.seg.ids, n.bins=15,
+               x.title="Pct. w/LoF DECIPHER Gene", 
+               diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.8))
+dev.off()
+print("Fraction of neuro segments with at least one DECIPHER GoF gene:")
+pdf(paste(out.prefix, "seg_permutations.neuro_only.DECIPHER_GoF_genes.frac_any.pdf", sep="."),
+    height=2.2, width=2.4)
+plot.seg.perms(gw, perms, feature="n_DECIPHER_GoF_genes", measure="frac.any", 
+               subset_to_regions=neuro.seg.ids, n.bins=30,
+               x.title="Pct. w/GoF DECIPHER Gene", 
+               diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.8))
+dev.off()
 

@@ -186,3 +186,22 @@ robust.lm <- function(x, y, conf=0.95){
   return(list("fit" = fit, "ci" = pred.out))
 }
 
+# Fit exponential decay to a list of points
+fit.exp.decay <- function(x, y){
+  # Following example on https://rpubs.com/mengxu/exponential-model
+  
+  train.df <- data.frame("x"=as.numeric(x), 
+                         "y"=as.numeric(y))
+  train.df <- train.df[which(train.df$y > 0), ]
+  
+  # Estimate initial parameters
+  theta.0 <- 0.5 * min(train.df$y)
+  model.0 <- lm(log(y - theta.0) ~ x, data=train.df)
+  alpha.0 <- exp(coef(model.0)[1])
+  beta.0 <- coef(model.0)[2]
+  start <- list(alpha = alpha.0, beta = beta.0, theta = theta.0)
+  
+  # Re-fit the model with estimated starting parameters
+  return(nls(y ~ alpha * exp(beta * x) + theta, start = start, data=train.df,
+             control=nls.control(maxiter=1000, warnOnly=T)))
+}

@@ -29,9 +29,10 @@ workflow segment_permutation {
         perm_prefix="${perm_prefix}.bygene.starting_seed_${seed}",
         rCNV_bucket=rCNV_bucket
     }
+    # Annotate separately to allow for caching of permutation step
     call annotate_shard {
       input:
-        perm_table=perm_shard.perm_table,
+        perm_table=perm_shard_bygene.perm_table,
         perm_prefix="${perm_prefix}.bygene.starting_seed_${seed}",
         rCNV_bucket=rCNV_bucket
     }
@@ -39,7 +40,7 @@ workflow segment_permutation {
 
   call merge_perms {
     input:
-      perm_tables=annotate_shard.annotated_table,
+      annotated_tables=annotate_shard.annotated_table,
       perm_prefix="${perm_prefix}.${total_n_perms}_permuted_segments_bygene",
       rCNV_bucket=rCNV_bucket
   }
@@ -59,7 +60,7 @@ task enumerate_seeds {
   >>>
 
   runtime {
-    # docker: "talkowski/rcnv@sha256:af27d859af7d4675ae014cb66d1f48bc8ceb7033d4f25677cfc8ec6baac47751"
+    docker: "talkowski/rcnv@sha256:82b781b4374b85258457084abe4ca7b9d12c4f9b64471b7f336fc16279f742fb"
     preemptible: 1
   }
 
@@ -85,6 +86,9 @@ task perm_shard_bygene {
       ${rCNV_bucket}/refs/GRCh37.autosomes.genome \
       ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.all_features.bed.gz \
       refs/
+    gsutil -m cp \
+      ${rCNV_bucket}/results/segment_association/* \
+      ./
 
     # Reformat gene coordinates
     zcat refs/gencode.v19.canonical.pext_filtered.all_features.bed.gz \
@@ -105,7 +109,7 @@ task perm_shard_bygene {
   >>>
 
   runtime {
-    # docker: "talkowski/rcnv@sha256:77adc010fe1501bf69f75988e7251f2a7b1c80fa266a9caea3a4b6f87ea3ff0f"
+    docker: "talkowski/rcnv@sha256:82b781b4374b85258457084abe4ca7b9d12c4f9b64471b7f336fc16279f742fb"
     preemptible: 1
   }
 
@@ -125,8 +129,8 @@ task annotate_shard {
     set -e
 
     # Localize necessary references
-    gsutil -m cp \
-      ${rCNV_bucket}/cleaned_data/gene_lists \
+    gsutil -m cp -r \
+      ${rCNV_bucket}/cleaned_data/genes/gene_lists \
       ./
     mkdir refs
     gsutil -m cp \
@@ -137,17 +141,15 @@ task annotate_shard {
       ./
 
     # Build necessary inputs
-    cat << EOF > genelists_to_annotate.tsv
-gnomAD_constrained${TAB}gene_lists/gnomad.v2.1.1.lof_constrained.genes.list
-gnomAD_tolerant${TAB}gene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list
-CLinGen_HI${TAB}gene_lists/ClinGen.hmc_haploinsufficient.genes.list
-CLinGen_TS${TAB}gene_lists/ClinGen.hmc_triplosensitive.genes.list
-DECIPHER_LoF${TAB}gene_lists/DDG2P.hmc_lof.genes.list
-DECIPHER_GoF${TAB}gene_lists/DDG2P.hmc_gof.genes.list
-OMIM${TAB}gene_lists/HP0000118.HPOdb.genes.list
-EOF
+    echo -e "gnomAD_constrained\tgene_lists/gnomad.v2.1.1.lof_constrained.genes.list" > genelists_to_annotate.tsv
+    echo -e "gnomAD_tolerant\tgene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list" >> genelists_to_annotate.tsv
+    echo -e "CLinGen_HI\tgene_lists/ClinGen.hmc_haploinsufficient.genes.list" >> genelists_to_annotate.tsv
+    echo -e "CLinGen_TS\tgene_lists/ClinGen.hmc_triplosensitive.genes.list" >> genelists_to_annotate.tsv
+    echo -e "DECIPHER_LoF\tgene_lists/DDG2P.hmc_lof.genes.list" >> genelists_to_annotate.tsv
+    echo -e "DECIPHER_GoF\tgene_lists/DDG2P.hmc_gof.genes.list" >> genelists_to_annotate.tsv
+    echo -e "OMIM\tgene_lists/HP0000118.HPOdb.genes.list" >> genelists_to_annotate.tsv
     while read nocolon hpo; do
-      echo -e "${hpo}\tgene_lists/${nocolon}.HPOdb.genes.list"
+      echo -e "$hpo\tgene_lists/$nocolon.HPOdb.genes.list"
     done < refs/test_phenotypes.list \
     > hpo_genelists.tsv
     zcat rCNV.final_segments.loci.bed.gz \
@@ -162,11 +164,11 @@ EOF
       --segment-hpos segment_hpos.tsv \
       --outfile ${perm_prefix}.annotated.tsv.gz \
       --gzip \
-      ${perm_prefix}.tsv.gz
+      ${perm_table}
   >>>
 
   runtime {
-    # docker: "talkowski/rcnv@sha256:77adc010fe1501bf69f75988e7251f2a7b1c80fa266a9caea3a4b6f87ea3ff0f"
+    docker: "talkowski/rcnv@sha256:82b781b4374b85258457084abe4ca7b9d12c4f9b64471b7f336fc16279f742fb"
     preemptible: 1
   }
 
@@ -200,12 +202,12 @@ task merge_perms {
 
     # Copy to rCNV bucket
     gsutil -m cp \
-      ${perm_prefix}.bed.gz \
+      ${perm_prefix}.tsv.gz \
       ${rCNV_bucket}/analysis/paper/data/large_segments/permutations/
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:77adc010fe1501bf69f75988e7251f2a7b1c80fa266a9caea3a4b6f87ea3ff0f"
+    docker: "talkowski/rcnv@sha256:82b781b4374b85258457084abe4ca7b9d12c4f9b64471b7f336fc16279f742fb"
     preemptible: 1
     disks: "local-disk 200 SSD"
   }

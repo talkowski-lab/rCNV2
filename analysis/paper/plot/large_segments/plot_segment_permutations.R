@@ -95,21 +95,21 @@ perms <- load.perms(perm.res.in)
 # Plot overlap with known genomic disorders
 pdf(paste(out.prefix, "seg_permutations.gd_overlap.pdf", sep="."),
     height=2.2, width=2.6)
-plot.seg.perms(gw, perms, feature="any_gd", measure="sum", n.bins=50,
+plot.seg.perms(gw, perms, feature="any_gd", measure="sum", n.bins=30,
                x.title="Known Genomic Disorders",
-               diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.6))
+               diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.8))
 dev.off()
 
 # Plot number of genes
 pdf(paste(out.prefix, "seg_permutations.n_genes.mean.pdf", sep="."),
     height=2.2, width=2.4)
-plot.seg.perms(gw, perms, feature="n_genes", measure="mean", n.bins=50, 
+plot.seg.perms(gw, perms, feature="n_genes", measure="mean", n.bins=30, 
                x.title="Mean Genes per Segment", 
                diamond.cex=1.25, parmar=c(2.2, 2, 0, 0.6))
 dev.off()
 pdf(paste(out.prefix, "seg_permutations.n_genes.median.pdf", sep="."),
     height=2.2, width=2.4)
-plot.seg.perms(gw, perms, feature="n_genes", measure="median", n.bins=50, 
+plot.seg.perms(gw, perms, feature="n_genes", measure="median", n.bins=30, 
                x.title="Median Genes per Segment", 
                diamond.cex=1.25, parmar=c(2.2, 2, 0, 0.6))
 dev.off()

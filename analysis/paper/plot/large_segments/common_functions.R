@@ -279,10 +279,15 @@ gw.swarm <- function(gw, x.bool, y, cnv.split=TRUE, ylims=NULL,
 }
 
 # Function to plot segment permutation test results
-plot.seg.perms <- function(gw, perms, feature, measure, n.bins=100, 
+plot.seg.perms <- function(gw, perms, feature, measure, 
+                           subset_to_regions=NULL, n.bins=100, min.bins=10,
                            x.title=NULL, xlims=NULL,
                            diamond.cex=1.5, parmar=c(2.25, 2, 0.5, 0.5)){
   # Get plot data
+  if(!is.null(subset_to_regions)){
+    gw <- gw[which(gw$region_id %in% subset_to_regions), ]
+    perms <- lapply(perms, function(df){df[which(df$region_id %in% subset_to_regions), ]})
+  }
   perm.dat <- do.call("rbind", lapply(perms, function(df){
     if(measure == "mean"){
       c("ALL" = mean(df[, which(colnames(df)==feature)], na.rm=T),
@@ -293,9 +298,9 @@ plot.seg.perms <- function(gw, perms, feature, measure, n.bins=100,
     }else if(measure == "median"){
       c("ALL" = median(df[, which(colnames(df)==feature)], na.rm=T),
         "DEL" = median(df[which(df$cnv=="DEL"), 
-                        which(colnames(df)==feature)], na.rm=T),
+                          which(colnames(df)==feature)], na.rm=T),
         "DUP" = median(df[which(df$cnv=="DUP"), 
-                        which(colnames(df)==feature)], na.rm=T))
+                          which(colnames(df)==feature)], na.rm=T))
     }else if(measure == "sum"){
       c("ALL" = sum(df[, which(colnames(df)==feature)]),
         "DEL" = sum(df[which(df$cnv=="DEL"), 
@@ -303,11 +308,10 @@ plot.seg.perms <- function(gw, perms, feature, measure, n.bins=100,
         "DUP" = sum(df[which(df$cnv=="DUP"), 
                        which(colnames(df)==feature)]))
     }else if(measure == "frac.any"){
-      c("ALL" = length(df[, which(colnames(df)==feature)] > 0) / nrow(df),
-        "DEL" = length(df[which(df$cnv=="DEL"), 
-                       which(colnames(df)==feature)] > 0) / length(which(df$cnv=="DEL")),
-        "DUP" = length(df[which(df$cnv=="DUP"), 
-                       which(colnames(df)==feature)] > 0) / length(which(df$cnv=="DUP")))
+      hits <- which(df[, which(colnames(df)==feature)] > 0)
+      100 * c("ALL" = length(hits) / nrow(df),
+              "DEL" = length(intersect(hits, which(df$cnv=="DEL"))) / length(which(df$cnv=="DEL")),
+              "DUP" = length(intersect(hits, which(df$cnv=="DUP"))) / length(which(df$cnv=="DUP")))
     }
   }))
   # Convert boolean gw.dat column back to numeric, if needed
@@ -328,32 +332,42 @@ plot.seg.perms <- function(gw, perms, feature, measure, n.bins=100,
                 "DEL" = sum(gw.vals[which(gw$cnv=="DEL")], na.rm=T),
                 "DUP" = sum(gw.vals[which(gw$cnv=="DUP")], na.rm=T))
   }else if(measure == "frac.any"){
-    gw.dat <- c("ALL" = length(which(gw.vals > 0)) / length(gw.vals),
-                "DEL" = length(which(gw.vals[which(gw$cnv=="DEL")] > 0)) / length(which(gw$cnv=="DEL")),
-                "DUP" = length(which(gw.vals[which(gw$cnv=="DUP")] > 0)) / length(which(gw$cnv=="DUP")))
+    gw.dat <- 100 * c("ALL" = length(which(gw.vals > 0)) / length(gw.vals),
+                      "DEL" = length(which(gw.vals[which(gw$cnv=="DEL")] > 0)) / length(which(gw$cnv=="DEL")),
+                      "DUP" = length(which(gw.vals[which(gw$cnv=="DUP")] > 0)) / length(which(gw$cnv=="DUP")))
   }
-  val.range <- range(rbind(perm.dat, gw.dat), na.rm=T)
-  val.range <- c(floor(val.range[1]), ceiling(1.25*val.range[2]))
-  if(val.range[2] - val.range[1] <= n.bins & 
-     length(unique(as.numeric(perm.dat))) <= n.bins){
-    bins <- val.range[1]:val.range[2]
+  val.range <- range(perm.dat, na.rm=T)
+  val.range <- c(floor(val.range[1]), ceiling(val.range[2]))
+  unique.vals <- length(unique(as.numeric(perm.dat)))
+  if(unique.vals <= min.bins){
+    bins <- seq(val.range[1], val.range[2], length.out=min.bins)
+  }else if(unique.vals <= n.bins){
+   bins <- seq(val.range[1], val.range[2], length.out=floor(unique.vals/2))
+  # }else if(val.range[2] - val.range[1] <= n.bins){
+  #   bins <- val.range[1]:val.range[2]
   }else{
     bins <- seq(val.range[1], val.range[2], length.out=n.bins)
   }
   bin.width <- bins[2]-bins[1]
   if(is.null(xlims)){
-    xlims <- range(bins)
+    xrange <- range(rbind(perm.dat, gw.dat), na.rm=T)
+    xlims <- c(xrange[1], 1.25 * xrange[2])
   }
   perm.means <- apply(perm.dat, 2, mean, na.rm=T)
-  perm.hists <- as.data.frame(apply(perm.dat, 2, function(vals){hist(vals, breaks=bins, plot=F)$counts}))
   perm.pvals <- sapply(1:3, function(i){calc.perm.p(perm.vals=perm.dat[, i], obs.val=gw.dat[i])})
   
   # Helper function to add a single mirrored violin-histogram hybrid of values to an existing plot
-  plot.viohist <- function(values, bins, y.at, width=0.8, 
+  plot.viohist <- function(perm.dat.vals, bins, y.at, width=0.8, 
                            obs.val=NA, obs.color=NA, obs.border=NA, 
                            color=bluewhite, border=blueblack,
                            diamond.cex=4, y.title=NULL){
-    values[which(values==0)] <- NA
+    perm.hist <- hist(perm.dat.vals, breaks=bins, plot=F)
+    values <- perm.hist$counts
+    # Convert zero-bins to NAs for the outermost 5% of the distribution
+    outer.lims <- quantile(perm.dat.vals, probs=c(0.025, 0.975), na.rm=T)
+    outer.zero.bins <- intersect(which(perm.hist$mids < outer.lims[1] | perm.hist$mids > outer.lims[2]),
+                                 which(values==0))
+    values[outer.zero.bins] <- NA
     values <- values / (max(values, na.rm=T) * 2/width)
     rect(xleft=bins[-length(bins)], xright=bins[-1],
          ybottom=-values + y.at, ytop=values + y.at, 
@@ -392,7 +406,7 @@ plot.seg.perms <- function(gw, perms, feature, measure, n.bins=100,
   plot(NA, xlim=xlims, ylim=c(3, 0), type="n",
        xaxt="n", yaxt="n", xlab="", ylab="")
   sapply(1:3, function(i){
-    plot.viohist(perm.hists[, i], bins, i-0.5,
+    plot.viohist(perm.dat[, i], bins, i-0.5,
                  color=vio.colors[i], border=vio.borders[i],
                  y.title=row.labels[i], diamond.cex=diamond.cex, obs.val=gw.dat[i], 
                  obs.color=row.colors[i], obs.border=row.borders[i])
@@ -412,3 +426,4 @@ plot.seg.perms <- function(gw, perms, feature, measure, n.bins=100,
   })
   mtext(1, text=x.title, line=1.2)
 }
+
