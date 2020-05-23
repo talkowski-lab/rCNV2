@@ -10,7 +10,7 @@
 
 # Master parameters and common functions for rCNV2 manuscript formalized secondary analyses
 
-options(scipen=1000, stringsAsFactors=F)
+options(scipen=1000, stringsAsFactors=F, family="sans")
 
 
 ########
@@ -71,6 +71,8 @@ pheno.abbrevs <- c("Mixed", "Neuro.", "Non-Neuro.")
 ##########
 # COLORS #
 ##########
+graphabs.green <- "#027831"
+gw.sig.color <- "#FFB533"
 blueblack <- "#003F6A"
 redblack <- "#4F1C14"
 purpleblack <- "#3F2759"

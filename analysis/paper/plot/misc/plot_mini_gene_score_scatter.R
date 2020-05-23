@@ -44,7 +44,7 @@ plot.mini.scatter <- function(scores, n.points=1000, seed=2020){
   set.seed(seed)
   scores <- scores[sample(1:nrow(scores), n.points, replace=F), ]
   # Prep plot area
-  par(mar=c(1.2, 1.2, 0.2, 0.2), bty="n", bg=NA)
+  par(mar=c(1.1, 1.1, 0.2, 0.2), bty="n", bg=NA)
   plot(NA, xlim=c(0, 1), ylim=c(0, 1),
        xaxs="i", xlab="", xaxt="n",
        yaxs="i", ylab="", yaxt="n")
@@ -117,6 +117,6 @@ if(!is.null(rcnv.config)){
 scores <- load.scores(scores.in)
 
 # Plot scores
-png(out.png, height=1.1*300, width=1.1*300, res=300)
+png(out.png, height=1.15*300, width=1.15*300, res=300, family="sans")
 plot.mini.scatter(scores, n.points=1250)
 dev.off()
