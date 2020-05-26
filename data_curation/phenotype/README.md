@@ -36,7 +36,7 @@ For the UK BioBank dataset, all phenotypes were encoded in [ICD-10 format](https
 
 Given the scope of analyses in this study, we reduced the 19,153 unique ICD-10 codes to a smaller subset relevant to this study. This was accomplished through:
 1. Automated filtering (`prune_ukbb_icd10_dictionary.py`) to isolate ICD-10 codes with a cohort prevalance of at least 0.01% but no greater than 5%
-2. Manual review by a physician to further identify terms unlikely to have a strong genetic component (e.g., infectious .  
+2. Manual review by a physician to further identify terms unlikely to have a strong genetic component.  
 
 Afterwards, phenotypes for each sample were converted from ICD-10 to plain-text indications with `icd10_to_indication.py`.  
 
@@ -46,7 +46,7 @@ Once converted to plain-text indications, UK BioBank samples were subjected to i
 
 After assigning HPO terms to each sample, we next reduced the number of HPO terms used in this study to those with appreciable sample size and those that were partially non-overlapping with other related HPO terms.
 
-After tabulating the number of samples matching each HPO code, we retained all HPO terms with at least 1,000 samples. 
+After tabulating the number of samples matching each HPO code, we retained all HPO terms with at least 2,000 samples. 
 
 We next compared shared sample memberships between all pairs of hierarchically related HPO terms:
  * If fewer than 2,000 samples differed between a pair of HPO terms, we retained the more general (i.e., higher-level) term, and excluded the more specific (i.e., lower-level) term.
@@ -54,7 +54,7 @@ We next compared shared sample memberships between all pairs of hierarchically r
 
  Finally, to help control for batch-specific technical artifacts, we required that all HPO terms be represented with at least 500 samples in at least two different [metacohorts (described here)](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/#case-control-metacohorts).
 
-This process yielded a condensed hierarchical phenotype classification system with 30 distinct HPO terms (including healthy controls), each which had ≥ 1,000 samples in total, ≥ 500 samples from at least two different metacohorts and differed from any related HPO terms by at least 2,000 distinct samples.  
+This process yielded a condensed hierarchical phenotype classification system with 30 distinct HPO terms (including healthy controls), each which had ≥ 2,000 samples in total, ≥500 samples from at least two different metacohorts and differed from any related HPO terms by at least 2,000 distinct samples.  
 
 The code to perform this HPO consolidation process described above is also contained in `convert_phenotypes_to_hpo.sh`    
 

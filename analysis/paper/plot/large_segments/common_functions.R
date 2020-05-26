@@ -110,6 +110,18 @@ gw.scatter <- function(gw, x, y, xlims=NULL, ylims=NULL, add.lm=T,
   # Prep plot area
   par(mar=parmar)
   plot(NA, xlim=xlims, ylim=ylims, xlab="", ylab="", xaxt="n", yaxt="n")
+  rect(xleft=par("usr")[1], xright=par("usr")[2],
+       ybottom=par("usr")[3], ytop=par("usr")[4],
+       border=NA, bty="n", col=bluewhite)
+  
+  # Add gridlines
+  if(is.null(x.at)){
+    x.at <- axTicks(1)
+  }
+  if(is.null(y.at)){
+    y.at <- axTicks(2)
+  }
+  abline(v=x.at, h=y.at, col="white")
   
   # Add linear fits, if optioned
   if(add.lm==T){
@@ -129,12 +141,6 @@ gw.scatter <- function(gw, x, y, xlims=NULL, ylims=NULL, add.lm=T,
   points(x, y, pch=21, bg=gw$color, col=gw$black)
   
   # Add axis ticks
-  if(is.null(x.at)){
-    x.at <- axTicks(1)
-  }
-  if(is.null(y.at)){
-    y.at <- axTicks(2)
-  }
   axis(1, at=x.at, labels=NA, tck=-0.03, col=blueblack)
   axis(2, at=y.at, labels=NA, tck=-0.03, col=blueblack)
   
@@ -275,6 +281,55 @@ gw.swarm <- function(gw, x.bool, y, cnv.split=TRUE, ylims=NULL,
       axis(3, at=c(0.5, 1.5), tck=0.03, col=blueblack, labels=NA, line=0.5)
       mtext(3, text=format.pval(pval), line=0.5)
     }
+  }
+}
+
+# Simpler generic vioplot/swarmplot hybrid for showing distribution of values split by DEL & DUP
+gw.simple.vioswarm <- function(gw, y, add.y.axis=T, ytitle=NULL, 
+                               parmar=c(1.3, 3, 0.3, 0.3)){
+  # Load necessary libraries
+  require(vioplot, quietly=T)
+  require(beeswarm, quietly=T)
+  
+  # Get plot data
+  ylims <- range(y, na.rm=T)
+  plot.dat <- lapply(c("DEL", "DUP"), function(cnv){y[which(gw$cnv==cnv)]})
+  pt.colors <- lapply(c("DEL", "DUP"), function(cnv){gw$color[which(gw$cnv==cnv)]})
+  pt.borders <- lapply(c("DEL", "DUP"), function(cnv){gw$black[which(gw$cnv==cnv)]})
+  
+  # Prep plot area
+  par(mar=parmar, bty="n")
+  plot(NA, xlim=c(0, 2), ylim=ylims,
+       xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i")
+  
+  # Add violins & swarms
+  sapply(1:2, function(x){
+    vioplot(plot.dat[[x]], at=x-0.5, add=T, wex=0.8, 
+            drawRect=F, col=cnv.whites[x], border=cnv.blacks[x])
+    segments(x0=x-0.7, x1=x-0.3, 
+             y0=median(plot.dat[[x]], na.rm=T),
+             y1=median(plot.dat[[x]], na.rm=T),
+             lend="round", lwd=2, col=cnv.blacks[x])
+    # boxplot(plot.dat[[x]], at=x-0.5, col=cnv.blacks[x], lty=1, outline=F,
+    #         staplewex=0, add=T, boxwex=0.2)
+    beeswarm(plot.dat[[x]], at=x-0.5, add=T, corralWidth=0.8, corral="wrap",
+             pch=21, pwbg=pt.colors[[x]], pwcol=pt.borders[[x]])
+  })
+  
+  # Add x-axis
+  sapply(1:2, function(x){
+    axis(1, at=x-c(0.1, 0.9), tck=0, labels=NA, col=blueblack)
+    axis(1, at=x-0.5, line=-0.9, labels=c("DEL", "DUP")[x], tick=F)
+  })
+  
+  # Add automatic Y-axis, if optioned
+  if(add.y.axis==T){
+    y.at <- axTicks(2)
+    axis(2, at=y.at, labels=NA, tck=-0.03, col=blueblack)
+    sapply(1:length(y.at), function(i){
+      axis(2, at=y.at[i], labels=y.at[i], tick=F, line=-0.6, las=2)
+    })
+    mtext(2, text=ytitle, line=1.75)
   }
 }
 

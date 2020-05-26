@@ -73,6 +73,7 @@ pheno.abbrevs <- c("Mixed", "Neuro.", "Non-Neuro.")
 ##########
 graphabs.green <- "#027831"
 gw.sig.color <- "#FFB533"
+ns.color="gray70"
 blueblack <- "#003F6A"
 redblack <- "#4F1C14"
 purpleblack <- "#3F2759"
