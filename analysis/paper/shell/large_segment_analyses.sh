@@ -29,6 +29,7 @@ gsutil -m cp \
   ${rCNV_bucket}/cleaned_data/binned_genome/GRCh37.200kb_bins_10kb_steps.raw.bed.gz \
   ${rCNV_bucket}/refs/GRCh37.autosomes.genome \
   ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
+  ${rCNV_bucket}/analysis/paper/data/misc/*_dnm_counts.tsv.gz \
   refs/
 mkdir meta_stats/
 gsutil -m cp \
@@ -101,6 +102,10 @@ while read nocolon hpo; do
   echo -e "${hpo}\tgene_lists/${nocolon}.HPOdb.genes.list"
 done < refs/test_phenotypes.list \
 > hpo_genelists.tsv
+cat << EOF > dnm_counts_to_annotate.tsv
+ASC${TAB}refs/asc_dnm_counts.tsv.gz
+DDD${TAB}refs/ddd_dnm_counts.tsv.gz
+EOF
 /opt/rCNV2/analysis/paper/scripts/large_segments/compile_segment_table.py \
   --final-loci rCNV.final_segments.loci.bed.gz \
   --hc-gds refs/lit_GDs.hc.bed.gz \
@@ -115,12 +120,29 @@ done < refs/test_phenotypes.list \
   --min-jaccard-sum 1.0 \
   --genelists genelists_to_annotate.tsv \
   --hpo-genelists hpo_genelists.tsv \
+  --dnm-tsvs dnm_counts_to_annotate.tsv \
   --gd-recip "10e-10" \
   --nahr-recip 0.25 \
   --bgzip
 gsutil -m cp \
   ${prefix}.master_segments.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/
+
+
+# Plot basic segment distributions
+if [ -e basic_distribs ]; then
+  rm -rf basic_distribs
+fi
+mkdir basic_distribs
+/opt/rCNV2/analysis/paper/plot/large_segments/plot_basic_segment_distribs.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  rCNV.final_segments.loci.bed.gz \
+  ${prefix}.master_segments.bed.gz \
+  basic_distribs/${prefix}
+/opt/rCNV2/analysis/paper/plot/large_segments/plot_seg_attributes_vs_ngenes.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  ${prefix}.master_segments.bed.gz \
+  basic_distribs/${prefix}
 
 
 # Run segment permutation tests
@@ -146,52 +168,6 @@ mkdir perm_test_plots
   perm_test_plots/${prefix}
 
 
-# # DEV: Run gene set permutation tests
-# n_perms=50
-# seed=51
-# perm_prefix="gene_perm_test"
-# # Download & format gene coordinates (note: requires permissions)
-# gsutil -m cp \
-#   ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.all_features.bed.gz \
-#   refs/
-# zcat refs/gencode.v19.canonical.pext_filtered.all_features.bed.gz \
-# | cut -f1-4 \
-# | bgzip -c \
-# > refs/gencode.v19.canonical.pext_filtered.bed.gz
-# # Permute gene blocks
-# /opt/rCNV2/analysis/paper/scripts/gene_association/shuffle_gene_blocks.py \
-#   --genome refs/GRCh37.autosomes.genome \
-#   --n-perms ${n_perms} \
-#   --first-seed ${seed} \
-#   --outfile ${perm_prefix}.tsv.gz \
-#   --gzip \
-#   <( zcat rCNV.final_segments.loci.bed.gz \
-#      | awk -v FS="\t" -v OFS="\t" '{ print $4, $5, $NF }' ) \
-#   refs/gencode.v19.canonical.pext_filtered.bed.gz
-# # Build necessary inputs for annotation
-# echo -e "gnomAD_constrained\tgene_lists/gnomad.v2.1.1.lof_constrained.genes.list" > genelist_to_annotate.tsv
-# echo -e "gnomAD_tolerant\tgene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list" >> genelist_to_annotate.tsv
-# echo -e "CLinGen_HI\tgene_lists/ClinGen.hmc_haploinsufficient.genes.list" >> genelist_to_annotate.tsv
-# echo -e "CLinGen_TS\tgene_lists/ClinGen.hmc_triplosensitive.genes.list" >> genelist_to_annotate.tsv
-# echo -e "DECIPHER_LoF\tgene_lists/DDG2P.hmc_lof.genes.list" >> genelist_to_annotate.tsv
-# echo -e "DECIPHER_GoF\tgene_lists/DDG2P.hmc_gof.genes.list" >> genelist_to_annotate.tsv
-# echo -e "OMIM\tgene_lists/HP0000118.HPOdb.genes.list" >> genelist_to_annotate.tsv
-# while read nocolon hpo; do
-#   echo -e "$hpo\tgene_lists/$nocolon.HPOdb.genes.list"
-# done < refs/test_phenotypes.list \
-# > hpo_genelists.tsv
-# zcat rCNV.final_segments.loci.bed.gz \
-# | grep -ve '^#' \
-# | awk -v FS="\t" -v OFS="\t" '{ print $4, $15 }' \
-# > segment_hpos.tsv
-# # Annotate
-# /opt/rCNV2/analysis/paper/scripts/large_segments/annotate_shuffled_seg_gene_blocks.py \
-#   --gene-sets genelists_to_annotate.forblocks.tsv \
-#   --hpo-genelists hpo_genelists.tsv \
-#   --segment-hpos segment_hpos.tsv \
-#   --outfile ${perm_prefix}.annotated.tsv.gz \
-#   --gzip \
-#   ${perm_prefix}.tsv.gz
 # Run segment permutation tests while matching on number of genes per segment
 # Note: in practice, this is parallelized in the cloud using segment_permutation_bygene.wdl
 # The code to execute these permutation tests is contained elsewhere
@@ -202,7 +178,7 @@ gsutil -m cp \
   ./
 
 
-# Plot segment permutation results
+# Plot segment permutation results while matching on number of genes per segment
 if ! [ -e perm_test_plots ]; then
   mkdir perm_test_plots
 fi
@@ -251,15 +227,27 @@ done < <( zcat rCNV.final_segments.loci.bed.gz | grep -ve '^#' \
 
 
 # Plot master grid summarizing segment association across all phenotypes
+if [ -e association_grid ]; then
+  rm -rf association_grid
+fi
+mkdir association_grid
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_association_grid.R \
   --clusters locus_clusters.txt \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.final_segments.loci.bed.gz \
+  ${prefix}.master_segments.bed.gz \
   ${prefix}.final_segments.loci.all_sumstats.tsv.gz \
   refs/${prefix}.reordered_hpos.txt \
-  ${prefix}.large_segments.association_grid.pdf
-gsutil -m cp \
-  ${prefix}.large_segments.association_grid.pdf \
+  association_grid/${prefix}
+
+
+# Copy all plots to gs:// bucket (note: requires permissions)
+gsutil -m cp -r \
+  basic_distribs \
+  perm_test_plots \
+  effect_size_plots \
+  pleiotropy_plots \
+  association_grid \
   ${rCNV_bucket}/analysis/paper/plots/large_segments/
 
 

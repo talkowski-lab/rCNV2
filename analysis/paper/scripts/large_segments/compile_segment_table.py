@@ -17,6 +17,7 @@ cnvtypes = 'DEL DUP'.split()
 import pandas as pd
 import pybedtools as pbt
 from itertools import combinations
+from numpy import nansum
 import argparse
 from os.path import splitext
 from sys import stdout
@@ -205,6 +206,29 @@ def annotate_hpo_genes(df, loci_hpos, hpo_genes):
     return df
 
 
+def count_dnms(df, dnm_path, col_prefix):
+    """
+    Annotate segments based on sum of observed de novo coding mutations
+    """
+
+    # Load DNMs
+    dnms = pd.read_csv(dnm_path, sep='\t').\
+              rename(columns={'#gene' : 'gene'})
+
+    def _sum_dnms(genes_str, dnms, key):
+        genes = str(genes_str[0]).split(';')
+        if len(genes) == 0 or 'NaN' in genes:
+            return 0
+        else:
+            return dnms.loc[dnms.gene.isin(genes), key].sum()
+            
+    for csq in 'lof mis syn'.split():
+        df['_'.join([col_prefix, 'dnm', csq])] \
+            = pd.DataFrame(df.genes).apply(_sum_dnms, axis=1, raw=True, dnms=dnms, key=csq)
+
+    return df
+
+
 def main():
     """
     Main block
@@ -237,6 +261,9 @@ def main():
     parser.add_argument('--hpo-genelists', help='Tsv of HPO-specific genelists to ' +
                         'annotate. Will match on segment HPO. Two columns ' +
                         'expected: HPO, and path to genelist.')
+    parser.add_argument('--dnm-tsvs', help='Tsv of de novo mutation counts ' +
+                        ' to annotate. Two columns expected: study prefix, and ' +
+                        'path to tsv with dnm counts.')
     parser.add_argument('--gd-recip', type=float, default=0.2, help='Reciprocal ' +
                         'overlap required for GD match. [default: 0.2]')
     parser.add_argument('--nahr-recip', type=float, default=0.5, help='Reciprocal ' +
@@ -341,6 +368,13 @@ def main():
     if args.hpo_genelists is not None:
         hpo_genes = load_hpo_genelists(args.hpo_genelists)
         all_df = annotate_hpo_genes(all_df, loci_hpos, hpo_genes)
+
+    # Annotate with de novo mutations, if optioned
+    if args.dnm_tsvs is not None:
+        with open(args.dnm_tsvs) as dnm_ins:
+            for study, dnm_path in csv.reader(dnm_ins, delimiter='\t'):
+                all_df = count_dnms(all_df, dnm_path, study)
+
     
     # Sort & write out merged BED
     all_df.sort_values(by='chr start end cnv region_id'.split(), inplace=True)

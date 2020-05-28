@@ -15,4 +15,3 @@ This directory is divided into multiple subdirectories, as follows:
 | [`scripts/`](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/paper/scripts/) | Miscellaneous helper scripts |  
 | [`shell/`](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/paper/data_processing/) | Bash code blocks to perform data processing |  
 | [`wdl/`](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/paper/wdl/) | WDL wrappers to execute entire secondary analysis workflows |  
-

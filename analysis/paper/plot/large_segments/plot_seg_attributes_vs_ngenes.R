@@ -14,12 +14,45 @@
 options(stringsAsFactors=F, scipen=1000)
 
 
+######################
+### DATA FUNCTIONS ###
+######################
+# Split values by CNV & bins of number of genes
+quantile.split <- function(segs, feature, breaks=NULL, break.names=NULL, probs=seq(0, 1, 0.2)){
+  vals <- segs[, which(colnames(segs)==feature)]
+  ngenes <- segs$n_genes
+  if(is.null(breaks)){
+    breaks <- floor(quantile(ngenes, probs=probs, na.rm=T))
+    breaks[length(breaks)] <- breaks[length(breaks)] + 1 
+  }
+  if(is.null(break.names)){
+    break.names <- sapply(2:length(breaks), function(i){
+      paste(breaks[i-1], breaks[i], sep="-")
+    })
+  }
+  
+  res <- lapply(c("DEL", "DUP"), function(cnv){
+    cnv.vals <- vals[which(segs$cnv == cnv)]
+    cnv.ngenes <- ngenes[which(segs$cnv == cnv)]
+    cnv.res <- lapply(2:length(breaks), function(i){
+      cnv.vals[which(cnv.ngenes>=breaks[i-1] & cnv.ngenes<breaks[i])]
+    })
+    names(cnv.res) <- break.names
+    return(cnv.res)
+  })
+  names(res) <- c("DEL", "DUP")
+  
+  return(res)
+}
+
+
 ##########################
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Plot values vs # of genes
 scatter.vsGenes <- function(segs, feature, pt.cex=0.75, fit=NULL,
-                            xlims=NULL, ylims=NULL, y.title=NULL,
+                            xlims=NULL, ylims=NULL, y.title=NULL, 
+                            y.title.line=2, y.pct=FALSE,
                             horiz.line=NULL, legend.pos=NULL,
                             parmar=c(2.5, 3, 0.5, 0.5)){
   # Get plot values
@@ -77,6 +110,14 @@ scatter.vsGenes <- function(segs, feature, pt.cex=0.75, fit=NULL,
         fit.df$y <- predict(fit.model, newdata=fit.df)
         points(fit.df, type="l", lwd=2, col=cnv.colors[which(names(cnv.colors)==cnv)])
       })
+    }else if(fit == "rollmean"){
+      lapply(c("DEL", "DUP"), function(cnv){
+        fit.df <- data.frame("x"=ngenes[which(segs$cnv==cnv)],
+                             "y"=vals[which(segs$cnv==cnv)])
+        fit.df <- fit.df[order(fit.df$x), ]
+        fit <- loess(y ~ x, data=fit.df, span=1)
+        points(x=fit.df$x, y=predict(fit), type="l", lwd=2, col=cnv.colors[which(names(cnv.colors)==cnv)])
+      })
     }
   }
   
@@ -87,8 +128,13 @@ scatter.vsGenes <- function(segs, feature, pt.cex=0.75, fit=NULL,
   mtext(1, line=1.3, text="Genes in Segment")
   axis(2, at=c(-10e10, 10e10), col=blueblack, labels=NA)
   axis(2, labels=NA, tck=-0.03, col=blueblack)
-  axis(2, at=axTicks(2), labels=axTicks(2), tick=F, las=2, line=-0.65)
-  mtext(2, line=2, text=y.title)
+  if(y.pct==T){
+    y.labs <- paste(round(100*axTicks(2), 0), "%", sep="")
+  }else{
+    y.labs <- axTicks(2)
+  }
+  axis(2, at=axTicks(2), labels=y.labs, tick=F, las=2, line=-0.65)
+  mtext(2, line=y.title.line, text=y.title)
   
   # Add legend, if optioned
   if(!is.null(legend.pos)){
@@ -152,10 +198,10 @@ prop_constrained.genome_avg <- 3036/18641
 # Plot proportion of constrained genes vs. # of genes
 pdf(paste(out.prefix, "prop_constrained_vs_ngenes.pdf", sep="."),
     height=2.2, width=3)
-scatter.vsGenes(segs, feature="prop_constrained", y.title="Proportion Constrained",
+scatter.vsGenes(segs, feature="prop_constrained", y.title="Constrained Genes",
                 legend.pos="topright", pt.cex=0.85,
                 horiz.line=prop_constrained.genome_avg,
-                parmar=c(2.5, 3, 0.5, 3.5))
+                y.pct=T, y.title.line=2.25, parmar=c(2.5, 3.25, 0.5, 3.5))
 axis(4, at=prop_constrained.genome_avg, tck=-0.03, col=blueblack, labels=NA)
 axis(4, at=prop_constrained.genome_avg, tick=F, line=-0.9, las=2,
      labels=c("Genome\naverage"), col.axis=blueblack, font=3, cex=0.8)

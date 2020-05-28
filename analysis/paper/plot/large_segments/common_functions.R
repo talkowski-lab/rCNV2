@@ -88,6 +88,14 @@ merge.loci.segs <- function(loci, segs){
   return(gw)
 }
 
+# Lookup overlap with any known GDs for a set of coordinates
+get.gd.overlap <- function(chrom, start, end, segs){
+  sort(unique(segs$cnv[which(segs$any_gd 
+                             & segs$chr==chrom 
+                             & segs$end>=start 
+                             & segs$start<=end)]))
+}
+
 
 ##########################
 ### PLOTTING FUNCTIONS ###
