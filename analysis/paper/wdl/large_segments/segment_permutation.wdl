@@ -32,12 +32,26 @@ workflow segment_permutation {
         perm_prefix="${perm_prefix}.starting_seed_${seed}",
         rCNV_bucket=rCNV_bucket
     }
+    call perm_shard_litGDs {
+      input:
+        seed=seed,
+        n_perms=perms_per_shard,
+        whitelist=perm_prep.whitelist,
+        perm_prefix="${perm_prefix}.lit_GDs.starting_seed_${seed}",
+        rCNV_bucket=rCNV_bucket
+    }
   }
 
-  call merge_perms {
+  call merge_perms as merge_loci {
     input:
       perm_tables=perm_shard.perm_table,
       perm_prefix="${perm_prefix}.${total_n_perms}_permuted_segments",
+      rCNV_bucket=rCNV_bucket
+  }
+  call merge_perms as merge_lit_gds {
+    input:
+      perm_tables=perm_shard_litGDs.perm_table,
+      perm_prefix="${perm_prefix}.lit_GDs.${total_n_perms}_permuted_segments",
       rCNV_bucket=rCNV_bucket
   }
 }
@@ -137,6 +151,110 @@ task perm_shard {
       --gd-recip "10e-10" \
       --nahr-recip 0.25 \
       --bgzip
+  >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:77adc010fe1501bf69f75988e7251f2a7b1c80fa266a9caea3a4b6f87ea3ff0f"
+    preemptible: 1
+  }
+
+  output {
+    File perm_table = "${perm_prefix}.master_segments.bed.gz"
+  }  
+}
+
+
+# Single shard of segment permutation for literature-reported GDs
+task perm_shard_litGDs {
+  String seed
+  Int n_perms
+  File whitelist
+  String perm_prefix
+  String rCNV_bucket
+
+  command <<<
+    set -e
+
+    # Localize necessary reference files
+    mkdir refs
+    gsutil -m cp \
+      ${rCNV_bucket}/refs/GRCh37.autosomes.genome \
+      ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
+      ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
+      ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
+      refs/
+    gsutil -m cp \
+      ${rCNV_bucket}/results/segment_association/rCNV.final_segments.loci.bed.gz \
+      ./
+
+    # Reformat NAHR segments
+    cat <( echo -e "#chr\tstart\tend\tnahr_id\tcnv\tn_genes\tgenes" ) \
+    <( zcat refs/clustered_nahr_regions.bed.gz | grep -ve '^#' \
+       | awk -v FS="\t" -v OFS="\t" \
+         '{ print $1, $2, $3, $4"_DEL", "DEL", $5, $6"\n"$1, $2, $3, $4"_DUP", "DUP", $5, $6 }' ) \
+    | bgzip -c \
+    > clustered_nahr_regions.reformatted.bed.gz
+
+    # Pool & reformat GDs for permutation
+    cat <( zcat refs/lit_GDs.hc.bed.gz | sed -n '1p' | cut -f1-5 \
+           | paste - <( echo "intervals" ) ) \
+        <( zcat refs/lit_GDs.*.bed.gz \
+           | fgrep -v "#" | cut -f1-5 \
+           | sort -Vk1,1 -k2,2n -k3,3n -k5,5V \
+           | awk -v OFS="\t" '{ print $0, $1":"$2"-"$3 }' ) \
+    | bgzip -c \
+    > lit_GDs.pooled.bed.gz
+
+    # Permute literature GDs
+    /opt/rCNV2/analysis/paper/scripts/large_segments/shuffle_segs.py \
+      --genome refs/GRCh37.autosomes.genome \
+      --whitelist ${whitelist} \
+      --n-perms ${n_perms} \
+      --first-seed ${seed} \
+      --outfile ${perm_prefix}.all.bed.gz \
+      --bgzip \
+      lit_GDs.pooled.bed.gz
+
+    # Annotate with genes
+    /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
+      --bgzip \
+      --outbed ${perm_prefix}.all.w_genes.bed.gz \
+      ${perm_prefix}.all.bed.gz \
+      refs/gencode.v19.canonical.pext_filtered.gtf.gz
+
+    # Split out by confidence
+    for conf in HC MC LC; do 
+      cat <( zcat ${perm_prefix}.all.w_genes.bed.gz | sed -n '1p' \
+             | awk '{ print "#"$0 }' ) \
+          <( zcat ${perm_prefix}.all.w_genes.bed.gz \
+             | awk -v conf=$conf '{ if ($4 ~ "_"conf"_GD_") print $0 }' ) \
+      | bgzip -c \
+      > ${perm_prefix}.$conf.bed.gz
+    done
+
+    # Create dummy of genome-wide significant segments for final segment compilation
+    # Uses first row of final segments file with chromosome set to "Z" to ensure
+    # no possible overlaps
+    cat <( zcat rCNV.final_segments.loci.bed.gz | sed -n '1p' ) \
+        <( zcat rCNV.final_segments.loci.bed.gz | sed -n '2p' \
+           | awk -v OFS="\t" '{ $1="Z"; print $0 }' ) \
+    > dummy.loci.bed
+
+    # Compile new segment table with existing GDs and NAHR regions
+    /opt/rCNV2/analysis/paper/scripts/large_segments/compile_segment_table.py \
+      --final-loci dummy.loci.bed \
+      --hc-gds ${perm_prefix}.HC.bed.gz \
+      --mc-gds ${perm_prefix}.MC.bed.gz \
+      --lc-gds ${perm_prefix}.LC.bed.gz \
+      --nahr-cnvs clustered_nahr_regions.reformatted.bed.gz \
+      --outfile ${perm_prefix}.master_segments.w_dummy.bed.gz \
+      --gd-recip "10e-10" \
+      --nahr-recip 0.25 \
+      --bgzip
+    zcat ${perm_prefix}.master_segments.w_dummy.bed.gz \
+    | grep -ve '^Z' \
+    | bgzip -c \
+    > ${perm_prefix}.master_segments.bed.gz
   >>>
 
   runtime {
