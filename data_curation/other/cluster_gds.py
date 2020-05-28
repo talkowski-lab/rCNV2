@@ -100,7 +100,7 @@ def finalize_regions(maps, cnv, min_score=0, max_score=10e10, min_size=200000,
         gd_bt = pbt.BedTool(gd_coord_str, from_string=True)
         if cyto_bed is not None:
             bandrange = get_cytobands(gd_bt, cyto_bed)
-            gd_id = '_'.join([id_prefix, cnv, bandrange])
+            gd_id = '_'.join([id_prefix, str(k), cnv, bandrange])
         else:
             gd_id = '_'.join([id_prefix, cnv, str(k)])
         gd_str = '\t'.join([gd_coord_str, gd_id, cnv])

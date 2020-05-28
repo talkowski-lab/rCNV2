@@ -16,7 +16,11 @@ import argparse
 from os.path import splitext
 import gzip
 from sys import stdout
+import pandas as pd
 import subprocess
+
+
+dnm_csqs = 'lof mis syn'.split()
 
 
 def load_hpo_genelists(tsv_in):
@@ -55,6 +59,9 @@ def main():
                         'providing --segment-hpos.')
     parser.add_argument('--segment-hpos', help='tsv of segment ids and semicolon-' +
                         'delimited list of associated HPOs.')
+    parser.add_argument('--dnm-tsvs', help='Tsv of de novo mutation counts ' +
+                        ' to annotate. Two columns expected: study prefix, and ' +
+                        'path to tsv with dnm counts.')
     parser.add_argument('-o', '--outfile', help='Path to output tsv file. [default: ' +
                         'stdout]', default='stdout')
     parser.add_argument('-z', '--gzip', action='store_true', help='Compress ' + 
@@ -100,6 +107,17 @@ def main():
                             in csv.reader(fin, delimiter='\t')}
         header_cols += ['n_HPOmatched_genes']
 
+    # Read DNM counts, if optioned
+    if args.dnm_tsvs is not None:
+        dnms = {}
+        with open(args.dnm_tsvs) as dnm_in:
+            reader = csv.reader(dnm_in, delimiter='\t')
+            for study, dnm_path in reader:
+                dnm_df = pd.read_csv(dnm_path, sep='\t').\
+                            rename(columns={'#gene' : 'gene'})
+                dnms[study] = dnm_df
+                header_cols += ['_'.join([study, 'dnm', csq]) for csq in dnm_csqs]
+
     # Write header to outfile
     outfile.write('\t'.join(header_cols) + '\n')
 
@@ -125,6 +143,12 @@ def main():
         if args.hpo_genelists is not None and args.segment_hpos is not None:
             hgenes = [g for l in [hpo_genes[h] for h in segment_hpos[orig_bid]] for g in l]
             outvals.append(len([g for g in genes if g in hgenes]))
+
+        # Annotate with count of de novo mutations per study, if optioned
+        if args.dnm_tsvs is not None:
+            for dnm_df in dnms.values():
+                for csq in dnm_csqs:
+                    outvals.append(dnm_df.loc[dnm_df.gene.isin(genes), csq].sum())
 
         outfile.write('\t'.join([str(x) for x in outvals]) + '\n')
 

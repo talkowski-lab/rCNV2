@@ -154,27 +154,6 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/permutations/${prefix}.${n_seg_perms}_permuted_segments.bed.gz \
   ./
 
-# Segment permutation dev code for known GDs
-seed=1
-n_perms=10
-whitelist=whitelist.bed.gz
-perm_prefix=perm_test
-# Permute GDs
-for conf in hc mc lc; do
-  /opt/rCNV2/analysis/paper/scripts/large_segments/shuffle_segs.py \
-    --genome refs/GRCh37.autosomes.genome \
-    --whitelist ${whitelist} \
-    --n-perms ${n_perms} \
-    --first-seed ${seed} \
-    --outfile ${perm_prefix}.$conf.bed.gz \
-    --bgzip \
-    <( zcat refs/lit_GDs.$conf.bed.gz \
-       | cut -f1-5 \
-       | awk -v OFS="\t" '{ print $0, $1":"$2"-"$3 }' )
-done
-
-
-
 
 # Plot segment permutation results
 if [ -e perm_test_plots ]; then

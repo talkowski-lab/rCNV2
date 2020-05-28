@@ -170,18 +170,6 @@ Owen${TAB}/opt/rCNV2/refs/UKBB_GD.Owen_2018.bed.gz
 Girirajan${TAB}/opt/rCNV2/refs/Girirajan_2012_GD.bed.gz
 Dittwald${TAB}/opt/rCNV2/refs/Dittwald_2013_GD.bed.gz
 EOF
-# af_suffix="01pct"
-# for CNV in DEL DUP; do
-#   zcat \
-#     wgs_common_cnvs.$CNV.$af_suffix.bed.gz \
-#     rCNV2_common_cnvs.$CNV.$af_suffix.bed.gz \
-#   | grep -ve '^#' \
-#   | cut -f1-3 \
-#   | sort -Vk1,1 -k2,2n -k3,3n \
-#   | bedtools merge -i -\
-#   | bgzip -c \
-#   > combined_common_cnvs.$CNV.$af_suffix.bed.gz
-# done
 # Clusters GDs (and formats them in preparation for gene annotation, below)
 # Note: no longer apply control frequency filter (this can be handled with the 
 # benign annotation in the final segments table later in analysis)

@@ -96,6 +96,36 @@ get.gd.overlap <- function(chrom, start, end, segs){
                              & segs$start<=end)]))
 }
 
+# Summarize permutation results across all permutations for a single feature
+perm.summary <- function(perms, feature, measure="mean"){
+  do.call("rbind", lapply(perms, function(df){
+    if(measure == "mean"){
+      c("ALL" = mean(df[, which(colnames(df)==feature)], na.rm=T),
+        "DEL" = mean(df[which(df$cnv=="DEL"), 
+                        which(colnames(df)==feature)], na.rm=T),
+        "DUP" = mean(df[which(df$cnv=="DUP"), 
+                        which(colnames(df)==feature)], na.rm=T))
+    }else if(measure == "median"){
+      c("ALL" = median(df[, which(colnames(df)==feature)], na.rm=T),
+        "DEL" = median(df[which(df$cnv=="DEL"), 
+                          which(colnames(df)==feature)], na.rm=T),
+        "DUP" = median(df[which(df$cnv=="DUP"), 
+                          which(colnames(df)==feature)], na.rm=T))
+    }else if(measure == "sum"){
+      c("ALL" = sum(df[, which(colnames(df)==feature)]),
+        "DEL" = sum(df[which(df$cnv=="DEL"), 
+                       which(colnames(df)==feature)]),
+        "DUP" = sum(df[which(df$cnv=="DUP"), 
+                       which(colnames(df)==feature)]))
+    }else if(measure == "frac.any"){
+      hits <- which(df[, which(colnames(df)==feature)] > 0)
+      100 * c("ALL" = length(hits) / nrow(df),
+              "DEL" = length(intersect(hits, which(df$cnv=="DEL"))) / length(which(df$cnv=="DEL")),
+              "DUP" = length(intersect(hits, which(df$cnv=="DUP"))) / length(which(df$cnv=="DUP")))
+    }
+  }))
+}
+
 
 ##########################
 ### PLOTTING FUNCTIONS ###
@@ -342,7 +372,7 @@ gw.simple.vioswarm <- function(gw, y, add.y.axis=T, ytitle=NULL,
 }
 
 # Function to plot segment permutation test results
-plot.seg.perms <- function(gw, perms, feature, measure, 
+plot.seg.perms <- function(gw, perms, feature, measure, xnorm=F,
                            subset_to_regions=NULL, n.bins=100, min.bins=10,
                            x.title=NULL, xlims=NULL,
                            diamond.cex=1.5, parmar=c(2.25, 2, 0.5, 0.5)){
@@ -351,32 +381,7 @@ plot.seg.perms <- function(gw, perms, feature, measure,
     gw <- gw[which(gw$region_id %in% subset_to_regions), ]
     perms <- lapply(perms, function(df){df[which(df$region_id %in% subset_to_regions), ]})
   }
-  perm.dat <- do.call("rbind", lapply(perms, function(df){
-    if(measure == "mean"){
-      c("ALL" = mean(df[, which(colnames(df)==feature)], na.rm=T),
-        "DEL" = mean(df[which(df$cnv=="DEL"), 
-                        which(colnames(df)==feature)], na.rm=T),
-        "DUP" = mean(df[which(df$cnv=="DUP"), 
-                        which(colnames(df)==feature)], na.rm=T))
-    }else if(measure == "median"){
-      c("ALL" = median(df[, which(colnames(df)==feature)], na.rm=T),
-        "DEL" = median(df[which(df$cnv=="DEL"), 
-                          which(colnames(df)==feature)], na.rm=T),
-        "DUP" = median(df[which(df$cnv=="DUP"), 
-                          which(colnames(df)==feature)], na.rm=T))
-    }else if(measure == "sum"){
-      c("ALL" = sum(df[, which(colnames(df)==feature)]),
-        "DEL" = sum(df[which(df$cnv=="DEL"), 
-                       which(colnames(df)==feature)]),
-        "DUP" = sum(df[which(df$cnv=="DUP"), 
-                       which(colnames(df)==feature)]))
-    }else if(measure == "frac.any"){
-      hits <- which(df[, which(colnames(df)==feature)] > 0)
-      100 * c("ALL" = length(hits) / nrow(df),
-              "DEL" = length(intersect(hits, which(df$cnv=="DEL"))) / length(which(df$cnv=="DEL")),
-              "DUP" = length(intersect(hits, which(df$cnv=="DUP"))) / length(which(df$cnv=="DUP")))
-    }
-  }))
+  perm.dat <- perm.summary(perms, feature, measure)
   # Convert boolean gw.dat column back to numeric, if needed
   gw.vals <- gw[, which(colnames(gw)==feature)]
   if(all(sapply(gw.vals, function(x){is.logical(x) | is.na(x)}))){
@@ -398,6 +403,13 @@ plot.seg.perms <- function(gw, perms, feature, measure,
     gw.dat <- 100 * c("ALL" = length(which(gw.vals > 0)) / length(gw.vals),
                       "DEL" = length(which(gw.vals[which(gw$cnv=="DEL")] > 0)) / length(which(gw$cnv=="DEL")),
                       "DUP" = length(which(gw.vals[which(gw$cnv=="DUP")] > 0)) / length(which(gw$cnv=="DUP")))
+  }
+  if(xnorm==T){
+    perm.meds <- apply(perm.dat, 2, median, na.rm=T)
+    for(i in 1:3){
+      perm.dat[, i] <- perm.dat[, i] - perm.meds[i]
+      gw.dat[i] <- gw.dat[i] - perm.meds[i]
+    }
   }
   val.range <- range(perm.dat, na.rm=T)
   val.range <- c(floor(val.range[1]), ceiling(val.range[2]))
@@ -483,6 +495,7 @@ plot.seg.perms <- function(gw, perms, feature, measure,
     #      xpd=T, cex=stats.cex)
     print(paste(prettyNum(round(gw.dat[i]/mean(perm.dat[, i], na.rm=T), 1), small.interval=1), "fold", sep="-"))
   })
+  axis(1, at=c(10e-10, 10e10), labels=NA, col=blueblack, tck=0)
   axis(1, at=unique(c(0, axTicks(1))), labels=NA, col=blueblack, tck=-0.03)
   sapply(1:length(axTicks(1)), function(i){
     axis(1, at=axTicks(1)[i], labels=prettyNum(axTicks(1)[i], big.mark=","), line=-0.65, tick=F)

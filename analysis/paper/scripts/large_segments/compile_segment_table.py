@@ -375,7 +375,6 @@ def main():
             for study, dnm_path in csv.reader(dnm_ins, delimiter='\t'):
                 all_df = count_dnms(all_df, dnm_path, study)
 
-    
     # Sort & write out merged BED
     all_df.sort_values(by='chr start end cnv region_id'.split(), inplace=True)
     all_df.rename(columns={list(all_df.columns)[0] : '#chr'}).\
