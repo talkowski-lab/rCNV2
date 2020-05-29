@@ -30,6 +30,7 @@ gsutil -m cp \
   ${rCNV_bucket}/refs/GRCh37.autosomes.genome \
   ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
   ${rCNV_bucket}/analysis/paper/data/misc/*_dnm_counts.tsv.gz \
+  ${rCNV_bucket}/analysis/paper/data/misc/gene_mutation_rates.tsv.gz \
   refs/
 mkdir meta_stats/
 gsutil -m cp \
@@ -121,6 +122,7 @@ EOF
   --genelists genelists_to_annotate.tsv \
   --hpo-genelists hpo_genelists.tsv \
   --dnm-tsvs dnm_counts_to_annotate.tsv \
+  --snv-mus refs/gene_mutation_rates.tsv.gz \
   --gd-recip "10e-10" \
   --nahr-recip 0.25 \
   --bgzip
@@ -151,7 +153,7 @@ mkdir basic_distribs
 # Copy results of segment permutation tests (note: requires permissions)
 n_seg_perms=10000
 gsutil -m cp \
-  ${rCNV_bucket}/analysis/paper/data/large_segments/permutations/${prefix}.${n_seg_perms}_permuted_segments.bed.gz \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/permutations/${prefix}*${n_seg_perms}_permuted_segments.bed.gz \
   ./
 
 
@@ -165,6 +167,7 @@ mkdir perm_test_plots
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   ${prefix}.${n_seg_perms}_permuted_segments.bed.gz \
+  ${prefix}.lit_GDs.${n_seg_perms}_permuted_segments.bed.gz \
   perm_test_plots/${prefix}
 
 
@@ -174,7 +177,7 @@ mkdir perm_test_plots
 # Copy results of segment permutation tests (note: requires permissions)
 n_seg_perms=10000
 gsutil -m cp \
-  ${rCNV_bucket}/analysis/paper/data/large_segments/permutations/${prefix}.${n_seg_perms}_permuted_segments_bygene.tsv.gz \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/permutations/${prefix}*${n_seg_perms}_permuted_segments_bygene.tsv.gz \
   ./
 
 
@@ -187,6 +190,7 @@ fi
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   ${prefix}.${n_seg_perms}_permuted_segments_bygene.tsv.gz \
+  ${prefix}.lit_GDs.${n_seg_perms}_permuted_segments_bygene.tsv.gz \
   perm_test_plots/${prefix}
 
 

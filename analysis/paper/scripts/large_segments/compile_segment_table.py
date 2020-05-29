@@ -206,7 +206,7 @@ def annotate_hpo_genes(df, loci_hpos, hpo_genes):
     return df
 
 
-def count_dnms(df, dnm_path, col_prefix):
+def count_dnms(df, dnm_path, col_prefix, mu_df=None):
     """
     Annotate segments based on sum of observed de novo coding mutations
     """
@@ -215,8 +215,8 @@ def count_dnms(df, dnm_path, col_prefix):
     dnms = pd.read_csv(dnm_path, sep='\t').\
               rename(columns={'#gene' : 'gene'})
 
-    def _sum_dnms(genes_str, dnms, key):
-        genes = str(genes_str[0]).split(';')
+    def _sum_dnms(genes_str, dnms, key, exclude=[]):
+        genes = [x for x in str(genes_str[0]).split(';') if x not in exclude]
         if len(genes) == 0 or 'NaN' in genes:
             return 0
         else:
@@ -225,6 +225,19 @@ def count_dnms(df, dnm_path, col_prefix):
     for csq in 'lof mis syn'.split():
         df['_'.join([col_prefix, 'dnm', csq])] \
             = pd.DataFrame(df.genes).apply(_sum_dnms, axis=1, raw=True, dnms=dnms, key=csq)
+        if mu_df is not None:
+            mu_df_x = mu_df.copy(deep=True)
+            n_dnms = df['_'.join([col_prefix, 'dnm', csq])].sum()
+            mu_df_x['mu_' + csq] = mu_df_x['mu_' + csq] * n_dnms
+            genes_missing_mus = mu_df_x['gene'][mu_df_x['mu_' + csq].isnull()].tolist()
+            obs_no_missing_mus = pd.DataFrame(df.genes).\
+                                    apply(_sum_dnms, axis=1, raw=True, dnms=dnms, 
+                                          key=csq, exclude=genes_missing_mus)
+            expected = pd.DataFrame(df.genes).\
+                          apply(_sum_dnms, axis=1, raw=True, dnms=mu_df_x, 
+                                key='mu_' + csq, exclude=genes_missing_mus)
+            df['_'.join([col_prefix, 'dnm', csq, 'vs_expected'])] \
+                = (obs_no_missing_mus - expected).round(decimals=6)
 
     return df
 
@@ -264,6 +277,9 @@ def main():
     parser.add_argument('--dnm-tsvs', help='Tsv of de novo mutation counts ' +
                         ' to annotate. Two columns expected: study prefix, and ' +
                         'path to tsv with dnm counts.')
+    parser.add_argument('--snv-mus', help='Tsv of snv mutation rates per gene. ' +
+                        'Four columns expected: gene, and relative mutation rates ' +
+                        'for lof, missense, and synonymous mutations.')
     parser.add_argument('--gd-recip', type=float, default=0.2, help='Reciprocal ' +
                         'overlap required for GD match. [default: 0.2]')
     parser.add_argument('--nahr-recip', type=float, default=0.5, help='Reciprocal ' +
@@ -371,9 +387,14 @@ def main():
 
     # Annotate with de novo mutations, if optioned
     if args.dnm_tsvs is not None:
+        # Also, load snv mutation rates, if optioned
+        if args.snv_mus is not None:
+            mu_df = pd.read_csv(args.snv_mus, sep='\t').rename(columns={'#gene' : 'gene'})
+        else:
+            mu_df = None
         with open(args.dnm_tsvs) as dnm_ins:
             for study, dnm_path in csv.reader(dnm_ins, delimiter='\t'):
-                all_df = count_dnms(all_df, dnm_path, study)
+                all_df = count_dnms(all_df, dnm_path, study, mu_df)
 
     # Sort & write out merged BED
     all_df.sort_values(by='chr start end cnv region_id'.split(), inplace=True)

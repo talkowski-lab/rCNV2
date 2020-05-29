@@ -41,14 +41,14 @@ workflow segment_permutation {
     call annotate_shard as annotate_segs {
       input:
         perm_table=perm_shard_bygene.perm_table,
-        hpomatch=true,
+        hpomatch="TRUE",
         perm_prefix="${perm_prefix}.bygene.starting_seed_${seed}",
         rCNV_bucket=rCNV_bucket
     }
     call annotate_shard as annotate_litGDs {
       input:
         perm_table=perm_shard_bygene_litGDs.perm_table,
-        hpomatch=false,
+        hpomatch="FALSE",
         perm_prefix="${perm_prefix}.lit_GDs.bygene.starting_seed_${seed}",
         rCNV_bucket=rCNV_bucket
     }
@@ -131,7 +131,7 @@ task perm_shard_bygene {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:82b781b4374b85258457084abe4ca7b9d12c4f9b64471b7f336fc16279f742fb"
+    docker: "talkowski/rcnv@sha256:2176cfce20a878f1dd3288e8e534c57689c58663d0354ef68b5c7c18bf34d4b7"
     preemptible: 1
   }
 
@@ -189,7 +189,7 @@ task perm_shard_bygene_litGDs {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:82b781b4374b85258457084abe4ca7b9d12c4f9b64471b7f336fc16279f742fb"
+    docker: "talkowski/rcnv@sha256:2176cfce20a878f1dd3288e8e534c57689c58663d0354ef68b5c7c18bf34d4b7"
     preemptible: 1
   }
 
@@ -201,7 +201,7 @@ task perm_shard_bygene_litGDs {
 # Single shard of annotation
 task annotate_shard {
   File perm_table
-  Boolean hpomatch
+  String hpomatch
   String perm_prefix
   String rCNV_bucket
 
@@ -215,6 +215,8 @@ task annotate_shard {
     mkdir refs
     gsutil -m cp \
       ${rCNV_bucket}/analysis/analysis_refs/test_phenotypes.list \
+      ${rCNV_bucket}/analysis/paper/data/misc/*_dnm_counts.tsv.gz \
+      ${rCNV_bucket}/analysis/paper/data/misc/gene_mutation_rates.tsv.gz \
       refs/
     gsutil -m cp \
       ${rCNV_bucket}/results/segment_association/* \
@@ -228,6 +230,8 @@ task annotate_shard {
     echo -e "DECIPHER_LoF\tgene_lists/DDG2P.hmc_lof.genes.list" >> genelists_to_annotate.tsv
     echo -e "DECIPHER_GoF\tgene_lists/DDG2P.hmc_gof.genes.list" >> genelists_to_annotate.tsv
     echo -e "OMIM\tgene_lists/HP0000118.HPOdb.genes.list" >> genelists_to_annotate.tsv
+    echo -e "ASC\trefs/asc_dnm_counts.tsv.gz" > dnm_counts_to_annotate.tsv
+    echo -e "DDD\trefs/ddd_dnm_counts.tsv.gz" >> dnm_counts_to_annotate.tsv
     while read nocolon hpo; do
       echo -e "$hpo\tgene_lists/$nocolon.HPOdb.genes.list"
     done < refs/test_phenotypes.list \
@@ -236,25 +240,31 @@ task annotate_shard {
     | grep -ve '^#' \
     | awk -v FS="\t" -v OFS="\t" '{ print $4, $15 }' \
     > segment_hpos.tsv
-    echo -e "ASC\trefs/asc_dnm_counts.tsv.gz" > dnm_counts_to_annotate.tsv
-    echo -e "DDD\trefs/ddd_dnm_counts.tsv.gz" >> dnm_counts_to_annotate.tsv
 
     # Annotate permuted table
-    extra_args=""
-    if(hpomatch){
-      extra_args="--hpo-genelists hpo_genelists.tsv --segment-hpos segment_hpos.tsv"
-    }
-    /opt/rCNV2/analysis/paper/scripts/large_segments/annotate_shuffled_seg_gene_blocks.py \
-      --gene-sets genelists_to_annotate.tsv \
-      "$extra_args" \
-      --dnm-tsvs dnm_counts_to_annotate.tsv \
-      --outfile ${perm_prefix}.annotated.tsv.gz \
-      --gzip \
-      ${perm_table}
+    if [ ${hpomatch} == "TRUE" ]; then
+      /opt/rCNV2/analysis/paper/scripts/large_segments/annotate_shuffled_seg_gene_blocks.py \
+        --gene-sets genelists_to_annotate.tsv \
+        --hpo-genelists hpo_genelists.tsv \
+        --segment-hpos segment_hpos.tsv \
+        --dnm-tsvs dnm_counts_to_annotate.tsv \
+        --snv-mus gene_mutation_rates.tsv.gz \
+        --outfile ${perm_prefix}.annotated.tsv.gz \
+        --gzip \
+        ${perm_table}
+    else
+      /opt/rCNV2/analysis/paper/scripts/large_segments/annotate_shuffled_seg_gene_blocks.py \
+        --gene-sets genelists_to_annotate.tsv \
+        --dnm-tsvs dnm_counts_to_annotate.tsv \
+        --snv-mus gene_mutation_rates.tsv.gz \
+        --outfile ${perm_prefix}.annotated.tsv.gz \
+        --gzip \
+        ${perm_table}
+    fi
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:82b781b4374b85258457084abe4ca7b9d12c4f9b64471b7f336fc16279f742fb"
+    docker: "talkowski/rcnv@sha256:2176cfce20a878f1dd3288e8e534c57689c58663d0354ef68b5c7c18bf34d4b7"
     preemptible: 1
   }
 
@@ -293,7 +303,7 @@ task merge_perms {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:82b781b4374b85258457084abe4ca7b9d12c4f9b64471b7f336fc16279f742fb"
+    docker: "talkowski/rcnv@sha256:2176cfce20a878f1dd3288e8e534c57689c58663d0354ef68b5c7c18bf34d4b7"
     preemptible: 1
     disks: "local-disk 200 SSD"
   }

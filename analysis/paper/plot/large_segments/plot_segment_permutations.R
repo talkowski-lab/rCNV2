@@ -88,6 +88,10 @@ source(paste(script.dir, "common_functions.R", sep="/"))
 loci <- load.loci(loci.in)
 segs <- load.segment.table(segs.in)
 
+# Split seg IDs by gw-sig vs GD (but not gw-sig)
+gw.ids <- segs$region_id[which(segs$gw_sig)]
+lit.ids <- segs$region_id[which(segs$any_gd & !segs$gw_sig)]
+
 # Merge loci & segment data for genome-wide significant sites only
 gw <- merge.loci.segs(loci, segs)
 
@@ -96,37 +100,31 @@ perms <- load.perms(perm.res.in)
 lit.perms <- load.perms(lit.perm.res.in)
 
 # Plot overlap with known genomic disorders
-pdf(paste(out.prefix, "seg_permutations.gd_overlap.pdf", sep="."),
+pdf(paste(out.prefix, "seg_permutations.gw_sig.gd_overlap.pdf", sep="."),
     height=2.2, width=2.6)
-plot.seg.perms(gw, perms, feature="any_gd", measure="sum", n.bins=30,
+plot.seg.perms(segs, perms, feature="any_gd", 
+               subset_to_regions=gw.ids,
+               measure="sum", n.bins=30,
                x.title="Known Genomic Disorders",
                diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.8))
 dev.off()
 
 # Plot number of genes
-pdf(paste(out.prefix, "seg_permutations.n_genes.mean.pdf", sep="."),
+pdf(paste(out.prefix, "seg_permutations.gw_sig.n_genes.mean.pdf", sep="."),
     height=2.2, width=2.4)
-plot.seg.perms(gw, perms, feature="n_genes", measure="mean", n.bins=30, 
-               x.title="Genes per Segment", 
-               diamond.cex=1.25, parmar=c(2.2, 2, 0, 0.6))
-dev.off()
-pdf(paste(out.prefix, "seg_permutations.n_genes.median.pdf", sep="."),
-    height=2.2, width=2.4)
-plot.seg.perms(gw, perms, feature="n_genes", measure="median", n.bins=30, 
-               x.title="Median Genes per Segment", 
+plot.seg.perms(segs, perms, feature="n_genes", 
+               subset_to_regions=gw.ids,
+               measure="mean", n.bins=30, 
+               x.title="Mean Genes per Segment", 
                diamond.cex=1.25, parmar=c(2.2, 2, 0, 0.6))
 dev.off()
 
 # Plot number of genes for literature GDs
-pdf(paste(out.prefix, "seg_permutations.lit_GDs.n_genes.mean.pdf", sep="."),
+pdf(paste(out.prefix, "seg_permutations.lit_non_gw.n_genes.mean.pdf", sep="."),
     height=2.2, width=2.4)
-plot.seg.perms(segs, lit.perms, feature="n_genes", measure="mean", n.bins=30, 
+plot.seg.perms(segs.lit, lit.perms, feature="n_genes", 
+               subset_to_regions=lit.ids,
+               measure="mean", n.bins=30, 
                x.title="Mean Genes per Segment", 
-               diamond.cex=1.25, parmar=c(2.2, 2, 0, 0.6))
-dev.off()
-pdf(paste(out.prefix, "seg_permutations.lit_GDs.n_genes.median.pdf", sep="."),
-    height=2.2, width=2.4)
-plot.seg.perms(segs, lit.perms, feature="n_genes", measure="median", n.bins=30, 
-               x.title="Median Genes per Segment", 
                diamond.cex=1.25, parmar=c(2.2, 2, 0, 0.6))
 dev.off()

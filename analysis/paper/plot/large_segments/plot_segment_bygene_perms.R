@@ -44,27 +44,29 @@ option_list <- list(
 )
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage=paste("%prog loci.bed segs.tsv perm_res.tsv out_prefix", sep=" "),
+args <- parse_args(OptionParser(usage=paste("%prog loci.bed segs.tsv perm_res.tsv lit_GDs.perm_res.tsv out_prefix", sep=" "),
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Checks for appropriate positional arguments
-if(length(args$args) != 4){
-  stop(paste("Four positional arguments required: loci.bed, segs.tsv, perm_res.tsv, output_prefix\n", sep=" "))
+if(length(args$args) != 5){
+  stop(paste("Four positional arguments required: loci.bed, segs.tsv, perm_res.tsv, lit_GDs.perm_res.tsv, output_prefix\n", sep=" "))
 }
 
 # Writes args & opts to vars
 loci.in <- args$args[1]
 segs.in <- args$args[2]
 perm.res.in <- args$args[3]
-out.prefix <- args$args[4]
+lit.perm.res.in <- args$args[4]
+out.prefix <- args$args[5]
 rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
 # loci.in <- "~/scratch/rCNV.final_segments.loci.bed.gz"
 # segs.in <- "~/scratch/rCNV2_analysis_d1.master_segments.bed.gz"
 # perm.res.in <- "~/scratch/rCNV2_analysis_d1.10000_permuted_segments_bygene.tsv.gz"
+# perm.res.in <- "~/scratch/rCNV2_analysis_d1.lit_GDs.10000_permuted_segments_bygene.tsv.gz"
 # out.prefix <- "~/scratch/test_perm_bygene"
 # rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
 # script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
@@ -87,6 +89,7 @@ gw <- merge.loci.segs(loci, segs)
 
 # Load permutation results
 perms <- load.perms(perm.res.in)
+lit.perms <- load.perms(lit.perm.res.in)
 
 # Fraction of segments with at least one HPO-matched gene & avg. HPO-matched genes per seg
 print("Fraction of segments with at least one HPO-matched gene:")

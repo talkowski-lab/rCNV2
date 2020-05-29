@@ -62,6 +62,9 @@ def main():
     parser.add_argument('--dnm-tsvs', help='Tsv of de novo mutation counts ' +
                         ' to annotate. Two columns expected: study prefix, and ' +
                         'path to tsv with dnm counts.')
+    parser.add_argument('--snv-mus', help='Tsv of snv mutation rates per gene. ' +
+                        'Four columns expected: gene, and relative mutation rates ' +
+                        'for lof, missense, and synonymous mutations.')
     parser.add_argument('-o', '--outfile', help='Path to output tsv file. [default: ' +
                         'stdout]', default='stdout')
     parser.add_argument('-z', '--gzip', action='store_true', help='Compress ' + 
@@ -107,16 +110,30 @@ def main():
                             in csv.reader(fin, delimiter='\t')}
         header_cols += ['n_HPOmatched_genes']
 
+    # Load snv mutation rates, if optioned
+    if args.snv_mus is not None:
+        mu_df = pd.read_csv(args.snv_mus, sep='\t').rename(columns={'#gene' : 'gene'})
+    else:
+        mu_df = None
+
     # Read DNM counts, if optioned
     if args.dnm_tsvs is not None:
         dnms = {}
+        mus = {}
         with open(args.dnm_tsvs) as dnm_in:
             reader = csv.reader(dnm_in, delimiter='\t')
             for study, dnm_path in reader:
                 dnm_df = pd.read_csv(dnm_path, sep='\t').\
                             rename(columns={'#gene' : 'gene'})
                 dnms[study] = dnm_df
-                header_cols += ['_'.join([study, 'dnm', csq]) for csq in dnm_csqs]
+                if mu_df is not None:
+                    mus[study] = mu_df.copy(deep=True)
+                for csq in dnm_csqs:
+                    header_cols.append('_'.join([study, 'dnm', csq]))
+                    if mu_df is not None:
+                        n_dnms = dnms[study][csq].sum()
+                        mus[study]['mu_' + csq] = mus[study]['mu_' + csq] * n_dnms
+                        header_cols.append('_'.join([study, 'dnm', csq, 'vs_expected']))
 
     # Write header to outfile
     outfile.write('\t'.join(header_cols) + '\n')
@@ -146,9 +163,16 @@ def main():
 
         # Annotate with count of de novo mutations per study, if optioned
         if args.dnm_tsvs is not None:
-            for dnm_df in dnms.values():
+            for study in dnms.keys():
+                dnm_df = dnms[study]
                 for csq in dnm_csqs:
                     outvals.append(dnm_df.loc[dnm_df.gene.isin(genes), csq].sum())
+                    if mu_df is not None:
+                        mu_df_x = mus[study]
+                        genes_no_mus = mu_df['gene'][mu_df['mu_' + csq].isnull()].tolist()
+                        obs = dnm_df.loc[dnm_df.gene.isin(genes) & ~dnm_df.gene.isin(genes_no_mus), csq].sum()
+                        exp = mu_df_x.loc[mu_df_x.gene.isin(genes) & ~mu_df_x.gene.isin(genes_no_mus), 'mu_' + csq].sum()
+                        outvals.append(round(obs - exp, 6))
 
         outfile.write('\t'.join([str(x) for x in outvals]) + '\n')
 

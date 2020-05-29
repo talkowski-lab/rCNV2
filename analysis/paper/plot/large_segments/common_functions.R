@@ -371,44 +371,83 @@ gw.simple.vioswarm <- function(gw, y, add.y.axis=T, ytitle=NULL,
   }
 }
 
+# Helper function to add a single mirrored violin-histogram hybrid of values to an existing plot
+plot.viohist <- function(perm.dat.vals, bins, y.at, width=0.8, 
+                         obs.val=NA, obs.color=NA, obs.border=NA, 
+                         color=bluewhite, border=blueblack,
+                         diamond.cex=4, y.title=NULL){
+  perm.hist <- hist(perm.dat.vals, breaks=bins, plot=F)
+  values <- perm.hist$counts
+  # Convert zero-bins to NAs for the outermost 5% of the distribution
+  outer.lims <- quantile(perm.dat.vals, probs=c(0.025, 0.975), na.rm=T)
+  outer.zero.bins <- intersect(which(perm.hist$mids < outer.lims[1] | perm.hist$mids > outer.lims[2]),
+                               which(values==0))
+  values[outer.zero.bins] <- NA
+  values <- values / (max(values, na.rm=T) * 2/width)
+  rect(xleft=bins[-length(bins)], xright=bins[-1],
+       ybottom=-values + y.at, ytop=values + y.at, 
+       col=color, border="white")
+  segments(x0=rep(bins[-length(bins)], 2),
+           x1=rep(bins[-1], 2),
+           y0=c(values + y.at, -values + y.at), 
+           y1=c(values + y.at, -values + y.at),
+           col=border)
+  segments(x0=rep(bins, 2), x1=rep(bins, 2),
+           y0=c(y.at, values + y.at, y.at, -values + y.at),
+           y1=c(values + y.at, y.at, -values + y.at, y.at),
+           col=border)
+  segments(x0=obs.val, x1=obs.val, 
+           y0=y.at - 0.2, y1=y.at + 0.2, 
+           col=obs.color, lwd=3, lend="round")
+  points(x=obs.val, y=y.at, pch=23, bg=obs.color, 
+         col=obs.border, cex=diamond.cex)
+  if(!is.null(y.title)){
+    axis(2, at=y.at, line=-0.9, tick=F, las=2, labels=y.title)
+    # axis(2, at=c(y.at-(width/2), y.at+(width/2)), tck=0, labels=NA, col=blueblack)
+  }
+}
+
 # Function to plot segment permutation test results
-plot.seg.perms <- function(gw, perms, feature, measure, xnorm=F,
+plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
                            subset_to_regions=NULL, n.bins=100, min.bins=10,
                            x.title=NULL, xlims=NULL,
                            diamond.cex=1.5, parmar=c(2.25, 2, 0.5, 0.5)){
   # Get plot data
   if(!is.null(subset_to_regions)){
-    gw <- gw[which(gw$region_id %in% subset_to_regions), ]
+    segs <- segs[which(segs$region_id %in% subset_to_regions), ]
     perms <- lapply(perms, function(df){df[which(df$region_id %in% subset_to_regions), ]})
   }
   perm.dat <- perm.summary(perms, feature, measure)
-  # Convert boolean gw.dat column back to numeric, if needed
-  gw.vals <- gw[, which(colnames(gw)==feature)]
-  if(all(sapply(gw.vals, function(x){is.logical(x) | is.na(x)}))){
-    gw.vals <- sapply(gw.vals, function(x){if(is.na(x)){NA}else if(x==T){1}else if(x==F){0}else{NA}})
+  # Convert boolean segs.dat column back to numeric, if needed
+  segs.vals <- segs[, which(colnames(segs)==feature)]
+  if(all(sapply(segs.vals, function(x){is.logical(x) | is.na(x)}))){
+    segs.vals <- sapply(segs.vals, function(x){if(is.na(x)){NA}else if(x==T){1}else if(x==F){0}else{NA}})
   }
   if(measure == "mean"){
-    gw.dat <- c("ALL" = mean(gw.vals, na.rm=T),
-                "DEL" = mean(gw.vals[which(gw$cnv=="DEL")], na.rm=T),
-                "DUP" = mean(gw.vals[which(gw$cnv=="DUP")], na.rm=T))
+    segs.dat <- c("ALL" = mean(segs.vals, na.rm=T),
+                "DEL" = mean(segs.vals[which(segs$cnv=="DEL")], na.rm=T),
+                "DUP" = mean(segs.vals[which(segs$cnv=="DUP")], na.rm=T))
   }else if(measure == "median"){
-    gw.dat <- c("ALL" = median(gw.vals, na.rm=T),
-                "DEL" = median(gw.vals[which(gw$cnv=="DEL")], na.rm=T),
-                "DUP" = median(gw.vals[which(gw$cnv=="DUP")], na.rm=T))
+    segs.dat <- c("ALL" = median(segs.vals, na.rm=T),
+                "DEL" = median(segs.vals[which(segs$cnv=="DEL")], na.rm=T),
+                "DUP" = median(segs.vals[which(segs$cnv=="DUP")], na.rm=T))
   }else if(measure == "sum"){
-    gw.dat <- c("ALL" = sum(gw.vals, na.rm=T),
-                "DEL" = sum(gw.vals[which(gw$cnv=="DEL")], na.rm=T),
-                "DUP" = sum(gw.vals[which(gw$cnv=="DUP")], na.rm=T))
+    segs.dat <- c("ALL" = sum(segs.vals, na.rm=T),
+                "DEL" = sum(segs.vals[which(segs$cnv=="DEL")], na.rm=T),
+                "DUP" = sum(segs.vals[which(segs$cnv=="DUP")], na.rm=T))
   }else if(measure == "frac.any"){
-    gw.dat <- 100 * c("ALL" = length(which(gw.vals > 0)) / length(gw.vals),
-                      "DEL" = length(which(gw.vals[which(gw$cnv=="DEL")] > 0)) / length(which(gw$cnv=="DEL")),
-                      "DUP" = length(which(gw.vals[which(gw$cnv=="DUP")] > 0)) / length(which(gw$cnv=="DUP")))
+    segs.dat <- 100 * c("ALL" = length(which(segs.vals > 0)) / length(segs.vals),
+                      "DEL" = length(which(segs.vals[which(segs$cnv=="DEL")] > 0)) / length(which(segs$cnv=="DEL")),
+                      "DUP" = length(which(segs.vals[which(segs$cnv=="DUP")] > 0)) / length(which(segs$cnv=="DUP")))
   }
-  if(xnorm==T){
-    perm.meds <- apply(perm.dat, 2, median, na.rm=T)
+  perm.dat.raw <- perm.dat
+  segs.dat.raw <- segs.dat
+  if(norm==T){
+    perm.means <- apply(perm.dat, 2, mean, na.rm=T)
+    perm.sds <- apply(perm.dat, 2, sd, na.rm=T)
     for(i in 1:3){
-      perm.dat[, i] <- perm.dat[, i] - perm.meds[i]
-      gw.dat[i] <- gw.dat[i] - perm.meds[i]
+      perm.dat[, i] <- (perm.dat[, i] - perm.means[i]) / perm.sds[i]
+      segs.dat[i] <- (segs.dat[i] - perm.means[i]) / perm.sds[i]
     }
   }
   val.range <- range(perm.dat, na.rm=T)
@@ -425,47 +464,11 @@ plot.seg.perms <- function(gw, perms, feature, measure, xnorm=F,
   }
   bin.width <- bins[2]-bins[1]
   if(is.null(xlims)){
-    xrange <- range(rbind(perm.dat, gw.dat), na.rm=T)
+    xrange <- range(rbind(perm.dat, segs.dat), na.rm=T)
     xlims <- c(xrange[1], 1.25 * xrange[2])
   }
   perm.means <- apply(perm.dat, 2, mean, na.rm=T)
-  perm.pvals <- sapply(1:3, function(i){calc.perm.p(perm.vals=perm.dat[, i], obs.val=gw.dat[i])})
-  
-  # Helper function to add a single mirrored violin-histogram hybrid of values to an existing plot
-  plot.viohist <- function(perm.dat.vals, bins, y.at, width=0.8, 
-                           obs.val=NA, obs.color=NA, obs.border=NA, 
-                           color=bluewhite, border=blueblack,
-                           diamond.cex=4, y.title=NULL){
-    perm.hist <- hist(perm.dat.vals, breaks=bins, plot=F)
-    values <- perm.hist$counts
-    # Convert zero-bins to NAs for the outermost 5% of the distribution
-    outer.lims <- quantile(perm.dat.vals, probs=c(0.025, 0.975), na.rm=T)
-    outer.zero.bins <- intersect(which(perm.hist$mids < outer.lims[1] | perm.hist$mids > outer.lims[2]),
-                                 which(values==0))
-    values[outer.zero.bins] <- NA
-    values <- values / (max(values, na.rm=T) * 2/width)
-    rect(xleft=bins[-length(bins)], xright=bins[-1],
-         ybottom=-values + y.at, ytop=values + y.at, 
-         col=color, border="white")
-    segments(x0=rep(bins[-length(bins)], 2),
-             x1=rep(bins[-1], 2),
-             y0=c(values + y.at, -values + y.at), 
-             y1=c(values + y.at, -values + y.at),
-             col=border)
-    segments(x0=rep(bins, 2), x1=rep(bins, 2),
-             y0=c(y.at, values + y.at, y.at, -values + y.at),
-             y1=c(values + y.at, y.at, -values + y.at, y.at),
-             col=border)
-    segments(x0=obs.val, x1=obs.val, 
-             y0=y.at - 0.2, y1=y.at + 0.2, 
-             col=obs.color, lwd=3, lend="round")
-    points(x=obs.val, y=y.at, pch=23, bg=obs.color, 
-           col=obs.border, cex=diamond.cex)
-    if(!is.null(y.title)){
-      axis(2, at=y.at, line=-0.9, tick=F, las=2, labels=y.title)
-      # axis(2, at=c(y.at-(width/2), y.at+(width/2)), tck=0, labels=NA, col=blueblack)
-    }
-  }
+  perm.pvals <- sapply(1:3, function(i){calc.perm.p(perm.vals=perm.dat[, i], obs.val=segs.dat[i])})
   vio.colors <- rep(bluewhite, 3)
   vio.borders <- rep(blueblack, 3)
   # vio.colors <- c(purplewhite, redwhite, bluewhite)
@@ -483,17 +486,14 @@ plot.seg.perms <- function(gw, perms, feature, measure, xnorm=F,
   sapply(1:3, function(i){
     plot.viohist(perm.dat[, i], bins, i-0.5,
                  color=vio.colors[i], border=vio.borders[i],
-                 y.title=row.labels[i], diamond.cex=diamond.cex, obs.val=gw.dat[i], 
+                 y.title=row.labels[i], diamond.cex=diamond.cex, obs.val=segs.dat[i], 
                  obs.color=row.colors[i], obs.border=row.borders[i])
     segments(x0=perm.means[i], x1=perm.means[i],
              y0=i-0.7, y1=i-0.3, lwd=3, 
              col=vio.borders[i], lend="round")
-    text(x=gw.dat[i]-(0.03*(par("usr")[2]-par("usr")[1])), y=i-0.7, pos=4, 
+    text(x=segs.dat[i]-(0.03*(par("usr")[2]-par("usr")[1])), y=i-0.7, pos=4, 
          labels=perm.pvals[2, ][[i]], xpd=T, cex=stats.cex)
-    # text(x=gw.dat[i]-(0.03*(par("usr")[2]-par("usr")[1])), y=i-0.7, pos=4, 
-    #      labels=paste(prettyNum(round(1.73233, 1), small.interval=1), "fold", sep="-"),
-    #      xpd=T, cex=stats.cex)
-    print(paste(prettyNum(round(gw.dat[i]/mean(perm.dat[, i], na.rm=T), 1), small.interval=1), "fold", sep="-"))
+    print(paste(prettyNum(round(segs.dat.raw[i]/mean(perm.dat.raw[, i], na.rm=T), 1), small.interval=1), "fold", sep="-"))
   })
   axis(1, at=c(10e-10, 10e10), labels=NA, col=blueblack, tck=0)
   axis(1, at=unique(c(0, axTicks(1))), labels=NA, col=blueblack, tck=-0.03)
