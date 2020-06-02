@@ -62,43 +62,50 @@ source(paste(script.dir, "common_functions.R", sep="/"))
 loci <- load.loci(loci.in)
 segs <- load.segment.table(segs.in)
 
+# Subset to pathogenic segments
+segs <- segs[which(segs$any_gd | segs$gw_sig), ]
+
 # Merge loci & segment data for genome-wide significant sites only
 gw <- merge.loci.segs(loci, segs)
 
 # Swarmplot of segment size
-pdf(paste(out.prefix, "gw.segment_size_distribs.pdf", sep="."),
-    height=2, width=2.3)
-gw.simple.vioswarm(gw, y=log10(gw$size), add.y.axis=F, parmar=c(1.2, 4, 0.3, 0.3))
-axis(2, at=log10(logscale.minor), tck=-0.03, col=blueblack, labels=NA)
-axis(2, at=log10(c(300000, 600000, 1000000, 3000000)), tick=F, 
-     las=2, line=-0.65, labels=c("300kb", "600kb", "1Mb", "3Mb"))
+pdf(paste(out.prefix, "gw_plus_litGDGs.segment_size_distribs.pdf", sep="."),
+    height=2, width=2.75)
+segs.swarm(segs, x.bool=!(segs$gw_sig), y=log10(segs$size), 
+           x.labs=c("GW-Sig.", "Lit. (Not sig.)"), violin=T,
+           add.y.axis=F, pt.cex=0.75, parmar=c(1.2, 4, 0.2, 0.2))
+axis(2, at=log10(logscale.minor), tck=-0.015, col=blueblack, labels=NA, lwd=0.7)
+axis(2, at=log10(logscale.demi), tck=-0.03, col=blueblack, labels=NA)
+axis(2, at=log10(logscale.demi.bp), tick=F, las=2, line=-0.65, labels=logscale.demi.bp.labels)
 mtext(2, line=2.75, text=bquote("log"[10] * "(Segment Size)"))
 dev.off()
 
 # Swarmplot of genes per segment
-pdf(paste(out.prefix, "gw.n_genes_per_segment.pdf", sep="."),
-    height=2, width=2.3)
-gw.simple.vioswarm(gw, y=gw$n_genes, 
-                   add.y.axis=T, ytitle="Genes in Segment", 
-                   parmar=c(1.2, 3, 0.3, 0.3))
+pdf(paste(out.prefix, "gw_plus_litGDGs.n_genes_per_segment.pdf", sep="."),
+    height=2, width=2.6)
+segs.swarm(segs, x.bool=!(segs$gw_sig), y=segs$n_genes, 
+           x.labs=c("GW-Sig.", "Lit. (Not sig.)"), violin=T,
+           add.y.axis=T, ytitle="Genes in Segment", pt.cex=0.75, 
+           parmar=c(1.2, 3, 0.2, 0.2))
 dev.off()
 
 # Swarmplot of gene density
-pdf(paste(out.prefix, "gw.basic_gene_density.pdf", sep="."),
-    height=2, width=2.3)
-gw.simple.vioswarm(gw, y=100000*(gw$n_genes/gw$size), 
-                   add.y.axis=T, ytitle="Genes per 100kb", 
-                   parmar=c(1.2, 3, 0.3, 0.3))
+pdf(paste(out.prefix, "gw_plus_litGDGs.basic_gene_density.pdf", sep="."),
+    height=2, width=2.6)
+segs.swarm(segs, x.bool=!(segs$gw_sig), y=100000*(segs$n_genes/segs$size), 
+           x.labs=c("GW-Sig.", "Lit. (Not sig.)"), violin=T,
+           add.y.axis=T, ytitle="Genes per 100kb", pt.cex=0.75, 
+           parmar=c(1.2, 3, 0.2, 0.2))
 dev.off()
 
 # Scatterplot of size vs genes
-pdf(paste(out.prefix, "gw.genes_vs_size.pdf", sep="."),
+pdf(paste(out.prefix, "gw_plus_litGDs.genes_vs_size.pdf", sep="."),
     height=2, width=2)
-gw.scatter(gw, x=log10(gw$size), y=gw$n_genes, 
-           x.at=log10(logscale.minor), x.labs=rep(NA, length(logscale.minor)),
-           ytitle="Genes in Segment", parmar=c(2.75, 2.75, 0.3, 0.3))
-axis(1, at=log10(c(300000,1000000, 3000000)), tick=F, 
-     line=-0.7, labels=c("300kb", "1Mb", "3Mb"))
+segs.scatter(segs, x=log10(segs$size), y=segs$n_genes, 
+             x.at=log10(logscale.minor), x.labs=rep(NA, length(logscale.minor)),
+             pt.cex=0.75, ytitle="Genes in Segment", parmar=c(2.75, 2.75, 0.3, 0.3))
+axis(1, at=log10(c(500000, 5000000)), tick=F, 
+     line=-0.7, labels=c("500kb", "5Mb"))
 mtext(1, line=1.35, text=bquote("log"[10] * "(Segment Size)"))
 dev.off()
- 
+

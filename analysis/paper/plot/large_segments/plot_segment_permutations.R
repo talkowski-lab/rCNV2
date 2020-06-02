@@ -35,12 +35,68 @@ load.perms <- function(perm.res.in){
 }
 
 
+##########################
+### PLOTTING FUNCTIONS ###
+##########################
+# Plot scaled Venn diagram of GW-sig and literature-curated segs
+cnv.venn <- function(segs, cnv, perms=NULL, margin=0.05){
+  # Get plot values
+  gw.idx <- which(segs$gw_sig & segs$cnv==cnv)
+  n.gw <- length(gw.idx)
+  lit.idx <- which(segs$any_gd & segs$cnv==cnv)
+  n.lit <- length(lit.idx)
+  both.idx <- intersect(gw.idx, lit.idx)
+  n.both <- length(both.idx)
+  
+  # Set colors
+  colors <- c(control.cnv.colors[which(names(cnv.colors)==cnv)],
+              cnv.colors[which(names(cnv.colors)==cnv)])
+
+  # # Calculate permuted P-value of overlap if permutation results are provided
+  # if(!is.null(perms)){
+  #   perm.dat <- perm.summary(perms, feature="any_gd", measure="sum", 
+  #                            subset_to_regions=segs$region_id[gw.idx])
+  #   perm.p <- length(which(perm.dat[, 1] >= n.both)) / nrow(perm.dat)
+  #   if(perm.p == 0){
+  #     p.fmt <- format.pval(1/nrow(perm.dat), equality="<")
+  #   }else{
+  #     p.fmt <- format.pval(perm.p)
+  #   }
+  # }else{
+  #   p.fmt <- NULL
+  # }
+  # 
+  # # Set axis label dimensions
+  # if(cnv == "DEL"){
+  #   lab.side <- 1
+  #   lab.line <- -0.1
+  # }else{
+  #   lab.side <- 3
+  #   lab.line <- -0.3
+  # }
+  
+  # Prep plot area
+  par(mar=rep(0.1, 4), bty="n")
+  plot(NA, xlim=c(0, 1), ylim=c(0, 1), asp=1,
+       xaxs="i", xaxt="n", xlab="", 
+       yaxs="i", yaxt="n", ylab="")
+  draw.pairwise.venn(n.lit, n.gw, n.both, 
+                     col=colors, rotation.degree=180,
+                     fill=sapply(colors, adjustcolor, alpha=0.5),
+                     add=T, fontfamily="sans", margin=margin)
+  # mtext(lab.side, line=lab.line, text=cnv, font=2, col=colors[2])
+  # mtext(lab.side, line=lab.line, text=p.fmt)
+  # axis(lab.side, at=c(0.05, 0.95), tck=0, col=blueblack, labels=NA)
+}
+
+
 #####################
 ### RSCRIPT BLOCK ###
 #####################
 require(optparse, quietly=T)
 require(funr, quietly=T)
 require(MASS, quietly=T)
+require(VennDiagram, quietly=T)
 
 # List of command-line options
 option_list <- list(
@@ -48,14 +104,14 @@ option_list <- list(
 )
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage=paste("%prog loci.bed segs.tsv perm_res.bed lit_GD_perm_res.bed out_prefix", sep=" "),
+args <- parse_args(OptionParser(usage=paste("%prog loci.bed segs.tsv perm_res.bed lit_GD_perm_res.bed outdir prefix", sep=" "),
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Checks for appropriate positional arguments
-if(length(args$args) != 5){
-  stop(paste("Four positional arguments required: loci.bed, segs.tsv, perm_res.bed, lit_GD_perm_res.bed, output_prefix\n", sep=" "))
+if(length(args$args) != 6){
+  stop(paste("Six positional arguments required: loci.bed, segs.tsv, perm_res.bed, lit_GD_perm_res.bed, outdir, and prefix\n", sep=" "))
 }
 
 # Writes args & opts to vars
@@ -63,7 +119,8 @@ loci.in <- args$args[1]
 segs.in <- args$args[2]
 perm.res.in <- args$args[3]
 lit.perm.res.in <- args$args[4]
-out.prefix <- args$args[5]
+outdir <- args$args[5]
+prefix <- args$args[6]
 rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
@@ -71,7 +128,8 @@ rcnv.config <- opts$`rcnv-config`
 # segs.in <- "~/scratch/rCNV2_analysis_d1.master_segments.bed.gz"
 # perm.res.in <- "~/scratch/rCNV2_analysis_d1.10000_permuted_segments.bed.gz"
 # lit.perm.res.in <- "~/scratch/rCNV2_analysis_d1.lit_GDs.10000_permuted_segments.bed.gz"
-# out.prefix <- "~/scratch/test_effect_sizes"
+# outdir <- "~/scratch/"
+# prefix <- "test_seg_perm_res"
 # rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
 # script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
 
@@ -99,32 +157,34 @@ gw <- merge.loci.segs(loci, segs)
 perms <- load.perms(perm.res.in)
 lit.perms <- load.perms(lit.perm.res.in)
 
-# Plot overlap with known genomic disorders
-pdf(paste(out.prefix, "seg_permutations.gw_sig.gd_overlap.pdf", sep="."),
-    height=2.2, width=2.6)
+# Plot single panel of overlap with known genomic disorders
+print("Overlap with known genomic disorders:")
+pdf(paste(outdir, "/", prefix, ".gd_overlap.pdf", sep=""),
+    height=2.2, width=2.5)
 plot.seg.perms(segs, perms, feature="any_gd", 
                subset_to_regions=gw.ids,
                measure="sum", n.bins=30,
                x.title="Known Genomic Disorders",
-               diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.8))
+               parmar=c(2.2, 2, 0, 2.0))
 dev.off()
+
+# Venn diagrams of overlap between gw-sig and lit GDs
+sapply(c("DEL", "DUP"), function(cnv){
+  pdf(paste(outdir, "/", prefix, ".gw_vs_lit.", cnv, ".venn.pdf", sep=""),
+      height=1, width=1)
+  cnv.venn(segs[which(segs$gw_sig | segs$any_gd), ], cnv, perms, margin=0.025)
+  dev.off()
+})
 
 # Plot number of genes
-pdf(paste(out.prefix, "seg_permutations.gw_sig.n_genes.mean.pdf", sep="."),
-    height=2.2, width=2.4)
-plot.seg.perms(segs, perms, feature="n_genes", 
-               subset_to_regions=gw.ids,
-               measure="mean", n.bins=30, 
-               x.title="Mean Genes per Segment", 
-               diamond.cex=1.25, parmar=c(2.2, 2, 0, 0.6))
-dev.off()
+print("Mean number of genes per segment:")
+plot.all.perm.res(segs, perms, lit.perms, 
+                  feature="n_genes", measure="mean",
+                  outdir, prefix, norm=F, norm.multi=F,
+                  n.bins.single=30, n.bins.multi=50,
+                  x.title="Mean Genes per Segment", 
+                  pdf.dims.single=c(2.2, 2.4),
+                  parmar.single=c(2.25, 2, 0, 1.2),
+                  pdf.dims.multi=c(4, 3.5),
+                  parmar.multi=c(2.25, 6.25, 0, 0.5))
 
-# Plot number of genes for literature GDs
-pdf(paste(out.prefix, "seg_permutations.lit_non_gw.n_genes.mean.pdf", sep="."),
-    height=2.2, width=2.4)
-plot.seg.perms(segs.lit, lit.perms, feature="n_genes", 
-               subset_to_regions=lit.ids,
-               measure="mean", n.bins=30, 
-               x.title="Mean Genes per Segment", 
-               diamond.cex=1.25, parmar=c(2.2, 2, 0, 0.6))
-dev.off()

@@ -148,12 +148,12 @@ get.hpo.color <- function(hpo){
 }
 
 # Format p-value for printing to plots
-format.pval <- function(p, nsmall=2, max.decimal=3, equality="="){
-  if(-log10(p)>100){
-    bquote(italic(P) < 10 ^ -100)
+format.pval <- function(p, nsmall=2, max.decimal=3, equality="=", min.phred.p=100){
+  if(-log10(p)>min.phred.p){
+    bquote(italic(P) %~~% 0)
   }else if(ceiling(-log10(p)) > max.decimal){
     parts <- unlist(strsplit(format(p, scientific=T), split="e"))
-    base <- gsub(" ", "", formatC(round(as.numeric(parts[1]), nsmall), digits=nsmall), fixed=T)
+    base <- gsub(" ", "", formatC(round(as.numeric(parts[1]), nsmall), digits=1+nsmall), fixed=T)
     exp <- gsub(" ", "", as.numeric(parts[2]), fixed=T)
     bquote(italic(P) ~ .(equality) ~ .(base) ~ "x" ~ 10 ^ .(exp))
   }else{

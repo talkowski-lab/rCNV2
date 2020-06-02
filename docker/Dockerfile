@@ -65,7 +65,7 @@ RUN Rscript -e "sapply(c('optparse','metafor','KernSmooth','metap','MASS','flux'
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 RUN Rscript -e "sapply(c('beeswarm','Hmisc','EQL','vioplot'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
-RUN Rscript -e "sapply(c('psych','funr'),\
+RUN Rscript -e "sapply(c('psych','funr','VennDiagram'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 RUN Rscript -e \
     "install.packages('https://cran.r-project.org/src/contrib/Archive/plotrix/plotrix_3.6-6.tar.gz')"
@@ -81,7 +81,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout ffa0ae3ca4b3a4067ab865dca82e773bd19ad1b3 && \
+    git checkout 95216acae0ed8efdbef9842c9a3e62e4b7f99da4 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)

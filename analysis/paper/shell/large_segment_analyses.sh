@@ -168,7 +168,8 @@ mkdir perm_test_plots
   ${prefix}.master_segments.bed.gz \
   ${prefix}.${n_seg_perms}_permuted_segments.bed.gz \
   ${prefix}.lit_GDs.${n_seg_perms}_permuted_segments.bed.gz \
-  perm_test_plots/${prefix}
+  perm_test_plots/ \
+  "${prefix}.segment_perms"
 
 
 # Run segment permutation tests while matching on number of genes per segment
@@ -191,7 +192,8 @@ fi
   ${prefix}.master_segments.bed.gz \
   ${prefix}.${n_seg_perms}_permuted_segments_bygene.tsv.gz \
   ${prefix}.lit_GDs.${n_seg_perms}_permuted_segments_bygene.tsv.gz \
-  perm_test_plots/${prefix}
+  perm_test_plots/ \
+  "${prefix}.segment_perms_bygene"
 
 
 # Plot effect size covariates

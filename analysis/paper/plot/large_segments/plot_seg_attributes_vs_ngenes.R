@@ -59,20 +59,6 @@ scatter.vsGenes <- function(segs, feature, pt.cex=0.75, fit=NULL,
   segs <- segs[which(segs$n_genes>0), ]
   ngenes <- segs$n_genes
   vals <- segs[, which(colnames(segs) == feature)]
-  pt.bg <- sapply(1:nrow(segs), function(i){
-    if(segs$gw[i]){
-      cnv.colors[which(names(cnv.colors)==segs$cnv[i])]
-    }else{
-      control.cnv.colors[which(names(control.cnv.colors)==segs$cnv[i])]
-    }
-  })
-  pt.col <- sapply(1:nrow(segs), function(i){
-    if(segs$gw[i]){
-      cnv.blacks[which(names(cnv.blacks)==segs$cnv[i])]
-    }else{
-      cnv.colors[which(names(cnv.colors)==segs$cnv[i])]
-    }
-  })
   if(is.null(xlims)){
     xlims <- c(0, max(ngenes, na.rm=T))
   }
@@ -93,12 +79,9 @@ scatter.vsGenes <- function(segs, feature, pt.cex=0.75, fit=NULL,
   }
   
   # Add points
-  points(ngenes[which(!segs$gw)], vals[which(!segs$gw)],
-         pch=21, cex=pt.cex, 
-         bg=pt.bg[which(!segs$gw)], col=pt.col[which(!segs$gw)])
-  points(ngenes[which(segs$gw)], vals[which(segs$gw)],
-         pch=22, cex=pt.cex, 
-         bg=pt.bg[which(segs$gw)], col=pt.col[which(segs$gw)])
+  points(ngenes, vals,
+         pch=segs$pt.pch, cex=pt.cex, 
+         bg=segs$pt.bg, col=segs$pt.border)
   
   # Fit trendlines for DEL and DUP, if optioned
   if(!is.null(fit)){
@@ -191,19 +174,50 @@ source(paste(script.dir, "common_functions.R", sep="/"))
 
 # Load segment table & subset to pathogenic sites
 segs <- load.segment.table(segs.in)
-segs <- segs[which(segs$pathogenic), ]
-segs$prop_constrained <- segs$n_gnomAD_constrained_genes / segs$n_genes
+segs <- segs[which(segs$gw_sig | segs$any_gd), ]
 prop_constrained.genome_avg <- 3036/18641
 
 # Plot proportion of constrained genes vs. # of genes
 pdf(paste(out.prefix, "prop_constrained_vs_ngenes.pdf", sep="."),
     height=2.2, width=3)
-scatter.vsGenes(segs, feature="prop_constrained", y.title="Constrained Genes",
-                legend.pos="topright", pt.cex=0.85,
+scatter.vsGenes(segs, feature="gnomAD_constrained_prop", y.title="Constrained Genes",
+                y.pct=T, pt.cex=0.85,
                 horiz.line=prop_constrained.genome_avg,
-                y.pct=T, y.title.line=2.25, parmar=c(2.5, 3.25, 0.5, 3.5))
+                y.title.line=2.25, parmar=c(2.5, 3.25, 0.5, 3.5))
 axis(4, at=prop_constrained.genome_avg, tck=-0.03, col=blueblack, labels=NA)
 axis(4, at=prop_constrained.genome_avg, tick=F, line=-0.9, las=2,
      labels=c("Genome\naverage"), col.axis=blueblack, font=3, cex=0.8)
+dev.off()
+
+# Plot average enrichment of ASC DNMs vs. # of genes
+pdf(paste(out.prefix, "ASC_dnPTVs_vs_ngenes.pdf", sep="."),
+    height=2.2, width=2.4)
+scatter.vsGenes(segs, feature="ASC_dnm_lof_vs_expected_per_gene", 
+                y.title=bquote("Excess" ~ italic("dn") * "PTVs / Gene"),
+                y.pct=F, pt.cex=0.85, horiz.line=0,
+                y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
+dev.off()
+pdf(paste(out.prefix, "ASC_dnMis_vs_ngenes.pdf", sep="."),
+    height=2.2, width=2.4)
+scatter.vsGenes(segs, feature="ASC_dnm_mis_vs_expected_per_gene", 
+                y.title=bquote("Excess" ~ italic("dn") * "Mis. / Gene"),
+                y.pct=F, pt.cex=0.85, horiz.line=0,
+                y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
+dev.off()
+
+# Plot average enrichment of DDD DNMs vs. # of genes
+pdf(paste(out.prefix, "DDD_dnPTVs_vs_ngenes.pdf", sep="."),
+    height=2.2, width=2.4)
+scatter.vsGenes(segs, feature="DDD_dnm_lof_vs_expected_per_gene", 
+                y.title=bquote("Excess" ~ italic("dn") * "PTVs / Gene"),
+                y.pct=F, pt.cex=0.85, horiz.line=0,
+                y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
+dev.off()
+pdf(paste(out.prefix, "DDD_dnMis_vs_ngenes.pdf", sep="."),
+    height=2.2, width=2.4)
+scatter.vsGenes(segs, feature="DDD_dnm_mis_vs_expected_per_gene", 
+                y.title=bquote("Excess" ~ italic("dn") * "Mis. / Gene"),
+                y.pct=F, pt.cex=0.85, horiz.line=0,
+                y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
 dev.off()
 

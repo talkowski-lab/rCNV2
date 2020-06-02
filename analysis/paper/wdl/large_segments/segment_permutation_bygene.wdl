@@ -248,7 +248,7 @@ task annotate_shard {
         --hpo-genelists hpo_genelists.tsv \
         --segment-hpos segment_hpos.tsv \
         --dnm-tsvs dnm_counts_to_annotate.tsv \
-        --snv-mus gene_mutation_rates.tsv.gz \
+        --snv-mus refs/gene_mutation_rates.tsv.gz \
         --outfile ${perm_prefix}.annotated.tsv.gz \
         --gzip \
         ${perm_table}
@@ -256,7 +256,7 @@ task annotate_shard {
       /opt/rCNV2/analysis/paper/scripts/large_segments/annotate_shuffled_seg_gene_blocks.py \
         --gene-sets genelists_to_annotate.tsv \
         --dnm-tsvs dnm_counts_to_annotate.tsv \
-        --snv-mus gene_mutation_rates.tsv.gz \
+        --snv-mus refs/gene_mutation_rates.tsv.gz \
         --outfile ${perm_prefix}.annotated.tsv.gz \
         --gzip \
         ${perm_table}
@@ -264,7 +264,7 @@ task annotate_shard {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2176cfce20a878f1dd3288e8e534c57689c58663d0354ef68b5c7c18bf34d4b7"
+    docker: "talkowski/rcnv@sha256:4437404f27d6492866882886e3053106bd3b90509f4eec94ecda060548cb78a8"
     preemptible: 1
   }
 
@@ -303,7 +303,7 @@ task merge_perms {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2176cfce20a878f1dd3288e8e534c57689c58663d0354ef68b5c7c18bf34d4b7"
+    docker: "talkowski/rcnv@sha256:4437404f27d6492866882886e3053106bd3b90509f4eec94ecda060548cb78a8"
     preemptible: 1
     disks: "local-disk 200 SSD"
   }

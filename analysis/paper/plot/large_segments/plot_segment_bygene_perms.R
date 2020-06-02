@@ -24,6 +24,13 @@ load.perms <- function(perm.res.in){
   colnames(perms)[1] <- gsub("#", "", colnames(perms)[1], fixed=T)
   perm.range <- sort(unique(perms$perm_idx))
   
+  # Add normalized columns
+  perms$gnomAD_constrained_prop <- perms$n_gnomAD_constrained_genes / perms$n_genes
+  for(cname in colnames(perms)[grep("_dnm_", colnames(perms), fixed=T)]){
+    new.cname <- paste(cname, "per_gene", sep="_")
+    perms[, new.cname] <- perms[cname] / perms$n_genes
+  }
+  
   # Split each permutation into a list of dfs (one per perm)
   lapply(perm.range, function(i){
     as.data.frame(perms[which(perms$perm_idx==i), -(which(colnames(perms)=="perm_idx"))])
@@ -44,14 +51,14 @@ option_list <- list(
 )
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage=paste("%prog loci.bed segs.tsv perm_res.tsv lit_GDs.perm_res.tsv out_prefix", sep=" "),
+args <- parse_args(OptionParser(usage=paste("%prog loci.bed segs.tsv perm_res.bed lit_GD_perm_res.bed outdir prefix", sep=" "),
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Checks for appropriate positional arguments
-if(length(args$args) != 5){
-  stop(paste("Four positional arguments required: loci.bed, segs.tsv, perm_res.tsv, lit_GDs.perm_res.tsv, output_prefix\n", sep=" "))
+if(length(args$args) != 6){
+  stop(paste("Six positional arguments required: loci.bed, segs.tsv, perm_res.bed, lit_GD_perm_res.bed, outdir, and prefix\n", sep=" "))
 }
 
 # Writes args & opts to vars
@@ -59,15 +66,17 @@ loci.in <- args$args[1]
 segs.in <- args$args[2]
 perm.res.in <- args$args[3]
 lit.perm.res.in <- args$args[4]
-out.prefix <- args$args[5]
+outdir <- args$args[5]
+prefix <- args$args[6]
 rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
 # loci.in <- "~/scratch/rCNV.final_segments.loci.bed.gz"
 # segs.in <- "~/scratch/rCNV2_analysis_d1.master_segments.bed.gz"
 # perm.res.in <- "~/scratch/rCNV2_analysis_d1.10000_permuted_segments_bygene.tsv.gz"
-# perm.res.in <- "~/scratch/rCNV2_analysis_d1.lit_GDs.10000_permuted_segments_bygene.tsv.gz"
-# out.prefix <- "~/scratch/test_perm_bygene"
+# lit.perm.res.in <- "~/scratch/rCNV2_analysis_d1.lit_GDs.10000_permuted_segments_bygene.tsv.gz"
+# outdir <- "~/scratch"
+# prefix <- "test_perm_bygene"
 # rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
 # script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
 
@@ -87,58 +96,113 @@ segs <- load.segment.table(segs.in)
 # Merge loci & segment data for genome-wide significant sites only
 gw <- merge.loci.segs(loci, segs)
 
+# Get list of neuro loci plus lit GDs
+neuro.plus.lit.ids <- sort(unique(c(loci$region_id[which(sapply(loci$hpos, function(hpos){any(hpos %in% neuro.hpos)}))],
+                                    segs$region_id[which(segs$any_gd & !segs$gw_sig)])))
+
 # Load permutation results
 perms <- load.perms(perm.res.in)
 lit.perms <- load.perms(lit.perm.res.in)
 
-# Fraction of segments with at least one HPO-matched gene & avg. HPO-matched genes per seg
+# Fraction of gw-sig segments with at least one HPO-matched gene
 print("Fraction of segments with at least one HPO-matched gene:")
-pdf(paste(out.prefix, "seg_permutations.HPOmatched_genes.frac_any.pdf", sep="."),
+pdf(paste(outdir, "/", prefix, ".HPOmatched_genes.frac_any.pdf", sep=""),
     height=2.2, width=2.4)
-plot.seg.perms(gw, perms, feature="n_HPOmatched_genes", measure="frac.any", n.bins=15,
-               x.title="Pct. w/HPO-Matched Gene", 
-               diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.8))
+plot.seg.perms(gw, perms, feature="n_HPOmatched_genes", measure="frac.any", 
+               n.bins=15, x.title="Pct. w/HPO-Matched Gene", 
+               parmar=c(2.2, 2, 0, 1.8))
 dev.off()
+
+# Mean # of HPO-matched genes per gw-sig segment
 print("Mean HPO-matched genes per segment:")
-pdf(paste(out.prefix, "seg_permutations.HPOmatched_genes.mean.pdf", sep="."),
+pdf(paste(outdir, "/", prefix, ".HPOmatched_genes.mean.pdf", sep=""),
     height=2.2, width=2.4)
-plot.seg.perms(gw, perms, feature="n_HPOmatched_genes", measure="mean", n.bins=30,
-               x.title="Mean HPO-Matched Genes", 
-               diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.8))
+plot.seg.perms(gw, perms, feature="n_HPOmatched_genes", measure="mean", 
+               n.bins=30, x.title="Mean HPO-Matched Genes",
+               parmar=c(2.2, 2, 0, 2))
 dev.off()
 
 # Fraction of segments with at least one constrained gene
 print("Fraction of segments with at least one constrained gene:")
-pdf(paste(out.prefix, "seg_permutations.constrained_genes.frac_any.pdf", sep="."),
-    height=2.2, width=2.4)
-plot.seg.perms(gw, perms, feature="n_gnomAD_constrained_genes", measure="frac.any", n.bins=15,
-               x.title="Pct. w/Constrained Gene", 
-               diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.8))
-dev.off()
-print("Mean constrained genes per segment:")
-pdf(paste(out.prefix, "seg_permutations.constrained_genes.mean.pdf", sep="."),
-    height=2.2, width=2.4)
-plot.seg.perms(gw, perms, feature="n_gnomAD_constrained_genes", measure="mean", n.bins=30,
-               x.title="Mean Constrained Genes", 
-               diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.8))
-dev.off()
+plot.all.perm.res(segs, perms, lit.perms, 
+                  feature="n_gnomAD_constrained_genes", measure="frac.any",
+                  outdir, prefix, norm=F, norm.multi=F,
+                  n.bins.single=15, n.bins.multi=30,
+                  xmax=100, x.title="Pct. w/Constrained Gene",
+                  pdf.dims.single=c(2.2, 2.4),
+                  parmar.single=c(2.25, 2, 0, 2),
+                  pdf.dims.multi=c(4, 3.5),
+                  parmar.multi=c(2.25, 6.25, 0, 2.4))
 
-# Fraction of neuro segments with at least one DECIPHER gene
-neuro.seg.ids <- gw$region_id[which(unlist(lapply(gw$hpos, function(hpos){any(hpos %in% neuro.hpos)})))]
-print("Fraction of neuro segments with at least one DECIPHER LoF gene:")
-pdf(paste(out.prefix, "seg_permutations.neuro_only.DECIPHER_LoF_genes.frac_any.pdf", sep="."),
-    height=2.2, width=2.4)
-plot.seg.perms(gw, perms, feature="n_DECIPHER_LoF_genes", measure="frac.any", 
-               subset_to_regions=neuro.seg.ids, n.bins=15,
-               x.title="Pct. w/LoF DECIPHER Gene", 
-               diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.8))
-dev.off()
-print("Fraction of neuro segments with at least one DECIPHER GoF gene:")
-pdf(paste(out.prefix, "seg_permutations.neuro_only.DECIPHER_GoF_genes.frac_any.pdf", sep="."),
-    height=2.2, width=2.4)
-plot.seg.perms(gw, perms, feature="n_DECIPHER_GoF_genes", measure="frac.any", 
-               subset_to_regions=neuro.seg.ids, n.bins=30,
-               x.title="Pct. w/GoF DECIPHER Gene", 
-               diamond.cex=1.25, parmar=c(2.2, 2, 0, 1.8))
-dev.off()
+# Mean number of constrained genes per segment
+print("Mean constrained genes per segment:")
+plot.all.perm.res(segs, perms, lit.perms, 
+                  feature="n_gnomAD_constrained_genes", measure="mean",
+                  outdir, prefix, norm=F, norm.multi=F,
+                  n.bins.single=30, n.bins.multi=50,
+                  x.title="Mean Constrained Genes", 
+                  pdf.dims.single=c(2.2, 2.4),
+                  parmar.single=c(2.25, 2, 0, 1.2),
+                  pdf.dims.multi=c(4, 3.5),
+                  parmar.multi=c(2.25, 6.25, 0, 0.5))
+
+# Mean excess number of de novo PTVs per gene in ASC
+# When restricting gw-sig to neuro-associated loci
+print("ASC LoF DNMs per gene vs. expected:")
+plot.all.perm.res(segs, perms, lit.perms, 
+                  feature="ASC_dnm_lof_vs_expected_per_gene", measure="mean",
+                  outdir, paste(prefix, "gw_neuro_plus_lit", sep="."), 
+                  subset_to_regions=neuro.plus.lit.ids,
+                  norm=F, norm.multi=F,
+                  n.bins.single=50, n.bins.multi=50, min.bins=25,
+                  x.title=bquote("Excess" ~ italic("De Novo") ~ "PTVs / Gene"), 
+                  pdf.dims.single=c(2.2, 2.4),
+                  parmar.single=c(2.25, 2, 0, 1.2),
+                  pdf.dims.multi=c(4, 3.5),
+                  parmar.multi=c(2.25, 6.25, 0, 0.5))
+
+# Mean excess number of de novo missense per gene in ASC
+# When restricting gw-sig to neuro-associated loci
+print("ASC missense DNMs per gene vs. expected:")
+plot.all.perm.res(segs, perms, lit.perms, 
+                  feature="ASC_dnm_mis_vs_expected_per_gene", measure="mean",
+                  outdir, paste(prefix, "gw_neuro_plus_lit", sep="."), 
+                  subset_to_regions=neuro.plus.lit.ids,
+                  norm=F, norm.multi=F,
+                  n.bins.single=50, n.bins.multi=50, min.bins=25,
+                  x.title=bquote("Excess" ~ italic("De Novo") ~ "Mis. / Gene"), 
+                  pdf.dims.single=c(2.2, 2.4),
+                  parmar.single=c(2.25, 2, 0, 2.0),
+                  pdf.dims.multi=c(4, 3.5),
+                  parmar.multi=c(2.25, 6.25, 0, 2.25))
+
+# Mean excess number of de novo PTVs per gene in DDD
+# When restricting gw-sig to neuro-associated loci
+print("DDD LoF DNMs per gene vs. expected:")
+plot.all.perm.res(segs, perms, lit.perms, 
+                  feature="DDD_dnm_lof_vs_expected_per_gene", measure="mean",
+                  outdir, paste(prefix, "gw_neuro_plus_lit", sep="."), 
+                  subset_to_regions=neuro.plus.lit.ids,
+                  norm=F, norm.multi=F,
+                  n.bins.single=50, n.bins.multi=50, min.bins=25,
+                  x.title=bquote("Excess" ~ italic("De Novo") ~ "PTVs / Gene"), 
+                  pdf.dims.single=c(2.2, 2.4),
+                  parmar.single=c(2.25, 2, 0, 2.0),
+                  pdf.dims.multi=c(4, 3.5),
+                  parmar.multi=c(2.25, 6.25, 0, 2.25))
+
+# Mean excess number of de novo missense per gene in DDD
+# When restricting gw-sig to neuro-associated loci
+print("DDD missense DNMs per gene vs. expected:")
+plot.all.perm.res(segs, perms, lit.perms, 
+                  feature="DDD_dnm_mis_vs_expected_per_gene", measure="mean",
+                  outdir, paste(prefix, "gw_neuro_plus_lit", sep="."), 
+                  subset_to_regions=neuro.plus.lit.ids,
+                  norm=F, norm.multi=F,
+                  n.bins.single=50, n.bins.multi=50, min.bins=25,
+                  x.title=bquote("Excess" ~ italic("De Novo") ~ "Mis. / Gene"), 
+                  pdf.dims.single=c(2.2, 2.4),
+                  parmar.single=c(2.25, 2, 0, 1.2),
+                  pdf.dims.multi=c(4, 3.5),
+                  parmar.multi=c(2.25, 6.25, 0, 0.5))
 
