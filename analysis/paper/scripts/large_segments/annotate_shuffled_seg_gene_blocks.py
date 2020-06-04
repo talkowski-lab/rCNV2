@@ -17,6 +17,7 @@ from os.path import splitext
 import gzip
 from sys import stdout
 import pandas as pd
+from numpy import log10
 from scipy.stats import hmean
 import subprocess
 
