@@ -165,6 +165,7 @@ plot.seg.perms(segs, perms, feature="any_gd",
                subset_to_regions=gw.ids,
                measure="sum", n.bins=30,
                x.title="Known Genomic Disorders",
+               diamond.pch=22,
                parmar=c(2.2, 2, 0, 2.0))
 dev.off()
 
@@ -186,5 +187,5 @@ plot.all.perm.res(segs, perms, lit.perms,
                   pdf.dims.single=c(2.2, 2.4),
                   parmar.single=c(2.25, 2, 0, 1.2),
                   pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.25, 6.25, 0, 0.5))
+                  parmar.multi=c(2.2, 6.05, 0, 2.2))
 

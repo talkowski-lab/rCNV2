@@ -17,6 +17,7 @@ from os.path import splitext
 import gzip
 from sys import stdout
 import pandas as pd
+from scipy.stats import hmean
 import subprocess
 
 
@@ -37,6 +38,26 @@ def load_hpo_genelists(tsv_in):
             hpo_genes[hpo] = [g.rstrip() for g in open(path).readlines()]
 
     return hpo_genes
+
+
+def preprocess_gtex(gtex_in, min_expression=1):
+    """
+    Preprocess GTEx expression matrix for segment annotation
+    """
+
+    # Load GTEx stats
+    gtex = pd.read_csv(gtex_in, sep='\t').rename(columns = {'#gene' : 'gene'})
+    gtex.index = gtex['gene']
+    gtex.drop(columns='gene', inplace=True)
+
+    # Compute arithmetic mean per gene
+    gtex_means = gtex.mean(axis=1, skipna=True)
+
+    # Collect ubiquitous expressor labels
+    trans_min = log10(min_expression + 1)
+    gtex_ubi = gtex.apply(lambda vals: all(vals.dropna() >= trans_min), axis=1)
+
+    return gtex_means, gtex_ubi
 
 
 def main():
@@ -65,6 +86,12 @@ def main():
     parser.add_argument('--snv-mus', help='Tsv of snv mutation rates per gene. ' +
                         'Four columns expected: gene, and relative mutation rates ' +
                         'for lof, missense, and synonymous mutations.')
+    parser.add_argument('--gtex-matrix', help='Tsv gene X tissue expression levels ' +
+                        'from GTEx. Will be used for various expression-based ' +
+                        'gene annotations.')
+    parser.add_argument('--min-expression', default=1, help='Minimum expression ' +
+                        'level (in unscaled TPM) to consider a gene as "expressed". ' +
+                        '[default: 1]')
     parser.add_argument('-o', '--outfile', help='Path to output tsv file. [default: ' +
                         'stdout]', default='stdout')
     parser.add_argument('-z', '--gzip', action='store_true', help='Compress ' + 
@@ -135,6 +162,11 @@ def main():
                         mus[study]['mu_' + csq] = mus[study]['mu_' + csq] * n_dnms
                         header_cols.append('_'.join([study, 'dnm', csq, 'vs_expected']))
 
+    # Preprocess GTEx expression matrix, if optioned
+    if args.gtex_matrix is not None:
+        gtex_mean, gtex_ubi = preprocess_gtex(args.gtex_matrix, min_expression=args.min_expression)
+        header_cols += ['gene_expression_harmonic_mean n_ubiquitously_expressed_genes'.split()]
+
     # Write header to outfile
     outfile.write('\t'.join(header_cols) + '\n')
 
@@ -173,6 +205,17 @@ def main():
                         obs = dnm_df.loc[dnm_df.gene.isin(genes) & ~dnm_df.gene.isin(genes_no_mus), csq].sum()
                         exp = mu_df_x.loc[mu_df_x.gene.isin(genes) & ~mu_df_x.gene.isin(genes_no_mus), 'mu_' + csq].sum()
                         outvals.append(round(obs - exp, 6))
+
+        # Annotate with expression-based features, if optioned
+        if args.gtex_matrix is not None:
+            elig_genes = gtex_means.index.tolist()
+            gtex_genes = [g for g in genes if g in elig_genes]
+            if len(gtex_genes) > 0:
+                mean_expr = hmean(gtex_means[gtex_means.index.isin(gtex_genes)])
+                n_ubi = gtex_ubi[gtex_ubi.index.isin(gtex_genes)].sum()
+                outvals.append([mean_expr, n_ubi])
+            else:
+                outvals.append([0, 0])
 
         outfile.write('\t'.join([str(x) for x in outvals]) + '\n')
 

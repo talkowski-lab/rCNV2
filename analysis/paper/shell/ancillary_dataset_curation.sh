@@ -44,6 +44,12 @@ wget https://www.biorxiv.org/content/biorxiv/early/2020/04/01/797787/DC4/embed/m
   --genes gencode.v19.canonical.pext_filtered.genes.list \
   -o asc_dnm_counts.tsv.gz \
   -z
+/opt/rCNV2/data_curation/other/curate_asc_dnms.py \
+  --dnm-tsv satterstrom_asc_dnms.raw.tsv.gz \
+  --genes gencode.v19.canonical.pext_filtered.genes.list \
+  --controls \
+  -o asc_dnm_counts.unaffecteds.tsv.gz \
+  -z
 
 
 # Download & reformat gnomAD mutation rate table
@@ -58,6 +64,6 @@ gzip -f gene_mutation_rates.tsv
 # Copy curated DNMs and mutation rates to gs:// bucket (note: requires permissions)
 gsutil -m cp \
   ddd_dnm_counts.tsv.gz \
-  asc_dnm_counts.tsv.gz \
+  asc_dnm_counts*tsv.gz \
   gene_mutation_rates.tsv.gz \
   ${rCNV_bucket}/analysis/paper/data/misc/

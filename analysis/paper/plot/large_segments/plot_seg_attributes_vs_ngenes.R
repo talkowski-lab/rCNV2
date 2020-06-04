@@ -107,7 +107,9 @@ scatter.vsGenes <- function(segs, feature, pt.cex=0.75, fit=NULL,
   # Add axes
   axis(1, at=c(-10e10, 10e10), col=blueblack, labels=NA)
   axis(1, labels=NA, tck=-0.03, col=blueblack)
-  axis(1, at=axTicks(1), tick=F, labels=prettyNum(axTicks(1), big.mark=","), line=-0.65)
+  sapply(axTicks(1), function(x){
+    axis(1, at=x, tick=F, labels=prettyNum(x, big.mark=","), line=-0.65)
+  })
   mtext(1, line=1.3, text="Genes in Segment")
   axis(2, at=c(-10e10, 10e10), col=blueblack, labels=NA)
   axis(2, labels=NA, tck=-0.03, col=blueblack)
@@ -142,22 +144,24 @@ option_list <- list(
 )
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage=paste("%prog segs.tsv out_prefix", sep=" "),
+args <- parse_args(OptionParser(usage=paste("%prog loci.bed segs.tsv out_prefix", sep=" "),
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Checks for appropriate positional arguments
-if(length(args$args) != 2){
-  stop(paste("Two positional arguments required: segs.tsv and output_prefix\n", sep=" "))
+if(length(args$args) != 3){
+  stop(paste("Three positional arguments required: loci.bed, segs.tsv, and output_prefix\n", sep=" "))
 }
 
 # Writes args & opts to vars
-segs.in <- args$args[1]
-out.prefix <- args$args[2]
+loci.in <- args$args[1]
+segs.in <- args$args[2]
+out.prefix <- args$args[3]
 rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
+# loci.in <- "~/scratch/rCNV.final_segments.loci.bed.gz"
 # segs.in <- "~/scratch/rCNV2_analysis_d1.master_segments.bed.gz"
 # out.prefix <- "~/scratch/test_effect_sizes"
 # rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
@@ -172,10 +176,16 @@ if(!is.null(rcnv.config)){
 script.dir <- funr::get_script_path()
 source(paste(script.dir, "common_functions.R", sep="/"))
 
-# Load segment table & subset to pathogenic sites
+# Load loci & segment table
+loci <- load.loci(loci.in)
 segs <- load.segment.table(segs.in)
 segs <- segs[which(segs$gw_sig | segs$any_gd), ]
 prop_constrained.genome_avg <- 3036/18641
+
+# Get list of neuro loci plus lit GDs
+neuro.plus.lit.ids <- sort(unique(c(loci$region_id[which(sapply(loci$hpos, function(hpos){any(hpos %in% neuro.hpos)}))],
+                                    segs$region_id[which(segs$any_gd & !segs$gw_sig)])))
+neuro.segs <- segs[which(segs$region_id %in% neuro.plus.lit.ids), ]
 
 # Plot proportion of constrained genes vs. # of genes
 pdf(paste(out.prefix, "prop_constrained_vs_ngenes.pdf", sep="."),
@@ -189,33 +199,38 @@ axis(4, at=prop_constrained.genome_avg, tick=F, line=-0.9, las=2,
      labels=c("Genome\naverage"), col.axis=blueblack, font=3, cex=0.8)
 dev.off()
 
+# NOTE: all DNM enrichment plots restricted to lit GDs + neuro-associated GW-sig GDs
+
 # Plot average enrichment of ASC DNMs vs. # of genes
 pdf(paste(out.prefix, "ASC_dnPTVs_vs_ngenes.pdf", sep="."),
-    height=2.2, width=2.4)
-scatter.vsGenes(segs, feature="ASC_dnm_lof_vs_expected_per_gene", 
+    height=2.2, width=2)
+scatter.vsGenes(neuro.segs, feature="ASC_dnm_lof_vs_expected_per_gene", 
                 y.title=bquote("Excess" ~ italic("dn") * "PTVs / Gene"),
                 y.pct=F, pt.cex=0.85, horiz.line=0,
                 y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
 dev.off()
 pdf(paste(out.prefix, "ASC_dnMis_vs_ngenes.pdf", sep="."),
-    height=2.2, width=2.4)
-scatter.vsGenes(segs, feature="ASC_dnm_mis_vs_expected_per_gene", 
+    height=2.2, width=2)
+scatter.vsGenes(neuro.segs, feature="ASC_dnm_mis_vs_expected_per_gene", 
                 y.title=bquote("Excess" ~ italic("dn") * "Mis. / Gene"),
                 y.pct=F, pt.cex=0.85, horiz.line=0,
                 y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
 dev.off()
 
 # Plot average enrichment of DDD DNMs vs. # of genes
+# Note: LoF panel is intentionally larger than other three for placement in main figure
 pdf(paste(out.prefix, "DDD_dnPTVs_vs_ngenes.pdf", sep="."),
-    height=2.2, width=2.4)
-scatter.vsGenes(segs, feature="DDD_dnm_lof_vs_expected_per_gene", 
+    height=2.2, width=3)
+scatter.vsGenes(neuro.segs, feature="DDD_dnm_lof_vs_expected_per_gene", 
                 y.title=bquote("Excess" ~ italic("dn") * "PTVs / Gene"),
                 y.pct=F, pt.cex=0.85, horiz.line=0,
-                y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
+                y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 3.5))
+axis(4, at=0, tck=-0.03, col=blueblack, labels=NA)
+axis(4, at=0, tick=F, line=-0.9, las=2, labels=c("No\nExcess"), col.axis=blueblack, font=3, cex=0.8)
 dev.off()
 pdf(paste(out.prefix, "DDD_dnMis_vs_ngenes.pdf", sep="."),
-    height=2.2, width=2.4)
-scatter.vsGenes(segs, feature="DDD_dnm_mis_vs_expected_per_gene", 
+    height=2.2, width=2)
+scatter.vsGenes(neuro.segs, feature="DDD_dnm_mis_vs_expected_per_gene", 
                 y.title=bquote("Excess" ~ italic("dn") * "Mis. / Gene"),
                 y.pct=F, pt.cex=0.85, horiz.line=0,
                 y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))

@@ -215,8 +215,9 @@ task annotate_shard {
     mkdir refs
     gsutil -m cp \
       ${rCNV_bucket}/analysis/analysis_refs/test_phenotypes.list \
-      ${rCNV_bucket}/analysis/paper/data/misc/*_dnm_counts.tsv.gz \
+      ${rCNV_bucket}/analysis/paper/data/misc/*_dnm_counts*tsv.gz \
       ${rCNV_bucket}/analysis/paper/data/misc/gene_mutation_rates.tsv.gz \
+      ${rCNV_bucket}/cleaned_data/genes/annotations/gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
       refs/
     gsutil -m cp \
       ${rCNV_bucket}/results/segment_association/* \
@@ -231,6 +232,7 @@ task annotate_shard {
     echo -e "DECIPHER_GoF\tgene_lists/DDG2P.hmc_gof.genes.list" >> genelists_to_annotate.tsv
     echo -e "OMIM\tgene_lists/HP0000118.HPOdb.genes.list" >> genelists_to_annotate.tsv
     echo -e "ASC\trefs/asc_dnm_counts.tsv.gz" > dnm_counts_to_annotate.tsv
+    echo -e "ASC_unaffected\trefs/asc_dnm_counts.unaffecteds.tsv.gz" >> dnm_counts_to_annotate.tsv
     echo -e "DDD\trefs/ddd_dnm_counts.tsv.gz" >> dnm_counts_to_annotate.tsv
     while read nocolon hpo; do
       echo -e "$hpo\tgene_lists/$nocolon.HPOdb.genes.list"
@@ -249,6 +251,7 @@ task annotate_shard {
         --segment-hpos segment_hpos.tsv \
         --dnm-tsvs dnm_counts_to_annotate.tsv \
         --snv-mus refs/gene_mutation_rates.tsv.gz \
+        --gtex-matrix refs/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
         --outfile ${perm_prefix}.annotated.tsv.gz \
         --gzip \
         ${perm_table}
@@ -257,6 +260,7 @@ task annotate_shard {
         --gene-sets genelists_to_annotate.tsv \
         --dnm-tsvs dnm_counts_to_annotate.tsv \
         --snv-mus refs/gene_mutation_rates.tsv.gz \
+        --gtex-matrix refs/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
         --outfile ${perm_prefix}.annotated.tsv.gz \
         --gzip \
         ${perm_table}

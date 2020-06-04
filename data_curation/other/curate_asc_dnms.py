@@ -20,7 +20,7 @@ import subprocess
 lof_csqs = 'frameshift_variant stop_gained splice_donor_variant splice_acceptor_variant'.split()
 
 
-def load_dnms(dnms_in):
+def load_dnms(dnms_in, controls=False):
     """
     Load DNMs and extract columns & rows of interest
     Return: list of (gene, consequence) tuples
@@ -29,8 +29,14 @@ def load_dnms(dnms_in):
     # Load DNMs as pd.DataFrame
     dnm_df = pd.read_csv(dnms_in, sep='\t')
 
-    # Restrict to high-confidence coding variants in affected children
-    keep_rows = (dnm_df.Affected_Status == 2) \
+    # Set code for affectedness status
+    if controls:
+        affected_key = 1
+    else:
+        affected_key = 2
+
+    # Restrict to high-confidence coding variants
+    keep_rows = (dnm_df.Affected_Status == affected_key) \
                 & dnm_df.Coding \
                 & (dnm_df.Confidence == 'HIGH')
     dnm_df = dnm_df.loc[keep_rows, :]
@@ -53,6 +59,8 @@ def main():
                         'et al., Cell, 2020. Required.', required=True)
     parser.add_argument('--genes', help='list of gene symbols to consider. Required.',
                         required=True)
+    parser.add_argument('--controls', help='output DNMs in controls. [default: cases]',
+                        action='store_true')
     parser.add_argument('-o', '--outfile', help='Path to output tsv file. [default: ' +
                         'stdout]', default='stdout')
     parser.add_argument('-z', '--gzip', action='store_true', help='Compress ' + 
@@ -76,7 +84,7 @@ def main():
     gdict = {g.rstrip() : zeros.copy() for g in open(args.genes).readlines()}
 
     # Load & filter DNMs
-    dnms = load_dnms(args.dnm_tsv)
+    dnms = load_dnms(args.dnm_tsv, args.controls)
 
     # Count DNMs per gene
     for gene, csq in dnms:

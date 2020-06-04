@@ -59,8 +59,10 @@ load.segment.table <- function(segs.in){
   segs[, listcol.idxs] <- apply(segs[, listcol.idxs], 2, strsplit, split=";")
   
   # Convert numeric columns to numerics
-  numcol.idxs <- c(which(colnames(segs) %in% c("start", "end", "size")),
-                   grep("^n_", colnames(segs), fixed=F))
+  numcol.idxs <- unique(c(which(colnames(segs) %in% c("start", "end", "size")),
+                          grep("^n_", colnames(segs), fixed=F),
+                          grep("_dnm_", colnames(segs), fixed=T),
+                          grep("_express", colnames(segs), fixed=T)))
   segs[, numcol.idxs] <- apply(segs[, numcol.idxs], 2, as.numeric)
   
   # Convert boolean dummy columns to logicals
@@ -71,6 +73,7 @@ load.segment.table <- function(segs.in){
   
   # Add normalized columns
   segs$gnomAD_constrained_prop <- segs$n_gnomAD_constrained_genes / segs$n_genes
+  segs$prop_ubiquitously_expressed <- segs$n_ubiquitously_expressed_genes / segs$n_genes
   for(cname in colnames(segs)[grep("_dnm_", colnames(segs), fixed=T)]){
     new.cname <- paste(cname, "per_gene", sep="_")
     segs[, new.cname] <- segs[cname] / segs$n_genes
@@ -182,9 +185,9 @@ calc.segs.dat <- function(segs, feature, measure, subset_to_regions=NULL){
 ##########################
 # Generic segment scatterplot function
 segs.scatter <- function(segs, x, y, xlims=NULL, ylims=NULL, add.lm=T, pt.cex=1,
-                       xtitle=NULL, x.at=NULL, x.labs=NULL, x.labs.at=NULL, parse.x.labs=FALSE,
-                       ytitle=NULL, y.at=NULL, y.labs=NULL, y.labs.at=NULL, parse.y.labs=FALSE,
-                       parmar=c(3, 3, 0.8, 0.8)){
+                         xtitle=NULL, x.at=NULL, x.labs=NULL, x.labs.at=NULL, parse.x.labs=FALSE,
+                         ytitle=NULL, y.at=NULL, y.labs=NULL, y.labs.at=NULL, parse.y.labs=FALSE,
+                         parmar=c(3, 3, 0.8, 0.8)){
   # Get plot values
   if(is.null(xlims)){
     xlims <- range(x[which(!is.infinite(x))], na.rm=T)
@@ -278,16 +281,22 @@ gw.scatter <- segs.scatter
 
 # Generic swarm/boxplot function
 segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL, 
-                     add.pvalue=FALSE, stat.test="wilcoxon", alternative="two.sided",
-                     xtitle=NULL, x.labs=c("FALSE", "TRUE"),
-                     add.y.axis=TRUE, ytitle=NULL, y.at=NULL, y.labs=NULL, y.labs.at=NULL, 
-                     parse.y.labs=FALSE, violin=FALSE, pt.cex=1,
-                     parmar=c(2.3, 3, 0.5, 0.5)){
+                       add.pvalue=FALSE, stat.test="wilcoxon", alternative="two.sided",
+                       xtitle=NULL, x.labs=c("FALSE", "TRUE"),
+                       add.y.axis=TRUE, ytitle=NULL, y.at=NULL, y.labs=NULL, y.labs.at=NULL, 
+                       parse.y.labs=FALSE, violin=FALSE, pt.cex=1,
+                       parmar=c(2.3, 3, 0.5, 0.5)){
   
   require(beeswarm, quietly=T)
   if(violin==T){
     require(vioplot, quietly=T)
   }
+  
+  # Restrict to non-NA, finite values
+  keep.idx <- which(!is.na(y) & !is.infinite(y))
+  segs <- segs[keep.idx, ]
+  x.bool <- x.bool[keep.idx]
+  y <- y[keep.idx]
   
   # Get plot values
   if(is.null(ylims)){
@@ -307,9 +316,9 @@ segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL,
                           segs$pt.bg[intersect(which(x.bool), del.idx)],
                           segs$pt.bg[intersect(which(x.bool), dup.idx)])
     pt.pch.list <- list(segs$pt.pch[intersect(which(!x.bool), del.idx)],
-                          segs$pt.pch[intersect(which(!x.bool), dup.idx)],
-                          segs$pt.pch[intersect(which(x.bool), del.idx)],
-                          segs$pt.pch[intersect(which(x.bool), dup.idx)])
+                        segs$pt.pch[intersect(which(!x.bool), dup.idx)],
+                        segs$pt.pch[intersect(which(x.bool), del.idx)],
+                        segs$pt.pch[intersect(which(x.bool), dup.idx)])
     pt.border.list <- list(segs$pt.border[intersect(which(!x.bool), del.idx)],
                            segs$pt.border[intersect(which(!x.bool), dup.idx)],
                            segs$pt.border[intersect(which(x.bool), del.idx)],
@@ -322,7 +331,7 @@ segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL,
     y.vals <- list(y[which(!x.bool)],
                    y[which(x.bool)])
     pt.pch.list <- list(segs$pt.pch[which(!x.bool)],
-                          segs$pt.pch[which(x.bool)])
+                        segs$pt.pch[which(x.bool)])
     pt.color.list <- list(segs$pt.bg[which(!x.bool)],
                           segs$pt.bg[which(x.bool)])
     pt.border.list <- list(segs$pt.border[which(!x.bool)],
@@ -393,15 +402,26 @@ segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL,
   }
   
   # Add P-values, if optioned
-  if(stat.test=="wilcoxon"){
-    stat.res <- wilcox.test(y ~ x.bool, alternative=alternative)
-    pval <- stat.res$p.value
-    print(stat.res)
-  }
   if(add.pvalue==T){
     if(cnv.split==T){
-      warning("P-value labeling with cnv.split=T is currently unsupported")
+      if(stat.test=="wilcoxon"){
+        pvals <- sapply(c("DEL", "DUP"), function(cnv){
+          stat.res <- wilcox.test(y[which(segs$cnv==cnv)] ~ x.bool[which(segs$cnv==cnv)], alternative=alternative)
+          pval <- stat.res$p.value
+          print(stat.res)
+          return(pval)
+        })
+        axis(3, at=c(0.5, 1.5)-width, tck=0.03, col=blueblack, labels=NA, line=0.5)
+        axis(3, at=mean(c(0.5, 1.5)-width), labels=format.pval(pvals[1]), line=-0.6, tick=F)
+        axis(3, at=c(0.5, 1.5)+width, tck=0.03, col=blueblack, labels=NA, line=1.6)
+        axis(3, at=mean(c(0.5, 1.5)+width), labels=format.pval(pvals[2]), line=0.5, tick=F)
+      }
     }else{
+      if(stat.test=="wilcoxon"){
+        stat.res <- wilcox.test(y ~ x.bool, alternative=alternative)
+        pval <- stat.res$p.value
+        print(stat.res)
+      }
       axis(3, at=c(0.5, 1.5), tck=0.03, col=blueblack, labels=NA, line=0.5)
       mtext(3, text=format.pval(pval), line=0.5)
     }
@@ -411,17 +431,30 @@ segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL,
 gw.swarm <- segs.swarm
 
 # Simpler generic vioplot/swarmplot hybrid for showing distribution of values split by DEL & DUP
-segs.simple.vioswarm <- function(segs, y, add.y.axis=T, ytitle=NULL, 
-                               parmar=c(1.3, 3, 0.3, 0.3)){
+segs.simple.vioswarm <- function(segs, y, subset_to_regions=NULL,
+                                 add.y.axis=T, ytitle=NULL, ytitle.line=1.75,
+                                 add.pvalue=FALSE, stat.test="wilcoxon", alternative="two.sided",
+                                 pt.cex=1, parmar=c(1.3, 3, 0.3, 0.3)){
   # Load necessary libraries
   require(vioplot, quietly=T)
   require(beeswarm, quietly=T)
   
+  # Restrict to non-NA, finite values
+  keep.idx <- which(!is.na(y) & !is.infinite(y))
+  segs <- segs[keep.idx, ]
+  y <- y[keep.idx]
+
   # Get plot data
+  if(!is.null(subset_to_regions)){
+    keepers <- which(segs$region_id %in% subset_to_regions)
+    segs <- segs[keepers, ]
+    y <- y[keepers]
+  }
   ylims <- range(y, na.rm=T)
   plot.dat <- lapply(c("DEL", "DUP"), function(cnv){y[which(segs$cnv==cnv)]})
-  pt.colors <- lapply(c("DEL", "DUP"), function(cnv){segs$color[which(segs$cnv==cnv)]})
-  pt.borders <- lapply(c("DEL", "DUP"), function(cnv){segs$black[which(segs$cnv==cnv)]})
+  pt.bg <- lapply(c("DEL", "DUP"), function(cnv){segs$pt.bg[which(segs$cnv==cnv)]})
+  pt.color <- lapply(c("DEL", "DUP"), function(cnv){segs$pt.border[which(segs$cnv==cnv)]})
+  pt.pch <- pt.colors <- lapply(c("DEL", "DUP"), function(cnv){segs$pt.pch[which(segs$cnv==cnv)]})
   
   # Prep plot area
   par(mar=parmar, bty="n")
@@ -430,8 +463,8 @@ segs.simple.vioswarm <- function(segs, y, add.y.axis=T, ytitle=NULL,
   
   # Add violins & swarms
   sapply(1:2, function(x){
-    vioplot(plot.dat[[x]], at=x-0.5, add=T, wex=0.8, 
-            drawRect=F, col=cnv.whites[x], border=cnv.blacks[x])
+    vioplot(plot.dat[[x]], at=x-0.5, add=T, wex=0.8, drawRect=F, 
+            col=cnv.whites[[x]], border=cnv.blacks[[x]])
     segments(x0=x-0.7, x1=x-0.3, 
              y0=median(plot.dat[[x]], na.rm=T),
              y1=median(plot.dat[[x]], na.rm=T),
@@ -439,7 +472,7 @@ segs.simple.vioswarm <- function(segs, y, add.y.axis=T, ytitle=NULL,
     # boxplot(plot.dat[[x]], at=x-0.5, col=cnv.blacks[x], lty=1, outline=F,
     #         staplewex=0, add=T, boxwex=0.2)
     beeswarm(plot.dat[[x]], at=x-0.5, add=T, corralWidth=0.8, corral="wrap",
-             pch=21, pwbg=pt.colors[[x]], pwcol=pt.borders[[x]])
+             pwcol=pt.color[[x]], pwbg=pt.bg[[x]], pwpch=pt.pch[[x]], cex=pt.cex)
   })
   
   # Add x-axis
@@ -450,12 +483,23 @@ segs.simple.vioswarm <- function(segs, y, add.y.axis=T, ytitle=NULL,
   
   # Add automatic Y-axis, if optioned
   if(add.y.axis==T){
+    axis(2, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
     y.at <- axTicks(2)
     axis(2, at=y.at, labels=NA, tck=-0.03, col=blueblack)
     sapply(1:length(y.at), function(i){
       axis(2, at=y.at[i], labels=y.at[i], tick=F, line=-0.6, las=2)
     })
-    mtext(2, text=ytitle, line=1.75)
+    mtext(2, text=ytitle, line=ytitle.line)
+  }
+  # Add P-values, if optioned
+  if(add.pvalue==T){
+    if(stat.test=="wilcoxon"){
+      stat.res <- wilcox.test(plot.dat[[1]], plot.dat[[2]], alternative=alternative)
+      pval <- stat.res$p.value
+      print(stat.res)
+    }
+    axis(3, at=c(0.5, 1.5), tck=0.03, col=blueblack, labels=NA, line=0.5)
+    mtext(3, text=format.pval(pval), line=0.5)
   }
 }
 # Alias
@@ -489,7 +533,7 @@ plot.viohist <- function(perm.dat.vals, bins, y.at, width=0.8,
   segments(x0=obs.val, x1=obs.val, 
            y0=y.at - 0.2, y1=y.at + 0.2, 
            col=obs.color, lwd=3, lend="round")
-  points(x=obs.val, y=y.at, pch=23, bg=obs.color, 
+  points(x=obs.val, y=y.at, pch=obs.pch, bg=obs.color, 
          col=obs.border, cex=diamond.cex)
   if(!is.null(y.title)){
     axis(2, at=y.at, line=-0.9, tick=F, las=2, labels=y.title)
@@ -503,7 +547,7 @@ plot.viohist <- function(perm.dat.vals, bins, y.at, width=0.8,
 plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
                            subset_to_regions=NULL, n.bins=100, min.bins=10,
                            x.title=NULL, xlims=NULL, xmin=NULL, xmax=NULL,
-                           diamond.cex=1.25, parmar=c(2.25, 2, 0.5, 0.5)){
+                           diamond.pch=23, diamond.cex=1.25, parmar=c(2.25, 2, 0.5, 0.5)){
   # Get plot data
   if(!is.null(subset_to_regions)){
     segs <- segs[which(segs$region_id %in% subset_to_regions), ]
@@ -572,7 +616,7 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
     plot.viohist(perm.dat[, i], bins, i-0.5,
                  color=vio.colors[i], border=vio.borders[i],
                  y.title=row.labels[i], diamond.cex=diamond.cex, obs.val=segs.dat[i], 
-                 obs.color=row.colors[i], obs.border=row.borders[i])
+                 obs.color=row.colors[i], obs.border=row.borders[i], obs.pch=diamond.pch)
     segments(x0=perm.means[i], x1=perm.means[i],
              y0=i-0.7, y1=i-0.3, lwd=3, 
              col=vio.borders[i], lend="round")
@@ -583,7 +627,7 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
       text(x=segs.dat[i]+(0.03*(par("usr")[2]-par("usr")[1])), y=i-0.7, pos=2, 
            labels=perm.pvals[2, ][[i]], xpd=T, cex=stats.cex)
     }
-    print(paste(prettyNum(round(segs.dat.raw[i]/mean(perm.dat.raw[, i], na.rm=T), 1), small.interval=1), "fold", sep="-"))
+    print(paste(prettyNum(round(segs.dat.raw[i]/mean(perm.dat.raw[, i], na.rm=T), 2), small.interval=2), "fold", sep="-"))
   })
   
   # Axes & cleanup
@@ -688,9 +732,9 @@ plot.seg.perms.multi <- function(segs, gw.perms, lit.perms, union.perms,
     sapply(1:3, function(j){
       y.at <- (3*j)-(3-i)-0.5+(0.5*(j-1))
       plot.viohist(perm.dat[[i]][, j], bins, y.at,
-                   color=vio.colors[j], border=vio.borders[j], obs.pch=obs.pch[i],
+                   color=vio.colors[j], border=vio.borders[j], 
                    y.title=inner.row.labels[i], diamond.cex=diamond.cex, obs.val=segs.dat[[i]][j], 
-                   obs.color=row.colors[j], obs.border=row.borders[j],
+                   obs.pch=obs.pch[i], obs.color=row.colors[j], obs.border=row.borders[j],
                    left.ax.line=T)
       segments(x0=perm.means[[i]][j], x1=perm.means[[i]][j],
                y0=y.at-0.2, y1=y.at+0.2, lwd=3, 
@@ -711,7 +755,7 @@ plot.seg.perms.multi <- function(segs, gw.perms, lit.perms, union.perms,
   sapply(1:length(axTicks(1)), function(i){
     axis(1, at=axTicks(1)[i], labels=prettyNum(axTicks(1)[i], big.mark=","), line=-0.65, tick=F)
   })
-  mtext(1, text=x.title, line=1.2)
+  mtext(1, text=x.title, line=1.3)
   sapply(1:3, function(i){
     ax.at <- ((3*i)+(0.5*(i-1)))-c(2.9, 0.1)
     axis(2, at=ax.at, tck=0, labels=NA, col=blueblack, line=4)
@@ -772,8 +816,8 @@ plot.all.perm.res <- function(segs, gw.perms, lit.perms,
   plot.seg.perms(segs, gw.perms, feature=feature, measure=measure, 
                  subset_to_regions=all.gw.ids,
                  n.bins=n.bins.single, min.bins=min.bins, norm=norm,
-                 x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
-                 parmar=parmar.single)
+                 x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax, 
+                 diamond.pch=22, parmar=parmar.single)
   dev.off()
   
   # Plot lit GDs alone
@@ -784,7 +828,7 @@ plot.all.perm.res <- function(segs, gw.perms, lit.perms,
                  subset_to_regions=all.gd.ids,
                  n.bins=n.bins.single, min.bins=min.bins, norm=norm,
                  x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
-                 parmar=parmar.single)
+                 diamond.pch=21, parmar=parmar.single)
   dev.off()
   
   # Plot non-significant lit GDs alone
@@ -795,7 +839,7 @@ plot.all.perm.res <- function(segs, gw.perms, lit.perms,
                  subset_to_regions=gd.nonsig.ids,
                  n.bins=n.bins.single, min.bins=min.bins, norm=norm,
                  x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
-                 parmar=parmar.single)
+                 diamond.pch=21, parmar=parmar.single)
   dev.off()
   
   # Plot combined analysis of all subsets

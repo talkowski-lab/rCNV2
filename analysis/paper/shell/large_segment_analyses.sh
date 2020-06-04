@@ -29,8 +29,9 @@ gsutil -m cp \
   ${rCNV_bucket}/cleaned_data/binned_genome/GRCh37.200kb_bins_10kb_steps.raw.bed.gz \
   ${rCNV_bucket}/refs/GRCh37.autosomes.genome \
   ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
-  ${rCNV_bucket}/analysis/paper/data/misc/*_dnm_counts.tsv.gz \
+  ${rCNV_bucket}/analysis/paper/data/misc/*_dnm_counts*tsv.gz \
   ${rCNV_bucket}/analysis/paper/data/misc/gene_mutation_rates.tsv.gz \
+  ${rCNV_bucket}/cleaned_data/genes/annotations/gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
   refs/
 mkdir meta_stats/
 gsutil -m cp \
@@ -105,6 +106,7 @@ done < refs/test_phenotypes.list \
 > hpo_genelists.tsv
 cat << EOF > dnm_counts_to_annotate.tsv
 ASC${TAB}refs/asc_dnm_counts.tsv.gz
+ASC_unaffected${TAB}refs/asc_dnm_counts.unaffecteds.tsv.gz
 DDD${TAB}refs/ddd_dnm_counts.tsv.gz
 EOF
 /opt/rCNV2/analysis/paper/scripts/large_segments/compile_segment_table.py \
@@ -123,6 +125,7 @@ EOF
   --hpo-genelists hpo_genelists.tsv \
   --dnm-tsvs dnm_counts_to_annotate.tsv \
   --snv-mus refs/gene_mutation_rates.tsv.gz \
+  --gtex-matrix refs/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
   --gd-recip "10e-10" \
   --nahr-recip 0.25 \
   --bgzip
@@ -220,6 +223,27 @@ mkdir pleiotropy_plots
   pleiotropy_plots/${prefix}
 
 
+# Compare NAHR vs nonrecurrent segments
+if [ -e nahr_vs_nonrecurrent ]; then
+  rm -rf nahr_vs_nonrecurrent
+fi
+mkdir nahr_vs_nonrecurrent
+/opt/rCNV2/analysis/paper/plot/large_segments/plot_seg_mechanism_comparisons.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  rCNV.final_segments.loci.bed.gz \
+  ${prefix}.master_segments.bed.gz \
+  nahr_vs_nonrecurrent/${prefix}
+/opt/rCNV2/analysis/paper/plot/large_segments/plot_oligogenicity_index_comparisons.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  rCNV.final_segments.loci.bed.gz \
+  ${prefix}.master_segments.bed.gz \
+  refs/ddd_dnm_counts.tsv.gz \
+  refs/asc_dnm_counts.tsv.gz \
+  refs/gene_mutation_rates.tsv.gz \
+  nahr_vs_nonrecurrent/${prefix}
+
+
+
 # Collapse overlapping DEL/DUP segments for sake of plotting
 while read intervals rid; do
   echo "$intervals" | sed -e 's/\;/\n/g' -e 's/\:\|\-/\t/g' \
@@ -253,6 +277,7 @@ gsutil -m cp -r \
   perm_test_plots \
   effect_size_plots \
   pleiotropy_plots \
+  nahr_vs_nonrecurrent \
   association_grid \
   ${rCNV_bucket}/analysis/paper/plots/large_segments/
 

@@ -17,7 +17,8 @@ cnvtypes = 'DEL DUP'.split()
 import pandas as pd
 import pybedtools as pbt
 from itertools import combinations
-from numpy import nansum
+from numpy import nansum, log10
+from scipy.stats import hmean
 import argparse
 from os.path import splitext
 from sys import stdout
@@ -242,6 +243,51 @@ def count_dnms(df, dnm_path, col_prefix, mu_df=None):
     return df
 
 
+def annotate_expression(all_df, gtex_in, min_expression=1):
+    """
+    Annotate segments with various expression-based metrics
+    Adds the following columns to all_df:
+        1. gene_expression_harmonic_mean: harmonic mean of expression levels across tissues for all genes per segment
+        2. n_ubiquitously_expressed_genes: count of genes expressed >= min_expression for all tissues
+    """
+
+    # Load GTEx stats
+    gtex = pd.read_csv(gtex_in, sep='\t').rename(columns = {'#gene' : 'gene'})
+    gtex.index = gtex['gene']
+    gtex.drop(columns='gene', inplace=True)
+
+    # Compute harmonic mean of expression levels for all genes per segment
+    def _gtex_geneset_hmean(genes_str, gtex_means):
+        elig_genes = gtex_means.index.tolist()
+        genes = [x for x in str(genes_str[0]).split(';') if x in elig_genes]
+        if len(genes) > 0:
+            return hmean(gtex_means[gtex_means.index.isin(genes)])
+        else:
+            return 0
+
+    gtex_means = gtex.mean(axis=1, skipna=True)
+    all_df['gene_expression_harmonic_mean'] \
+        = pd.DataFrame(all_df.genes).apply(_gtex_geneset_hmean, axis=1, raw=True, 
+                                           gtex_means=gtex_means)
+
+    # Compute number of tissues with expression > min_expression per gene
+    # Note that GTEx matrix has been log10(x+1) transformed
+    def _count_ubi(genes_str, gtex_ubi):
+        elig_genes = gtex_means.index.tolist()
+        genes = [x for x in str(genes_str[0]).split(';') if x in elig_genes]
+        if len(genes) > 0:
+            return gtex_ubi[gtex_ubi.index.isin(genes)].sum()
+        else:
+            return 0
+
+    trans_min = log10(min_expression + 1)
+    gtex_ubi = gtex.apply(lambda vals: all(vals.dropna() >= trans_min), axis=1)
+    all_df['n_ubiquitously_expressed_genes'] \
+        = pd.DataFrame(all_df.genes).apply(_count_ubi, axis=1, raw=True, gtex_ubi=gtex_ubi)
+
+    return all_df
+
+
 def main():
     """
     Main block
@@ -280,6 +326,12 @@ def main():
     parser.add_argument('--snv-mus', help='Tsv of snv mutation rates per gene. ' +
                         'Four columns expected: gene, and relative mutation rates ' +
                         'for lof, missense, and synonymous mutations.')
+    parser.add_argument('--gtex-matrix', help='Tsv gene X tissue expression levels ' +
+                        'from GTEx. Will be used for various expression-based ' +
+                        'gene annotations.')
+    parser.add_argument('--min-expression', default=1, help='Minimum expression ' +
+                        'level (in unscaled TPM) to consider a gene as "expressed". ' +
+                        '[default: 1]')
     parser.add_argument('--gd-recip', type=float, default=0.2, help='Reciprocal ' +
                         'overlap required for GD match. [default: 0.2]')
     parser.add_argument('--nahr-recip', type=float, default=0.5, help='Reciprocal ' +
@@ -395,6 +447,10 @@ def main():
         with open(args.dnm_tsvs) as dnm_ins:
             for study, dnm_path in csv.reader(dnm_ins, delimiter='\t'):
                 all_df = count_dnms(all_df, dnm_path, study, mu_df)
+
+    # Annotate with various expression-based metrics
+    if args.gtex_matrix is not None:
+        all_df = annotate_expression(all_df, args.gtex_matrix, args.min_expression)
 
     # Sort & write out merged BED
     all_df.sort_values(by='chr start end cnv region_id'.split(), inplace=True)

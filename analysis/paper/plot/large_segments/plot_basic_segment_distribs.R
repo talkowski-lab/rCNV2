@@ -70,10 +70,10 @@ gw <- merge.loci.segs(loci, segs)
 
 # Swarmplot of segment size
 pdf(paste(out.prefix, "gw_plus_litGDGs.segment_size_distribs.pdf", sep="."),
-    height=2, width=2.75)
+    height=2.25, width=2.75)
 segs.swarm(segs, x.bool=!(segs$gw_sig), y=log10(segs$size), 
-           x.labs=c("GW-Sig.", "Lit. (Not sig.)"), violin=T,
-           add.y.axis=F, pt.cex=0.75, parmar=c(1.2, 4, 0.2, 0.2))
+           x.labs=c("GW-Sig.", "Lit. (Not sig.)"), violin=T, add.pvalue=T,
+           add.y.axis=F, pt.cex=0.75, parmar=c(1.2, 4, 2.65, 0.2))
 axis(2, at=log10(logscale.minor), tck=-0.015, col=blueblack, labels=NA, lwd=0.7)
 axis(2, at=log10(logscale.demi), tck=-0.03, col=blueblack, labels=NA)
 axis(2, at=log10(logscale.demi.bp), tick=F, las=2, line=-0.65, labels=logscale.demi.bp.labels)
@@ -82,30 +82,66 @@ dev.off()
 
 # Swarmplot of genes per segment
 pdf(paste(out.prefix, "gw_plus_litGDGs.n_genes_per_segment.pdf", sep="."),
-    height=2, width=2.6)
+    height=2.25, width=2.6)
 segs.swarm(segs, x.bool=!(segs$gw_sig), y=segs$n_genes, 
-           x.labs=c("GW-Sig.", "Lit. (Not sig.)"), violin=T,
+           x.labs=c("GW-Sig.", "Lit. (Not sig.)"), violin=T, add.pvalue=T,
            add.y.axis=T, ytitle="Genes in Segment", pt.cex=0.75, 
-           parmar=c(1.2, 3, 0.2, 0.2))
+           parmar=c(1.2, 3, 2.5, 0.2))
 dev.off()
 
 # Swarmplot of gene density
 pdf(paste(out.prefix, "gw_plus_litGDGs.basic_gene_density.pdf", sep="."),
-    height=2, width=2.6)
+    height=2.25, width=2.6)
 segs.swarm(segs, x.bool=!(segs$gw_sig), y=100000*(segs$n_genes/segs$size), 
-           x.labs=c("GW-Sig.", "Lit. (Not sig.)"), violin=T,
+           x.labs=c("GW-Sig.", "Lit. (Not sig.)"), violin=T, add.pvalue=T,
            add.y.axis=T, ytitle="Genes per 100kb", pt.cex=0.75, 
-           parmar=c(1.2, 3, 0.2, 0.2))
+           parmar=c(1.2, 3, 2.5, 0.2))
 dev.off()
 
 # Scatterplot of size vs genes
 pdf(paste(out.prefix, "gw_plus_litGDs.genes_vs_size.pdf", sep="."),
-    height=2, width=2)
+    height=2.25, width=2.25)
 segs.scatter(segs, x=log10(segs$size), y=segs$n_genes, 
              x.at=log10(logscale.minor), x.labs=rep(NA, length(logscale.minor)),
-             pt.cex=0.75, ytitle="Genes in Segment", parmar=c(2.75, 2.75, 0.3, 0.3))
+             pt.cex=0.85, ytitle="Genes in Segment", parmar=c(2.75, 2.75, 0.3, 0.3))
 axis(1, at=log10(c(500000, 5000000)), tick=F, 
      line=-0.7, labels=c("500kb", "5Mb"))
 mtext(1, line=1.35, text=bquote("log"[10] * "(Segment Size)"))
 dev.off()
 
+# Swarmplot of del vs dup effect size
+pdf(paste(out.prefix, "gw_del_vs_dup.lnOR.pdf", sep="."),
+    height=2, width=2)
+segs.simple.vioswarm(gw, gw$max_ln_or, add.y.axis=T,
+                     ytitle=bquote("Max." ~ italic("ln") * ("Odds Ratio")), ytitle.line=1,
+           add.pvalue=T, parmar=c(1.2, 2.25, 1.5, 0.2))
+dev.off()
+
+# Swarmplot of del vs dup control frequency
+pdf(paste(out.prefix, "gw_del_vs_dup.control_freq.pdf", sep="."),
+    height=2, width=2)
+segs.simple.vioswarm(gw, -log10(gw$pooled_control_freq), add.y.axis=F,
+                     add.pvalue=T, parmar=c(1.2, 3.25, 1.5, 0.2))
+axis(2, at=-log10(logscale.major), col=blueblack, tck=-0.03, labels=NA)
+sapply(1:length(logscale.major), function(x){
+  axis(2, at=-log10(logscale.major[x]), tick=F, las=2, line=-0.65,
+       labels=bquote(10^.(log10(logscale.major[x]))))
+})
+mtext(2, text="CNV Freq. in Controls", line=2.25)
+dev.off()
+
+# Swarmplot of del vs dup avg. expression levels
+pdf(paste(out.prefix, "gw_del_vs_dup.avg_expression.pdf", sep="."),
+    height=2, width=2.2)
+segs.simple.vioswarm(segs, segs$gene_expression_harmonic_mean, add.y.axis=T,
+                     ytitle=bquote("Avg. Gene Expression"), ytitle.line=1.75,
+                     pt.cex=0.75, add.pvalue=T, parmar=c(1.2, 2.8, 1.5, 0.2))
+dev.off()
+
+# Swarmplot of prop ubiquitously expressed for del vs dup
+pdf(paste(out.prefix, "gw_del_vs_dup.prop_ubi_expressed.pdf", sep="."),
+    height=2, width=2.2)
+segs.simple.vioswarm(segs, segs$prop_ubiquitously_expressed, add.y.axis=T,
+                     ytitle=bquote("Prop. Ubiquitously Expr."), ytitle.line=1.75,
+                     pt.cex=0.75, add.pvalue=T, parmar=c(1.2, 2.8, 1.5, 0.2))
+dev.off()

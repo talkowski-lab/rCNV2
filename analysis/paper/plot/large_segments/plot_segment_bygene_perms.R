@@ -12,6 +12,7 @@
 
 
 options(stringsAsFactors=F, scipen=1000)
+csqs <- c("PTVs" = "lof", "Mis." = "mis", "Syn." = "syn")
 
 
 ######################
@@ -110,7 +111,7 @@ pdf(paste(outdir, "/", prefix, ".HPOmatched_genes.frac_any.pdf", sep=""),
     height=2.2, width=2.4)
 plot.seg.perms(gw, perms, feature="n_HPOmatched_genes", measure="frac.any", 
                n.bins=15, x.title="Pct. w/HPO-Matched Gene", 
-               parmar=c(2.2, 2, 0, 1.8))
+               diamond.pch=22, parmar=c(2.2, 2, 0, 1.8))
 dev.off()
 
 # Mean # of HPO-matched genes per gw-sig segment
@@ -119,7 +120,7 @@ pdf(paste(outdir, "/", prefix, ".HPOmatched_genes.mean.pdf", sep=""),
     height=2.2, width=2.4)
 plot.seg.perms(gw, perms, feature="n_HPOmatched_genes", measure="mean", 
                n.bins=30, x.title="Mean HPO-Matched Genes",
-               parmar=c(2.2, 2, 0, 2))
+               diamond.pch=22, parmar=c(2.2, 2, 0, 2))
 dev.off()
 
 # Fraction of segments with at least one constrained gene
@@ -146,63 +147,25 @@ plot.all.perm.res(segs, perms, lit.perms,
                   pdf.dims.multi=c(4, 3.5),
                   parmar.multi=c(2.25, 6.25, 0, 0.5))
 
-# Mean excess number of de novo PTVs per gene in ASC
+# Mean excess number of de novo PTVs & missense per gene in ASC & DDD
 # When restricting gw-sig to neuro-associated loci
-print("ASC LoF DNMs per gene vs. expected:")
-plot.all.perm.res(segs, perms, lit.perms, 
-                  feature="ASC_dnm_lof_vs_expected_per_gene", measure="mean",
-                  outdir, paste(prefix, "gw_neuro_plus_lit", sep="."), 
-                  subset_to_regions=neuro.plus.lit.ids,
-                  norm=F, norm.multi=F,
-                  n.bins.single=50, n.bins.multi=50, min.bins=25,
-                  x.title=bquote("Excess" ~ italic("De Novo") ~ "PTVs / Gene"), 
-                  pdf.dims.single=c(2.2, 2.4),
-                  parmar.single=c(2.25, 2, 0, 1.2),
-                  pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.25, 6.25, 0, 0.5))
-
-# Mean excess number of de novo missense per gene in ASC
-# When restricting gw-sig to neuro-associated loci
-print("ASC missense DNMs per gene vs. expected:")
-plot.all.perm.res(segs, perms, lit.perms, 
-                  feature="ASC_dnm_mis_vs_expected_per_gene", measure="mean",
-                  outdir, paste(prefix, "gw_neuro_plus_lit", sep="."), 
-                  subset_to_regions=neuro.plus.lit.ids,
-                  norm=F, norm.multi=F,
-                  n.bins.single=50, n.bins.multi=50, min.bins=25,
-                  x.title=bquote("Excess" ~ italic("De Novo") ~ "Mis. / Gene"), 
-                  pdf.dims.single=c(2.2, 2.4),
-                  parmar.single=c(2.25, 2, 0, 2.0),
-                  pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.25, 6.25, 0, 2.25))
-
-# Mean excess number of de novo PTVs per gene in DDD
-# When restricting gw-sig to neuro-associated loci
-print("DDD LoF DNMs per gene vs. expected:")
-plot.all.perm.res(segs, perms, lit.perms, 
-                  feature="DDD_dnm_lof_vs_expected_per_gene", measure="mean",
-                  outdir, paste(prefix, "gw_neuro_plus_lit", sep="."), 
-                  subset_to_regions=neuro.plus.lit.ids,
-                  norm=F, norm.multi=F,
-                  n.bins.single=50, n.bins.multi=50, min.bins=25,
-                  x.title=bquote("Excess" ~ italic("De Novo") ~ "PTVs / Gene"), 
-                  pdf.dims.single=c(2.2, 2.4),
-                  parmar.single=c(2.25, 2, 0, 2.0),
-                  pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.25, 6.25, 0, 2.25))
-
-# Mean excess number of de novo missense per gene in DDD
-# When restricting gw-sig to neuro-associated loci
-print("DDD missense DNMs per gene vs. expected:")
-plot.all.perm.res(segs, perms, lit.perms, 
-                  feature="DDD_dnm_mis_vs_expected_per_gene", measure="mean",
-                  outdir, paste(prefix, "gw_neuro_plus_lit", sep="."), 
-                  subset_to_regions=neuro.plus.lit.ids,
-                  norm=F, norm.multi=F,
-                  n.bins.single=50, n.bins.multi=50, min.bins=25,
-                  x.title=bquote("Excess" ~ italic("De Novo") ~ "Mis. / Gene"), 
-                  pdf.dims.single=c(2.2, 2.4),
-                  parmar.single=c(2.25, 2, 0, 1.2),
-                  pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.25, 6.25, 0, 0.5))
+sapply(c("ASC", "DDD"), function(cohort){
+  sapply(1:length(csqs), function(ci){
+    csq <- csqs[ci]
+    csq.abbrev <- names(csqs)[ci]
+    print(paste(cohort, csq.abbrev, "DNMs per gene vs. expected:"))
+    plot.all.perm.res(segs, perms, lit.perms, 
+                      feature=paste(cohort, "dnm", csq, "vs_expected_per_gene", sep="_"),
+                      measure="mean",
+                      outdir, paste(prefix, "gw_neuro_plus_lit", sep="."), 
+                      subset_to_regions=neuro.plus.lit.ids,
+                      norm=F, norm.multi=F,
+                      n.bins.single=50, n.bins.multi=50, min.bins=25,
+                      x.title=bquote("Excess" ~ italic("De Novo") ~ .(csq.abbrev) ~ "/ Gene"), 
+                      pdf.dims.single=c(2.2, 2.4),
+                      parmar.single=c(2.25, 2, 0, 1.2),
+                      pdf.dims.multi=c(4, 3.5),
+                      parmar.multi=c(2.2, 6.05, 0, 2.3))
+  })
+})
 

@@ -78,6 +78,8 @@ We collected the following expression-based gene features:
 
 All expression values were derived from GTEx v7 (rather than the final v8 release) because GTEx v7 was the last version native to hg19/Gencode v19, which was a direct match for the Gencode version used in this study.  
 
+Note that all expression values from GTEx were transformed as log<sub>10</sub>(x + 1).  
+
 #### Gene features: constraint
 
 We collected the following gene features related to evolutionary constraint:  
