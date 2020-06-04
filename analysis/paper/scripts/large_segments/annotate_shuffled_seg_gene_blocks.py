@@ -165,8 +165,8 @@ def main():
 
     # Preprocess GTEx expression matrix, if optioned
     if args.gtex_matrix is not None:
-        gtex_mean, gtex_ubi = preprocess_gtex(args.gtex_matrix, min_expression=args.min_expression)
-        header_cols += ['gene_expression_harmonic_mean n_ubiquitously_expressed_genes'.split()]
+        gtex_means, gtex_ubi = preprocess_gtex(args.gtex_matrix, min_expression=args.min_expression)
+        header_cols += 'gene_expression_harmonic_mean n_ubiquitously_expressed_genes'.split()
 
     # Write header to outfile
     outfile.write('\t'.join(header_cols) + '\n')
@@ -214,9 +214,9 @@ def main():
             if len(gtex_genes) > 0:
                 mean_expr = hmean(gtex_means[gtex_means.index.isin(gtex_genes)])
                 n_ubi = gtex_ubi[gtex_ubi.index.isin(gtex_genes)].sum()
-                outvals.append([mean_expr, n_ubi])
+                outvals += [mean_expr, n_ubi]
             else:
-                outvals.append([0, 0])
+                outvals += [0, 0]
 
         outfile.write('\t'.join([str(x) for x in outvals]) + '\n')
 

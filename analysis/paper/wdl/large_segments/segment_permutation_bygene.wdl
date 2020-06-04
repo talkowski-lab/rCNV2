@@ -268,7 +268,7 @@ task annotate_shard {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e38b5b447bc5971e2963e3d9156545b388775bdc42b7767b0d82a7737fc51b78"
+    docker: "talkowski/rcnv@sha256:08b33306a293e3bb4a5cc7e5a0f73c7ce9d9ea60c133b36ba152e16e2e2102c8"
     preemptible: 1
   }
 
@@ -307,7 +307,7 @@ task merge_perms {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e38b5b447bc5971e2963e3d9156545b388775bdc42b7767b0d82a7737fc51b78"
+    docker: "talkowski/rcnv@sha256:08b33306a293e3bb4a5cc7e5a0f73c7ce9d9ea60c133b36ba152e16e2e2102c8"
     preemptible: 1
     disks: "local-disk 200 SSD"
   }
