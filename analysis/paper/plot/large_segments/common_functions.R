@@ -74,10 +74,7 @@ load.segment.table <- function(segs.in){
   # Add normalized columns
   segs$gnomAD_constrained_prop <- segs$n_gnomAD_constrained_genes / segs$n_genes
   segs$prop_ubiquitously_expressed <- segs$n_ubiquitously_expressed_genes / segs$n_genes
-  for(cname in colnames(segs)[grep("_dnm_", colnames(segs), fixed=T)]){
-    new.cname <- paste(cname, "per_gene", sep="_")
-    segs[, new.cname] <- segs[cname] / segs$n_genes
-  }
+  segs <- normalize.dnms(segs)
   
   # Add formatted sizes
   segs$formatted_size <- paste(prettyNum(round(segs$size/1000, 0), big.mark=","), "kb", sep=" ")
@@ -94,6 +91,34 @@ load.segment.table <- function(segs.in){
   segs$pt.bg[nonsig.gd.idx] <- control.cnv.colors[segs$cnv[nonsig.gd.idx]]
   
   # Return cleaned dataframe
+  return(segs)
+}
+
+# Normalize DNM counts vs. synonymous inflation
+normalize.dnms <- function(segs, dnm.cohorts=c("DDD", "ASC", "ASC_unaffected")){
+  for(cohort in dnm.cohorts){
+    syn.obs.colname <- paste(cohort, "dnm_syn_obs_wMu", sep="_")
+    syn.exp.colname <- paste(cohort, "dnm_syn_exp_wMu", sep="_")
+    if(syn.obs.colname %in% colnames(segs) & syn.exp.colname %in% colnames(segs)){
+      syn.obs <- segs[, which(colnames(segs)==syn.obs.colname)]
+      syn.exp <- segs[, which(colnames(segs)==syn.exp.colname)]
+      syn.d <- (syn.obs - syn.exp) / segs$n_genes
+      for(csq in c("lof", "mis")){
+        dam.obs.colname <- paste(cohort, "dnm", csq, "obs_wMu", sep="_")
+        dam.exp.colname <- paste(cohort, "dnm", csq, "exp_wMu", sep="_")
+        if(dam.obs.colname %in% colnames(segs) & dam.exp.colname %in% colnames(segs)){
+          dam.obs <- segs[, which(colnames(segs)==dam.obs.colname)]
+          dam.exp <- segs[, which(colnames(segs)==dam.exp.colname)]
+          dam.d <- (dam.obs - dam.exp) / segs$n_genes
+          # Outlier-robust linear fit of obs-exp damaging ~ obs-exp synonymous
+          fit <- robust.lm(syn.d, dam.d)$fit
+          coeffs <- as.numeric(fit$coefficients)
+          dam.d.adj <- dam.d - coeffs[1] - (coeffs[2] * syn.d)
+          segs[paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_")] <- dam.d.adj
+        }
+      }
+    }
+  }
   return(segs)
 }
 
@@ -624,7 +649,7 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
       text(x=segs.dat[i]-(0.03*(par("usr")[2]-par("usr")[1])), y=i-0.7, pos=4, 
            labels=perm.pvals[2, ][[i]], xpd=T, cex=stats.cex)
     }else{
-      text(x=segs.dat[i]+(0.03*(par("usr")[2]-par("usr")[1])), y=i-0.7, pos=2, 
+      text(x=perm.means[i]-(0.03*(par("usr")[2]-par("usr")[1])), y=i-0.7, pos=4, 
            labels=perm.pvals[2, ][[i]], xpd=T, cex=stats.cex)
     }
     print(paste(prettyNum(round(segs.dat.raw[i]/mean(perm.dat.raw[, i], na.rm=T), 2), small.interval=2), "fold", sep="-"))
@@ -743,7 +768,7 @@ plot.seg.perms.multi <- function(segs, gw.perms, lit.perms, union.perms,
         text(x=segs.dat[[i]][j]-(0.015*(par("usr")[2]-par("usr")[1])), y=y.at-0.2, pos=4, 
              labels=perm.pvals[[i]][2, ][[j]], xpd=T, cex=stats.cex)
       }else{
-        text(x=segs.dat[[i]][j]+(0.015*(par("usr")[2]-par("usr")[1])), y=y.at-0.2, pos=2, 
+        text(x=perm.means[[i]][j]-(0.015*(par("usr")[2]-par("usr")[1])), y=y.at-0.2, pos=4, 
              labels=perm.pvals[[i]][2, ][[j]], xpd=T, cex=stats.cex)
       }
     })

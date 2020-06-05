@@ -12,7 +12,7 @@
 
 
 options(stringsAsFactors=F, scipen=1000)
-csqs <- c("PTVs" = "lof", "Mis." = "mis", "Syn." = "syn")
+csqs <- c("PTVs" = "lof", "Mis." = "mis")
 
 
 ######################
@@ -30,14 +30,11 @@ load.perms <- function(perm.res.in){
   if("n_ubiquitously_expressed_genes" %in% colnames(perms)){
     perms$prop_ubiquitously_expressed <- perms$n_ubiquitously_expressed_genes / perms$n_genes
   }
-  for(cname in colnames(perms)[grep("_dnm_", colnames(perms), fixed=T)]){
-    new.cname <- paste(cname, "per_gene", sep="_")
-    perms[, new.cname] <- perms[cname] / perms$n_genes
-  }
   
   # Split each permutation into a list of dfs (one per perm)
+  # Also performs per-permutation normalization of DNM excess
   lapply(perm.range, function(i){
-    as.data.frame(perms[which(perms$perm_idx==i), -(which(colnames(perms)=="perm_idx"))])
+    normalize.dnms(as.data.frame(perms[which(perms$perm_idx==i), -(which(colnames(perms)=="perm_idx"))]))
   })
 }
 
@@ -162,6 +159,23 @@ plot.all.perm.res(segs, perms, lit.perms,
                   pdf.dims.multi=c(4, 3.5),
                   parmar.multi=c(2.25, 6.25, 0, 0.5))
 
+# TEST DEV CODE
+pdf(paste("~/scratch/test.pdf"), height=8, width=8)
+par(mfrow=c(3, 2))
+sapply(c("DDD", "ASC", "ASC_unaffected"), function(cohort){
+  sapply(1:length(csqs), function(ci){
+    csq <- csqs[ci]
+    csq.abbrev <- names(csqs)[ci]
+    plot.seg.perms(gw, perms, 
+                   feature=paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_"),
+                   measure="mean", subset_to_regions=neuro.plus.lit.ids,
+                   n.bins=100, x.title=bquote("Excess" ~ italic("De Novo") ~ .(csq.abbrev) ~ "/ Gene"), 
+                   diamond.pch=22, parmar=c(3, 4, 2, 2))
+    mtext(3, text=paste(cohort, csq.abbrev), font=2)
+  })
+})
+dev.off()
+
 # Mean excess number of de novo PTVs & missense per gene in ASC & DDD
 # When restricting gw-sig to neuro-associated loci
 sapply(c("ASC", "DDD", "ASC_unaffected"), function(cohort){
@@ -170,12 +184,12 @@ sapply(c("ASC", "DDD", "ASC_unaffected"), function(cohort){
     csq.abbrev <- names(csqs)[ci]
     print(paste(cohort, csq.abbrev, "DNMs per gene vs. expected:"))
     plot.all.perm.res(segs, perms, lit.perms, 
-                      feature=paste(cohort, "dnm", csq, "vs_expected_per_gene", sep="_"),
+                      feature=paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_"),
                       measure="mean",
                       outdir, paste(prefix, "gw_neuro_plus_lit", sep="."), 
                       subset_to_regions=neuro.plus.lit.ids,
                       norm=F, norm.multi=F,
-                      n.bins.single=50, n.bins.multi=50, min.bins=25,
+                      n.bins.single=100, n.bins.multi=100, min.bins=25,
                       x.title=bquote("Excess" ~ italic("De Novo") ~ .(csq.abbrev) ~ "/ Gene"), 
                       pdf.dims.single=c(2.2, 2.4),
                       parmar.single=c(2.25, 2, 0, 1.2),

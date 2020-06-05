@@ -204,14 +204,14 @@ dev.off()
 # Plot average enrichment of ASC DNMs vs. # of genes
 pdf(paste(out.prefix, "ASC_dnPTVs_vs_ngenes.pdf", sep="."),
     height=2.2, width=2)
-scatter.vsGenes(neuro.segs, feature="ASC_dnm_lof_vs_expected_per_gene", 
+scatter.vsGenes(neuro.segs, feature="ASC_dnm_lof_norm_excess_per_gene", 
                 y.title=bquote("Excess" ~ italic("dn") * "PTVs / Gene"),
                 y.pct=F, pt.cex=0.85, horiz.line=0,
                 y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
 dev.off()
 pdf(paste(out.prefix, "ASC_dnMis_vs_ngenes.pdf", sep="."),
     height=2.2, width=2)
-scatter.vsGenes(neuro.segs, feature="ASC_dnm_mis_vs_expected_per_gene", 
+scatter.vsGenes(neuro.segs, feature="ASC_dnm_mis_norm_excess_per_gene", 
                 y.title=bquote("Excess" ~ italic("dn") * "Mis. / Gene"),
                 y.pct=F, pt.cex=0.85, horiz.line=0,
                 y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
@@ -221,7 +221,7 @@ dev.off()
 # Note: LoF panel is intentionally larger than other three for placement in main figure
 pdf(paste(out.prefix, "DDD_dnPTVs_vs_ngenes.pdf", sep="."),
     height=2.2, width=3)
-scatter.vsGenes(neuro.segs, feature="DDD_dnm_lof_vs_expected_per_gene", 
+scatter.vsGenes(neuro.segs, feature="DDD_dnm_lof_norm_excess_per_gene", 
                 y.title=bquote("Excess" ~ italic("dn") * "PTVs / Gene"),
                 y.pct=F, pt.cex=0.85, horiz.line=0,
                 y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 3.5))
@@ -230,7 +230,7 @@ axis(4, at=0, tick=F, line=-0.9, las=2, labels=c("No\nExcess"), col.axis=bluebla
 dev.off()
 pdf(paste(out.prefix, "DDD_dnMis_vs_ngenes.pdf", sep="."),
     height=2.2, width=2)
-scatter.vsGenes(neuro.segs, feature="DDD_dnm_mis_vs_expected_per_gene", 
+scatter.vsGenes(neuro.segs, feature="DDD_dnm_mis_norm_excess_per_gene", 
                 y.title=bquote("Excess" ~ italic("dn") * "Mis. / Gene"),
                 y.pct=F, pt.cex=0.85, horiz.line=0,
                 y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))

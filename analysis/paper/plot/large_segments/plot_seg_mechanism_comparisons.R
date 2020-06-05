@@ -121,7 +121,7 @@ pdf(paste(out.prefix, "segs_by_mechanism.DDD_dnLoF_per_gene.pdf", sep="."),
     height=2.25, width=2.6)
 segs.swarm(segs[which(segs$n_genes>0), ], 
            x.bool=segs$nahr[which(segs$n_genes>0)], 
-           y=(segs$DDD_dnm_lof_vs_expected_per_gene/segs$n_genes)[which(segs$n_genes>0)], 
+           y=segs$DDD_dnm_lof_norm_excess_per_gene,
            x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.y.axis=T, add.pvalue=T,
            ytitle=bquote("Excess" ~ italic("dn") * "PTV" ~ "/ Gene"), 
            pt.cex=0.75, parmar=c(1.2, 3, 2.5, 0))
@@ -132,7 +132,7 @@ pdf(paste(out.prefix, "segs_by_mechanism.DDD_dnMis_per_gene.pdf", sep="."),
     height=2.25, width=2.6)
 segs.swarm(segs[which(segs$n_genes>0), ], 
            x.bool=segs$nahr[which(segs$n_genes>0)], 
-           y=(segs$DDD_dnm_mis_vs_expected_per_gene/segs$n_genes)[which(segs$n_genes>0)], 
+           y=segs$DDD_dnm_mis_norm_excess_per_gene,
            x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.y.axis=T, add.pvalue=T,
            ytitle=bquote("Excess" ~ italic("dn") * "Mis" ~ "/ Gene"), 
            pt.cex=0.75, parmar=c(1.2, 3, 2.5, 0))
@@ -143,7 +143,7 @@ pdf(paste(out.prefix, "segs_by_mechanism.ASC_dnLoF_per_gene.pdf", sep="."),
     height=2.25, width=2.6)
 segs.swarm(segs[which(segs$n_genes>0), ], 
            x.bool=segs$nahr[which(segs$n_genes>0)], 
-           y=(segs$ASC_dnm_lof_vs_expected_per_gene/segs$n_genes)[which(segs$n_genes>0)], 
+           y=segs$ASC_dnm_lof_norm_excess_per_gene,
            x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.y.axis=T, add.pvalue=T,
            ytitle=bquote("Excess" ~ italic("dn") * "PTV" ~ "/ Gene"), 
            pt.cex=0.75, parmar=c(1.2, 3, 2.5, 0))
@@ -154,7 +154,7 @@ pdf(paste(out.prefix, "segs_by_mechanism.ASC_dnMis_per_gene.pdf", sep="."),
     height=2.25, width=2.6)
 segs.swarm(segs[which(segs$n_genes>0), ], 
            x.bool=segs$nahr[which(segs$n_genes>0)], 
-           y=(segs$ASC_dnm_mis_vs_expected_per_gene/segs$n_genes)[which(segs$n_genes>0)], 
+           y=segs$ASC_dnm_mis_norm_excess_per_gene,
            x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.y.axis=T, add.pvalue=T,
            ytitle=bquote("Excess" ~ italic("dn") * "Mis" ~ "/ Gene"), 
            pt.cex=0.75, parmar=c(1.2, 3, 2.5, 0))
