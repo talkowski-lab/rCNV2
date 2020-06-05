@@ -17,7 +17,7 @@ cnvtypes = 'DEL DUP'.split()
 import pandas as pd
 import pybedtools as pbt
 from itertools import combinations
-from numpy import nansum, log10
+from numpy import nansum, log10, NaN
 from scipy.stats import hmean
 import argparse
 from os.path import splitext
@@ -216,8 +216,11 @@ def count_dnms(df, dnm_path, col_prefix, mu_df=None):
     dnms = pd.read_csv(dnm_path, sep='\t').\
               rename(columns={'#gene' : 'gene'})
 
-    def _sum_dnms(genes_str, dnms, key, exclude=[]):
-        genes = [x for x in str(genes_str[0]).split(';') if x not in exclude]
+    def _sum_dnms(genes_str, dnms, key, include=None):
+        if include is not None:
+            genes = [x for x in str(genes_str[0]).split(';') if x in include]
+        else:
+            genes = str(genes_str[0]).split(';')
         if len(genes) == 0 or 'NaN' in genes:
             return 0
         else:
@@ -230,15 +233,18 @@ def count_dnms(df, dnm_path, col_prefix, mu_df=None):
             mu_df_x = mu_df.copy(deep=True)
             n_dnms = df['_'.join([col_prefix, 'dnm', csq])].sum()
             mu_df_x['mu_' + csq] = mu_df_x['mu_' + csq] * n_dnms
-            genes_missing_mus = mu_df_x['gene'][mu_df_x['mu_' + csq].isnull()].tolist()
-            obs_no_missing_mus = pd.DataFrame(df.genes).\
+            genes_with_mus = mu_df_x.dropna()['gene'].tolist()
+            obs_with_mus = pd.DataFrame(df.genes).\
                                     apply(_sum_dnms, axis=1, raw=True, dnms=dnms, 
-                                          key=csq, exclude=genes_missing_mus)
+                                          key=csq, include=genes_with_mus)
             expected = pd.DataFrame(df.genes).\
                           apply(_sum_dnms, axis=1, raw=True, dnms=mu_df_x, 
-                                key='mu_' + csq, exclude=genes_missing_mus)
-            df['_'.join([col_prefix, 'dnm', csq, 'vs_expected'])] \
-                = (obs_no_missing_mus - expected).round(decimals=6)
+                                key='mu_' + csq, include=genes_with_mus)
+            oe_ratio = obs_with_mus / expected
+            df['_'.join([col_prefix, 'dnm', csq, 'obs_wMu'])] \
+                = (obs_with_mus)
+            df['_'.join([col_prefix, 'dnm', csq, 'exp_wMu'])] \
+                = (expected).round(decimals=6)
 
     return df
 
@@ -441,7 +447,9 @@ def main():
     if args.dnm_tsvs is not None:
         # Also, load snv mutation rates, if optioned
         if args.snv_mus is not None:
-            mu_df = pd.read_csv(args.snv_mus, sep='\t').rename(columns={'#gene' : 'gene'})
+            mu_df = pd.read_csv(args.snv_mus, sep='\t').\
+                       rename(columns={'#gene' : 'gene'}).\
+                       dropna()
         else:
             mu_df = None
         with open(args.dnm_tsvs) as dnm_ins:

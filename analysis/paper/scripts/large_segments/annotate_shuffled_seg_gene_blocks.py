@@ -140,7 +140,9 @@ def main():
 
     # Load snv mutation rates, if optioned
     if args.snv_mus is not None:
-        mu_df = pd.read_csv(args.snv_mus, sep='\t').rename(columns={'#gene' : 'gene'})
+        mu_df = pd.read_csv(args.snv_mus, sep='\t').\
+                   rename(columns={'#gene' : 'gene'}).\
+                   dropna()
     else:
         mu_df = None
 
@@ -161,7 +163,8 @@ def main():
                     if mu_df is not None:
                         n_dnms = dnms[study][csq].sum()
                         mus[study]['mu_' + csq] = mus[study]['mu_' + csq] * n_dnms
-                        header_cols.append('_'.join([study, 'dnm', csq, 'vs_expected']))
+                        header_cols += ['_'.join([study, 'dnm', csq, 'obs_wMu']),
+                                        '_'.join([study, 'dnm', csq, 'exp_wMu'])]
 
     # Preprocess GTEx expression matrix, if optioned
     if args.gtex_matrix is not None:
@@ -202,10 +205,10 @@ def main():
                     outvals.append(dnm_df.loc[dnm_df.gene.isin(genes), csq].sum())
                     if mu_df is not None:
                         mu_df_x = mus[study]
-                        genes_no_mus = mu_df['gene'][mu_df['mu_' + csq].isnull()].tolist()
-                        obs = dnm_df.loc[dnm_df.gene.isin(genes) & ~dnm_df.gene.isin(genes_no_mus), csq].sum()
-                        exp = mu_df_x.loc[mu_df_x.gene.isin(genes) & ~mu_df_x.gene.isin(genes_no_mus), 'mu_' + csq].sum()
-                        outvals.append(round(obs - exp, 6))
+                        genes_with_mus = mu_df.dropna()['gene'].tolist()
+                        obs = dnm_df.loc[dnm_df.gene.isin(genes) & dnm_df.gene.isin(genes_with_mus), csq].sum()
+                        exp = mu_df_x.loc[mu_df_x.gene.isin(genes) & mu_df_x.gene.isin(genes_with_mus), 'mu_' + csq].sum()
+                        outvals += [obs, round(exp, 6)]
 
         # Annotate with expression-based features, if optioned
         if args.gtex_matrix is not None:
@@ -214,7 +217,7 @@ def main():
             if len(gtex_genes) > 0:
                 mean_expr = hmean(gtex_means[gtex_means.index.isin(gtex_genes)])
                 n_ubi = gtex_ubi[gtex_ubi.index.isin(gtex_genes)].sum()
-                outvals += [mean_expr, n_ubi]
+                outvals += [round(mean_expr, 6), n_ubi]
             else:
                 outvals += [0, 0]
 

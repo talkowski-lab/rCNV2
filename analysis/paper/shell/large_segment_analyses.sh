@@ -146,6 +146,7 @@ mkdir basic_distribs
   basic_distribs/${prefix}
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_seg_attributes_vs_ngenes.R \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   basic_distribs/${prefix}
 
@@ -262,9 +263,6 @@ dup_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
   assoc_stat_plots/${prefix}.example_miami.png
 
 
-
-
-
 # Collapse overlapping DEL/DUP segments for sake of plotting
 while read intervals rid; do
   echo "$intervals" | sed -e 's/\;/\n/g' -e 's/\:\|\-/\t/g' \
@@ -299,6 +297,7 @@ gsutil -m cp -r \
   effect_size_plots \
   pleiotropy_plots \
   nahr_vs_nonrecurrent \
+  assoc_stat_plots \
   association_grid \
   ${rCNV_bucket}/analysis/paper/plots/large_segments/
 
