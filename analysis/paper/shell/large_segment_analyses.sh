@@ -243,6 +243,27 @@ mkdir nahr_vs_nonrecurrent
   nahr_vs_nonrecurrent/${prefix}
 
 
+# Generate mini Miami plot of example phenotype for main figure panel
+if [ -e assoc_stat_plots ]; then
+  rm -rf assoc_stat_plots
+fi
+mkdir assoc_stat_plots
+example_hpo="HP0012759"
+del_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
+              refs/sliding_window.rCNV.DEL.empirical_genome_wide_pval.hpo_cutoffs.tsv )
+dup_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
+              refs/sliding_window.rCNV.DUP.empirical_genome_wide_pval.hpo_cutoffs.tsv )
+/opt/rCNV2/analysis/paper/plot/large_segments/plot_example_miami.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --del-cutoff ${del_cutoff} \
+  --dup-cutoff ${dup_cutoff} \
+  meta_stats/${example_hpo}.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
+  meta_stats/${example_hpo}.rCNV.DUP.sliding_window.meta_analysis.stats.bed.gz \
+  assoc_stat_plots/${prefix}.example_miami.png
+
+
+
+
 
 # Collapse overlapping DEL/DUP segments for sake of plotting
 while read intervals rid; do

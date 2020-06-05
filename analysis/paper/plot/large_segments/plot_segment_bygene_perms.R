@@ -27,6 +27,9 @@ load.perms <- function(perm.res.in){
   
   # Add normalized columns
   perms$gnomAD_constrained_prop <- perms$n_gnomAD_constrained_genes / perms$n_genes
+  if("n_ubiquitously_expressed_genes" %in% colnames(perms)){
+    perms$prop_ubiquitously_expressed <- perms$n_ubiquitously_expressed_genes / perms$n_genes
+  }
   for(cname in colnames(perms)[grep("_dnm_", colnames(perms), fixed=T)]){
     new.cname <- paste(cname, "per_gene", sep="_")
     perms[, new.cname] <- perms[cname] / perms$n_genes
@@ -147,9 +150,21 @@ plot.all.perm.res(segs, perms, lit.perms,
                   pdf.dims.multi=c(4, 3.5),
                   parmar.multi=c(2.25, 6.25, 0, 0.5))
 
+# Average gene expression per segment
+print("Harmonic mean of gene expression per segment:")
+plot.all.perm.res(segs, perms, lit.perms, 
+                  feature="gene_expression_harmonic_mean", measure="mean",
+                  outdir, prefix, norm=F, norm.multi=F,
+                  n.bins.single=30, n.bins.multi=50,
+                  x.title="Avg. Gene Expression", 
+                  pdf.dims.single=c(2.2, 2.4),
+                  parmar.single=c(2.25, 2, 0, 1.2),
+                  pdf.dims.multi=c(4, 3.5),
+                  parmar.multi=c(2.25, 6.25, 0, 0.5))
+
 # Mean excess number of de novo PTVs & missense per gene in ASC & DDD
 # When restricting gw-sig to neuro-associated loci
-sapply(c("ASC", "DDD"), function(cohort){
+sapply(c("ASC", "DDD", "ASC_unaffected"), function(cohort){
   sapply(1:length(csqs), function(ci){
     csq <- csqs[ci]
     csq.abbrev <- names(csqs)[ci]
