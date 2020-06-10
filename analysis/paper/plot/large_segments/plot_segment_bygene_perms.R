@@ -159,23 +159,6 @@ plot.all.perm.res(segs, perms, lit.perms,
                   pdf.dims.multi=c(4, 3.5),
                   parmar.multi=c(2.25, 6.25, 0, 0.5))
 
-# TEST DEV CODE
-pdf(paste("~/scratch/test.pdf"), height=8, width=8)
-par(mfrow=c(3, 2))
-sapply(c("DDD", "ASC", "ASC_unaffected"), function(cohort){
-  sapply(1:length(csqs), function(ci){
-    csq <- csqs[ci]
-    csq.abbrev <- names(csqs)[ci]
-    plot.seg.perms(gw, perms, 
-                   feature=paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_"),
-                   measure="mean", subset_to_regions=neuro.plus.lit.ids,
-                   n.bins=100, x.title=bquote("Excess" ~ italic("De Novo") ~ .(csq.abbrev) ~ "/ Gene"), 
-                   diamond.pch=22, parmar=c(3, 4, 2, 2))
-    mtext(3, text=paste(cohort, csq.abbrev), font=2)
-  })
-})
-dev.off()
-
 # Mean excess number of de novo PTVs & missense per gene in ASC & DDD
 # When restricting gw-sig to neuro-associated loci
 sapply(c("ASC", "DDD", "ASC_unaffected"), function(cohort){

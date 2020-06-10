@@ -263,6 +263,65 @@ dup_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
   assoc_stat_plots/${prefix}.example_miami.png
 
 
+# Plot various association test statistics for quality control supplementary figures
+if ! [ -e assoc_stat_plots ]; then
+  mkdir assoc_stat_plots
+fi
+if ! [ -e meta_stats/matrices ]; then
+  mkdir meta_stats/matrices
+fi
+# Strip out P-value columns per HPO & CNV pair
+while read nocolon hpo; do
+  echo $nocolon
+  for cnv in DEL DUP; do
+    echo $cnv
+    statsfile=meta_stats/$nocolon.rCNV.$cnv.sliding_window.meta_analysis.stats.bed.gz
+    for column in meta_phred_p meta_phred_p_secondary; do
+      echo $column
+      idx=$( zcat $statsfile | head -n1 | sed 's/\t/\n/g' \
+             | awk -v column=$column '{ if ($1==column) print NR }' )
+      zcat $statsfile | sed '1d' | cut -f$idx \
+      | cat <( echo -e "${nocolon}_${cnv}" ) - \
+      > meta_stats/matrices/$nocolon.$cnv.$column.tsv
+    done
+  done
+done < refs/test_phenotypes.list
+# Collect bin coordinates
+zcat \
+  meta_stats/$( head -n1 refs/test_phenotypes.list | cut -f1 ).rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
+| cut -f1-3 \
+> window_coordinates.bed
+# Make matrices for primary and secondary P-values across phenotypes per CNV type 
+for cnv in DEL DUP; do
+  for column in meta_phred_p meta_phred_p_secondary; do
+    paste \
+      window_coordinates.bed \
+      meta_stats/matrices/*.$cnv.$column.tsv \
+    | bgzip -c \
+    > meta_stats/matrices/${prefix}.$cnv.$column.all_hpos.bed.gz
+  done
+done
+# Generate plots
+del_cutoff=$( fgrep -v "#" refs/sliding_window.rCNV.DEL.empirical_genome_wide_pval.hpo_cutoffs.tsv \
+              | head -n1 | cut -f2 )
+del_cutoff=$( fgrep -v "#" refs/sliding_window.rCNV.DUP.empirical_genome_wide_pval.hpo_cutoffs.tsv \
+              | head -n1 | cut -f2 )
+/opt/rCNV2/analysis/paper/plot/large_segments/plot_sliding_window_pval_distribs.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --del-cutoff ${del_cutoff} \
+  --dup-cutoff ${dup_cutoff} \
+  meta_stats/matrices/${prefix}.DEL.meta_phred_p.all_hpos.bed.gz \
+  meta_stats/matrices/${prefix}.DUP.meta_phred_p.all_hpos.bed.gz \
+  meta_stats/matrices/${prefix}.DEL.meta_phred_p_secondary.all_hpos.bed.gz \
+  meta_stats/matrices/${prefix}.DUP.meta_phred_p_secondary.all_hpos.bed.gz \
+  refs/${prefix}.reordered_hpos.txt \
+  refs/HPOs_by_metacohort.table.tsv \
+  assoc_stat_plots/${prefix}
+# TO PLOT:
+# GW-sig permutation results (DEL & DUP)
+# Scatterplot of original segment size (total sig bp) & finemapped size
+
+
 # Collapse overlapping DEL/DUP segments for sake of plotting
 while read intervals rid; do
   echo "$intervals" | sed -e 's/\;/\n/g' -e 's/\:\|\-/\t/g' \

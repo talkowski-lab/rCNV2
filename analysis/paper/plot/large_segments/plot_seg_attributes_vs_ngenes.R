@@ -203,14 +203,14 @@ dev.off()
 
 # Plot average enrichment of ASC DNMs vs. # of genes
 pdf(paste(out.prefix, "ASC_dnPTVs_vs_ngenes.pdf", sep="."),
-    height=2.2, width=2)
+    height=2.2, width=2.3)
 scatter.vsGenes(neuro.segs, feature="ASC_dnm_lof_norm_excess_per_gene", 
                 y.title=bquote("Excess" ~ italic("dn") * "PTVs / Gene"),
                 y.pct=F, pt.cex=0.85, horiz.line=0,
                 y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
 dev.off()
 pdf(paste(out.prefix, "ASC_dnMis_vs_ngenes.pdf", sep="."),
-    height=2.2, width=2)
+    height=2.2, width=2.3)
 scatter.vsGenes(neuro.segs, feature="ASC_dnm_mis_norm_excess_per_gene", 
                 y.title=bquote("Excess" ~ italic("dn") * "Mis. / Gene"),
                 y.pct=F, pt.cex=0.85, horiz.line=0,
@@ -229,7 +229,7 @@ axis(4, at=0, tck=-0.03, col=blueblack, labels=NA)
 axis(4, at=0, tick=F, line=-0.9, las=2, labels=c("No\nExcess"), col.axis=blueblack, font=3, cex=0.8)
 dev.off()
 pdf(paste(out.prefix, "DDD_dnMis_vs_ngenes.pdf", sep="."),
-    height=2.2, width=2)
+    height=2.2, width=2.3)
 scatter.vsGenes(neuro.segs, feature="DDD_dnm_mis_norm_excess_per_gene", 
                 y.title=bquote("Excess" ~ italic("dn") * "Mis. / Gene"),
                 y.pct=F, pt.cex=0.85, horiz.line=0,
