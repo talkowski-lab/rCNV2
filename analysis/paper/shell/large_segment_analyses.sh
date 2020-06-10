@@ -263,7 +263,56 @@ dup_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
   assoc_stat_plots/${prefix}.example_miami.png
 
 
-# Plot various association test statistics for quality control supplementary figures
+# Plot results from genome-wide permutation testing to establish FDR
+if ! [ -e assoc_stat_plots ]; then
+  mkdir assoc_stat_plots
+fi
+if ! [ -e meta_stats/perm_res ]; then
+  mkdir meta_stats/perm_res
+fi
+# Gather all permutation P-values 
+# (note: this has been parallelized in FireCloud with collect_permuted_meta_p_matrices.wdl )
+
+while read nocolon hpo; do
+  for CNV in DEL DUP; do
+    echo -e "\nSTARTING $nocolon\n"
+    gsutil -m cp \
+      "${rCNV_bucket}/analysis/sliding_windows/$nocolon/rCNV/permutations/$nocolon.rCNV.${CNV}.sliding_window.meta_analysis.stats.perm_*.bed.gz" \
+      meta_stats/perm_res/
+    n_pheno_perms=$( find meta_stats/perm_res/ -name "$nocolon.rCNV.${CNV}.sliding_window.meta_analysis.stats.perm_*.bed.gz" \
+                     | awk -v FS="_" '{ print $NF }' | cut -f1 -d\. | sort -nrk1,1 | head -n1 )
+    for i in $( seq 1 ${n_pheno_perms} ); do
+      p_idx=$( zcat meta_stats/perm_res/$nocolon.rCNV.${CNV}.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
+               | sed -n '1p' | sed 's/\t/\n/g' | awk -v OFS="\t" '{ if ($1=="meta_phred_p") print NR }' )
+      zcat meta_stats/perm_res/$nocolon.rCNV.${CNV}.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
+      | grep -ve '^#' \
+      | awk -v p_idx=$p_idx '{ print $(p_idx) }' \
+      | cat <( echo "$nocolon.${CNV}.$i" ) - \
+      > meta_stats/perm_res/$nocolon.rCNV.${CNV}.sliding_window.meta_analysis.stats.permuted_p_values.$i.txt
+    done
+    rm meta_stats/perm_res/$nocolon.rCNV.${CNV}.sliding_window.meta_analysis.stats.perm_*.bed.gz
+    echo -e "\nFINISHED $nocolon\n"
+  done
+done < refs/test_phenotypes.list
+for CNV in DEL DUP; do
+  echo -e "\nMAKING P-VALUE MATRIX\n"
+  paste meta_stats/perm_res/*.rCNV.${CNV}.sliding_window.meta_analysis.stats.permuted_p_values.*.txt \
+  | gzip -c \
+  > ${prefix}.rCNV.${CNV}.permuted_pval_matrix.txt.gz
+done
+
+# Make plots of permuted P-values vs empirical FDR target
+/opt/rCNV2/analysis/paper/plot/large_segments/plot_permuted_fdr.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --fdr-target 0.000003715428 \
+  ${freq_code}.DEL.permuted_pval_matrix.txt.gz \
+  ${freq_code}.DUP.permuted_pval_matrix.txt.gz \
+  refs/ \
+  sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}
+
+
+
+# Plot correlation of primary & secondary P-values for all phenotypes & CNV classes
 if ! [ -e assoc_stat_plots ]; then
   mkdir assoc_stat_plots
 fi
@@ -304,7 +353,7 @@ done
 # Generate plots
 del_cutoff=$( fgrep -v "#" refs/sliding_window.rCNV.DEL.empirical_genome_wide_pval.hpo_cutoffs.tsv \
               | head -n1 | cut -f2 )
-del_cutoff=$( fgrep -v "#" refs/sliding_window.rCNV.DUP.empirical_genome_wide_pval.hpo_cutoffs.tsv \
+dup_cutoff=$( fgrep -v "#" refs/sliding_window.rCNV.DUP.empirical_genome_wide_pval.hpo_cutoffs.tsv \
               | head -n1 | cut -f2 )
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_sliding_window_pval_distribs.R \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
@@ -317,11 +366,65 @@ del_cutoff=$( fgrep -v "#" refs/sliding_window.rCNV.DUP.empirical_genome_wide_pv
   refs/${prefix}.reordered_hpos.txt \
   refs/HPOs_by_metacohort.table.tsv \
   assoc_stat_plots/${prefix}
-# TO PLOT:
-# GW-sig permutation results (DEL & DUP)
+
+
+# Plot correlation of sizes for original significant regions and fine-mapped reigons
+if ! [ -e assoc_stat_plots ]; then
+  mkdir assoc_stat_plots
+fi
+if ! [ -e meta_stats/sigbins ]; then
+  mkdir meta_stats/sigbins
+fi
+# Extract significant windows per phenotype from summary statistics
+while read nocolon hpo; do
+  echo $nocolon
+  for cnv in DEL DUP; do
+    echo $cnv
+    primary_cutoff=$( fgrep -v "#" refs/sliding_window.rCNV.$cnv.empirical_genome_wide_pval.hpo_cutoffs.tsv \
+                      | head -n1 | cut -f2 )
+    /opt/rCNV2/analysis/paper/scripts/large_segments/get_sig_windows.R \
+      --primary-p-cutoff $primary_cutoff \
+      --secondary-p-cutoff 0.05 \
+      --min-nominal 2 \
+      --secondary-or-nominal \
+      meta_stats/$nocolon.rCNV.$cnv.sliding_window.meta_analysis.stats.bed.gz \
+      meta_stats/sigbins/$nocolon.$cnv.sig_windows.bed
+    fgrep -v "#" meta_stats/sigbins/$nocolon.$cnv.sig_windows.bed \
+    | sort -Vk1,1 -k2,2n -k3,3n \
+    | bedtools merge -d 1000000 -i - \
+    | bgzip -c \
+    > meta_stats/sigbins/$nocolon.$cnv.sig_windows.merged.bed.gz
+  done
+done < refs/test_phenotypes.list
+# Match final significant refined associations with their original significant windows
+while read nocolon hpo; do
+  for cnv in DEL DUP; do
+    zcat rCNV.final_segments.associations.bed.gz \
+    | fgrep -w $hpo \
+    | fgrep -w $cnv \
+    | cut -f1-4 \
+    | bedtools intersect -wa -wb -a - \
+      -b meta_stats/sigbins/$nocolon.$cnv.sig_windows.merged.bed.gz \
+    | awk -v FS="\t" -v OFS="\t" -v hpo=$hpo -v cnv=$cnv \
+      '{ print $4, cnv, hpo, $7-$6, $3-$2 }'
+  done
+done < refs/test_phenotypes.list \
+| sort -Vk1,1 -k2,2n -k3,3n -k4,4V -k5,5V \
+| cat <( echo -e "region_id\tcnv\thpo\toriginal_size\trefined_size" ) - \
+| gzip -c \
+> ${prefix}.associations.old_vs_new_size.tsv.gz
 # Scatterplot of original segment size (total sig bp) & finemapped size
+/opt/rCNV2/analysis/paper/plot/large_segments/plot_orig_vs_refined_assoc_sizes.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  ${prefix}.associations.old_vs_new_size.tsv.gz \
+  assoc_stat_plots/${prefix}
 
 
+# Plot master grid summarizing segment association across all phenotypes
+if [ -e association_grid ]; then
+  rm -rf association_grid
+fi
+mkdir association_grid
 # Collapse overlapping DEL/DUP segments for sake of plotting
 while read intervals rid; do
   echo "$intervals" | sed -e 's/\;/\n/g' -e 's/\:\|\-/\t/g' \
@@ -332,13 +435,7 @@ done < <( zcat rCNV.final_segments.loci.bed.gz | grep -ve '^#' \
 | bedtools merge -i - -d 1000000 -c 4 -o distinct \
 | cut -f4 \
 > locus_clusters.txt
-
-
-# Plot master grid summarizing segment association across all phenotypes
-if [ -e association_grid ]; then
-  rm -rf association_grid
-fi
-mkdir association_grid
+# Generate master locus grid plot
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_association_grid.R \
   --clusters locus_clusters.txt \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \

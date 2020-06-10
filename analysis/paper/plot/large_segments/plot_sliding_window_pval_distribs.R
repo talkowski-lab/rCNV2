@@ -212,7 +212,7 @@ lambda.scatter <- function(del, dup, hpo.n,
   x.length <- par("usr")[2] - par("usr")[1]
   y.length <- ylims[2] - ylims[1]
   text(x=par("usr")[2] + 0.05 * x.length, 
-       y=par("usr")[3] + 0.175 * y.length,
+       y=par("usr")[3] + 0.15 * y.length,
        pos=2, col=cnv.colors[1], labels=bquote(.(del.fit.p)))
   text(x=par("usr")[2] + 0.05 * x.length, 
        y=par("usr")[3] + 0.05 * y.length,
@@ -223,7 +223,12 @@ lambda.scatter <- function(del, dup, hpo.n,
 primary.vs.secondary.scatter <- function(pvals.1, pvals.2, keep.idx=NULL,
                                          cutoff.1=6, cutoff.2=-log10(0.05),
                                          sig.color="black", nonsig.color="gray75",
-                                         pt.cex=0.2, parmar=c(2.25, 2.25, 0.25, 0.25)){
+                                         min.point.plot=-log10(0.5), pt.cex=0.2, 
+                                         parmar=c(2.25, 2.25, 0.25, 0.25)){
+  # Fill NA P-values with P=1
+  pvals.1 <- as.data.frame(apply(pvals.1, 2, function(ps){ps[which(is.na(ps))] <- 1; return(ps)}))
+  pvals.2 <- as.data.frame(apply(pvals.2, 2, function(ps){ps[which(is.na(ps))] <- 1; return(ps)}))
+  
   # Subset p-values to indexes to keep (if optioned)
   if(!is.null(keep.idx)){
     pvals.1 <- pvals.1[keep.idx, ]
@@ -233,6 +238,7 @@ primary.vs.secondary.scatter <- function(pvals.1, pvals.2, keep.idx=NULL,
   # Gather plot data
   pvals <- data.frame("primary"=-log10(as.vector(as.matrix(pvals.1))),
                       "secondary"=-log10(as.vector(as.matrix(pvals.2))))
+  pvals <- pvals[which(apply(pvals, 1, function(ps){max(ps, na.rm=T) >= min.point.plot})), ]
   pvals <- pvals[which(!is.na(pvals$primary) & !is.na(pvals$secondary) &
                          !is.infinite(pvals$primary) & !is.infinite(pvals$secondary)), ]
   ax.lims <- range(pvals, na.rm=T)
@@ -253,7 +259,13 @@ primary.vs.secondary.scatter <- function(pvals.1, pvals.2, keep.idx=NULL,
        ybottom=par("usr")[3], ytop=par("usr")[4], 
        border=NA, bty="n", col=bluewhite)
   abline(h=axTicks(2), v=axTicks(1), col="white")
-  # abline(0, 1, col=blueblack)
+  rect(xleft=0, xright=min.point.plot,
+       ybottom=0, ytop=min.point.plot,
+       border=NA, bty="n", col=nonsig.color)
+  points(x=seq(0, min.point.plot, length.out=25),
+         y=rep(0, 25), pch=19, cex=pt.cex, col=pt.colors)
+  points(y=seq(0, min.point.plot, length.out=25),
+         x=rep(0, 25), pch=19, cex=pt.cex, col=pt.colors)
   
   # Add points
   points(pvals, pch=19, cex=pt.cex, col=pt.colors)
@@ -323,9 +335,9 @@ dup.cutoff <- -log10(as.numeric(opts$`dup-cutoff`))
 # hpo.samplesize.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
 # out.prefix <- "~/scratch/test_pval_qc"
 # rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
 # del.cutoff <- 6
 # dup.cutoff <- 6
+# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
 
 # Source rCNV2 config, if optioned
 if(!is.null(rcnv.config)){
