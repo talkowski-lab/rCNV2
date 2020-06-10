@@ -6,21 +6,23 @@
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Compile P-value matrices from permuted sliding window meta-analyses for rCNV2
+# Compile permuted FDR matrices from sliding window meta-analyses for rCNV2
 
 
 workflow get_matrices {
   File phenotype_list
+  Float fdr_target
   String rCNV_bucket
   String prefix
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
 
-  # Scatter over phenotypes & collect matrices
+  # Scatter over phenotypes & collect empirical fdrs
   scatter ( pheno in phenotypes ) {
-    call get_pheno_matrices {
+    call get_fdrs_perPheno {
       input:
         pheno=pheno[0],
+        fdr_target=fdr_target,
         rCNV_bucket=rCNV_bucket
     }
   }
@@ -45,9 +47,10 @@ workflow get_matrices {
 }
 
 
-# Get P-value matrices for DEL and DUP for a single phenotype
-task get_pheno_matrices {
+# Get permuted FDRs for DEL and DUP for a single phenotype
+task get_fdrs_perPheno {
   String pheno
+  Float fdr_target
   String rCNV_bucket
 
   command <<<
@@ -66,14 +69,10 @@ task get_pheno_matrices {
                        | awk -v FS="_" '{ print $NF }' | cut -f1 -d\. | sort -nrk1,1 | head -n1 )
 
       for i in $( seq 1 $n_pheno_perms ); do
-
-        p_idx=$( zcat perm_res/${pheno}.rCNV.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
-                 | sed -n '1p' | sed 's/\t/\n/g' | awk -v OFS="\t" '{ if ($1=="meta_phred_p") print NR }' )
-
+        
         zcat perm_res/${pheno}.rCNV.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
         | grep -ve '^#' \
         | awk -v p_idx=$p_idx '{ print $(p_idx) }' \
-        | cat <( echo "${pheno}.$CNV.$i" ) - \
         > perm_res/${pheno}.rCNV.$CNV.sliding_window.meta_analysis.stats.permuted_p_values.$i.txt
       done
 

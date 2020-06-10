@@ -29,6 +29,7 @@ load.pvals <- function(sumstats.in, p.colname="meta_phred_p", p.is.phred=T){
 
 # Compute empirical FDR
 calc.fdr <- function(pvals, fdr.target){
+  n <- length(pvals)
   n.true <- ceiling(fdr.target * n)
   sort(pvals)[n.true]
 }
