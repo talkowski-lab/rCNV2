@@ -11,7 +11,6 @@
 
 workflow get_matrices {
   File phenotype_list
-  Array[String]? cnvs = ['DEL', 'DUP']
   String rCNV_bucket
   String prefix
 
@@ -20,15 +19,27 @@ workflow get_matrices {
   # Scatter over phenotypes & collect matrices
   scatter ( pheno in phenotypes ) {
     call get_pheno_matrices {
-      pheno=pheno[0],
-      rCNV_bucket=rCNV_bucket
+      input:
+        pheno=pheno[0],
+        rCNV_bucket=rCNV_bucket
     }
   }
 
-  # # Merge all phenotypes into one matrix per CNV type
-  # scatter ( cnv in cnvs ) {
-
-  # }
+  # Merge all phenotypes into one matrix per CNV type
+  call merge_matrices as merge_DEL {
+    input:
+      matrices=get_pheno_matrices.del_matrix,
+      prefix=prefix,
+      CNV="DEL",
+      rCNV_bucket=rCNV_bucket
+  }
+  call merge_matrices as merge_DUP {
+    input:
+      matrices=get_pheno_matrices.dup_matrix,
+      prefix=prefix,
+      CNV="DUP",
+      rCNV_bucket=rCNV_bucket
+  }
 
   output {}
 }
@@ -73,29 +84,50 @@ task get_pheno_matrices {
   >>>
 
   output {
-    del_matrix = "${pheno}.rCNV.DEL.sliding_window.meta_analysis.stats.permuted_p_values.tsv.gz"
-    dup_matrix = "${pheno}.rCNV.DUP.sliding_window.meta_analysis.stats.permuted_p_values.tsv.gz"
+    File del_matrix = "${pheno}.rCNV.DEL.sliding_window.meta_analysis.stats.permuted_p_values.tsv.gz"
+    File dup_matrix = "${pheno}.rCNV.DUP.sliding_window.meta_analysis.stats.permuted_p_values.tsv.gz"
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2176cfce20a878f1dd3288e8e534c57689c58663d0354ef68b5c7c18bf34d4b7"
+    docker: "talkowski/rcnv@sha256:32208d4ae1e351b1d2bc57c06952abe8b1ebc16b5c0b19908a863970b7bc15a9"
     preemptible: 1
     disks: "local-disk 200 SSD"
   }  
 }
 
 
-# # Merge P-value matrices across all phenotypes
-# task merge_matrices {
-#   Array[File] matrices
-#   String prefix
-#   String CNV
-#   String rCNV_bucket
+# Merge P-value matrices across all phenotypes
+task merge_matrices {
+  Array[File] matrices
+  String prefix
+  String CNV
+  String rCNV_bucket
 
-#   command <<<
-#     set -e
+  command <<<
+    set -e
 
+    # Relocate & decompress matrices
+    echo -e "${sep="\n" matrices}" \
+    | xargs -I {} mv {} ./
+    find ./ \
+      -name "*.rCNV.${CNV}.sliding_window.meta_analysis.stats.permuted_p_values.tsv.gz" \
+    | xargs -I {} gunzip {}
 
-#   >>>
-# }
+    # Paste matrices
+    paste ./*.rCNV.${CNV}.sliding_window.meta_analysis.stats.permuted_p_values.tsv \
+    | gzip -c \
+    > ${prefix}.rCNV.${CNV}.sliding_window.meta_analysis.stats.permuted_p_values.tsv.gz
+
+    # Copy to gs bucket
+    gsutil -m cp \
+      ${prefix}.rCNV.${CNV}.sliding_window.meta_analysis.stats.permuted_p_values.tsv.gz \
+      ${rCNV_bucket}/analysis/sliding_windows/permuted_pvalue_matrices/
+  >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:32208d4ae1e351b1d2bc57c06952abe8b1ebc16b5c0b19908a863970b7bc15a9"
+    preemptible: 1
+    disks: "local-disk 200 SSD"
+  }  
+}
 

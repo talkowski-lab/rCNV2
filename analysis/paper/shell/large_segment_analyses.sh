@@ -271,45 +271,18 @@ if ! [ -e meta_stats/perm_res ]; then
   mkdir meta_stats/perm_res
 fi
 # Gather all permutation P-values 
-# (note: this has been parallelized in FireCloud with collect_permuted_meta_p_matrices.wdl )
-
-while read nocolon hpo; do
-  for CNV in DEL DUP; do
-    echo -e "\nSTARTING $nocolon\n"
-    gsutil -m cp \
-      "${rCNV_bucket}/analysis/sliding_windows/$nocolon/rCNV/permutations/$nocolon.rCNV.${CNV}.sliding_window.meta_analysis.stats.perm_*.bed.gz" \
-      meta_stats/perm_res/
-    n_pheno_perms=$( find meta_stats/perm_res/ -name "$nocolon.rCNV.${CNV}.sliding_window.meta_analysis.stats.perm_*.bed.gz" \
-                     | awk -v FS="_" '{ print $NF }' | cut -f1 -d\. | sort -nrk1,1 | head -n1 )
-    for i in $( seq 1 ${n_pheno_perms} ); do
-      p_idx=$( zcat meta_stats/perm_res/$nocolon.rCNV.${CNV}.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
-               | sed -n '1p' | sed 's/\t/\n/g' | awk -v OFS="\t" '{ if ($1=="meta_phred_p") print NR }' )
-      zcat meta_stats/perm_res/$nocolon.rCNV.${CNV}.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
-      | grep -ve '^#' \
-      | awk -v p_idx=$p_idx '{ print $(p_idx) }' \
-      | cat <( echo "$nocolon.${CNV}.$i" ) - \
-      > meta_stats/perm_res/$nocolon.rCNV.${CNV}.sliding_window.meta_analysis.stats.permuted_p_values.$i.txt
-    done
-    rm meta_stats/perm_res/$nocolon.rCNV.${CNV}.sliding_window.meta_analysis.stats.perm_*.bed.gz
-    echo -e "\nFINISHED $nocolon\n"
-  done
-done < refs/test_phenotypes.list
-for CNV in DEL DUP; do
-  echo -e "\nMAKING P-VALUE MATRIX\n"
-  paste meta_stats/perm_res/*.rCNV.${CNV}.sliding_window.meta_analysis.stats.permuted_p_values.*.txt \
-  | gzip -c \
-  > ${prefix}.rCNV.${CNV}.permuted_pval_matrix.txt.gz
-done
-
+# (Note: this has been parallelized in FireCloud with collect_permuted_meta_p_matrices.wdl )
+gsutil -m cp \
+  ${rCNV_bucket}/analysis/sliding_windows/permuted_pvalue_matrices/*tsv.gz \
+  meta_stats/perm_res/
 # Make plots of permuted P-values vs empirical FDR target
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_permuted_fdr.R \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   --fdr-target 0.000003715428 \
-  ${freq_code}.DEL.permuted_pval_matrix.txt.gz \
-  ${freq_code}.DUP.permuted_pval_matrix.txt.gz \
-  refs/ \
-  sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}
-
+  meta_stats/perm_res/${prefix}.rCNV.DEL.sliding_window.meta_analysis.stats.permuted_p_values.tsv.gz \
+  meta_stats/perm_res/${prefix}.rCNV.DUP.sliding_window.meta_analysis.stats.permuted_p_values.tsv.gz \
+  refs/HPOs_by_metacohort.table.tsv \
+  assoc_stat_plots/${prefix}.sliding_window_fdr_permutation
 
 
 # Plot correlation of primary & secondary P-values for all phenotypes & CNV classes
