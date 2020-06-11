@@ -75,6 +75,7 @@ We collected the following expression-based gene features:
 | Mean expression MAD | `expression_mad_mean` | Mean of median absolute deviation (MAD) of expression values  across all tissues in GTEx v7 | GTEx v7 [(GTEx Consortium, _Nature_, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/29022597) |  
 | Third quartile of expression MAD | `expression_mad_q3` | Third quartile of median absolute deviation (MAD) of expression values  across all tissues in GTEx v7 | GTEx v7 [(GTEx Consortium, _Nature_, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/29022597) |  
 | Max. expression MAD | `expression_mad_max` | Maximum of median absolute deviation (MAD) of expression values  across all tissues in GTEx v7 | GTEx v7 [(GTEx Consortium, _Nature_, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/29022597) |  
+| Expression components 1-20 | `expression_component_1` ... `expression_component_20` | Top 20 principal components of gene X tissue matrix from GTEx v7, using mean expression across individuals per gene per tissue | GTEx v7 [(GTEx Consortium, _Nature_, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/29022597) |  
 
 All expression values were derived from GTEx v7 (rather than the final v8 release) because GTEx v7 was the last version native to hg19/Gencode v19, which was a direct match for the Gencode version used in this study.  
 

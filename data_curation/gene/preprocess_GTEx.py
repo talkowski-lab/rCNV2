@@ -15,6 +15,7 @@ from os import path
 import gzip
 import numpy as np
 from scipy.stats import median_absolute_deviation as mad
+from sklearn.preprocessing import StandardScaler
 import subprocess
 import argparse
 
@@ -175,6 +176,18 @@ def load_gtex_matrix(gtex_in, genes, ensg_ids, tissues, quiet=False):
     return gtex_min, gtex_q1, gtex_median, gtex_mean, gtex_q3, gtex_max, gtex_sd, gtex_mad
 
 
+def pca_expression(matrix, n_pcs=20):
+    """
+    Reduce an expression matrix to its n_pcs top principal components
+    """
+
+    matrix.index = matrix.gene
+    matrix.drop(columns='gene', inplace=True)
+    # X = StandardScaler().fit_transform(matrix)
+
+    import pdb; pdb.set_trace()
+
+
 def write_matrix(matrix, filename, gzip):
     """
     Write matrix to file and gzip if optioned
@@ -198,6 +211,8 @@ def main():
     parser.add_argument('gtex_sample_manifest', help='GTEx sample manifest tsv')
     parser.add_argument('-p', '--prefix', default='GTEx_summary', help='Prefix ' +
                         'for output matrices')
+    parser.add_argument('--n-pcs', default=20, help='Number of principal components ' +
+                        'to retain', type=int)
     parser.add_argument('-z', '--gzip', action='store_true', help='Gzip outputs')
     args = parser.parse_args()
 
@@ -210,6 +225,10 @@ def main():
     # Load sample X gene expression matrix
     gtex_min, gtex_q1, gtex_median, gtex_mean, gtex_q3, gtex_max, gtex_sd, gtex_mad = \
         load_gtex_matrix(args.gtex_matrix, genes, ensg_ids, tissues)
+
+    # PCA of gene-level average expression levels across tissues
+    gtex_pca = pca_expression(gtex_mean, args.n_pcs)
+    import pdb; pdb.set_trace()
 
     # Write matrices to output files
     write_matrix(gtex_min, args.prefix + '.min.tsv', args.gzip)

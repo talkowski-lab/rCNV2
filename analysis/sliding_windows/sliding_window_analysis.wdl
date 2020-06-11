@@ -122,7 +122,7 @@ workflow sliding_window_analysis {
         metacohort_list=metacohort_list,
         metacohort_sample_table=metacohort_sample_table,
         freq_code="rCNV",
-        meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+        meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
         max_manhattan_phred_p=max_manhattan_phred_p,
         meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
@@ -140,7 +140,7 @@ workflow sliding_window_analysis {
       metacohort_sample_table=metacohort_sample_table,
       freq_code="rCNV",
       CNV="DEL",
-      meta_p_cutoffs_tsv=calc_genome_wide_cutoffs.p_cutoff_table[0],
+      meta_p_cutoffs_tsv=calc_genome_wide_cutoffs.bonferroni_cutoff_table[0],
       meta_secondary_p_cutoff=meta_secondary_p_cutoff,
       meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
       sig_window_pad=sig_window_pad,
@@ -156,7 +156,7 @@ workflow sliding_window_analysis {
       metacohort_sample_table=metacohort_sample_table,
       freq_code="rCNV",
       CNV="DUP",
-      meta_p_cutoffs_tsv=calc_genome_wide_cutoffs.p_cutoff_table[1],
+      meta_p_cutoffs_tsv=calc_genome_wide_cutoffs.bonferroni_cutoff_table[1],
       meta_secondary_p_cutoff=meta_secondary_p_cutoff,
       meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
       sig_window_pad=sig_window_pad,
@@ -378,7 +378,7 @@ task calc_meta_p_cutoff {
       sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}
 
     # Also produce an optional table of flat Bonferroni P-value cutoffs
-    awk -v pval=${p_cutoff} -v FS="\t" -v OFS="\t" \
+    awk -v pval=${fdr_target} -v FS="\t" -v OFS="\t" \
       '{ print $1, pval }' ${phenotype_list} \
     > sliding_window.${freq_code}.${CNV}.bonferroni_pval.hpo_cutoffs.tsv
 
@@ -392,7 +392,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
+    docker: "talkowski/rcnv@sha256:20ee162d7d45e0340d374861d137f76a2bfdfa848c8f7ff295f66b4bcd1bedd9"
     preemptible: 1
     memory: "32 GB"
     disks: "local-disk 275 HDD"
@@ -403,6 +403,7 @@ task calc_meta_p_cutoff {
     File perm_results_plot = "sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}_permutation_results.png"
     File p_cutoff_table = "sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}.hpo_cutoffs.tsv"
     File p_cutoff_ladder = "sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}.ncase_cutoff_ladder.tsv"
+    File bonferroni_cutoff_table = "sliding_window.${freq_code}.${CNV}.bonferroni_pval.hpo_cutoffs.tsv"
   }  
 }
 
@@ -428,7 +429,7 @@ task meta_analysis {
     # Copy burden stats & p-value cutoff tables
     find / -name "*${prefix}.${freq_code}.*.sliding_window.stats.bed.gz*" \
     | xargs -I {} mv {} ./
-    find / -name "*sliding_window.${freq_code}.*.empirical_genome_wide_pval.hpo_cutoffs.tsv*" \
+    find / -name "*sliding_window.${freq_code}.*.bonferroni_pval.hpo_cutoffs.tsv*" \
     | xargs -I {} mv {} ./
     # gsutil -m cp \
     #   ${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/** \
@@ -448,9 +449,9 @@ task meta_analysis {
                | awk -v FS="\t" '{ print $2 }' )
     title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
     DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                    sliding_window.${freq_code}.DEL.empirical_genome_wide_pval.hpo_cutoffs.tsv )
+                    sliding_window.${freq_code}.DEL.bonferroni_pval.hpo_cutoffs.tsv )
     DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                    sliding_window.${freq_code}.DUP.empirical_genome_wide_pval.hpo_cutoffs.tsv )
+                    sliding_window.${freq_code}.DUP.bonferroni_pval.hpo_cutoffs.tsv )
 
     # Run meta-analysis for each CNV type
     for CNV in DEL DUP; do
@@ -533,7 +534,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
+    docker: "talkowski/rcnv@sha256:20ee162d7d45e0340d374861d137f76a2bfdfa848c8f7ff295f66b4bcd1bedd9"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -640,7 +641,7 @@ task refine_regions {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:da1326355b9df88da7cb38e2de955a39807c429c59f711dc7f33647f11869c4d"
+    docker: "talkowski/rcnv@sha256:20ee162d7d45e0340d374861d137f76a2bfdfa848c8f7ff295f66b4bcd1bedd9"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -690,7 +691,7 @@ task merge_refined_regions {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:da1326355b9df88da7cb38e2de955a39807c429c59f711dc7f33647f11869c4d"
+    docker: "talkowski/rcnv@sha256:20ee162d7d45e0340d374861d137f76a2bfdfa848c8f7ff295f66b4bcd1bedd9"
     preemptible: 1
     bootDiskSizeGb: "20"
   }
@@ -723,7 +724,7 @@ task plot_region_summary {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:da1326355b9df88da7cb38e2de955a39807c429c59f711dc7f33647f11869c4d"
+    docker: "talkowski/rcnv@sha256:20ee162d7d45e0340d374861d137f76a2bfdfa848c8f7ff295f66b4bcd1bedd9"
     preemptible: 1
   }
 }

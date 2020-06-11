@@ -13,9 +13,9 @@ RUN apt-get -qqy update \
 
 # Create python environment
 RUN conda update -n base conda
-RUN conda create --name=rcnv python=3.7
+RUN conda create --name=rcnv python=3.7.3
 RUN conda config --set ssl_verify no
-RUN conda install -n rcnv -y r-base
+RUN conda install -n rcnv -c conda-forge -y r-base=3.4.3
 RUN conda install -n rcnv -y -c bioconda numpy scipy pandas scikit-learn
 RUN conda install -n rcnv -y -c bioconda samtools=1.9 pysam=0.15.3
 RUN conda install -n rcnv -y -c bioconda pybedtools bedtools=2.27.1
@@ -59,16 +59,23 @@ VOLUME ["/root/.config"]
 
 # Install R packages (note: intentionally do this in chunks for less painful re-builds)
 RUN apt-get -qqy update \
-    && apt-get -qqy install libxrender1 libcairo2-dev libxt-dev libx11-dev
+    && apt-get -qqy install libxrender1 libcairo2-dev libxt-dev libx11-dev 
 RUN apt-get -qqy upgrade
-RUN Rscript -e "sapply(c('optparse','metafor','KernSmooth','metap','MASS','flux'),\
+RUN Rscript -e "install.packages('devtools',repos='https://cloud.r-project.org')"
+RUN Rscript -e "sapply(c('optparse','MASS','KernSmooth'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
-RUN Rscript -e "sapply(c('beeswarm','Hmisc','EQL','vioplot'),\
+RUN ln -s /bin/tar /bin/gtar
+RUN Rscript -e "require(devtools);devtools::install_version('caTools',version=1.16,repos='https://cloud.r-project.org')"
+RUN Rscript -e "require(devtools);devtools::install_version('metafor',version='2.0-0',repos='https://cloud.r-project.org')"
+RUN Rscript -e "sapply(c('beeswarm','EQL','vioplot','flux'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
+RUN Rscript -e "require(devtools);devtools::install_version('latticeExtra',version='0.6-26',repos='https://cloud.r-project.org')"
+RUN Rscript -e "require(devtools);devtools::install_version('foreign',version='0.8-70',repos='https://cloud.r-project.org')"
+RUN Rscript -e "require(devtools);devtools::install_version('Hmisc',version='4.1-1',repos='https://cloud.r-project.org')"
+RUN Rscript -e "require(devtools);devtools::install_version('mnormt',version='1.5-5',repos='https://cloud.r-project.org')"
 RUN Rscript -e "sapply(c('psych','funr','VennDiagram'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
-RUN Rscript -e \
-    "install.packages('https://cran.r-project.org/src/contrib/Archive/plotrix/plotrix_3.6-6.tar.gz')"
+RUN Rscript -e "require(devtools);devtools::install_version('plotrix',version='3.6-6',repos='https://cloud.r-project.org')"
 
 # Install Athena toolkit
 RUN git clone https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/athena /opt/athena \
@@ -81,7 +88,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 331360d507acc50ef311b914f81eb67929e46225 && \
+    git checkout a2bf5035c115c5811a55f428f45a036e6a47adb9 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)

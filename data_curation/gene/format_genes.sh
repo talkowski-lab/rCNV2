@@ -110,6 +110,7 @@ mkdir gtex_stats/
 /opt/rCNV2/data_curation/gene/preprocess_GTEx.py \
   --gzip \
   --prefix gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats \
+  --n-pcs 20 \
   gencode.v19.canonical.pext_filtered.tsv.gz \
   GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct.gz \
   GTEx_v7_Annotations_SampleAttributesDS.txt

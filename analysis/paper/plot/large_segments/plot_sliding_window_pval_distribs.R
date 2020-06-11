@@ -17,28 +17,6 @@ options(stringsAsFactors=F, scipen=1000, check.names=F)
 ######################
 ### DATA FUNCTIONS ###
 ######################
-# Load a matrix of p-values
-load.pval.matrix <- function(matrix.in, has.coords=T, p.is.phred=T){
-  x <- read.table(matrix.in, header=T, sep="\t", comment.char="")
-  if(has.coords == T){
-    colnames(x)[1:3] <- c("chrom", "start", "end")
-    x[, 1] <- as.character(x[, 1])
-    x[, -1] <- apply(x[, -1], 2, as.numeric)
-    coords <- as.data.frame(x[, 1:3])
-    pvals <- as.data.frame(x[, -c(1:3)])
-  }else{
-    coords <- NULL
-    pvals <- as.data.frame(apply(x, 2, as.numeric))
-  }
-  if(p.is.phred == T){
-    pvals <- as.data.frame(apply(pvals, 2, function(x){10^-x}))
-  }
-  expected <- ppoints(nrow(pvals))
-  lambdas <- apply(pvals, 2, function(obs){dchisq(median(obs, na.rm=T), df=1)/dchisq(median(expected), df=1)})
-  return(list("coords" = coords, "pvals" = pvals,
-              "expected" = expected, "lambdas" = lambdas))
-}
-
 # Load HPO sample sizes
 load.hpo.samplesize <- function(hpo.samplesize.in, hpos=NULL){
   hpo.n <- read.table(hpo.samplesize.in, header=T, sep="\t", comment.char="")
