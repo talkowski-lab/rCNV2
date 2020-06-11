@@ -315,6 +315,12 @@ echo -e "\nANALYZING P-VALUE MATRIX\n"
   ${metacohort_sample_table} \
   sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}
 
+# Also produce an optional table of flat Bonferroni P-value cutoffs
+awk -v pval=${p_cutoff} -v FS="\t" -v OFS="\t" \
+  '{ print $1, pval }' ${phenotype_list} \
+> sliding_window.${freq_code}.${CNV}.bonferroni_pval.hpo_cutoffs.tsv
+  
+
 
 
 

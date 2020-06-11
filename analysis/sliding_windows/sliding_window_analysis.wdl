@@ -377,8 +377,15 @@ task calc_meta_p_cutoff {
       ${metacohort_sample_table} \
       sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}
 
+    # Also produce an optional table of flat Bonferroni P-value cutoffs
+    awk -v pval=${p_cutoff} -v FS="\t" -v OFS="\t" \
+      '{ print $1, pval }' ${phenotype_list} \
+    > sliding_window.${freq_code}.${CNV}.bonferroni_pval.hpo_cutoffs.tsv
+
     # Copy cutoff tables to output bucket
     gsutil -m cp sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}*tsv \
+      "${rCNV_bucket}/analysis/analysis_refs/"
+    gsutil -m cp sliding_window.${freq_code}.${CNV}.bonferroni_pval.hpo_cutoffs.tsv \
       "${rCNV_bucket}/analysis/analysis_refs/"
     gsutil -m cp sliding_window.${freq_code}.${CNV}.${fdr_table_suffix}_permutation_results.png \
       "${rCNV_bucket}/analysis/sliding_windows/empirical_fdr_plots/"

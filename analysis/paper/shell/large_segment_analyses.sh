@@ -271,7 +271,7 @@ if ! [ -e meta_stats/perm_res ]; then
   mkdir meta_stats/perm_res
 fi
 # Gather all permutation P-values 
-# (Note: this has been parallelized in FireCloud with collect_permuted_meta_p_matrices.wdl )
+# (Note: in practice, this has been parallelized in FireCloud with collect_permuted_meta_p_matrices.wdl )
 gsutil -m cp \
   ${rCNV_bucket}/analysis/sliding_windows/permuted_pvalue_matrices/*tsv.gz \
   meta_stats/perm_res/
@@ -279,10 +279,10 @@ gsutil -m cp \
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_permuted_fdr.R \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   --fdr-target 0.000003715428 \
-  meta_stats/perm_res/${prefix}.rCNV.DEL.sliding_window.meta_analysis.stats.permuted_p_values.tsv.gz \
-  meta_stats/perm_res/${prefix}.rCNV.DUP.sliding_window.meta_analysis.stats.permuted_p_values.tsv.gz \
+  meta_stats/perm_res/${prefix}.rCNV.DEL.sliding_window.meta_analysis.stats.permuted_fdrs.tsv.gz \
+  meta_stats/perm_res/${prefix}.rCNV.DUP.sliding_window.meta_analysis.stats.permuted_fdrs.tsv.gz \
   refs/HPOs_by_metacohort.table.tsv \
-  assoc_stat_plots/${prefix}.sliding_window_fdr_permutation
+  assoc_stat_plots/${prefix}
 
 
 # Plot correlation of primary & secondary P-values for all phenotypes & CNV classes

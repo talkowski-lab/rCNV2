@@ -24,91 +24,84 @@ load.hpos <- function(hpos.in){
              "n"=as.numeric(hpos[, 3]))
 }
 
-# Calculate FDR across a range of cutoffs for a vector of p-values
-calc.fdr <- function(pv, cutoffs){
-  pv <- pv[which(!is.na(pv))]
-  n.pv <- length(pv)
-  sapply(cutoffs, function(x){
-    length(which(pv>=x))/n.pv
-  })
+# Load & phred-scale precomputed FDR matrix
+load.fdrs <- function(fdrs.in){
+  fdrs <- read.table(fdrs.in, header=T, sep="\t", comment.char="", check.names=F)
+  colnames(fdrs) <- sapply(colnames(fdrs), function(x){unlist(strsplit(x, split=".", fixed=T))[1]})
+  fdrs <- as.data.frame(apply(fdrs, 2, function(vals){-log10(as.numeric(vals))}))
+  return(fdrs)
 }
 
-# Read p-values and calculate FDR CDF
-load.fdrs <- function(pvals.in, cutoffs, cnvtype=NULL){
-  pvals <- read.table(pvals.in, header=T, sep="\t", comment.char="")
-  if(!is.null(cnvtype)){
-    pvals <- pvals[, grep(cnvtype, colnames(pvals), fixed=T)]
+
+##########################
+### PLOTTING FUNCTIONS ###
+##########################
+# Plot permutation results against targeted FDR
+plot.fdrs <- function(fdrs, hpos, cnv, fdr.target,
+                      xlims=NULL, ylims=NULL,
+                      parmar=c(2.2, 2.5, 0.25, 0.25)){
+  # Get plot data
+  if(is.null(xlims)){
+    xlims <- range(log10(hpos$n), na.rm=T)
   }
-  fdr.mat <- apply(pvals, 2, calc.fdr, cutoffs=cutoffs)
-  rownames(fdr.mat) <- cutoffs
-  return(fdr.mat)
-}
-
-# Calculate minimum P-value cutoff corresponding to target FDR for a vector of p-values
-hit.fdr.target <- function(fdrv, cutoffs, target){
-  cutoffs[min(c(head(which(fdrv<=target), 1), length(fdrv)))]
-}
-
-# Calculate P-value cutoffs per permutation corresponding to target FDRs for a matrix of p-values
-get.fdr.cutoffs <- function(fdr.mat, fdr.target){
-  fdr.cutoffs <- as.data.frame(apply(fdr.mat, 2, hit.fdr.target, cutoffs=cutoffs, target=fdr.target))
-  colnames(fdr.cutoffs) <- "fdr.cutoff"
-  return(fdr.cutoffs)
-}
-
-# Create cutoff table of all permutations
-make.cutoff.mat <- function(fdr.mat, hpos, fdr.target){
-  perm.hpos <- unlist(lapply(strsplit(colnames(fdr.mat), split=".", fixed=T), function(vals){vals[1]}))
-  perm.n <- as.numeric(sapply(perm.hpos, function(hpo){hpos$n[which(hpos$hpo==hpo)]}))
-  case.frac <- perm.n / (perm.n + hpos$n[which(hpos$hpo=="HEALTHY_CONTROL")])
-  perm.idx <- unlist(lapply(strsplit(colnames(fdr.mat), split=".", fixed=T), function(vals){vals[3]}))
-  fdr.res <- get.fdr.cutoffs(fdr.mat, fdr.target)
-  cutoff.mat <- data.frame("hpo"=perm.hpos,
-                           "perm"=perm.idx,
-                           "n.cases"=perm.n,
-                           "case.frac"=case.frac,
-                           fdr.res)
-  rownames(cutoff.mat) <- NULL
-  return(cutoff.mat)
-}
-
-# Calculate a statistic for permuted cutoffs for each phenotype
-get.cutoff.stat <- function(cutoff.mat, stat){
-  stat.df <- as.data.frame(do.call("rbind", lapply(unique(cutoff.mat$hpo), function(hpo){
-    if(stat=="max"){
-      x <- max(cutoff.mat$fdr.cutoff[which(cutoff.mat$hpo==hpo)], na.rm=T)
-    }else if(stat=="mean"){
-      x <- mean(cutoff.mat$fdr.cutoff[which(cutoff.mat$hpo==hpo)], na.rm=T)
-    }else if(stat=="median"){
-      x <- median(cutoff.mat$fdr.cutoff[which(cutoff.mat$hpo==hpo)], na.rm=T)
-    }else if(stat=="q3"){
-      x <- quantile(cutoff.mat$fdr.cutoff[which(cutoff.mat$hpo==hpo)], probs=0.75, na.rm=T)
-    }
-    c(hpo,
-      head(cutoff.mat[which(cutoff.mat$hpo==hpo), 3:4], 1),
-      unlist(x))
-  })))
-  colnames(stat.df) <- c("hpo", "n.cases", "case.frac", "fdr.cutoff")
-  stat.df[, -1] <- apply(stat.df[, -1], 2, as.numeric)
-  return(stat.df)
+  if(is.null(ylims)){
+    ylims <- c(0, max(as.matrix(fdrs), na.rm=T))
+  }
+  medians <- apply(fdrs, 2, median, na.rm=T)
+  
+  # Prep plot area
+  par(mar=parmar, bty="n")
+  plot(NA, xlim=xlims, ylim=ylims,
+       xaxt="n", xlab="", yaxt="n", ylab="")
+  rect(xleft=par("usr")[1], xright=par("usr")[2],
+       ybottom=par("usr")[3], ytop=par("usr")[4],
+       bty="n", border=NA, col=bluewhite)
+  abline(h=axTicks(2), v=log10(logscale.major), col="white")
+  abline(h=fdr.target, col=blueblack)
+  
+  # Add points
+  sapply(hpos[, 1], function(hpo){
+    n <- log10(hpos$n[which(hpos$hpo==hpo)])
+    hpo.idx <- which(colnames(fdrs)==hpo)
+    points(x=rep(n, nrow(fdrs)), y=fdrs[, hpo.idx],
+           pch=19, cex=0.2, col=control.cnv.colors[cnv])
+  })
+  
+  # Add boxes for medians
+  sapply(hpos[, 1], function(hpo){
+    n <- log10(hpos$n[which(hpos$hpo==hpo)])
+    hpo.idx <- which(colnames(fdrs)==hpo)
+    points(x=n, y=medians[hpo.idx], pch=22, 
+           bg=cnv.colors[cnv], col=cnv.blacks[cnv])
+  })
+  
+  # Add X-axis
+  axis(1, at=log10(logscale.minor), tck=-0.015, col=blueblack, labels=NA)
+  axis(1, at=log10(logscale.major), tck=-0.03, col=blueblack, labels=NA)
+  axis(1, at=log10(c(1000, 10000, 100000, 1000000)), tick=F, line=-0.75,
+       labels=c("1", "10", "100", "1,000"))
+  mtext(1, text="Cases (Thousands)", line=1.1)
+  
+  # Add Y-axis
+  axis(2, at=c(-10e10, 10e10), labels=NA, col=blueblack, tck=0)
+  axis(2, tck=-0.03, col=blueblack, labels=NA)
+  axis(2, tick=F, las=2, line=-0.65)
+  mtext(2, text=bquote("Permuted" ~ -log[10](italic(P))), line=1.25)
 }
 
 
-#################
-### RSCRIPT BLOCK
-#################
+#####################
+### RSCRIPT BLOCK ###
+#####################
 require(optparse, quietly=T)
 require(funr, quietly=T)
-require(MASS, quietly=T)
 
 # List of command-line options
 option_list <- list(
-  make_option(c("--max-cutoff"), type="numeric", default=20,
-              help="max P-value cutoff to evaluate (Phred-scaled) [default %default]"),
-  make_option(c("--cutoff-step"), type="numeric", default=0.05,
-              help="P-value increments to evaluate (Phred-scaled) [default %default]"),
-  make_option(c("--fdr-target"), type="numeric", default=0.01,
-              help="FDR target [default %default]"))
+  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced."),
+  make_option(c("--fdr-target"), type="numeric", default=10e-8,
+              help="FDR target [default %default]")
+)
 
 # Get command-line arguments & options
 args <- parse_args(OptionParser(usage="%prog del.tsv dup.tsv hpo_table.tsv out.prefix",
@@ -120,39 +113,45 @@ if(length(args$args) != 4){
   stop("Incorrect number of positional arguments specified.")
 }
 
-del.pvals.in <- args$args[1]
-dup.pvals.in <- args$args[2]
+del.fdrs.in <- args$args[1]
+dup.fdrs.in <- args$args[2]
 hpos.in <- args$args[3]
 out.prefix <- args$args[4]
-max.cutoff <- opts$`max-cutoff`
-cutoff.step <- opts$`cutoff-step`
-fdr.target <- opts$`fdr-target`
+fdr.target <- -log10(opts$`fdr-target`)
+rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
-# del.pvals.in <- "~/scratch/rCNV2_analysis_d1.rCNV.DEL.sliding_window.meta_analysis.stats.permuted_p_values.tsv.gz"
-# dup.pvals.in <- "~/scratch/rCNV2_analysis_d1.rCNV.DUP.sliding_window.meta_analysis.stats.permuted_p_values.tsv.gz"
+# del.fdrs.in <- "~/scratch/rCNV2_analysis_d1.rCNV.DEL.sliding_window.meta_analysis.stats.permuted_fdrs.tsv.gz"
+# dup.fdrs.in <- "~/scratch/rCNV2_analysis_d1.rCNV.DUP.sliding_window.meta_analysis.stats.permuted_fdrs.tsv.gz"
 # hpos.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
 # out.prefix <- "~/scratch/sliding_windows_meta_fdr_perm_test"
-# max.cutoff <- 20
-# cutoff.step <- 0.05
-# fdr.target <- 0.000003715428
+# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
+# fdr.target <- -log10(0.000003715428)
+# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
+
+# Source rCNV2 config, if optioned
+if(!is.null(rcnv.config)){
+  source(rcnv.config)
+}
+
+# Source common functions
+script.dir <- funr::get_script_path()
+source(paste(script.dir, "common_functions.R", sep="/"))
 
 # Load sample size info
 hpos <- load.hpos(hpos.in)
+hpos <- hpos[which(hpos$hpo != "HEALTHY_CONTROL"), ]
 
-# Set FDR cutoffs
-cutoffs <- seq(0, max.cutoff, cutoff.step)
+# Load precomputed FDRs
+del.fdrs <- load.fdrs(del.fdrs.in)
+dup.fdrs <- load.fdrs(dup.fdrs.in)
+fdrs <- list("DEL" = del.fdrs, "DUP" = dup.fdrs)
 
-# Calculate FDR CDFs for each permutation
-del.fdr.mat <- load.fdrs(del.pvals.in, cutoffs, "DEL")
-dup.fdr.mat <- load.fdrs(dup.pvals.in, cutoffs, "DUP")
-
-# Calculate p-value cutoffs for each permutation for each target
-del.cutoff.mat <- make.cutoff.mat(del.fdr.mat, hpos, fdr.target)
-dup.cutoff.mat <- make.cutoff.mat(dup.fdr.mat, hpos, fdr.target)
-
-# Compute median cutoffs
-del.median.cutoffs <- get.cutoff.stat(del.cutoff.mat, "median")
-dup.median.cutoffs <- get.cutoff.stat(dup.cutoff.mat, "median")
-
+# Make one plot each for deletions and duplications
+sapply(c("DEL", "DUP"), function(cnv){
+  pdf(paste(out.prefix, "fdr_by_hpo", cnv, "pdf", sep="."),
+      height=2.25, width=2.5)
+  plot.fdrs(fdrs[[cnv]], hpos, cnv, fdr.target)
+  dev.off()
+})
 
