@@ -41,7 +41,7 @@ def load_segs(segs_in):
     return pbt.BedTool().from_dataframe(segs_df), coord_colname
 
 
-def custom_shuffle(segs, seed, genome, whitelist=None, coords_colname='coords'):
+def custom_shuffle(segs, seed, genome, whitelist=None, blacklist=None, coords_colname='coords'):
     """
     Customized implementation of bedtools shuffle
     """
@@ -55,16 +55,18 @@ def custom_shuffle(segs, seed, genome, whitelist=None, coords_colname='coords'):
     # But allows for overlapping CNV intervalls between CNV types (DEL vs DUP)
     if whitelist is not None:
         shuf_del = segs.filter(lambda x: x[4] == 'DEL').\
-                        shuffle(g=genome, incl=whitelist, seed=seed, f=1.0, 
-                                noOverlapping=True)
+                        shuffle(g=genome, incl=whitelist, excl=blacklist, seed=seed, f=1e-9, 
+                                noOverlapping=True, allowBeyondChromEnd=False)
         shuf_dup = segs.filter(lambda x: x[4] == 'DUP').\
-                        shuffle(g=genome, incl=whitelist, seed=-seed, f=1.0, 
-                                noOverlapping=True)
+                        shuffle(g=genome, incl=whitelist, excl=blacklist, seed=-seed, f=1e-9, 
+                                noOverlapping=True, allowBeyondChromEnd=False)
     else:
         shuf_del = segs.filter(lambda x: x[4] == 'DEL').\
-                        shuffle(g=genome, seed=seed, f=1.0, noOverlapping=True)
+                        shuffle(g=genome, seed=seed, f=1.0, noOverlapping=True, 
+                                allowBeyondChromEnd=False)
         shuf_dup = segs.filter(lambda x: x[4] == 'DUP').\
-                        shuffle(g=genome, seed=-seed, f=1.0, noOverlapping=True)
+                        shuffle(g=genome, seed=-seed, f=1.0, noOverlapping=True,
+                                allowBeyondChromEnd=False)
     shuf = shuf_del.cat(shuf_dup, postmerge=False).sort(g=genome).\
                     each(_seed_prefix, seed=seed).saveas()
                         
@@ -108,6 +110,8 @@ def main():
                         'genome file.')
     parser.add_argument('-w', '--whitelist', help='BED of regions to allow ' +
                         'during shuffling.')
+    parser.add_argument('-b', '--blacklist', help='BED of regions to exclude ' +
+                        'during shuffling.')
     parser.add_argument('-n', '--n-perms', type=int, default=1, help='Number of ' +
                         'permutations to perform.')
     parser.add_argument('-s', '--first-seed', type=int, default=1, help='Integer ' +
@@ -141,7 +145,7 @@ def main():
         if not args.quiet:
             print('Starting permutation {}'.format(seed))
         shuffled_bt = custom_shuffle(segs, seed, args.genome, args.whitelist, 
-                                     coords_colname=coords_colname)
+                                     args.blacklist, coords_colname=coords_colname)
         if seed == args.first_seed:
             shuffled_bt.to_csv(outfile, sep='\t', na_rep='NA', header=True, 
                                index=False, mode='w')

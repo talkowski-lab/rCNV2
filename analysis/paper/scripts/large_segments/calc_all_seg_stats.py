@@ -116,13 +116,16 @@ def calc_all_effects(cs_dict, phenos, ssdir):
 
                 # Computes inverse variance-weighted mean of effect sizes
                 lnors = wdf.meta_lnOR.to_numpy()
-                if np.all(np.isnan(lnors)):
-                    iv_lnor, iv_lnor_lower, iv_lnor_upper = 0, np.nan, np.nan
-                else:
-                    lnor_cis = wdf.loc[:, ['meta_lnOR_lower', 'meta_lnOR_upper']].\
-                                   to_records(index=False)
-                    lnor_vars = [ci2se(ci) for ci in lnor_cis]
-                    iv_lnor, (iv_lnor_lower, iv_lnor_upper) = iv_mean(lnors, lnor_vars)
+                try:
+                    if np.all(np.isnan(lnors)):
+                        iv_lnor, iv_lnor_lower, iv_lnor_upper = 0, np.nan, np.nan
+                    else:
+                        lnor_cis = wdf.loc[:, ['meta_lnOR_lower', 'meta_lnOR_upper']].\
+                                       to_records(index=False)
+                        lnor_vars = [ci2se(ci) for ci in lnor_cis]
+                        iv_lnor, (iv_lnor_lower, iv_lnor_upper) = iv_mean(lnors, lnor_vars)
+                except:
+                    import pdb; pdb.set_trace()
 
                 # Gathers peak primary and secondary p-values
                 if np.all(np.isnan(wdf.meta_phred_p)):

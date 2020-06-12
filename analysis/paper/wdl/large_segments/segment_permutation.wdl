@@ -20,7 +20,8 @@ workflow segment_permutation {
     input:
       binned_genome=binned_genome,
       total_n_perms=total_n_perms,
-      perms_per_shard=perms_per_shard
+      perms_per_shard=perms_per_shard,
+      rCNV_bucket=rCNV_bucket
   }
 
   scatter ( seed in perm_prep.seeds ) {
@@ -29,6 +30,7 @@ workflow segment_permutation {
         seed=seed,
         n_perms=perms_per_shard,
         whitelist=perm_prep.whitelist,
+        blacklist=perm_prep.blacklist,
         perm_prefix="${perm_prefix}.starting_seed_${seed}",
         rCNV_bucket=rCNV_bucket
     }
@@ -37,6 +39,7 @@ workflow segment_permutation {
         seed=seed,
         n_perms=perms_per_shard,
         whitelist=perm_prep.whitelist,
+        blacklist=perm_prep.blacklist,
         perm_prefix="${perm_prefix}.lit_GDs.starting_seed_${seed}",
         rCNV_bucket=rCNV_bucket
     }
@@ -62,6 +65,7 @@ task perm_prep {
   File binned_genome
   Int total_n_perms
   Int perms_per_shard
+  String rCNV_bucket
 
   command <<<
     set -e
@@ -69,17 +73,25 @@ task perm_prep {
     # Make whitelist
     bedtools merge -i ${binned_genome} | bgzip -c > whitelist.bed.gz
 
+    # Invert whitelist as explicit blacklist (pybedtools has some unusual shuffle behavior)
+    gsutil -m cat ${rCNV_bucket}/refs/GRCh37.autosomes.genome \
+    | awk -v OFS="\t" '{ print $1, 0, 500000000 }' \
+    | bedtools subtract -a - -b whitelist.bed.gz \
+    | bgzip -c \
+    > blacklist.bed.gz
+
     # Make seeds
     seq 1 ${perms_per_shard} ${total_n_perms} > seeds.txt
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:6eb55e14c31a06071dc2c220566cc3665cbfdc6a662efd7c0776f1a1d360f829"
+    docker: "talkowski/rcnv@sha256:f9c97e660b54ef7d4a7221fcd3e022aa066053344d65c7750b9b9b6f2413a184"
     preemptible: 1
   }
 
   output {
     File whitelist = "whitelist.bed.gz"
+    File blacklist = "blacklist.bed.gz"
     Array[String] seeds = read_lines("seeds.txt")
   }
 }
@@ -90,6 +102,7 @@ task perm_shard {
   String seed
   Int n_perms
   File whitelist
+  File blacklist
   String perm_prefix
   String rCNV_bucket
 
@@ -128,6 +141,7 @@ task perm_shard {
     /opt/rCNV2/analysis/paper/scripts/large_segments/shuffle_segs.py \
       --genome refs/GRCh37.autosomes.genome \
       --whitelist ${whitelist} \
+      --blacklist ${blacklist} \
       --n-perms ${n_perms} \
       --first-seed ${seed} \
       --outfile ${perm_prefix}.bed.gz \
@@ -170,7 +184,7 @@ task perm_shard {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0ac85afb703849cd30e35656d4c3fcb34ec1e88515304f6aed71ce5bda977ee0"
+    docker: "talkowski/rcnv@sha256:f9c97e660b54ef7d4a7221fcd3e022aa066053344d65c7750b9b9b6f2413a184"
     preemptible: 1
   }
 
@@ -185,6 +199,7 @@ task perm_shard_litGDs {
   String seed
   Int n_perms
   File whitelist
+  File blacklist
   String perm_prefix
   String rCNV_bucket
 
@@ -233,6 +248,7 @@ task perm_shard_litGDs {
     /opt/rCNV2/analysis/paper/scripts/large_segments/shuffle_segs.py \
       --genome refs/GRCh37.autosomes.genome \
       --whitelist ${whitelist} \
+      --blacklist ${blacklist} \
       --n-perms ${n_perms} \
       --first-seed ${seed} \
       --outfile ${perm_prefix}.all.bed.gz \
@@ -296,7 +312,7 @@ task perm_shard_litGDs {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2176cfce20a878f1dd3288e8e534c57689c58663d0354ef68b5c7c18bf34d4b7"
+    docker: "talkowski/rcnv@sha256:f9c97e660b54ef7d4a7221fcd3e022aa066053344d65c7750b9b9b6f2413a184"
     preemptible: 1
   }
 
@@ -347,7 +363,7 @@ task merge_perms {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2176cfce20a878f1dd3288e8e534c57689c58663d0354ef68b5c7c18bf34d4b7"
+    docker: "talkowski/rcnv@sha256:f9c97e660b54ef7d4a7221fcd3e022aa066053344d65c7750b9b9b6f2413a184"
     preemptible: 1
     disks: "local-disk 200 SSD"
   }
