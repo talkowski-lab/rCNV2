@@ -534,7 +534,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:20ee162d7d45e0340d374861d137f76a2bfdfa848c8f7ff295f66b4bcd1bedd9"
+    docker: "talkowski/rcnv@sha256:0ac85afb703849cd30e35656d4c3fcb34ec1e88515304f6aed71ce5bda977ee0"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -641,7 +641,7 @@ task refine_regions {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:20ee162d7d45e0340d374861d137f76a2bfdfa848c8f7ff295f66b4bcd1bedd9"
+    docker: "talkowski/rcnv@sha256:0ac85afb703849cd30e35656d4c3fcb34ec1e88515304f6aed71ce5bda977ee0"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -691,7 +691,7 @@ task merge_refined_regions {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:20ee162d7d45e0340d374861d137f76a2bfdfa848c8f7ff295f66b4bcd1bedd9"
+    docker: "talkowski/rcnv@sha256:0ac85afb703849cd30e35656d4c3fcb34ec1e88515304f6aed71ce5bda977ee0"
     preemptible: 1
     bootDiskSizeGb: "20"
   }
@@ -724,7 +724,7 @@ task plot_region_summary {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:20ee162d7d45e0340d374861d137f76a2bfdfa848c8f7ff295f66b4bcd1bedd9"
+    docker: "talkowski/rcnv@sha256:0ac85afb703849cd30e35656d4c3fcb34ec1e88515304f6aed71ce5bda977ee0"
     preemptible: 1
   }
 }

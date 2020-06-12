@@ -16,6 +16,7 @@ import gzip
 import numpy as np
 from scipy.stats import median_absolute_deviation as mad
 from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 import subprocess
 import argparse
 
@@ -181,11 +182,16 @@ def pca_expression(matrix, n_pcs=20):
     Reduce an expression matrix to its n_pcs top principal components
     """
 
-    matrix.index = matrix.gene
-    matrix.drop(columns='gene', inplace=True)
-    # X = StandardScaler().fit_transform(matrix)
+    # Clean input matrix
+    X = StandardScaler().fit_transform(matrix.drop(columns='gene').fillna(value=0))
 
-    import pdb; pdb.set_trace()
+    # PCA
+    pca = PCA(n_components=n_pcs).fit_transform(X)
+    pc_names = ['expression_component_' + str(i) for i in range(1, n_pcs+1)]
+    pcadf = pd.DataFrame(pca, columns=pc_names)
+
+    # Convert back to dataframe with genes as first column
+    return pd.concat([matrix.loc[:, 'gene'], pcadf], axis=1)
 
 
 def write_matrix(matrix, filename, gzip):
@@ -228,7 +234,6 @@ def main():
 
     # PCA of gene-level average expression levels across tissues
     gtex_pca = pca_expression(gtex_mean, args.n_pcs)
-    import pdb; pdb.set_trace()
 
     # Write matrices to output files
     write_matrix(gtex_min, args.prefix + '.min.tsv', args.gzip)
@@ -239,6 +244,7 @@ def main():
     write_matrix(gtex_max, args.prefix + '.max.tsv', args.gzip)
     write_matrix(gtex_sd, args.prefix + '.sd.tsv', args.gzip)
     write_matrix(gtex_mad, args.prefix + '.mad.tsv', args.gzip)
+    write_matrix(gtex_pca, args.prefix + '.pca.tsv', args.gzip)
 
 
 if __name__ == '__main__':

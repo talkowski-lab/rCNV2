@@ -181,6 +181,7 @@ loci <- load.loci(loci.in)
 segs <- load.segment.table(segs.in)
 segs <- segs[which(segs$gw_sig | segs$any_gd), ]
 prop_constrained.genome_avg <- 3036/18641
+segs$constrained_expected <- segs$n_genes * prop_constrained.genome_avg
 
 # Get list of neuro loci plus lit GDs
 neuro.plus.lit.ids <- sort(unique(c(loci$region_id[which(sapply(loci$hpos, function(hpos){any(hpos %in% neuro.hpos)}))],

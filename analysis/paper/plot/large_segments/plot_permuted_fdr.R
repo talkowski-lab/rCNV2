@@ -75,7 +75,7 @@ plot.fdrs <- function(fdrs, hpos, cnv, fdr.target,
   })
   
   # Add line for Bonferroni
-  abline(h=fdr.target, col=blueblack, lty=2)
+  abline(h=fdr.target, col=blueblack, lty=2, lwd=1.5)
   
   # Add X-axis
   axis(1, at=log10(logscale.minor), tck=-0.015, col=blueblack, labels=NA)

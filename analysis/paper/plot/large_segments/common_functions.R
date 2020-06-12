@@ -59,14 +59,14 @@ load.segment.table <- function(segs.in){
   segs[, listcol.idxs] <- apply(segs[, listcol.idxs], 2, strsplit, split=";")
   
   # Convert numeric columns to numerics
-  numcol.idxs <- unique(c(which(colnames(segs) %in% c("start", "end", "size")),
+  numcol.idxs <- unique(c(which(colnames(segs) %in% c("start", "end", "size", "meta_best_p")),
                           grep("^n_", colnames(segs), fixed=F),
                           grep("_dnm_", colnames(segs), fixed=T),
                           grep("_express", colnames(segs), fixed=T)))
   segs[, numcol.idxs] <- apply(segs[, numcol.idxs], 2, as.numeric)
   
   # Convert boolean dummy columns to logicals
-  boolcol.idxs <- which(colnames(segs) %in% c("gw_sig", "hc_gd", "mc_gd", "lc_gd", "any_gd",
+  boolcol.idxs <- which(colnames(segs) %in% c("gw_sig", "nom_sig", "hc_gd", "mc_gd", "lc_gd", "any_gd",
                                               "pathogenic", "benign", "nahr", "pleiotropic"))
   segs[, boolcol.idxs] <- apply(segs[, boolcol.idxs], 2, function(vals){
     sapply(vals, function(val){if(val==1){TRUE}else{FALSE}})})
@@ -81,14 +81,18 @@ load.segment.table <- function(segs.in){
   
   # Add graphical columns
   gw.sig.idx <- which(segs$gw_sig)
-  nonsig.gd.idx <- which(segs$any_gd & !segs$gw_sig)
+  nomsig.gd.idx <- which(segs$any_gd & !segs$gw_sig & segs$nom_sig)
+  nonsig.gd.idx <- which(segs$any_gd & !segs$nom_sig)
   segs$pt.pch <- NA; segs$pt.border <- NA; segs$pt.bg <- NA
   segs$pt.pch[gw.sig.idx] <- 22
   segs$pt.border[gw.sig.idx] <- cnv.blacks[segs$cnv[gw.sig.idx]]
   segs$pt.bg[gw.sig.idx] <- cnv.colors[segs$cnv[gw.sig.idx]]
+  segs$pt.pch[nomsig.gd.idx] <- 21
+  segs$pt.border[nomsig.gd.idx] <- cnv.colors[segs$cnv[nomsig.gd.idx]]
+  segs$pt.bg[nomsig.gd.idx] <- control.cnv.colors[segs$cnv[nomsig.gd.idx]]
   segs$pt.pch[nonsig.gd.idx] <- 21
-  segs$pt.border[nonsig.gd.idx] <- cnv.colors[segs$cnv[nonsig.gd.idx]]
-  segs$pt.bg[nonsig.gd.idx] <- control.cnv.colors[segs$cnv[nonsig.gd.idx]]
+  segs$pt.border[nonsig.gd.idx] <- control.cnv.colors[segs$cnv[nonsig.gd.idx]]
+  segs$pt.bg[nonsig.gd.idx] <- NA
   
   # Return cleaned dataframe
   return(segs)
@@ -231,11 +235,18 @@ load.pval.matrix <- function(matrix.in, has.coords=T, p.is.phred=T){
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Generic segment scatterplot function
-segs.scatter <- function(segs, x, y, xlims=NULL, ylims=NULL, add.lm=T, pt.cex=1,
-                         xtitle=NULL, x.at=NULL, x.labs=NULL, x.labs.at=NULL, parse.x.labs=FALSE,
-                         ytitle=NULL, y.at=NULL, y.labs=NULL, y.labs.at=NULL, parse.y.labs=FALSE,
+segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
+                         xlims=NULL, ylims=NULL, add.lm=T, pt.cex=1,
+                         xtitle=NULL, x.title.line=1.75, x.at=NULL, x.labs=NULL, x.labs.at=NULL, parse.x.labs=FALSE,
+                         ytitle=NULL, y.title.line=1.75, y.at=NULL, y.labs=NULL, y.labs.at=NULL, parse.y.labs=FALSE,
                          parmar=c(3, 3, 0.8, 0.8)){
   # Get plot values
+  if(!is.null(subset_to_regions)){
+    keep.idx <- which(segs$region_id %in% subset_to_regions)
+    segs <- segs[keep.idx, ]
+    x <- x[keep.idx]
+    y <- y[keep.idx]
+  }
   if(is.null(xlims)){
     xlims <- range(x[which(!is.infinite(x))], na.rm=T)
   }
@@ -317,8 +328,8 @@ segs.scatter <- function(segs, x, y, xlims=NULL, ylims=NULL, add.lm=T, pt.cex=1,
   })
   
   # Add axis titles
-  mtext(1, text=xtitle, line=1.75)
-  mtext(2, text=ytitle, line=1.75)
+  mtext(1, text=xtitle, line=x.title.line)
+  mtext(2, text=ytitle, line=y.title.line)
   
   # Add cleanup box
   box(col=blueblack, bty="o")

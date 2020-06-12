@@ -58,7 +58,7 @@ gsutil -m cp \
 find meta_stats/ -name "*meta_analysis.stats.bed.gz" | xargs -I {} tabix -f {}
 
 
-# Compute effect size and max P-value per phenotype per final segment
+# Compute effect size and max P-value per phenotype per gw-sig segment
 /opt/rCNV2/analysis/paper/scripts/large_segments/calc_all_seg_stats.py \
   -o ${prefix}.final_segments.loci.all_sumstats.tsv \
   rCNV.final_segments.loci.bed.gz \
@@ -67,6 +67,22 @@ find meta_stats/ -name "*meta_analysis.stats.bed.gz" | xargs -I {} tabix -f {}
 gzip -f ${prefix}.final_segments.loci.all_sumstats.tsv
 gsutil -m cp \
   ${prefix}.final_segments.loci.all_sumstats.tsv.gz \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/
+
+
+# Compute effect size and max P-value per phenotype per literature-based segment
+zcat refs/lit_GDs.*.bed.gz | fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n \
+| awk -v OFS="\t" '{ print $0, $1":"$2"-"$3 }' \
+| cat <( zcat refs/lit_GDs.hc.bed.gz | grep -e '^#' | paste - <( echo "cred_interval_coords") ) - \
+| bgzip -c > all_gds.bed.gz
+/opt/rCNV2/analysis/paper/scripts/large_segments/calc_all_seg_stats.py \
+  -o ${prefix}.lit_gds.all_sumstats.tsv \
+  all_gds.bed.gz \
+  refs/test_phenotypes.list \
+  meta_stats
+gzip -f ${prefix}.lit_gds.all_sumstats.tsv
+gsutil -m cp \
+  ${prefix}.lit_gds.all_sumstats.tsv.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/
 
 
@@ -109,6 +125,10 @@ ASC${TAB}refs/asc_dnm_counts.tsv.gz
 ASC_unaffected${TAB}refs/asc_dnm_counts.unaffecteds.tsv.gz
 DDD${TAB}refs/ddd_dnm_counts.tsv.gz
 EOF
+cat \
+  <( zcat ${prefix}.final_segments.loci.all_sumstats.tsv.gz ) \
+  <( zcat ${prefix}.lit_gds.all_sumstats.tsv.gz | grep -ve '^region_id' ) \
+> pooled_sumstats.tsv
 /opt/rCNV2/analysis/paper/scripts/large_segments/compile_segment_table.py \
   --final-loci rCNV.final_segments.loci.bed.gz \
   --hc-gds refs/lit_GDs.hc.bed.gz \
@@ -126,6 +146,7 @@ EOF
   --dnm-tsvs dnm_counts_to_annotate.tsv \
   --snv-mus refs/gene_mutation_rates.tsv.gz \
   --gtex-matrix refs/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
+  --meta-sumstats pooled_sumstats.tsv \
   --gd-recip "10e-10" \
   --nahr-recip 0.25 \
   --bgzip

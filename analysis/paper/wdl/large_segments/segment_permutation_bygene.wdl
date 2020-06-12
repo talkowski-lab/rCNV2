@@ -131,7 +131,7 @@ task perm_shard_bygene {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2176cfce20a878f1dd3288e8e534c57689c58663d0354ef68b5c7c18bf34d4b7"
+    docker: "talkowski/rcnv@sha256:0ac85afb703849cd30e35656d4c3fcb34ec1e88515304f6aed71ce5bda977ee0"
     preemptible: 1
   }
 

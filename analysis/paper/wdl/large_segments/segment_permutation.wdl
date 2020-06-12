@@ -103,10 +103,18 @@ task perm_shard {
       ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
       ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
       ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
+      ${rCNV_bucket}/analysis/analysis_refs/test_phenotypes.list \
       refs/
     gsutil -m cp \
       ${rCNV_bucket}/results/segment_association/rCNV.final_segments.loci.bed.gz \
       ./
+    mkdir meta_stats/
+    gsutil -m cp \
+      ${rCNV_bucket}/analysis/sliding_windows/**.rCNV.**.sliding_window.meta_analysis.stats.bed.gz \
+      meta_stats/
+
+    # Tabix all meta-analysis stats
+    find meta_stats/ -name "*meta_analysis.stats.bed.gz" | xargs -I {} tabix -f {}
 
     # Reformat NAHR segments
     cat <( echo -e "#chr\tstart\tend\tnahr_id\tcnv\tn_genes\tgenes" ) \
@@ -140,6 +148,13 @@ task perm_shard {
       rCNV.final_segments.loci.bed.gz \
       ${perm_prefix}.reformatted.permuted_loci.bed.gz
 
+    # Recompute summary stats for all permuted loci
+    /opt/rCNV2/analysis/paper/scripts/large_segments/calc_all_seg_stats.py \
+      -o ${perm_prefix}.final_segments.loci.all_sumstats.tsv \
+      ${perm_prefix}.reformatted.permuted_loci.bed.gz \
+      refs/test_phenotypes.list \
+      meta_stats
+
     # Compile new segment table with existing GDs and NAHR regions
     /opt/rCNV2/analysis/paper/scripts/large_segments/compile_segment_table.py \
       --final-loci ${perm_prefix}.reformatted.permuted_loci.bed.gz \
@@ -147,6 +162,7 @@ task perm_shard {
       --mc-gds refs/lit_GDs.mc.bed.gz \
       --lc-gds refs/lit_GDs.lc.bed.gz \
       --nahr-cnvs clustered_nahr_regions.reformatted.bed.gz \
+      --meta-sumstats ${perm_prefix}.final_segments.loci.all_sumstats.tsv \
       --outfile ${perm_prefix}.master_segments.bed.gz \
       --gd-recip "10e-10" \
       --nahr-recip 0.25 \
@@ -154,7 +170,7 @@ task perm_shard {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2176cfce20a878f1dd3288e8e534c57689c58663d0354ef68b5c7c18bf34d4b7"
+    docker: "talkowski/rcnv@sha256:0ac85afb703849cd30e35656d4c3fcb34ec1e88515304f6aed71ce5bda977ee0"
     preemptible: 1
   }
 
@@ -182,10 +198,18 @@ task perm_shard_litGDs {
       ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
       ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
       ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
+      ${rCNV_bucket}/analysis/analysis_refs/test_phenotypes.list \
       refs/
     gsutil -m cp \
       ${rCNV_bucket}/results/segment_association/rCNV.final_segments.loci.bed.gz \
       ./
+    mkdir meta_stats/
+    gsutil -m cp \
+      ${rCNV_bucket}/analysis/sliding_windows/**.rCNV.**.sliding_window.meta_analysis.stats.bed.gz \
+      meta_stats/
+
+    # Tabix all meta-analysis stats
+    find meta_stats/ -name "*meta_analysis.stats.bed.gz" | xargs -I {} tabix -f {}
 
     # Reformat NAHR segments
     cat <( echo -e "#chr\tstart\tend\tnahr_id\tcnv\tn_genes\tgenes" ) \
@@ -222,6 +246,19 @@ task perm_shard_litGDs {
       ${perm_prefix}.all.bed.gz \
       refs/gencode.v19.canonical.pext_filtered.gtf.gz
 
+    # Recompute summary stats for all permuted loci
+    zcat ${perm_prefix}.all.w_genes.bed.gz \
+    | fgrep -v "#" \
+    | sort -Vk1,1 -k2,2n -k3,3n \
+    | awk -v OFS="\t" '{ print $0, $1":"$2"-"$3 }' \
+    | cat <( zcat ${perm_prefix}.all.w_genes.bed.gz | grep -e '^#' | paste - <( echo "cred_interval_coords") ) - \
+    | bgzip -c > all_gds.bed.gz
+    /opt/rCNV2/analysis/paper/scripts/large_segments/calc_all_seg_stats.py \
+      -o ${perm_prefix}.permuted_gds.all_sumstats.tsv \
+      all_gds.bed.gz \
+      refs/test_phenotypes.list \
+      meta_stats
+
     # Split out by confidence
     for conf in HC MC LC; do 
       cat <( zcat ${perm_prefix}.all.w_genes.bed.gz | sed -n '1p' \
@@ -247,6 +284,7 @@ task perm_shard_litGDs {
       --mc-gds ${perm_prefix}.MC.bed.gz \
       --lc-gds ${perm_prefix}.LC.bed.gz \
       --nahr-cnvs clustered_nahr_regions.reformatted.bed.gz \
+      --meta-sumstats ${perm_prefix}.permuted_gds.all_sumstats.tsv \
       --outfile ${perm_prefix}.master_segments.w_dummy.bed.gz \
       --gd-recip "10e-10" \
       --nahr-recip 0.25 \

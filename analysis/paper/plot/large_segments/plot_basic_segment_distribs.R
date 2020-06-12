@@ -98,15 +98,18 @@ segs.swarm(segs, x.bool=!(segs$gw_sig), y=100000*(segs$n_genes/segs$size),
            parmar=c(1.2, 3, 2.5, 0.2))
 dev.off()
 
-# Scatterplot of size vs genes
+# Scatterplot of size vs genes (log-log)
 pdf(paste(out.prefix, "gw_plus_litGDs.genes_vs_size.pdf", sep="."),
     height=2.25, width=2.25)
-segs.scatter(segs, x=log10(segs$size), y=segs$n_genes, 
+segs.scatter(segs, x=log10(segs$size), y=log2(segs$n_genes), 
+             subset_to_regions=segs$region_id[which(segs$n_genes>0)],
              x.at=log10(logscale.minor), x.labs=rep(NA, length(logscale.minor)),
-             pt.cex=0.85, ytitle="Genes in Segment", parmar=c(2.75, 2.75, 0.3, 0.3))
+             y.labs=NA, ytitle=bquote("log"[2] * "(Genes)"), y.title.line=1.5,
+             pt.cex=0.85, parmar=c(2.75, 2.75, 0.3, 0.3))
 axis(1, at=log10(c(500000, 5000000)), tick=F, 
      line=-0.7, labels=c("500kb", "5Mb"))
-mtext(1, line=1.35, text=bquote("log"[10] * "(Segment Size)"))
+mtext(1, line=1.5, text=bquote("log"[10] * "(Segment Size)"))
+axis(2, at=axTicks(2), tick=F, line=-0.65, labels=2^axTicks(2), las=2)
 dev.off()
 
 # Swarmplot of del vs dup effect size

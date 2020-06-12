@@ -17,7 +17,7 @@ cnvtypes = 'DEL DUP'.split()
 import pandas as pd
 import pybedtools as pbt
 from itertools import combinations
-from numpy import nansum, log10, NaN
+from numpy import nansum, log10, NaN, nanmax
 from scipy.stats import hmean
 import argparse
 from os.path import splitext
@@ -294,6 +294,47 @@ def annotate_expression(all_df, gtex_in, min_expression=1):
     return all_df
 
 
+def annotate_meta_sumstats(all_df, sumstats_in):
+    """
+    Annotate segments with sumstats for best phenotype association while matching on CNV type
+    Adds the following columns to all_df:
+        1. meta_best_p: top P-value for any phenotype
+        2. nom_sig: dummy indicator if the phenotype is nominally significant in at least one phenotype
+        3. meta_best_lnor: lnOR estimate for phenotype corresponding to meta_best_p
+    """
+
+    # Load sumstats
+    ss = pd.read_csv(sumstats_in, sep='\t')
+    numeric_cols = 'lnor lnor_lower lnor_upper pvalue pvalue_secondary'.split()
+    ss[numeric_cols] = ss[numeric_cols].apply(pd.to_numeric)
+
+    # Get best P-value per segment
+    best_ps = []
+    nomsig = []
+    best_lnORs = []
+    for rid, cnv in all_df.loc[:, 'region_id cnv'.split()].itertuples(index=False, name=None):
+        pvals = ss.loc[(ss.region_id == rid) & (ss.cnv == cnv), 'pvalue']
+        if len(pvals) > 0:
+            top_p = float(nanmax(pvals.astype(float)))
+            top_lnOR = ss.loc[(ss.region_id == rid) & (ss.cnv == cnv) & (ss.pvalue == top_p), 'lnor'].values[0]
+            best_ps.append(top_p)
+            if top_p >= -log10(0.05):
+                nomsig.append(1)
+            else:
+                nomsig.append(0)
+            best_lnORs.append(top_lnOR)
+        else:
+            best_ps.append(NaN)
+            nomsig.append(0)
+            best_lnORs.append(NaN)
+
+    all_df['meta_best_p'] = best_ps
+    all_df['nom_sig'] = nomsig
+    all_df['meta_best_lnor'] = best_lnORs
+
+    return all_df
+
+
 def main():
     """
     Main block
@@ -335,6 +376,8 @@ def main():
     parser.add_argument('--gtex-matrix', help='Tsv gene X tissue expression levels ' +
                         'from GTEx. Will be used for various expression-based ' +
                         'gene annotations.')
+    parser.add_argument('--meta-sumstats', help='Tsv of meta-analysis summary statistics ' +
+                        'per phenotype per region. Computed with calc_all_seg_stats.py')
     parser.add_argument('--min-expression', default=1, help='Minimum expression ' +
                         'level (in unscaled TPM) to consider a gene as "expressed". ' +
                         '[default: 1]')
@@ -459,6 +502,10 @@ def main():
     # Annotate with various expression-based metrics
     if args.gtex_matrix is not None:
         all_df = annotate_expression(all_df, args.gtex_matrix, args.min_expression)
+
+    # Annotate with best P-value from meta-analysis summary statistics, if optioned
+    if args.meta_sumstats is not None:
+        all_df = annotate_meta_sumstats(all_df, args.meta_sumstats)
 
     # Sort & write out merged BED
     all_df.sort_values(by='chr start end cnv region_id'.split(), inplace=True)
