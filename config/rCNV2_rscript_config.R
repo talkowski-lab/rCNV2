@@ -208,3 +208,26 @@ fit.exp.decay <- function(x, y){
   return(nls(y ~ alpha * exp(beta * x) + theta, start = start, data=train.df,
              control=nls.control(maxiter=1000, warnOnly=T)))
 }
+
+# Load a matrix of p-values
+load.pval.matrix <- function(matrix.in, has.coords=T, ncols.coords=3, p.is.phred=T){
+  x <- read.table(matrix.in, header=T, sep="\t", comment.char="")
+  if(has.coords == T){
+    colnames(x)[1:ncols.coords] <- c("chrom", "start", "end", "gene")[1:ncols.coords]
+    x[, 1] <- as.character(x[, 1])
+    x[, 2:3] <- apply(x[, 2:3], 2, as.numeric)
+    x[, -c(1:ncols.coords)] <- apply(x[, -c(1:ncols.coords)], 2, as.numeric)
+    coords <- as.data.frame(x[, 1:ncols.coords])
+    pvals <- as.data.frame(x[, -c(1:ncols.coords)])
+  }else{
+    coords <- NULL
+    pvals <- as.data.frame(apply(x, 2, as.numeric))
+  }
+  if(p.is.phred == T){
+    pvals <- as.data.frame(apply(pvals, 2, function(x){10^-x}))
+  }
+  expected <- ppoints(nrow(pvals))
+  lambdas <- apply(pvals, 2, function(obs){dchisq(median(obs, na.rm=T), df=1)/dchisq(median(expected), df=1)})
+  return(list("coords" = coords, "pvals" = pvals,
+              "expected" = expected, "lambdas" = lambdas))
+}

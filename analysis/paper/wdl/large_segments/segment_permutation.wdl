@@ -11,6 +11,7 @@
 
 workflow segment_permutation {
   File binned_genome
+  File phenotype_list
   Int total_n_perms
   Int perms_per_shard
   String perm_prefix
@@ -19,9 +20,11 @@ workflow segment_permutation {
   call perm_prep {
     input:
       binned_genome=binned_genome,
+      phenotype_list=phenotype_list,
       total_n_perms=total_n_perms,
       perms_per_shard=perms_per_shard,
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      prefix=perm_prefix
   }
 
   scatter ( seed in perm_prep.seeds ) {
@@ -31,6 +34,8 @@ workflow segment_permutation {
         n_perms=perms_per_shard,
         whitelist=perm_prep.whitelist,
         blacklist=perm_prep.blacklist,
+        del_max_p_bed=perm_prep.del_max_p_bed,
+        dup_max_p_bed=perm_prep.dup_max_p_bed,
         perm_prefix="${perm_prefix}.starting_seed_${seed}",
         rCNV_bucket=rCNV_bucket
     }
@@ -40,6 +45,8 @@ workflow segment_permutation {
         n_perms=perms_per_shard,
         whitelist=perm_prep.whitelist,
         blacklist=perm_prep.blacklist,
+        del_max_p_bed=perm_prep.del_max_p_bed,
+        dup_max_p_bed=perm_prep.dup_max_p_bed,
         perm_prefix="${perm_prefix}.lit_GDs.starting_seed_${seed}",
         rCNV_bucket=rCNV_bucket
     }
@@ -60,12 +67,14 @@ workflow segment_permutation {
 }
 
 
-# Prepare permutation seeds and whitelist
+# Prepare permutation seeds, whitelist, and BEDs of best P per window
 task perm_prep {
   File binned_genome
+  File phenotype_list
   Int total_n_perms
   Int perms_per_shard
   String rCNV_bucket
+  String prefix
 
   command <<<
     set -e
@@ -82,10 +91,55 @@ task perm_prep {
 
     # Make seeds
     seq 1 ${perms_per_shard} ${total_n_perms} > seeds.txt
+
+    # Localize meta-analysis stats
+    mkdir meta_stats/
+    gsutil -m cp \
+      ${rCNV_bucket}/analysis/sliding_windows/**.rCNV.**.sliding_window.meta_analysis.stats.bed.gz \
+      meta_stats/
+
+    # Strip out P-value column per HPO & CNV pair
+    mkdir meta_stats/matrices/
+    while read nocolon hpo; do
+      echo $nocolon
+      for cnv in DEL DUP; do
+        echo $cnv
+        statsfile=meta_stats/$nocolon.rCNV.$cnv.sliding_window.meta_analysis.stats.bed.gz
+        idx=$( zcat $statsfile | head -n1 | sed 's/\t/\n/g' \
+               | awk '{ if ($1=="meta_phred_p") print NR }' )
+        zcat $statsfile | sed '1d' | cut -f$idx \
+        | cat <( echo -e "${nocolon}_${cnv}" ) - \
+        > meta_stats/matrices/$nocolon.$cnv.meta_phred_p.tsv
+      done
+    done < ${phenotype_list}
+
+    # Collect bin coordinates
+    zcat \
+      meta_stats/$( head -n1 ${phenotype_list} | cut -f1 ).rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
+    | cut -f1-3 \
+    > window_coordinates.bed
+
+    # Make matrices for primary P-values across phenotypes per CNV type 
+    for cnv in DEL DUP; do
+      paste \
+        window_coordinates.bed \
+        meta_stats/matrices/*.$cnv.meta_phred_p.tsv \
+      | bgzip -c \
+      > meta_stats/matrices/${prefix}.$cnv.meta_phred_p.all_hpos.bed.gz
+    done
+
+    # Compress to single BED of max P per window
+    for cnv in DEL DUP; do
+      /opt/rCNV2/analysis/paper/scripts/large_segments/get_best_p_per_window.R \
+        --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+        meta_stats/matrices/${prefix}.$cnv.meta_phred_p.all_hpos.bed.gz \
+        ${prefix}.best_meta_phred_p_per_window.$cnv.bed
+      bgzip -f ${prefix}.best_meta_phred_p_per_window.$cnv.bed
+    done
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f9c97e660b54ef7d4a7221fcd3e022aa066053344d65c7750b9b9b6f2413a184"
+    docker: "talkowski/rcnv@sha256:0348e318f1a4cd0ef2d3587dadea0eb2aacc84879d1219157db3bc04b522460d"
     preemptible: 1
   }
 
@@ -93,6 +147,8 @@ task perm_prep {
     File whitelist = "whitelist.bed.gz"
     File blacklist = "blacklist.bed.gz"
     Array[String] seeds = read_lines("seeds.txt")
+    File del_max_p_bed = "${prefix}.best_meta_phred_p_per_window.DEL.bed.gz"
+    File del_max_p_bed = "${prefix}.best_meta_phred_p_per_window.DUP.bed.gz"
   }
 }
 
@@ -103,6 +159,8 @@ task perm_shard {
   Int n_perms
   File whitelist
   File blacklist
+  File del_max_p_bed
+  File dup_max_p_bed
   String perm_prefix
   String rCNV_bucket
 
@@ -162,12 +220,24 @@ task perm_shard {
       rCNV.final_segments.loci.bed.gz \
       ${perm_prefix}.reformatted.permuted_loci.bed.gz
 
-    # Recompute summary stats for all permuted loci
-    /opt/rCNV2/analysis/paper/scripts/large_segments/calc_all_seg_stats.py \
-      -o ${perm_prefix}.final_segments.loci.all_sumstats.tsv \
-      ${perm_prefix}.reformatted.permuted_loci.bed.gz \
-      refs/test_phenotypes.list \
-      meta_stats
+    # Recompute max P-value for all permuted loci 
+    # (dummy for regular calc_all_seg_stats.py, for speed)
+    echo -e "region_id\thpo\tcnv\tlnor\tlnor_lower\tlnor_upper\tpvalue\tpvalue_secondary" \
+    > ${perm_prefix}.final_segments.loci.all_sumstats.tsv
+    for cnv in DEL DUP; do
+      if [ $cnv == "DEL" ]; then
+        best_p_bed=${del_max_p_bed}
+      else
+        best_p_bed=${dup_max_p_bed}
+      fi
+      zcat ${perm_prefix}.reformatted.permuted_loci.bed.gz \
+      | fgrep -w $cnv | cut -f1-4 | sort -Vk1,1 -k2,2n -k3,3n \
+      | bedtools map -g refs/GRCh37.autosomes.genome \
+          -c 4 -o max -a - -b $best_p_bed \
+      | awk -v FS="\t" -v OFS="\t" -v cnv=$cnv \
+        '{ if ($NF==".") best=0; else best=$NF; print $4, "best", cnv, "NA", "NA", "NA", best, "NA" }' \
+      >> ${perm_prefix}.final_segments.loci.all_sumstats.tsv
+    done
 
     # Compile new segment table with existing GDs and NAHR regions
     /opt/rCNV2/analysis/paper/scripts/large_segments/compile_segment_table.py \
@@ -184,7 +254,7 @@ task perm_shard {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f9c97e660b54ef7d4a7221fcd3e022aa066053344d65c7750b9b9b6f2413a184"
+    docker: "talkowski/rcnv@sha256:0348e318f1a4cd0ef2d3587dadea0eb2aacc84879d1219157db3bc04b522460d"
     preemptible: 1
   }
 
@@ -218,13 +288,6 @@ task perm_shard_litGDs {
     gsutil -m cp \
       ${rCNV_bucket}/results/segment_association/rCNV.final_segments.loci.bed.gz \
       ./
-    mkdir meta_stats/
-    gsutil -m cp \
-      ${rCNV_bucket}/analysis/sliding_windows/**.rCNV.**.sliding_window.meta_analysis.stats.bed.gz \
-      meta_stats/
-
-    # Tabix all meta-analysis stats
-    find meta_stats/ -name "*meta_analysis.stats.bed.gz" | xargs -I {} tabix -f {}
 
     # Reformat NAHR segments
     cat <( echo -e "#chr\tstart\tend\tnahr_id\tcnv\tn_genes\tgenes" ) \
@@ -262,18 +325,24 @@ task perm_shard_litGDs {
       ${perm_prefix}.all.bed.gz \
       refs/gencode.v19.canonical.pext_filtered.gtf.gz
 
-    # Recompute summary stats for all permuted loci
-    zcat ${perm_prefix}.all.w_genes.bed.gz \
-    | fgrep -v "#" \
-    | sort -Vk1,1 -k2,2n -k3,3n \
-    | awk -v OFS="\t" '{ print $0, $1":"$2"-"$3 }' \
-    | cat <( zcat ${perm_prefix}.all.w_genes.bed.gz | grep -e '^#' | paste - <( echo "cred_interval_coords") ) - \
-    | bgzip -c > all_gds.bed.gz
-    /opt/rCNV2/analysis/paper/scripts/large_segments/calc_all_seg_stats.py \
-      -o ${perm_prefix}.permuted_gds.all_sumstats.tsv \
-      all_gds.bed.gz \
-      refs/test_phenotypes.list \
-      meta_stats
+    # Recompute max P-value for all permuted loci 
+    # (dummy for regular calc_all_seg_stats.py, for speed)
+    echo -e "region_id\thpo\tcnv\tlnor\tlnor_lower\tlnor_upper\tpvalue\tpvalue_secondary" \
+    > ${perm_prefix}.permuted_gds.all_sumstats.tsv
+    for cnv in DEL DUP; do
+      if [ $cnv == "DEL" ]; then
+        best_p_bed=${del_max_p_bed}
+      else
+        best_p_bed=${dup_max_p_bed}
+      fi
+      zcat ${perm_prefix}.all.w_genes.bed.gz \
+      | fgrep -w $cnv | cut -f1-4 | sort -Vk1,1 -k2,2n -k3,3n \
+      | bedtools map -g refs/GRCh37.autosomes.genome \
+          -c 4 -o max -a - -b $best_p_bed \
+      | awk -v FS="\t" -v OFS="\t" -v cnv=$cnv \
+        '{ if ($NF==".") best=0; else best=$NF; print $4, "best", cnv, "NA", "NA", "NA", best, "NA" }' \
+      >> ${perm_prefix}.permuted_gds.all_sumstats.tsv
+    done
 
     # Split out by confidence
     for conf in HC MC LC; do 
@@ -312,7 +381,7 @@ task perm_shard_litGDs {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f9c97e660b54ef7d4a7221fcd3e022aa066053344d65c7750b9b9b6f2413a184"
+    docker: "talkowski/rcnv@sha256:0348e318f1a4cd0ef2d3587dadea0eb2aacc84879d1219157db3bc04b522460d"
     preemptible: 1
   }
 
@@ -363,7 +432,7 @@ task merge_perms {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f9c97e660b54ef7d4a7221fcd3e022aa066053344d65c7750b9b9b6f2413a184"
+    docker: "talkowski/rcnv@sha256:0348e318f1a4cd0ef2d3587dadea0eb2aacc84879d1219157db3bc04b522460d"
     preemptible: 1
     disks: "local-disk 200 SSD"
   }

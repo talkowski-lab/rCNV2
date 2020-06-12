@@ -208,28 +208,6 @@ calc.segs.dat <- function(segs, feature, measure, subset_to_regions=NULL){
   }
 }
 
-# Load a matrix of p-values
-load.pval.matrix <- function(matrix.in, has.coords=T, p.is.phred=T){
-  x <- read.table(matrix.in, header=T, sep="\t", comment.char="")
-  if(has.coords == T){
-    colnames(x)[1:3] <- c("chrom", "start", "end")
-    x[, 1] <- as.character(x[, 1])
-    x[, -1] <- apply(x[, -1], 2, as.numeric)
-    coords <- as.data.frame(x[, 1:3])
-    pvals <- as.data.frame(x[, -c(1:3)])
-  }else{
-    coords <- NULL
-    pvals <- as.data.frame(apply(x, 2, as.numeric))
-  }
-  if(p.is.phred == T){
-    pvals <- as.data.frame(apply(pvals, 2, function(x){10^-x}))
-  }
-  expected <- ppoints(nrow(pvals))
-  lambdas <- apply(pvals, 2, function(obs){dchisq(median(obs, na.rm=T), df=1)/dchisq(median(expected), df=1)})
-  return(list("coords" = coords, "pvals" = pvals,
-              "expected" = expected, "lambdas" = lambdas))
-}
-
 
 ##########################
 ### PLOTTING FUNCTIONS ###
@@ -237,6 +215,7 @@ load.pval.matrix <- function(matrix.in, has.coords=T, p.is.phred=T){
 # Generic segment scatterplot function
 segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
                          xlims=NULL, ylims=NULL, add.lm=T, pt.cex=1,
+                         horiz.lines.at=NULL, horiz.lines.lty=1,
                          xtitle=NULL, x.title.line=1.75, x.at=NULL, x.labs=NULL, x.labs.at=NULL, parse.x.labs=FALSE,
                          ytitle=NULL, y.title.line=1.75, y.at=NULL, y.labs=NULL, y.labs.at=NULL, parse.y.labs=FALSE,
                          parmar=c(3, 3, 0.8, 0.8)){
@@ -271,6 +250,9 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
     y.at <- axTicks(2)
   }
   abline(v=x.at, h=y.at, col="white")
+  if(!is.null(horiz.lines.at)){
+    abline(h=horiz.lines.at, lty=horiz.lines.lty, col=blueblack)
+  }
   
   # Add linear fits, if optioned
   if(add.lm==T){

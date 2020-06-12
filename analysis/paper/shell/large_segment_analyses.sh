@@ -155,6 +155,14 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/
 
 
+# Get genome-wide significance thresholds
+example_hpo="HP0012759"
+del_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
+              refs/sliding_window.rCNV.DEL.bonferroni_pval.hpo_cutoffs.tsv )
+dup_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
+              refs/sliding_window.rCNV.DUP.bonferroni_pval.hpo_cutoffs.tsv )
+
+
 # Plot basic segment distributions
 if [ -e basic_distribs ]; then
   rm -rf basic_distribs
@@ -162,6 +170,7 @@ fi
 mkdir basic_distribs
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_basic_segment_distribs.R \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --gw-sig $del_cutoff \
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   basic_distribs/${prefix}

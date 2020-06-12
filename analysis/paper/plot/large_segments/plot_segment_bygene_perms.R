@@ -94,6 +94,9 @@ source(paste(script.dir, "common_functions.R", sep="/"))
 loci <- load.loci(loci.in)
 segs <- load.segment.table(segs.in)
 
+# Subset to segments nominally significant for at least one phenotype
+segs <- segs[which(segs$nom_sig), ]
+
 # Merge loci & segment data for genome-wide significant sites only
 gw <- merge.loci.segs(loci, segs)
 

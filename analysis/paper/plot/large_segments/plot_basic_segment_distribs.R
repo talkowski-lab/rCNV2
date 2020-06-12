@@ -22,7 +22,8 @@ require(funr, quietly=T)
 
 # List of command-line options
 option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
+  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced."),
+  make_option(c("--gw-sig"), default=10e-6, help="P-value cutoff for genome-wide signficance.")
 )
 
 # Get command-line arguments & options
@@ -41,12 +42,14 @@ loci.in <- args$args[1]
 segs.in <- args$args[2]
 out.prefix <- args$args[3]
 rcnv.config <- opts$`rcnv-config`
+gw.sig <- -log10(opts$`gw-sig`)
 
 # # DEV PARAMETERS
 # loci.in <- "~/scratch/rCNV.final_segments.loci.bed.gz"
 # segs.in <- "~/scratch/rCNV2_analysis_d1.master_segments.bed.gz"
 # out.prefix <- "~/scratch/final_segs"
 # rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
+# gw.sig <- 6
 # script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
 
 # Source rCNV2 config, if optioned
@@ -147,4 +150,22 @@ pdf(paste(out.prefix, "gw_del_vs_dup.prop_ubi_expressed.pdf", sep="."),
 segs.simple.vioswarm(segs, segs$prop_ubiquitously_expressed, add.y.axis=T,
                      ytitle=bquote("Prop. Ubiquitously Expr."), ytitle.line=1.75,
                      pt.cex=0.75, add.pvalue=T, parmar=c(1.2, 2.8, 1.5, 0.2))
+dev.off()
+
+# Scatterplot of peak P-value and corresponding lnOR for all sites
+pdf(paste(out.prefix, "all_segs.best_p_vs_or.pdf", sep="."),
+    height=2.3, width=2.4)
+segs.scatter(segs, x=log2(exp(segs$meta_best_lnor)), y=segs$meta_best_p, 
+             subset_to_regions=segs$region_id[which(!is.infinite(segs$meta_best_p))],
+             horiz.lines.at=c(gw.sig, -log10(0.05)), horiz.lines.lty=1,
+             xtitle=bquote(log[2]("Odds Ratio")), ytitle=bquote("Best -log"[10] * (italic(P))),
+             x.title.line=1.6, y.title.line=1.5,
+             add.lm=F, pt.cex=0.75, parmar=c(2.75, 2.75, 0.2, 0.2))
+x.bump <- 0.04 * (par("usr")[2] - par("usr")[1])
+y.bump <- 0.04 * (par("usr")[4] - par("usr")[3])
+# text(x=par("usr")[2] + x.bump, y=gw.sig + y.bump, labels=format.pval(10^-gw.sig), cex=0.75, pos=2)
+# text(x=par("usr")[2] + x.bump, y=-log10(0.05) + y.bump, labels=format.pval(0.05), cex=0.75, pos=2)
+text(x=par("usr")[2] + x.bump, y=8, labels="Genome-wide\nsignificant", cex=0.75, pos=2, font=3, col=blueblack)
+text(x=par("usr")[2] + x.bump, y=3, labels="Nominally\nsignificant", cex=0.75, pos=2, font=3, col=blueblack)
+# text(x=par("usr")[2] + x.bump, y=-log10(0.05) + y.bump, labels=format.pval(0.05), cex=0.75, pos=2)
 dev.off()
