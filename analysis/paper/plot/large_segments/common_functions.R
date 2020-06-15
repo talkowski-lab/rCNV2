@@ -243,7 +243,7 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
   dup.idx <- which(segs$cnv=="DUP")
   
   # Prep plot area
-  par(mar=parmar)
+  par(mar=parmar, bty="n")
   plot(NA, xlim=xlims, ylim=ylims, xlab="", ylab="", xaxt="n", yaxt="n")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
@@ -258,7 +258,9 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
   }
   abline(v=x.at, h=y.at, col="white")
   if(!is.null(horiz.lines.at)){
-    abline(h=horiz.lines.at, lty=horiz.lines.lty, col=blueblack)
+    sapply(1:length(horiz.lines.at), function(i){
+      abline(h=horiz.lines.at[i], lty=horiz.lines.lty[i], col=blueblack)
+    })
   }
   
   # Add linear fits, if optioned
@@ -285,7 +287,9 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
          cex=pt.cex)
   
   # Add axis ticks
+  axis(1, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
   axis(1, at=x.at, labels=NA, tck=-0.03, col=blueblack)
+  axis(2, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
   axis(2, at=y.at, labels=NA, tck=-0.03, col=blueblack)
   
   # Add axis labels
@@ -321,7 +325,7 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
   mtext(2, text=ytitle, line=y.title.line)
   
   # Add cleanup box
-  box(col=blueblack, bty="o")
+  # box(col=blueblack, bty="o")
 }
 # Alias
 gw.scatter <- segs.scatter
@@ -566,6 +570,7 @@ plot.viohist <- function(perm.dat.vals, bins, y.at, width=0.8,
                          color=bluewhite, border=blueblack,
                          diamond.cex=4, y.title=NULL, left.ax.line=F){
   perm.hist <- hist(perm.dat.vals, breaks=bins, plot=F)
+  perm.mean <- mean(as.numeric(perm.dat.vals[which(!is.infinite(perm.dat.vals))]), na.rm=T)
   values <- perm.hist$counts
   # Convert zero-bins to NAs for the outermost 5% of the distribution
   outer.lims <- quantile(perm.dat.vals, probs=c(0.025, 0.975), na.rm=T)
@@ -585,6 +590,9 @@ plot.viohist <- function(perm.dat.vals, bins, y.at, width=0.8,
            y0=c(y.at, values + y.at, y.at, -values + y.at),
            y1=c(values + y.at, y.at, -values + y.at, y.at),
            col=border)
+  segments(x0=perm.mean, x1=perm.mean,
+           y0=y.at - 0.2, y1=y.at + 0.2,
+           col=blueblack, lwd=3, lend="round")
   segments(x0=obs.val, x1=obs.val, 
            y0=y.at - 0.2, y1=y.at + 0.2, 
            col=obs.color, lwd=3, lend="round")
@@ -601,7 +609,7 @@ plot.viohist <- function(perm.dat.vals, bins, y.at, width=0.8,
 # Function to plot segment permutation test results
 plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
                            subset_to_regions=NULL, n.bins=100, min.bins=10,
-                           x.title=NULL, xlims=NULL, xmin=NULL, xmax=NULL,
+                           x.title=NULL, x.title.line=1.2, xlims=NULL, xmin=NULL, xmax=NULL,
                            diamond.pch=23, diamond.cex=1.25, parmar=c(2.25, 2, 0.5, 0.5)){
   # Get plot data
   if(!is.null(subset_to_regions)){
@@ -624,7 +632,7 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
   }
   
   # Determine value range and binning
-  val.range <- range(perm.dat, na.rm=T)
+  val.range <- range(perm.dat[which(!is.infinite(perm.dat) & !is.na(perm.dat) & !is.nan(perm.dat))], na.rm=T)
   val.range <- c(floor(val.range[1]), ceiling(val.range[2]))
   unique.vals <- length(unique(as.numeric(perm.dat)))
   if(unique.vals <= min.bins){
@@ -672,9 +680,9 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
                  color=vio.colors[i], border=vio.borders[i],
                  y.title=row.labels[i], diamond.cex=diamond.cex, obs.val=segs.dat[i], 
                  obs.color=row.colors[i], obs.border=row.borders[i], obs.pch=diamond.pch)
-    segments(x0=perm.means[i], x1=perm.means[i],
-             y0=i-0.7, y1=i-0.3, lwd=3, 
-             col=vio.borders[i], lend="round")
+    # segments(x0=perm.means[i], x1=perm.means[i],
+    #          y0=i-0.7, y1=i-0.3, lwd=3, 
+    #          col=vio.borders[i], lend="round")
     if(segs.dat[i] >= perm.means[i]){
       text(x=segs.dat[i]-(0.03*(par("usr")[2]-par("usr")[1])), y=i-0.7, pos=4, 
            labels=perm.pvals[2, ][[i]], xpd=T, cex=stats.cex)
@@ -691,14 +699,14 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
   sapply(1:length(axTicks(1)), function(i){
     axis(1, at=axTicks(1)[i], labels=prettyNum(axTicks(1)[i], big.mark=","), line=-0.65, tick=F)
   })
-  mtext(1, text=x.title, line=1.2)
+  mtext(1, text=x.title, line=x.title.line)
 }
 
 # Multi-panel plot of permutation results for segment subsets
 plot.seg.perms.multi <- function(segs, gw.perms, lit.perms, union.perms, 
                                  feature, measure,
                                  norm=F, n.bins=100, min.bins=10,
-                                 x.title=NULL, xlims=NULL, xmin=NULL, xmax=NULL,
+                                 x.title=NULL, xlims=NULL, xmin=NULL, xmax=NULL, max.x.ticks=5,
                                  inner.axis.cex=0.9, diamond.cex=1.25, 
                                  parmar=c(2.25, 6, 0.5, 0.5)){
   # Get ID subsets
@@ -773,7 +781,7 @@ plot.seg.perms.multi <- function(segs, gw.perms, lit.perms, union.perms,
   row.borders <- rep("black", 3)
   # row.borders <- c(purpleblack, redblack, blueblack)
   outer.row.labels <- c("All\nCNV", "DEL", "DUP")
-  inner.row.labels <- c("All Segs.", "GW-Sig.", "Literature\n  (Not sig.)")
+  inner.row.labels <- c("All Segs.", "GW-Sig.", "Only from\nLiterature")
   stats.cex <- 0.85
   obs.pch <- c(23, 22, 21)
   
@@ -805,10 +813,14 @@ plot.seg.perms.multi <- function(segs, gw.perms, lit.perms, union.perms,
   })
   
   # Axes & cleanup
+  x.at <- axTicks(1)
+  if(length(x.at) > max.x.ticks){
+    x.at <- x.at[seq(1, length(x.at), 2)]
+  }
   axis(1, at=c(-10e10, 10e10), labels=NA, col=blueblack, tck=0)
-  axis(1, at=unique(c(0, axTicks(1))), labels=NA, col=blueblack, tck=-0.03)
-  sapply(1:length(axTicks(1)), function(i){
-    axis(1, at=axTicks(1)[i], labels=prettyNum(axTicks(1)[i], big.mark=","), line=-0.65, tick=F)
+  axis(1, at=x.at, labels=NA, col=blueblack, tck=-0.03)
+  sapply(1:length(x.at), function(i){
+    axis(1, at=x.at[i], labels=prettyNum(x.at[i], big.mark=","), line=-0.65, tick=F)
   })
   mtext(1, text=x.title, line=1.3)
   sapply(1:3, function(i){

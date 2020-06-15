@@ -202,11 +202,11 @@ plot.all.loci <- function(gw, clusters, sumstats, hpos,
                           cex.table.text=0.9, buffer=0.1, 
                           parmar=c(0.25, 0.25, 8, 0.25)){
   # Prep plot area
-  prestat.widths <- rev(c(6, 3, 4, 3, 3))
+  prestat.widths <- rev(c(7, 3, 4, 3, 3))
   poststat.widths <- rep(10, 3)
   prep.plot(sumstats, clusters, hpos,
             ncols.prestats=5, prestat.widths=prestat.widths, 
-            prestat.colnames=c("Locus", "Signif.\nrCNVs", "Size", "NAHR", "Known\nGDs"),
+            prestat.colnames=c("Cytoband", "Signif.\nrCNVs", "Size", "NAHR", "Known\nGDs"),
             ncols.poststats=3, poststat.widths=poststat.widths,
             poststat.colnames=c("All Genes", 
                                 "Genes Constrained\nAgainst Truncating SNVs", 
@@ -429,7 +429,7 @@ hpos <- c(NA, hpos[1], NA,
 
 # Plot locus grid
 pdf(paste(out.prefix, "large_segments.association_grid.pdf", sep="."), 
-    height=10, width=16)
+    height=10.25, width=16)
 plot.all.loci(gw, clusters, sumstats, hpos, 
               stat.size="pvalue", max.stat.size=6, 
               stat.color="lnor", max.stat.color=log(8),

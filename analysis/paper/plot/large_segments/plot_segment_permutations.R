@@ -18,7 +18,7 @@ options(stringsAsFactors=F, scipen=1000)
 ### DATA FUNCTIONS ###
 ######################
 # Load & parse permutation results
-load.perms <- function(perm.res.in, susbet_to_regions=NULL){
+load.perms <- function(perm.res.in, subset_to_regions=NULL){
   # Read full permutation table
   perms <- read.table(perm.res.in, header=T, sep="\t", check.names=F, comment.char="")
   perms$perm_idx <- as.numeric(perms$perm_idx)
@@ -147,15 +147,16 @@ source(paste(script.dir, "common_functions.R", sep="/"))
 
 # Load loci & segment table
 loci <- load.loci(loci.in)
-segs <- load.segment.table(segs.in)
+segs.all <- load.segment.table(segs.in)
 
 # Restrict to segments nominally significant in at least one phenotype
-segs <- segs[which(segs$nom_sig), ]
+segs <- segs.all[which(segs.all$nom_sig), ]
 nomsig.ids <- segs$region_id
 
 # Split seg IDs by gw-sig vs GD (but not gw-sig)
 gw.ids <- segs$region_id[which(segs$gw_sig)]
 lit.ids <- segs$region_id[which(segs$any_gd & !segs$gw_sig)]
+all.lit.ids <- segs.all$region_id[which(segs.all$any_gd & !segs.all$gw_sig)]
 
 # Merge loci & segment data for genome-wide significant sites only
 gw <- merge.loci.segs(loci, segs)
@@ -170,7 +171,7 @@ pdf(paste(outdir, "/", prefix, ".gd_overlap.pdf", sep=""),
     height=2.2, width=2.5)
 plot.seg.perms(segs, perms, feature="any_gd", 
                subset_to_regions=gw.ids,
-               measure="sum", n.bins=30,
+               measure="sum", n.bins=100,
                x.title="Known Genomic Disorders",
                diamond.pch=22,
                parmar=c(2.2, 2, 0, 2.0))
@@ -192,18 +193,19 @@ plot.all.perm.res(segs, perms, lit.perms,
                   n.bins.single=30, n.bins.multi=50,
                   x.title="Mean Genes per Segment", 
                   pdf.dims.single=c(2.2, 2.4),
-                  parmar.single=c(2.25, 2, 0, 1.2),
+                  parmar.single=c(2.25, 2, 0, 2.2),
                   pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.2, 6.05, 0, 2.2))
+                  parmar.multi=c(2.25, 6.05, 0, 2.2))
 
-# Plot enrichment for top P-values
-print("Enrichment for top P-values:")
-plot.all.perm.res(segs, perms, lit.perms, 
-                  feature="meta_best_p", measure="mean",
-                  outdir, prefix, norm=F, norm.multi=F,
-                  n.bins.single=30, n.bins.multi=50,
-                  x.title=bquote("Best" ~ -log[10](italic(P))), 
-                  pdf.dims.single=c(2.2, 2.4),
-                  parmar.single=c(2.25, 2, 0, 1.2),
-                  pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.2, 6.05, 0, 2.2))
+# Plot single panel of enrichment for top P-values for non-significant GDs
+print("Enrichment for top P-values among non-sig lit GDs:")
+pdf(paste(outdir, "/", prefix, ".meta_best_p.nonsig_lit_gds.pdf", sep=""),
+    height=2.3, width=2.3)
+plot.seg.perms(segs.all[which(segs$region_id %in% all.lit.ids), ], 
+               lit.perms, feature="meta_best_p", 
+               subset_to_regions=all.lit.ids,
+               measure="mean", n.bins=30, min.bins=10,
+               x.title=bquote("Best" ~ -log[10](italic(P))),
+               diamond.pch=21, x.title.line=1.4,
+               parmar=c(2.4, 2, 0, 0.25))
+dev.off()

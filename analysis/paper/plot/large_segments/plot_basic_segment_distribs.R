@@ -49,7 +49,7 @@ gw.sig <- -log10(opts$`gw-sig`)
 # segs.in <- "~/scratch/rCNV2_analysis_d1.master_segments.bed.gz"
 # out.prefix <- "~/scratch/final_segs"
 # rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-# gw.sig <- 6
+# gw.sig <- -log10(3.715428E-6)
 # script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
 
 # Source rCNV2 config, if optioned
@@ -67,7 +67,7 @@ segs <- load.segment.table(segs.in)
 
 # Subset to all GD segs & those with nominal significance
 segs.all <- segs[which(segs$any_gd | segs$gw_sig), ]
-segs <- segs[which(segs.all$nom_sig), ]
+segs <- segs.all[which(segs.all$nom_sig), ]
 
 # Merge loci & segment data for genome-wide significant sites only
 gw <- merge.loci.segs(loci, segs)
@@ -156,17 +156,17 @@ dev.off()
 # Scatterplot of peak P-value and corresponding lnOR for all sites
 pdf(paste(out.prefix, "all_segs.best_p_vs_or.pdf", sep="."),
     height=2.3, width=2.4)
-segs.scatter(segs.all, x=log2(exp(segs$meta_best_lnor)), y=segs$meta_best_p, 
-             subset_to_regions=segs$region_id[which(!is.infinite(segs$meta_best_p))],
-             horiz.lines.at=c(gw.sig, -log10(0.05)), horiz.lines.lty=1,
+segs.scatter(segs.all, x=log2(exp(segs.all$meta_best_lnor)), y=segs.all$meta_best_p, 
+             subset_to_regions=segs.all$region_id[which(!is.infinite(segs.all$meta_best_p))],
+             horiz.lines.at=c(gw.sig, -log10(0.05)), horiz.lines.lty=c(2, 1),
              xtitle=bquote(log[2]("Odds Ratio")), ytitle=bquote("Best -log"[10] * (italic(P))),
              x.title.line=1.6, y.title.line=1.5,
              add.lm=F, pt.cex=0.75, parmar=c(2.75, 2.75, 0.2, 0.2))
 x.bump <- 0.04 * (par("usr")[2] - par("usr")[1])
 y.bump <- 0.04 * (par("usr")[4] - par("usr")[3])
 # text(x=par("usr")[2] + x.bump, y=gw.sig + y.bump, labels=format.pval(10^-gw.sig), cex=0.75, pos=2)
-# text(x=par("usr")[2] + x.bump, y=-log10(0.05) + y.bump, labels=format.pval(0.05), cex=0.75, pos=2)
-text(x=par("usr")[2] + x.bump, y=8, labels="Genome-wide\nsignificant", cex=0.75, pos=2, font=3, col=blueblack)
-text(x=par("usr")[2] + x.bump, y=3, labels="Nominally\nsignificant", cex=0.75, pos=2, font=3, col=blueblack)
+text(x=par("usr")[2] + x.bump, y=-log10(0.05) + y.bump, labels=format.pval(0.05, equality="<"), cex=0.75, pos=2, col=blueblack)
+text(x=par("usr")[2] + x.bump, y=7, labels="Genome-wide\nsignificance", cex=0.75, pos=2, font=3, col=blueblack)
+# text(x=par("usr")[2] + x.bump, y=2.4, labels="Nominal\nsignificance", cex=0.65, pos=2, font=3, col=blueblack)
 # text(x=par("usr")[2] + x.bump, y=-log10(0.05) + y.bump, labels=format.pval(0.05), cex=0.75, pos=2)
 dev.off()

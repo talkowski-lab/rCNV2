@@ -423,12 +423,14 @@ mkdir association_grid
 # Collapse overlapping DEL/DUP segments for sake of plotting
 while read intervals rid; do
   echo "$intervals" | sed -e 's/\;/\n/g' -e 's/\:\|\-/\t/g' \
-  | awk -v OFS="\t" -v rid=$rid '{ print $0, rid }'
+  | awk -v OFS="\t" -v rid=$rid '{ print $0, rid }' \
+  | bedtools merge -i - -c 4 -o distinct -d 10000000
 done < <( zcat rCNV.final_segments.loci.bed.gz | grep -ve '^#' \
           | awk -v FS="\t" -v OFS="\t" '{ print $(NF-3), $4 }' ) \
 | sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
-| bedtools merge -i - -d 1000000 -c 4 -o distinct \
+| bedtools merge -i - -d 200000 -c 4 -o distinct \
 | cut -f4 \
+| uniq \
 > locus_clusters.txt
 # Generate master locus grid plot
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_association_grid.R \

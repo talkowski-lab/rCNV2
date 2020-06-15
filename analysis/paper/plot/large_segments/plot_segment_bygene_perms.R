@@ -139,19 +139,19 @@ plot.all.perm.res(segs, perms, lit.perms,
                   pdf.dims.single=c(2.2, 2.4),
                   parmar.single=c(2.25, 2, 0, 2),
                   pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.25, 6.25, 0, 2.4))
+                  parmar.multi=c(2.25, 6.25, 0, 2.7))
 
 # Mean number of constrained genes per segment
 print("Mean constrained genes per segment:")
-plot.all.perm.res(segs, perms, lit.perms, 
+plot.all.perm.res(segs, perms, lit.perms,
                   feature="n_gnomAD_constrained_genes", measure="mean",
                   outdir, prefix, norm=F, norm.multi=F,
                   n.bins.single=30, n.bins.multi=50,
-                  x.title="Mean Constrained Genes", 
+                  x.title="Mean Constrained Genes",
                   pdf.dims.single=c(2.2, 2.4),
                   parmar.single=c(2.25, 2, 0, 1.2),
                   pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.25, 6.25, 0, 0.5))
+                  parmar.multi=c(2.25, 6.25, 0, 1.75))
 
 # Average gene expression per segment
 print("Harmonic mean of gene expression per segment:")
@@ -178,12 +178,12 @@ sapply(c("ASC", "DDD", "ASC_unaffected"), function(cohort){
                       outdir, paste(prefix, "gw_neuro_plus_lit", sep="."), 
                       subset_to_regions=neuro.region_ids,
                       norm=F, norm.multi=F,
-                      n.bins.single=100, n.bins.multi=100, min.bins=25,
+                      n.bins.single=100, n.bins.multi=100, min.bins=100,
                       x.title=bquote("Excess" ~ italic("De Novo") ~ .(csq.abbrev) ~ "/ Gene"), 
                       pdf.dims.single=c(2.2, 2.4),
                       parmar.single=c(2.25, 2, 0, 1.2),
                       pdf.dims.multi=c(4, 3.5),
-                      parmar.multi=c(2.2, 6.05, 0, 2.3))
+                      parmar.multi=c(2.25, 6.05, 0, 2.3))
   })
 })
 

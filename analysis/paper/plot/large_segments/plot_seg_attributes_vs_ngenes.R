@@ -45,6 +45,23 @@ quantile.split <- function(segs, feature, breaks=NULL, break.names=NULL, probs=s
   return(res)
 }
 
+# Compute Chi-square P-values for obs vs. expected constrained genes
+constrained.obs_exp.test <- function(segs){
+  segs$constrained_obs_exp_pvalue <- sapply(1:nrow(segs), function(i){
+    n_genes <- segs$n_genes[i]
+    exp <- segs$constrained_expected[i]
+    obs <- segs$n_gnomAD_constrained_genes[i]
+    chisq.mat <- matrix(c(n_genes - exp, n_genes - obs, exp, obs), 
+                        byrow=T, nrow=2)
+    if(n_genes > 0){
+      chisq.test(chisq.mat)$p.value
+    }else{
+      return(1)
+    }
+  })
+  return(segs)
+}
+
 
 ##########################
 ### PLOTTING FUNCTIONS ###
@@ -240,3 +257,12 @@ scatter.vsGenes(neuro.segs, feature="DDD_dnm_mis_norm_excess_per_gene",
                 y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
 dev.off()
 
+# Number of constrained genes vs expected
+constrained.max <- max(segs$constrained_expected, segs$n_gnomAD_constrained_genes)
+pdf(paste(out.prefix, "constrained_genes_obs_vs_exp.pdf", sep="."),
+    height=2.4, width=2.4)
+segs.scatter(segs, segs$constrained_expected, segs$n_gnomAD_constrained_genes, 
+             xlims=c(0, constrained.max), ylims=c(0, constrained.max),
+             xtitle="Constrained (Expected)", ytitle="Constrained (Observed)",
+             pt.cex=0.9)
+dev.off()
