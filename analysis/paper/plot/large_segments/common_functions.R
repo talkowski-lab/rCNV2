@@ -98,6 +98,13 @@ load.segment.table <- function(segs.in){
   return(segs)
 }
 
+# Compile master list of neuro-associated loci (using gw-sig for gw-sig loci and nominal for lit-based loci)
+get.neuro.region_ids <- function(loci, segs){
+  gw.hits <- loci$region_id[which(sapply(loci$hpos, function(hpos){any(hpos %in% neuro.hpos)}))]
+  lit.hits <- segs$region_id[which(segs$any_gd & segs$nom_neuro & !segs$gw_sig)]
+  sort(unique(c(gw.hits, lit.hits)))
+}
+
 # Normalize DNM counts vs. synonymous inflation
 normalize.dnms <- function(segs, dnm.cohorts=c("DDD", "ASC", "ASC_unaffected")){
   for(cohort in dnm.cohorts){
@@ -320,7 +327,7 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
 gw.scatter <- segs.scatter
 
 # Generic swarm/boxplot function
-segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL, 
+segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL, subset_to_regions=NULL,
                        add.pvalue=FALSE, stat.test="wilcoxon", alternative="two.sided",
                        xtitle=NULL, x.labs=c("FALSE", "TRUE"),
                        add.y.axis=TRUE, ytitle=NULL, y.at=NULL, y.labs=NULL, y.labs.at=NULL, 
@@ -330,6 +337,14 @@ segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL,
   require(beeswarm, quietly=T)
   if(violin==T){
     require(vioplot, quietly=T)
+  }
+  
+  # Subset to ID list, if optioned
+  if(!is.null(subset_to_regions)){
+    keep.idx <- which(segs$region_id %in% subset_to_regions)
+    segs <- segs[keep.idx, ]
+    x.bool <- x.bool[keep.idx]
+    y <- y[keep.idx]
   }
   
   # Restrict to non-NA, finite values

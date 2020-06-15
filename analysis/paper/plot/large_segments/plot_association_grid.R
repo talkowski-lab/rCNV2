@@ -429,7 +429,7 @@ hpos <- c(NA, hpos[1], NA,
 
 # Plot locus grid
 pdf(paste(out.prefix, "large_segments.association_grid.pdf", sep="."), 
-    height=8.5, width=16)
+    height=10, width=16)
 plot.all.loci(gw, clusters, sumstats, hpos, 
               stat.size="pvalue", max.stat.size=6, 
               stat.color="lnor", max.stat.color=log(8),

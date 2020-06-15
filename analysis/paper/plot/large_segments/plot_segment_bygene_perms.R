@@ -19,11 +19,14 @@ csqs <- c("PTVs" = "lof", "Mis." = "mis")
 ### DATA FUNCTIONS ###
 ######################
 # Load & parse permutation results
-load.perms <- function(perm.res.in){
+load.perms <- function(perm.res.in, subset_to_regions=NULL){
   # Read full permutation table
   perms <- read.table(perm.res.in, header=T, sep="\t", check.names=F, comment.char="")
   colnames(perms)[1] <- gsub("#", "", colnames(perms)[1], fixed=T)
   perm.range <- sort(unique(perms$perm_idx))
+  if(!is.null(subset_to_regions)){
+    perms <- perms[which(perms$region_id %in% subset_to_regions), ]
+  }
   
   # Add normalized columns
   perms$gnomAD_constrained_prop <- perms$n_gnomAD_constrained_genes / perms$n_genes
@@ -96,17 +99,17 @@ segs <- load.segment.table(segs.in)
 
 # Subset to segments nominally significant for at least one phenotype
 segs <- segs[which(segs$nom_sig), ]
+nomsig.ids <- segs$region_id
 
 # Merge loci & segment data for genome-wide significant sites only
 gw <- merge.loci.segs(loci, segs)
 
-# Get list of neuro loci plus lit GDs
-neuro.plus.lit.ids <- sort(unique(c(loci$region_id[which(sapply(loci$hpos, function(hpos){any(hpos %in% neuro.hpos)}))],
-                                    segs$region_id[which(segs$any_gd & !segs$gw_sig)])))
+# Get list of neuro loci
+neuro.region_ids <- get.neuro.region_ids(loci, segs)
 
 # Load permutation results
-perms <- load.perms(perm.res.in)
-lit.perms <- load.perms(lit.perm.res.in)
+perms <- load.perms(perm.res.in, subset_to_regions=nomsig.ids)
+lit.perms <- load.perms(lit.perm.res.in, subset_to_regions=nomsig.ids)
 
 # Fraction of gw-sig segments with at least one HPO-matched gene
 print("Fraction of segments with at least one HPO-matched gene:")
@@ -173,7 +176,7 @@ sapply(c("ASC", "DDD", "ASC_unaffected"), function(cohort){
                       feature=paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_"),
                       measure="mean",
                       outdir, paste(prefix, "gw_neuro_plus_lit", sep="."), 
-                      subset_to_regions=neuro.plus.lit.ids,
+                      subset_to_regions=neuro.region_ids,
                       norm=F, norm.multi=F,
                       n.bins.single=100, n.bins.multi=100, min.bins=25,
                       x.title=bquote("Excess" ~ italic("De Novo") ~ .(csq.abbrev) ~ "/ Gene"), 

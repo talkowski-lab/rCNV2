@@ -62,11 +62,14 @@ source(paste(script.dir, "common_functions.R", sep="/"))
 loci <- load.loci(loci.in)
 segs <- load.segment.table(segs.in)
 
-# Subset to pathogenic segments
-segs <- segs[which(segs$any_gd | segs$gw_sig), ]
+# Restrict to segments nominally significant in at least one phenotype
+segs <- segs[which(segs$nom_sig), ]
 
 # Merge loci & segment data for genome-wide significant sites only
 gw <- merge.loci.segs(loci, segs)
+
+# Get list of neuro loci
+neuro.region_ids <- get.neuro.region_ids(loci, segs)
 
 # Swarmplot of segment size vs. mechanism
 pdf(paste(out.prefix, "segs_by_mechanism.size.pdf", sep="."),
@@ -122,6 +125,7 @@ pdf(paste(out.prefix, "segs_by_mechanism.DDD_dnLoF_per_gene.pdf", sep="."),
 segs.swarm(segs[which(segs$n_genes>0), ], 
            x.bool=segs$nahr[which(segs$n_genes>0)], 
            y=segs$DDD_dnm_lof_norm_excess_per_gene,
+           subset_to_regions=neuro.region_ids,
            x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.y.axis=T, add.pvalue=T,
            ytitle=bquote("Excess" ~ italic("dn") * "PTV" ~ "/ Gene"), 
            pt.cex=0.75, parmar=c(1.2, 3, 2.5, 0))
@@ -133,6 +137,7 @@ pdf(paste(out.prefix, "segs_by_mechanism.DDD_dnMis_per_gene.pdf", sep="."),
 segs.swarm(segs[which(segs$n_genes>0), ], 
            x.bool=segs$nahr[which(segs$n_genes>0)], 
            y=segs$DDD_dnm_mis_norm_excess_per_gene,
+           subset_to_regions=neuro.region_ids,
            x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.y.axis=T, add.pvalue=T,
            ytitle=bquote("Excess" ~ italic("dn") * "Mis" ~ "/ Gene"), 
            pt.cex=0.75, parmar=c(1.2, 3, 2.5, 0))
@@ -144,6 +149,7 @@ pdf(paste(out.prefix, "segs_by_mechanism.ASC_dnLoF_per_gene.pdf", sep="."),
 segs.swarm(segs[which(segs$n_genes>0), ], 
            x.bool=segs$nahr[which(segs$n_genes>0)], 
            y=segs$ASC_dnm_lof_norm_excess_per_gene,
+           subset_to_regions=neuro.region_ids,
            x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.y.axis=T, add.pvalue=T,
            ytitle=bquote("Excess" ~ italic("dn") * "PTV" ~ "/ Gene"), 
            pt.cex=0.75, parmar=c(1.2, 3, 2.5, 0))
@@ -155,6 +161,7 @@ pdf(paste(out.prefix, "segs_by_mechanism.ASC_dnMis_per_gene.pdf", sep="."),
 segs.swarm(segs[which(segs$n_genes>0), ], 
            x.bool=segs$nahr[which(segs$n_genes>0)], 
            y=segs$ASC_dnm_mis_norm_excess_per_gene,
+           subset_to_regions=neuro.region_ids,
            x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.y.axis=T, add.pvalue=T,
            ytitle=bquote("Excess" ~ italic("dn") * "Mis" ~ "/ Gene"), 
            pt.cex=0.75, parmar=c(1.2, 3, 2.5, 0))

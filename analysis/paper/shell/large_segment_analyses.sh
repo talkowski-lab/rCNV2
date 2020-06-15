@@ -147,6 +147,7 @@ cat \
   --snv-mus refs/gene_mutation_rates.tsv.gz \
   --gtex-matrix refs/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
   --meta-sumstats pooled_sumstats.tsv \
+  --neuro-hpos refs/neuro_hpos.list \
   --gd-recip "10e-10" \
   --nahr-recip 0.25 \
   --bgzip
@@ -279,11 +280,6 @@ if [ -e assoc_stat_plots ]; then
   rm -rf assoc_stat_plots
 fi
 mkdir assoc_stat_plots
-example_hpo="HP0012759"
-del_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
-              refs/sliding_window.rCNV.DEL.empirical_genome_wide_pval.hpo_cutoffs.tsv )
-dup_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
-              refs/sliding_window.rCNV.DUP.empirical_genome_wide_pval.hpo_cutoffs.tsv )
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_example_miami.R \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   --del-cutoff ${del_cutoff} \
@@ -354,10 +350,6 @@ for cnv in DEL DUP; do
   done
 done
 # Generate plots
-del_cutoff=$( fgrep -v "#" refs/sliding_window.rCNV.DEL.empirical_genome_wide_pval.hpo_cutoffs.tsv \
-              | head -n1 | cut -f2 )
-dup_cutoff=$( fgrep -v "#" refs/sliding_window.rCNV.DUP.empirical_genome_wide_pval.hpo_cutoffs.tsv \
-              | head -n1 | cut -f2 )
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_sliding_window_pval_distribs.R \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   --del-cutoff ${del_cutoff} \

@@ -176,16 +176,19 @@ if(!is.null(rcnv.config)){
 script.dir <- funr::get_script_path()
 source(paste(script.dir, "common_functions.R", sep="/"))
 
-# Load loci & segment table
+# Load loci & segment tables
 loci <- load.loci(loci.in)
 segs <- load.segment.table(segs.in)
-segs <- segs[which(segs$gw_sig | segs$any_gd), ]
+
+# Subset to nominally significant segments
+segs <- segs[which(segs$nom_sig), ]
+
+# Set expected values of constrained genes
 prop_constrained.genome_avg <- 3036/18641
 segs$constrained_expected <- segs$n_genes * prop_constrained.genome_avg
 
 # Get list of neuro loci plus lit GDs
-neuro.plus.lit.ids <- sort(unique(c(loci$region_id[which(sapply(loci$hpos, function(hpos){any(hpos %in% neuro.hpos)}))],
-                                    segs$region_id[which(segs$any_gd & !segs$gw_sig)])))
+neuro.plus.lit.ids <- get.neuro.region_ids(loci, segs)
 neuro.segs <- segs[which(segs$region_id %in% neuro.plus.lit.ids), ]
 
 # Plot proportion of constrained genes vs. # of genes
@@ -200,7 +203,7 @@ axis(4, at=prop_constrained.genome_avg, tick=F, line=-0.9, las=2,
      labels=c("Genome\naverage"), col.axis=blueblack, font=3, cex=0.8)
 dev.off()
 
-# NOTE: all DNM enrichment plots restricted to lit GDs + neuro-associated GW-sig GDs
+# NOTE: all DNM enrichment plots restricted to neuro-associated regions
 
 # Plot average enrichment of ASC DNMs vs. # of genes
 pdf(paste(out.prefix, "ASC_dnPTVs_vs_ngenes.pdf", sep="."),

@@ -63,6 +63,9 @@ source(paste(script.dir, "common_functions.R", sep="/"))
 loci <- load.loci(loci.in)
 segs <- load.segment.table(segs.in)
 
+# Restrict to segments nominally significant in at least one phenotype
+segs <- segs[which(segs$nom_sig), ]
+
 # Merge loci & segment data for genome-wide significant sites only
 gw <- merge.loci.segs(loci, segs)
 
@@ -181,4 +184,16 @@ gw.swarm(gw,
          x.labs=c("Nonrecurrent", "NAHR"),
          xtitle="Mechanism",
          ytitle=expression("Effect Size" ~ (italic("ln") * " OR")))
+dev.off()
+pdf(paste(out.prefix, "lnOR_vs_NAHR.all_nomsig_segs.pdf", sep="."),
+    height=2.25, width=2.5)
+gw.swarm(segs, 
+         x.bool=segs$nahr, 
+         y=segs$meta_best_lnor,
+         add.pvalue = T, violin = T,
+         ylims=c(0, max(segs$meta_best_lnor)),
+         x.labs=c("Nonrecurrent", "NAHR"),
+         xtitle="Mechanism", 
+         ytitle=expression("Effect Size" ~ (italic("ln") * " OR")),
+         pt.cex=0.7, parmar=c(2.3, 3, 2.5, 0.5))
 dev.off()

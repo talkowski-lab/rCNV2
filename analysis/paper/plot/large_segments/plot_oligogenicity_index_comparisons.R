@@ -116,6 +116,9 @@ asc <- load.dnms(asc.dnms.in, mutrates)
 loci <- load.loci(loci.in)
 segs <- load.segment.table(segs.in)
 
+# Restrict to segments nominally significant in at least one phenotype
+segs <- segs[which(segs$nom_sig), ]
+
 # Annotate segs with oligogenicity indexes
 for(csq in csqs){
   segs[paste("ddd", csq, "oligo", sep=".")] <- calc.oligo.index(segs, ddd, csq=csq)
@@ -125,10 +128,9 @@ for(csq in csqs){
 # Merge loci & segment data for genome-wide significant sites only
 gw <- merge.loci.segs(loci, segs)
 
-# Subset segs to neuro loci plus lit GDs
-neuro.plus.lit.ids <- sort(unique(c(loci$region_id[which(sapply(loci$hpos, function(hpos){any(hpos %in% neuro.hpos)}))],
-                                    segs$region_id[which(segs$any_gd & !segs$gw_sig)])))
-neuro.segs <- segs[which(segs$region_id %in% neuro.plus.lit.ids), ]
+# Get list of neuro loci
+neuro.region_ids <- get.neuro.region_ids(loci, segs)
+neuro.segs <- segs[which(segs$region_id %in% neuro.region_ids), ]
 
 # Swarmplot of DDD oligogenicity indexes vs. mechanism
 pdf(paste(out.prefix, "segs_by_mechanism.ddd_lof_oligogenicity_index.pdf", sep="."),

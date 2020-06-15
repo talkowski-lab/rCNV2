@@ -65,8 +65,9 @@ source(paste(script.dir, "common_functions.R", sep="/"))
 loci <- load.loci(loci.in)
 segs <- load.segment.table(segs.in)
 
-# Subset to pathogenic segments
-segs <- segs[which(segs$any_gd | segs$gw_sig), ]
+# Subset to all GD segs & those with nominal significance
+segs.all <- segs[which(segs$any_gd | segs$gw_sig), ]
+segs <- segs[which(segs.all$nom_sig), ]
 
 # Merge loci & segment data for genome-wide significant sites only
 gw <- merge.loci.segs(loci, segs)
@@ -155,7 +156,7 @@ dev.off()
 # Scatterplot of peak P-value and corresponding lnOR for all sites
 pdf(paste(out.prefix, "all_segs.best_p_vs_or.pdf", sep="."),
     height=2.3, width=2.4)
-segs.scatter(segs, x=log2(exp(segs$meta_best_lnor)), y=segs$meta_best_p, 
+segs.scatter(segs.all, x=log2(exp(segs$meta_best_lnor)), y=segs$meta_best_p, 
              subset_to_regions=segs$region_id[which(!is.infinite(segs$meta_best_p))],
              horiz.lines.at=c(gw.sig, -log10(0.05)), horiz.lines.lty=1,
              xtitle=bquote(log[2]("Odds Ratio")), ytitle=bquote("Best -log"[10] * (italic(P))),

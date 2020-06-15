@@ -18,7 +18,7 @@ options(stringsAsFactors=F, scipen=1000)
 ### DATA FUNCTIONS ###
 ######################
 # Load & parse permutation results
-load.perms <- function(perm.res.in){
+load.perms <- function(perm.res.in, susbet_to_regions=NULL){
   # Read full permutation table
   perms <- read.table(perm.res.in, header=T, sep="\t", check.names=F, comment.char="")
   perms$perm_idx <- as.numeric(perms$perm_idx)
@@ -27,6 +27,9 @@ load.perms <- function(perm.res.in){
   # Drop unnecessary columns
   cols.to.drop <- c("#chr", "start", "end", "coords", "size", "genes")
   perms <- perms[, -which(colnames(perms) %in% cols.to.drop)]
+  if(!is.null(subset_to_regions)){
+    perms <- perms[which(perms$region_id %in% subset_to_regions), ]
+  }
   
   # Split each permutation into a list of dfs (one per perm)
   lapply(perm.range, function(i){
@@ -146,6 +149,10 @@ source(paste(script.dir, "common_functions.R", sep="/"))
 loci <- load.loci(loci.in)
 segs <- load.segment.table(segs.in)
 
+# Restrict to segments nominally significant in at least one phenotype
+segs <- segs[which(segs$nom_sig), ]
+nomsig.ids <- segs$region_id
+
 # Split seg IDs by gw-sig vs GD (but not gw-sig)
 gw.ids <- segs$region_id[which(segs$gw_sig)]
 lit.ids <- segs$region_id[which(segs$any_gd & !segs$gw_sig)]
@@ -154,8 +161,8 @@ lit.ids <- segs$region_id[which(segs$any_gd & !segs$gw_sig)]
 gw <- merge.loci.segs(loci, segs)
 
 # Load permutation results
-perms <- load.perms(perm.res.in)
-lit.perms <- load.perms(lit.perm.res.in)
+perms <- load.perms(perm.res.in, subset_to_regions=nomsig.ids)
+lit.perms <- load.perms(lit.perm.res.in, subset_to_regions=nomsig.ids)
 
 # Plot single panel of overlap with known genomic disorders
 print("Overlap with known genomic disorders:")
@@ -189,3 +196,14 @@ plot.all.perm.res(segs, perms, lit.perms,
                   pdf.dims.multi=c(4, 3.5),
                   parmar.multi=c(2.2, 6.05, 0, 2.2))
 
+# Plot enrichment for top P-values
+print("Enrichment for top P-values:")
+plot.all.perm.res(segs, perms, lit.perms, 
+                  feature="meta_best_p", measure="mean",
+                  outdir, prefix, norm=F, norm.multi=F,
+                  n.bins.single=30, n.bins.multi=50,
+                  x.title=bquote("Best" ~ -log[10](italic(P))), 
+                  pdf.dims.single=c(2.2, 2.4),
+                  parmar.single=c(2.25, 2, 0, 1.2),
+                  pdf.dims.multi=c(4, 3.5),
+                  parmar.multi=c(2.2, 6.05, 0, 2.2))
