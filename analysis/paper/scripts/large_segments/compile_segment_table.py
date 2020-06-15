@@ -460,8 +460,11 @@ def main():
                                       drop_first=True)
     benign_ids = benign_del_ids + benign_dup_ids
     cand_path_ids = loci_ids + hc_gd_ids + mc_gd_ids + lc_gd_ids
-    path_ids = [i for i in cand_path_ids if i not in benign_ids]
-    all_df['pathogenic'] = pd.get_dummies(all_df.region_id.isin(path_ids), drop_first=True)
+    path_ids = list(set([i for i in cand_path_ids if i not in benign_ids]))
+    if all_df.region_id.isin(path_ids).all():
+        all_df['pathogenic'] = 1
+    else:
+        all_df['pathogenic'] = pd.get_dummies(all_df.region_id.isin(path_ids), drop_first=True)
     if args.common_dels is not None and args.common_dups is not None:
         all_df['benign'] = pd.get_dummies(all_df.region_id.isin(benign_ids), drop_first=True)
     all_df['nahr'] = pd.get_dummies(all_df.region_id.isin(set(nahr_ids + all_ids_in_nahr)), 

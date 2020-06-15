@@ -108,7 +108,7 @@ task perm_prep {
         idx=$( zcat $statsfile | head -n1 | sed 's/\t/\n/g' \
                | awk '{ if ($1=="meta_phred_p") print NR }' )
         zcat $statsfile | sed '1d' | cut -f$idx \
-        | cat <( echo -e "${nocolon}_${cnv}" ) - \
+        | cat <( echo -e $nocolon"_"$cnv ) - \
         > meta_stats/matrices/$nocolon.$cnv.meta_phred_p.tsv
       done
     done < ${phenotype_list}
@@ -139,7 +139,7 @@ task perm_prep {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0348e318f1a4cd0ef2d3587dadea0eb2aacc84879d1219157db3bc04b522460d"
+    docker: "talkowski/rcnv@sha256:d6161740758077f03f799184022a4751324fe828db2ccfbbadb5d2197fb69893"
     preemptible: 1
   }
 
@@ -148,7 +148,7 @@ task perm_prep {
     File blacklist = "blacklist.bed.gz"
     Array[String] seeds = read_lines("seeds.txt")
     File del_max_p_bed = "${prefix}.best_meta_phred_p_per_window.DEL.bed.gz"
-    File del_max_p_bed = "${prefix}.best_meta_phred_p_per_window.DUP.bed.gz"
+    File dup_max_p_bed = "${prefix}.best_meta_phred_p_per_window.DUP.bed.gz"
   }
 }
 
@@ -179,13 +179,6 @@ task perm_shard {
     gsutil -m cp \
       ${rCNV_bucket}/results/segment_association/rCNV.final_segments.loci.bed.gz \
       ./
-    mkdir meta_stats/
-    gsutil -m cp \
-      ${rCNV_bucket}/analysis/sliding_windows/**.rCNV.**.sliding_window.meta_analysis.stats.bed.gz \
-      meta_stats/
-
-    # Tabix all meta-analysis stats
-    find meta_stats/ -name "*meta_analysis.stats.bed.gz" | xargs -I {} tabix -f {}
 
     # Reformat NAHR segments
     cat <( echo -e "#chr\tstart\tend\tnahr_id\tcnv\tn_genes\tgenes" ) \
@@ -254,7 +247,7 @@ task perm_shard {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0348e318f1a4cd0ef2d3587dadea0eb2aacc84879d1219157db3bc04b522460d"
+    docker: "talkowski/rcnv@sha256:d6161740758077f03f799184022a4751324fe828db2ccfbbadb5d2197fb69893"
     preemptible: 1
   }
 
@@ -270,6 +263,8 @@ task perm_shard_litGDs {
   Int n_perms
   File whitelist
   File blacklist
+  File del_max_p_bed
+  File dup_max_p_bed
   String perm_prefix
   String rCNV_bucket
 
@@ -381,7 +376,7 @@ task perm_shard_litGDs {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0348e318f1a4cd0ef2d3587dadea0eb2aacc84879d1219157db3bc04b522460d"
+    docker: "talkowski/rcnv@sha256:d6161740758077f03f799184022a4751324fe828db2ccfbbadb5d2197fb69893"
     preemptible: 1
   }
 
@@ -432,7 +427,7 @@ task merge_perms {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0348e318f1a4cd0ef2d3587dadea0eb2aacc84879d1219157db3bc04b522460d"
+    docker: "talkowski/rcnv@sha256:d6161740758077f03f799184022a4751324fe828db2ccfbbadb5d2197fb69893"
     preemptible: 1
     disks: "local-disk 200 SSD"
   }
