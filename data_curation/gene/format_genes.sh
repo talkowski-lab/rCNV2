@@ -16,14 +16,18 @@ docker run --rm -it talkowski/rcnv
 gcloud auth login
 
 
+# Set global parameters
+export rCNV_bucket="gs://rcnv_project"
+
+
 # Add helper alias for formatting long integers
 alias addcom="sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta'"
 
 
 # Download analysis references
 mkdir refs/
-gsutil -m cp gs://rcnv_project/analysis/analysis_refs/** refs/
-gsutil -m cp gs://rcnv_project/refs/** refs/
+gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/** refs/
+gsutil -m cp ${rCNV_bucket}/refs/** refs/
 
 
 # Download all gene data from Gencode v19
@@ -65,7 +69,7 @@ tabix -f gencode.v19.canonical.gtf.gz
 # Apply pext filter to exons from canonical transcripts
 # Note: pext pre-formatting takes several hours locally; was parallelized in cloud 
 # using process_pext.wdl, and can be downloaded (with permissions) at 
-# gs://rcnv_project/cleaned_data/genes/annotations/gnomad.v2.1.1.pext.bed.gz
+# ${rCNV_bucket}/cleaned_data/genes/annotations/gnomad.v2.1.1.pext.bed.gz
 gsutil -m cp \
   gs://gnomad-public/papers/2019-tx-annotation/pre_computed/all.possible.snvs.tx_annotated.022719.tsv.bgz \
   ./
@@ -116,7 +120,24 @@ mkdir gtex_stats/
   GTEx_v7_Annotations_SampleAttributesDS.txt
 # Copy precomputed GTEx summary data to rCNV bucket (note: requires permissions)
 gsutil -m cp -r gtex_stats \
-  gs://rcnv_project/cleaned_data/genes/annotations/
+  ${rCNV_bucket}/cleaned_data/genes/annotations/
+
+
+# Preprocess Epigenome Roadmap ChromHMM data to compute summaries
+wget https://egg2.wustl.edu/roadmap/data/byFileType/chromhmmSegmentations/ChmmModels/core_K27ac/jointModel/final/all.mnemonics.bedFiles.tgz
+tar -xzvf all.mnemonics.bedFiles.tgz
+wget https://egg2.wustl.edu/roadmap/data/byFileType/chromhmmSegmentations/ChmmModels/core_K27ac/jointModel/final/labelmap_18_core_K27ac.tab
+gsutil -m cp ${rCNV_bucket}/refs/REP_sample_manifest.tsv ./
+mkdir roadmap_stats/
+/opt/rCNV2/data_curation/gene/preprocess_REP.py \
+  --state-manifest labelmap_18_core_K27ac.tab \
+  --sample-manifest REP_sample_manifest.tsv \
+  --n-pcs 20 \
+  --prefix roadmap_stats/gencode.v19.canonical.pext_filtered.REP_chromatin_stats \
+  --gzip \
+  gencode.v19.canonical.pext_filtered.gtf.gz \
+  ./
+
 
 
 # Gather per-gene metadata (genomic)
@@ -146,6 +167,7 @@ done > gene_features.athena_tracklist.tsv
   --get-expression \
   --gtex-medians gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
   --gtex-mads gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.mad.tsv.gz \
+  --gtex-pca gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.pca.tsv.gz \
   --outbed gencode.v19.canonical.pext_filtered.expression_features.bed.gz \
   --bgzip \
   gencode.v19.canonical.pext_filtered.gtf.gz
@@ -154,7 +176,7 @@ done > gene_features.athena_tracklist.tsv
 # Gather per-gene constraint metadata
 wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
 wget http://genic-intolerance.org/data/RVIS_Unpublished_ExACv2_March2017.txt
-gsutil -m cp gs://rcnv_project/cleaned_data/genes/annotations/EDS.Wang_2018.tsv.gz ./
+gsutil -m cp ${rCNV_bucket}/cleaned_data/genes/annotations/EDS.Wang_2018.tsv.gz ./
 wget https://storage.googleapis.com/gnomad-public/legacy/exac_browser/forweb_cleaned_exac_r03_march16_z_data_pLI_CNV-final.txt.gz
 wget https://doi.org/10.1371/journal.pgen.1001154.s002
 # Add: promoter conservation, average exon conservation, EDS
@@ -181,11 +203,11 @@ wget https://doi.org/10.1371/journal.pgen.1001154.s002
 
 
 # Copy canonical gene metadata to rCNV bucket (note: requires permissions)
-gsutil -m cp gencode.v19.canonical*.gz* gs://rcnv_project/cleaned_data/genes/
+gsutil -m cp gencode.v19.canonical*.gz* ${rCNV_bucket}/cleaned_data/genes/
 gsutil -m cp gencode.v19.canonical*genes.list \
-  gs://rcnv_project/cleaned_data/genes/gene_lists/
+  ${rCNV_bucket}/cleaned_data/genes/gene_lists/
 gsutil -m cp genes_lost_during_pext_filtering.genes.list \
-  gs://rcnv_project/cleaned_data/genes/gene_lists/
+  ${rCNV_bucket}/cleaned_data/genes/gene_lists/
 
 
 # Generate BED file of pLoF constrained genes and mutationally tolerant genes from gnomAD
@@ -239,10 +261,10 @@ zcat gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
 
 # Copy gnomAD gene files to rCNV bucket (note: requires permissions)
 gsutil -m cp gencode.v19.canonical.pext_filtered.constrained.bed.gz \
-  gs://rcnv_project/analysis/analysis_refs/
+  ${rCNV_bucket}/analysis/analysis_refs/
 gsutil -m cp gnomad.v2.1.1.lof_constrained.genes.list \
   gnomad.v2.1.1.mutation_tolerant.genes.list \
-  gs://rcnv_project/cleaned_data/genes/gene_lists/
+  ${rCNV_bucket}/cleaned_data/genes/gene_lists/
 
 
 # Generate gene list of all genes associated with each HPO term
@@ -272,7 +294,7 @@ done < refs/test_phenotypes.list
 
 
 # Copy HPO-based gene lists to rCNV bucket (note: requires permissions)
-gsutil -m cp *.HPOdb.*genes.list gs://rcnv_project/cleaned_data/genes/gene_lists/
+gsutil -m cp *.HPOdb.*genes.list ${rCNV_bucket}/cleaned_data/genes/gene_lists/
 
 
 # Generate ClinGen dosage sensitive gene lists & copy to rCNV bucket (note: requires permissions)
@@ -281,7 +303,7 @@ wget ftp://ftp.clinicalgenome.org/ClinGen_gene_curation_list_GRCh37.tsv
   ClinGen_gene_curation_list_GRCh37.tsv \
   gencode.v19.canonical.pext_filtered.genes.list \
   ./
-gsutil -m cp ClinGen.*.genes.list gs://rcnv_project/cleaned_data/genes/gene_lists/  
+gsutil -m cp ClinGen.*.genes.list ${rCNV_bucket}/cleaned_data/genes/gene_lists/  
 
 
 # Generate DECIPHER/DDG2P gene lists & copy to rCNV bucket (note: requires permissions)
@@ -291,9 +313,9 @@ wget http://www.ebi.ac.uk/gene2phenotype/downloads/DDG2P.csv.gz
   gencode.v19.canonical.pext_filtered.genes.list \
   ./
 gsutil -m cp DDG2P.*.genes.list \
-  gs://rcnv_project/cleaned_data/genes/gene_lists/
+  ${rCNV_bucket}/cleaned_data/genes/gene_lists/
 gsutil -m cp DDG2P.*.genes_with_hpos.tsv \
-  gs://rcnv_project/cleaned_data/genes/gene_lists/ddg2p_with_hpos/
+  ${rCNV_bucket}/cleaned_data/genes/gene_lists/ddg2p_with_hpos/
 
 
 # Generate HTML table of gene lists for README

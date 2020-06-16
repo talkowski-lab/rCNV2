@@ -189,7 +189,7 @@ task perm_shard_bygene_litGDs {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:ce97409c1d0675664e9831a58f14ac3651460230c5af51e20af3b41b12a3197d"
+    docker: "talkowski/rcnv@sha256:cd1132eddf558c156999b20cbc65289e4bc175402205696874b8221dc947caf3"
     preemptible: 1
   }
 
@@ -268,7 +268,7 @@ task annotate_shard {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:ce97409c1d0675664e9831a58f14ac3651460230c5af51e20af3b41b12a3197d"
+    docker: "talkowski/rcnv@sha256:cd1132eddf558c156999b20cbc65289e4bc175402205696874b8221dc947caf3"
     preemptible: 1
   }
 
@@ -307,7 +307,7 @@ task merge_perms {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:ce97409c1d0675664e9831a58f14ac3651460230c5af51e20af3b41b12a3197d"
+    docker: "talkowski/rcnv@sha256:cd1132eddf558c156999b20cbc65289e4bc175402205696874b8221dc947caf3"
     preemptible: 1
     disks: "local-disk 200 SSD"
   }

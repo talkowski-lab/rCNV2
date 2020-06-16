@@ -423,35 +423,49 @@ def calc_gtex_stats(gtex_matrix):
     return pd.concat([gtex_matrix.loc[:, 'gene'], xstats_df], axis=1)
 
 
-def load_gtex(gtex_matrix):
+def load_gtex(gtex_matrix, expression_matrix=True):
     """
-    Read & clean GTEx expression matrix of gene X tissue, and compute summary stats
+    Read & clean GTEx expression matrix of gene X covariate, and (optionally) compute summary stats
     """
 
     gtex = pd.read_csv(gtex_matrix, sep='\t')
     gtex.rename(columns={'#gene' : 'gene'}, inplace=True)
-    
-    # Drop tissues with NaN values for all genes
-    nonnan_cols = gtex.iloc[:, 1:].apply(lambda vals: not all(np.isnan(vals)))
-    gtex = gtex.loc[:, ['gene'] + gtex.columns[1:][nonnan_cols].tolist()]
 
-    # Handle duplicate gene symbols by summing their untransformed values
-    # Note: assumes all expression values have been log10(TPM + 1) transformed
-    # (this is done by default in preprocess_GTEx.py)
+    if expression_matrix:    
+        # Drop tissues with NaN values for all genes
+        nonnan_cols = gtex.iloc[:, 1:].apply(lambda vals: not all(np.isnan(vals)))
+        gtex = gtex.loc[:, ['gene'] + gtex.columns[1:][nonnan_cols].tolist()]
+
+    # Handle duplicate gene symbols
     dups = [g for g, c in gtex.gene.value_counts().to_dict().items() if c > 1]
     if len(dups) > 0:
-        for gene in dups:
-            expr_sum = gtex.loc[gtex.gene == gene, gtex.columns[1:]].\
-                           apply(lambda vals: np.log10(np.nansum((10 ** vals) - 1) + 1))
-            newrow = pd.Series([gene] + expr_sum.tolist(), index=gtex.columns)
-            gtex = gtex.loc[gtex.gene != gene, :]
-            gtex = gtex.append(newrow, ignore_index=True)
+        if expression_matrix:
+            # Sum untransformed values
+            # Note: assumes all expression values have been log10(TPM + 1) transformed
+            # (this is done by default in preprocess_GTEx.py)
+            for gene in dups:
+                expr_sum = gtex.loc[gtex.gene == gene, gtex.columns[1:]].\
+                                apply(lambda vals: np.log10(np.nansum((10 ** vals) - 1) + 1))
+                newrow = pd.Series([gene] + expr_sum.tolist(), index=gtex.columns)
+                gtex = gtex.loc[gtex.gene != gene, :]
+                gtex = gtex.append(newrow, ignore_index=True)
+        else:
+            # Otherwise, compute mean of values
+            for gene in dups:
+                gmean = gtex.loc[gtex.gene == gene, gtex.columns[1:]].\
+                             apply(lambda vals: np.nanmean(vals))
+                newrow = pd.Series([gene] + gmean.tolist(), index=gtex.columns)
+                gtex = gtex.loc[gtex.gene != gene, :]
+                gtex = gtex.append(newrow, ignore_index=True)
 
-    # Compute summary stats per gene
-    return calc_gtex_stats(gtex)
+    # Compute summary stats per gene, if necessary
+    if expression_matrix:
+        return calc_gtex_stats(gtex)
+    else:
+        return gtex
 
 
-def get_expression_features(genes, ensg_ids, gtex_medians, gtex_mads):
+def get_expression_features(genes, ensg_ids, gtex_medians, gtex_mads, gtex_pca):
     """
     Collect various expression features per gene
     """
@@ -487,6 +501,19 @@ def get_expression_features(genes, ensg_ids, gtex_medians, gtex_mads):
                     xfeats_tmp[gene].append(xmad_df[xmad_df.gene == gene].iloc[:, 1:][v].iloc[0])
             else:
                 for col in xmad_cols:
+                    xfeats_tmp[gene].append(0)
+        header_cols += xmad_cols
+
+    # Load GTEx principal components
+    if gtex_pca is not None:
+        pca_df = load_gtex(gtex_pca, expression_matrix=False)
+        pca_cols = pca_df.columns.tolist()[1:]
+        for gene in genes:
+            if any(pca_df.gene == gene):
+                for v in pca_cols:
+                    xfeats_tmp[gene].append(pca_df.loc[pca_df.gene == gene, v].iloc[0])
+            else:
+                for col in pca_cols:
                     xfeats_tmp[gene].append(0)
         header_cols += xmad_cols
 
@@ -721,6 +748,8 @@ def main():
                         'Only used if --get-expression is specified.')
     parser.add_argument('--gtex-mads', help='GTEx gene X tissue expression MADs. ' +
                         'Only used if --get-expression is specified.')
+    parser.add_argument('--gtex-pca', help='GTEx gene X tissue principal components. ' +
+                        'Only used if --get-expression is specified.')
     parser.add_argument('--gnomad-constraint', help='gnomAD constraint tsv. Only ' +
                         'used if --get-constraint is specified.')
     parser.add_argument('--exac-cnv', help='ExAC CNV constraint tsv. Only used ' +
@@ -783,7 +812,8 @@ def main():
     # Get expression stats, if optioned
     if args.get_expression:
         header_add, expression_features = \
-            get_expression_features(genes, ensg_ids, args.gtex_medians, args.gtex_mads)
+            get_expression_features(genes, ensg_ids, args.gtex_medians, args.gtex_mads, 
+                                    args.gtex_pca)
         outbed_header = outbed_header + '\t' + header_add
     else:
         expression_features = None

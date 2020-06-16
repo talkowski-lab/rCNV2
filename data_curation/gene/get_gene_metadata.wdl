@@ -184,13 +184,15 @@ task get_expression_data {
       --get-expression \
       --gtex-medians gtex_stats/*.GTEx_v7_expression_stats.median.tsv.gz \
       --gtex-mads gtex_stats/*.GTEx_v7_expression_stats.mad.tsv.gz \
+      --gtex-pca gtex_stats/*.GTEx_v7_expression_stats.pca.tsv.gz \
       --outbed ${prefix}.expression_features.${contig}.bed.gz \
       --bgzip \
       subset.gtf.gz
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:5239898782e9936bf377373935fce5829907f68276b35e196204ba3f4615496e"
+    # TODO: UPDATE DOCKER
+    # docker: "talkowski/rcnv@sha256:5239898782e9936bf377373935fce5829907f68276b35e196204ba3f4615496e"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"

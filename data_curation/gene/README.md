@@ -28,7 +28,7 @@ For certain analyses, we used per-gene features across a variety of categories.
 
 These "gene features" are described below.  
 
-For each feature set, we controlled for inter-feature correlation structure by decomposing all features with principal components analysis and retaining the top "eigenfeatures" that explained at least 95% of inter-gene variance.  
+For each feature set, we controlled for inter-feature correlation structure by decomposing all features with principal components analysis and retaining the top "eigenfeatures" that explained at least 99% of inter-gene variance.  
 
 In practice, the feature collection and decomposition process was parallelized in [FireCloud/Terra](https://portal.firecloud.org) with `get_gene_metadata.wdl`.  
 
@@ -87,15 +87,15 @@ We collected the following gene features related to evolutionary constraint:
 
 | Feature name | Abbreviation | Description | Source |  
 | :--- | :--- | :--- | :--- |  
-| Probability of loss-of-function intolerance | `gnomad_pLI` | Probability of loss-of-function intolerance calculated in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _bioRxiv_, 2019)](https://www.biorxiv.org/content/10.1101/531210v2) |  
-| Probability of complete haplosufficiency | `gnomad_pNull` | Probability of haplosufficiency calculated in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _bioRxiv_, 2019)](https://www.biorxiv.org/content/10.1101/531210v2) |  
-| Probability of recessive lethality | `gnomad_pRec` | Probability of recessive lethality calculated in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _bioRxiv_, 2019)](https://www.biorxiv.org/content/10.1101/531210v2) |  
-| gnomAD missense obs:exp | `gnomad_oe_mis` | Observed : expected ratio for missense SNVs in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _bioRxiv_, 2019)](https://www.biorxiv.org/content/10.1101/531210v2) |  
-| gnomAD loss-of-function obs:exp | `gnomad_oe_lof` | Observed : expected ratio for loss-of-function SNVs in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _bioRxiv_, 2019)](https://www.biorxiv.org/content/10.1101/531210v2) |  
-| gnomAD missense obs:exp (upper 90% CI) | `gnomad_oe_mis_upper` | Upper 90% confidence interval of obs:exp ratio for missense SNVs in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _bioRxiv_, 2019)](https://www.biorxiv.org/content/10.1101/531210v2) |  
-| gnomAD loss-of-function obs:exp (upper 90% CI) | `gnomad_oe_lof_upper` | Upper 90% confidence interval of obs:exp ratio for loss-of-function SNVs in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _bioRxiv_, 2019)](https://www.biorxiv.org/content/10.1101/531210v2) |  
-| gnomAD missense Z-score | `gnomad_mis_z` | Z-score for missense obs:exp ratio in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _bioRxiv_, 2019)](https://www.biorxiv.org/content/10.1101/531210v2) |  
-| gnomAD loss-of-function Z-score | `gnomad_lof_z` | Z-score for loss-of-function obs:exp ratio in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _bioRxiv_, 2019)](https://www.biorxiv.org/content/10.1101/531210v2) |  
+| Probability of loss-of-function intolerance | `gnomad_pLI` | Probability of loss-of-function intolerance calculated in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _Nature_, 2020)](https://pubmed.ncbi.nlm.nih.gov/32461654) |  
+| Probability of complete haplosufficiency | `gnomad_pNull` | Probability of haplosufficiency calculated in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _Nature_, 2020)](https://pubmed.ncbi.nlm.nih.gov/32461654) |  
+| Probability of recessive lethality | `gnomad_pRec` | Probability of recessive lethality calculated in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _Nature_, 2020)](https://pubmed.ncbi.nlm.nih.gov/32461654) |  
+| gnomAD missense obs:exp | `gnomad_oe_mis` | Observed : expected ratio for missense SNVs in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _Nature_, 2020)](https://pubmed.ncbi.nlm.nih.gov/32461654) |  
+| gnomAD loss-of-function obs:exp | `gnomad_oe_lof` | Observed : expected ratio for loss-of-function SNVs in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _Nature_, 2020)](https://pubmed.ncbi.nlm.nih.gov/32461654) |  
+| gnomAD missense obs:exp (upper 90% CI) | `gnomad_oe_mis_upper` | Upper 90% confidence interval of obs:exp ratio for missense SNVs in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _Nature_, 2020)](https://pubmed.ncbi.nlm.nih.gov/32461654) |  
+| gnomAD loss-of-function obs:exp (upper 90% CI) | `gnomad_oe_lof_upper` | Upper 90% confidence interval of obs:exp ratio for loss-of-function SNVs in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _Nature_, 2020)](https://pubmed.ncbi.nlm.nih.gov/32461654) |  
+| gnomAD missense Z-score | `gnomad_mis_z` | Z-score for missense obs:exp ratio in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _Nature_, 2020)](https://pubmed.ncbi.nlm.nih.gov/32461654) |  
+| gnomAD loss-of-function Z-score | `gnomad_lof_z` | Z-score for loss-of-function obs:exp ratio in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _Nature_, 2020)](https://pubmed.ncbi.nlm.nih.gov/32461654) |  
 | ExAC CNV intolerance Z-score | `exac_cnv_z` | Z-score for obs:exp ratio of coding CNVs in ExAC | ExAC v1.0 [(Ruderfer _et al._, _Nat. Genet._, 2016)](https://www.ncbi.nlm.nih.gov/pubmed/27533299) |  
 | Haploinsufficiency score | `hurles_hi` | Haploinsufficiency scores predicted based on haplosufficient genes | [Huang _et al._, _PLOS Genetics_, 2010](https://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1001154) |  
 | RVIS | `rvis` | Residual variation intolerance score (RVIS) computed on gnomAD v2.0 | [Petrovski _et al._, _PLOS Genetics_, 2013](https://www.ncbi.nlm.nih.gov/pubmed/23990802) |  
@@ -108,7 +108,17 @@ We collected the following gene features related to evolutionary constraint:
 
 #### Gene features: chromatin  
 
-_TBD_  
+We collected the following chromatin-based gene features:  
+
+| Feature name | Abbreviation | Description | Source |  
+| :--- | :--- | :--- | :--- |  
+| Mean active TSS coverage | `chromhmm_1_TssA_mean` | Mean gene coverage by active TSS regions from ChromHMM across 98 tissues from the Roadmap Epigenomics Project | Roadmap Epigenomics Project [(Kundaje _et al._, _Nature_, 2015)](https://www.nature.com/articles/nature14248) |  
+| Standard deviation of active TSS coverage | `chromhmm_1_TssA_sd` | Standard deviation of gene coverage by active TSS regions from ChromHMM across 98 tissues from the Roadmap Epigenomics Project | Roadmap Epigenomics Project [(Kundaje _et al._, _Nature_, 2015)](https://www.nature.com/articles/nature14248) |  
+| Mean active TSS coverage | `chromhmm_1_TssA_mean` | Mean gene coverage by active TSS regions from ChromHMM across 98 tissues from the Roadmap Epigenomics Project | Roadmap Epigenomics Project [(Kundaje _et al._, _Nature_, 2015)](https://www.nature.com/articles/nature14248) |  
+| Standard deviation of active TSS coverage | `chromhmm_1_TssA_sd` | Standard deviation of gene coverage by active TSS regions from ChromHMM across 98 tissues from the Roadmap Epigenomics Project | Roadmap Epigenomics Project [(Kundaje _et al._, _Nature_, 2015)](https://www.nature.com/articles/nature14248) |  
+| Chromatin components 1-20 | `chromatin_component_1` ... `chromatin_component_20` | Top 20 principal components of gene X ChromHMM state matrix across 98 tissues from the Roadmap Epigenomics Project | Roadmap Epigenomics Project [(Kundaje _et al._, _Nature_, 2015)](https://www.nature.com/articles/nature14248) |  
+
+All chromatin data was based on the [Roadmap Epigenomics dataset](https://www.nature.com/articles/nature14248) using the expanded 18-state ChromHMM model on 98 tissues [as described here](https://egg2.wustl.edu/roadmap/web_portal/chr_state_learning.html).  
 
 ## Gene set definitions  
 
@@ -121,8 +131,8 @@ All gene lists in the table below are available from `gs://rcnv_project/cleaned_
 | Gene set | Genes | Filename prefix | Source | Description |
 | :--- | ---: | :--- | :--- | :---- | 
 | All genes | 18,641 | `gencode.v19.canonical.pext_filtered` | Gencode v19 [Harrow _et al._, _Genome Res._, 2012](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | Canonical transcripts from autosomal, protein-coding genes |
-| Constrained genes | 3,036 | `gnomad.v2.1.1.lof_constrained` | gnomAD v2.1.1 [Karczewski _et al._, _bioRxiv_, 2019](https://www.biorxiv.org/content/10.1101/531210v3) | pLI ≥ 0.9 or in the first LOEUF sextile |  
-| Mutation-tolerant genes | 2,013 | `gnomad.v2.1.1.mutation_tolerant` | gnomAD v2.1.1 [Karczewski _et al._, _bioRxiv_, 2019](https://www.biorxiv.org/content/10.1101/531210v3) | pLI ≥ 0.01, the last third of LOEUF, missense Z-score ≤ 0, missense OEUF ≥ 1, and synonymous Z-score ~ (-3, 3) |  
+| Constrained genes | 3,036 | `gnomad.v2.1.1.lof_constrained` | gnomAD v2.1.1 [Karczewski _et al._, _Nature_, 2020](https://www.biorxiv.org/content/10.1101/531210v3) | pLI ≥ 0.9 or in the first LOEUF sextile |  
+| Mutation-tolerant genes | 2,013 | `gnomad.v2.1.1.mutation_tolerant` | gnomAD v2.1.1 [Karczewski _et al._, _Nature_, 2020](https://www.biorxiv.org/content/10.1101/531210v3) | pLI ≥ 0.01, the last third of LOEUF, missense Z-score ≤ 0, missense OEUF ≥ 1, and synonymous Z-score ~ (-3, 3) |  
 | Phenotypic abnormality (HP:0000118)-associated genes | 3,825 | `HP0000118.HPOdb` | HPO database (accessed Mar 2020) [Köhler _et al._, _Nucleic Acids Res._, 2018](https://academic.oup.com/nar/article/47/D1/D1018/5198478) | Genes linked to HP:0000118 |
 | Abnormality of the nervous system (HP:0000707)-associated genes | 2,875 | `HP0000707.HPOdb` | HPO database (accessed Mar 2020) [Köhler _et al._, _Nucleic Acids Res._, 2018](https://academic.oup.com/nar/article/47/D1/D1018/5198478) | Genes linked to HP:0000707 |
 | Abnormality of nervous system physiology (HP:0012638)-associated genes | 2,678 | `HP0012638.HPOdb` | HPO database (accessed Mar 2020) [Köhler _et al._, _Nucleic Acids Res._, 2018](https://academic.oup.com/nar/article/47/D1/D1018/5198478) | Genes linked to HP:0012638 |

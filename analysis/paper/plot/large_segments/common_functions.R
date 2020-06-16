@@ -66,7 +66,8 @@ load.segment.table <- function(segs.in){
   segs[, numcol.idxs] <- apply(segs[, numcol.idxs], 2, as.numeric)
   
   # Convert boolean dummy columns to logicals
-  boolcol.idxs <- which(colnames(segs) %in% c("gw_sig", "nom_sig", "hc_gd", "mc_gd", "lc_gd", "any_gd",
+  boolcol.idxs <- which(colnames(segs) %in% c("gw_sig", "nom_sig", "nom_neuro", 
+                                              "hc_gd", "mc_gd", "lc_gd", "any_gd",
                                               "pathogenic", "benign", "nahr", "pleiotropic"))
   segs[, boolcol.idxs] <- apply(segs[, boolcol.idxs], 2, function(vals){
     sapply(vals, function(val){if(val==1){TRUE}else{FALSE}})})
