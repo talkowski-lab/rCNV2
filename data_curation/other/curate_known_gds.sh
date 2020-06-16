@@ -160,7 +160,7 @@ for conf in hmc all; do
 done
 
 
-# Integrate DECIPHER, ClinGen, Owen, Girirajan, and Dittwald
+# Integrate DECIPHER, ClinGen, Owen, Girirajan, Dittwald, and Stefansson
 # Prep input files
 TAB=$( printf '\t' )
 cat << EOF > cluster_gds.input.tsv
@@ -169,6 +169,7 @@ ClinGen${TAB}/ClinGen_GD.hmc.bed.gz
 Owen${TAB}/opt/rCNV2/refs/UKBB_GD.Owen_2018.bed.gz
 Girirajan${TAB}/opt/rCNV2/refs/Girirajan_2012_GD.bed.gz
 Dittwald${TAB}/opt/rCNV2/refs/Dittwald_2013_GD.bed.gz
+Stefansson${TAB}/opt/rCNV2/refs/Stefansson_2014_GD.bed.gz
 EOF
 # Clusters GDs (and formats them in preparation for gene annotation, below)
 # Note: no longer apply control frequency filter (this can be handled with the 

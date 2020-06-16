@@ -23,6 +23,7 @@ For this purpose, we integrated lists of GDs from the following publications and
 | UK BioBank | 24 | 30 | [Owen _et al._, _BMC Genomics_ (2018)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6278042/) |  
 | Girirajan _et al._ | 39 | 33 | [Girirajan _et al._, _New Engl. J. Med._ (2012)](https://www.nejm.org/doi/full/10.1056/NEJMoa1200395) |  
 | Dittwald _et al._ | 48 | 18 | [Dittwald _et al._, _Genome Res._ (2013)](https://www.ncbi.nlm.nih.gov/pubmed/23657883) |  
+| Stefansson _et al._ | 17 | 12 | [Stefansson _et al._, _Nature_ (2014)](https://pubmed.ncbi.nlm.nih.gov/24352232/) |  
 
 _\* Note: ClinGen counts represent regions scored at high and medium confidence only._  
 
