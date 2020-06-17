@@ -8,7 +8,9 @@ The structure of this directory is as follows:
 
 | Subdirectory | Description |
 | :--- | :--- |
-| [`binned_genome/`](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/binned_genome/) | Curation of genome-wide sequential bins and corresponding annotations |
-| [`CNV/`](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/) | Curation of CNV datasets |
-| [`gene/`](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene/) | Curation of gene reference and corresponding annotations |
-| [`phenotype/`](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/) | Curation of sample phenotypes |
+| [`binned_genome/`](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/binned_genome/) | Curation of genome-wide sequential bins and corresponding annotations |  
+| [`CNV/`](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/) | Curation of CNV datasets |  
+| [`gene/`](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene/) | Curation of gene reference and corresponding annotations |  
+| [`genome_annotations/`](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/genome_annotations/) | Curation of genome annotation tracks |  
+| [`other/`](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/other/) | Curation of miscellaneous ancillary datasets |  
+| [`phenotype/`](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/) | Curation of sample phenotypes |  

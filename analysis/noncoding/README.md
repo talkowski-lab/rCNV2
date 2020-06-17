@@ -13,7 +13,7 @@ In practice, this analysis was parallelized on [FireCloud/Terra](https://terra.b
 There were two preprocessing steps used exclusively for these noncoding association analyses:
 
 1. Noncoding CNV filtering ([described here](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#noncoding-subsets))  
-2. Annotation track curation ([described here](TBD))  
+2. CRB definition ([described here](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/genome_annotations))  
 
 ---  
 
@@ -23,29 +23,21 @@ We executed a standardized procedure to conduct CRB-based burden tests for each 
 
 The steps of this procedure are described below:  
 
-### 1. Identify annotation classes with global burdens of noncoding rCNVs in disease  
+### 1. Count rCNVs per CRB  
+
+### 2. Calculate burden statistics between cases & controls  
 
 #### Output files  
 
-### 2. Cluster annotations into CRBs  
+### 3. Combine association statistics across metacohorts  
+
+#### 4. Determining & calibrating exome-wide significance threshold  
 
 #### Output files  
 
-### 3. Count rCNVs per CRB  
+#### 5. Refine correlated associations  
 
-### 4. Calculate burden statistics between cases & controls  
-
-#### Output files  
-
-### 5. Combine association statistics across metacohorts  
-
-#### Determining & calibrating exome-wide significance threshold  
-
-#### Output files  
-
-#### 6. Refine correlated associations  
-
-#### 7. Reporting of final association statistics  
+#### 6. Reporting of final association statistics  
 
 ---  
 

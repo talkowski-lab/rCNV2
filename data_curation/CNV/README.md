@@ -312,7 +312,7 @@ The code to apply these filters is contained in `extract_noncoding_subsets.sh`.
 | meta1 | 44,229 | 8,341 | 0.19 | 195.0 kb | 1.44:1 | 19,585 | 5,111 | 0.26 | 157.0 kb | 1.82:1 |  
 | meta2 | 41,065 | 11,847 | 0.29 | 157.0 kb | 1.65:1 | 41,213 | 10,104 | 0.25 | 161.0 kb | 1.68:1 |  
 | meta3 | 153,870 | 35,960 | 0.23 | 165.0 kb | 1.91:1 | 24,161 | 7,358 | 0.3 | 165.0 kb | 2.26:1 |  
-| meta4 | 54,071 | 10,965 | 0.2 | 162.0 kb | 6.09:1 | 375,800 | 76,672 | 0.2 | 162.0 kb | 5.90:1 |  
+| meta4 | 54,071 | 10,965 | 0.2 | 162.0 kb | 6.09:1 | 375,800 | 76,672 | 0.2 | 162.0 kb | 5.90:1 | 
 
 ![Strictly noncoding rare CNV stats](https://storage.googleapis.com/rcnv_project/public/strict_noncoding.metacohort.stats.jpg)  
 
@@ -320,10 +320,10 @@ The code to apply these filters is contained in `extract_noncoding_subsets.sh`.
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
-| meta1 | 44,229 | 23,208 | 0.52 | 225.0 kb | 1:1.26 | 19,585 | 10,311 | 0.53 | 170.0 kb | 1:1.11 |  
-| meta2 | 41,065 | 23,784 | 0.58 | 176.0 kb | 1:1.11 | 41,213 | 20,207 | 0.49 | 174.0 kb | 1:1.23 |  
-| meta3 | 153,870 | 68,771 | 0.45 | 184.0 kb | 1.04:1 | 24,161 | 13,085 | 0.54 | 182.0 kb | 1.14:1 |  
-| meta4 | 54,071 | 21,903 | 0.41 | 174.0 kb | 2.86:1 | 375,800 | 149,367 | 0.4 | 174.0 kb | 2.98:1 |  
+| meta1 | 44,229 | 8,909 | 0.2 | 192.0 kb | 1.38:1 | 19,585 | 5,407 | 0.28 | 156.0 kb | 1.71:1 |  
+| meta2 | 41,065 | 12,472 | 0.3 | 156.0 kb | 1.55:1 | 41,213 | 10,618 | 0.26 | 160.0 kb | 1.58:1 |  
+| meta3 | 153,870 | 37,715 | 0.25 | 165.0 kb | 1.82:1 | 24,161 | 7,693 | 0.32 | 164.0 kb | 2.15:1 |  
+| meta4 | 54,071 | 11,552 | 0.21 | 161.0 kb | 5.52:1 | 375,800 | 80,810 | 0.22 | 162.0 kb | 5.37:1 | 
 
 ![Loose noncoding rare CNV stats](https://storage.googleapis.com/rcnv_project/public/loose_noncoding.metacohort.stats.jpg)  
 

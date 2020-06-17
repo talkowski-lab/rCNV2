@@ -63,7 +63,7 @@ def process_gtf(gtf_in, blacklist=[]):
 
     exonbt = pbt.BedTool('\n'.join([_simplify(x) for x in gtfbt.filter(_filter_gtf)]),
                          from_string=True)
-    sub_exonbt = exonbt.filter(lambda x: x[3] in blacklist).saveas()
+    sub_exonbt = exonbt.filter(lambda x: x[3] not in blacklist).saveas()
 
     return exonbt, sub_exonbt
 
