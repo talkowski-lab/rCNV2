@@ -28,99 +28,6 @@ gsutil cp gs://rcnv_project/analysis/analysis_refs/rCNV_metacohort_sample_counts
 alias addcom="sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta'"
 
 
-# Dev note: the below function was deprecated in Oct 2019. It has been replaced
-# by build_cnv_stats_table.py to allow for plotting of the tabular data
-# # Master function to collect CNV data
-# collect_stats () {
-#   infile=$1
-
-#   # Print header
-#   echo "| Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  "
-#   echo "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
-
-#   while read cohort N_total N_case N_ctrl bed; do
-#     for wrapper in 1; do
-#       echo "$cohort"
-
-#       if [ -s $bed ]; then
-#         n_case_cnv=$( zcat $bed \
-#                       | fgrep -v "#" | fgrep -v HEALTHY_CONTROL | wc -l )
-#         n_ctrl_cnv=$( zcat $bed \
-#                       | fgrep -v "#" | fgrep -w HEALTHY_CONTROL | wc -l )
-#       else
-#         n_case_cnv=0
-#         n_ctrl_cnv=0
-#       fi
-
-#       # Case stats
-#       echo "$N_case" | addcom
-#       if [ $n_case_cnv -gt 0 ]; then
-#         # Count of CNVs
-#         echo "$n_case_cnv" | addcom
-#         # Count per sample
-#         echo "" | awk -v n_case=$N_case -v n_cnv=$n_case_cnv \
-#                   '{ printf "%0.2f\n", n_cnv/n_case }'
-#         # Median size
-#         zcat $bed \
-#         | fgrep -v "#" \
-#         | fgrep -v HEALTHY_CONTROL \
-#         | awk '{ print $3-$2 }' \
-#         | sort -nk1,1 \
-#         | median \
-#         | awk '{ printf "%0.1f kb\n", $1/1000 }'
-#         # DEL : DUP ratio
-#         n_case_del=$( zcat $bed | fgrep -v "#" \
-#                       | fgrep -v HEALTHY_CONTROL | fgrep -w DEL | wc -l )
-#         n_case_dup=$( zcat $bed | fgrep -v "#" \
-#                       | fgrep -v HEALTHY_CONTROL | fgrep -w DUP | wc -l )
-#         if [ $n_case_del -ge $n_case_dup ]; then
-#           echo "" | awk -v del=$n_case_del -v dup=$n_case_dup \
-#                     '{ printf "%0.2f:1\n", del/dup }'
-#         else
-#           echo "" | awk -v del=$n_case_del -v dup=$n_case_dup \
-#                     '{ printf "1:%0.2f\n", dup/del }'
-#         fi
-#       else
-#         echo -e "0\t-\t-\t-"
-#       fi
-
-#       # Control stats
-#       echo "$N_ctrl" | addcom
-#       if [ $n_ctrl_cnv -gt 0 ]; then
-#         # Count of CNVs
-#         echo "$n_ctrl_cnv" | addcom
-#         # Count per sample
-#         echo "" | awk -v n_ctrl=$N_ctrl -v n_cnv=$n_ctrl_cnv \
-#                   '{ printf "%0.2f\n", n_cnv/n_ctrl }'
-#         # Median size
-#         zcat $bed \
-#         | fgrep -v "#" \
-#         | fgrep -w HEALTHY_CONTROL \
-#         | awk '{ print $3-$2 }' \
-#         | sort -nk1,1 \
-#         | median \
-#         | awk '{ printf "%0.1f kb\n", $1/1000 }'
-#         # DEL : DUP ratio
-#         n_ctrl_del=$( zcat $bed | fgrep -v "#" \
-#                       | fgrep -w HEALTHY_CONTROL | fgrep -w DEL | wc -l )
-#         n_ctrl_dup=$( zcat $bed | fgrep -v "#" \
-#                       | fgrep -w HEALTHY_CONTROL | fgrep -w DUP | wc -l )
-#         if [ $n_ctrl_del -ge $n_ctrl_dup ]; then
-#           echo "" | awk -v del=$n_ctrl_del -v dup=$n_ctrl_dup \
-#                     '{ printf "%0.2f:1\n", del/dup }'
-#         else
-#           echo "" | awk -v del=$n_ctrl_del -v dup=$n_ctrl_dup \
-#                     '{ printf "1:%0.2f\n", dup/del }'
-#         fi
-#       else
-#         echo -e "0\t-\t-\t-"
-#       fi
-#     done | paste -s
-#   done < <( fgrep -v "#" $infile ) \
-#   | sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' -e 's/\t/\ \|\ /g'
-# }
-
-
 # Collect and plot raw CNV data
 awk -v OFS="\t" '{ print $0, "/raw_cnv/"$1".raw.bed.gz" }' \
   /opt/rCNV2/refs/rCNV_sample_counts.txt \
@@ -164,6 +71,23 @@ for freq in rCNV vCNV uCNV; do
   /opt/rCNV2/data_curation/CNV/plot_cnv_stats_per_cohort.R \
     ${freq}.metacohort.stats.txt \
     ${freq}.metacohort.stats.jpg
+done
+
+
+# Collect and plot filtered noncoding CNV subsets per metacohort
+for subset in strict loose; do
+  awk -v OFS="\t" -v subset=$subset \
+    '{ print $0, "/cleaned_cnv/noncoding/"$1".rCNV."subset"_noncoding.bed.gz" }' \
+    rCNV_metacohort_sample_counts.txt \
+  | fgrep -v "#" | fgrep -v mega \
+  > ${subset}_noncoding.metacohorts.input.txt
+  /opt/rCNV2/data_curation/CNV/build_cnv_stats_table.py \
+    --tsv ${subset}_noncoding.metacohort.stats.txt \
+    --html ${subset}_noncoding.metacohort.stats.html.txt \
+    ${subset}_noncoding.metacohorts.input.txt
+  /opt/rCNV2/data_curation/CNV/plot_cnv_stats_per_cohort.R \
+    ${subset}_noncoding.metacohort.stats.txt \
+    ${subset}_noncoding.metacohort.stats.jpg
 done
 
 

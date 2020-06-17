@@ -209,8 +209,7 @@ task get_expression_data {
   >>>
 
   runtime {
-    # TODO: UPDATE DOCKER
-    # docker: "talkowski/rcnv@sha256:5239898782e9936bf377373935fce5829907f68276b35e196204ba3f4615496e"
+    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"
@@ -245,8 +244,8 @@ task get_chromatin_data {
     # Collect genomic metadata
     /opt/rCNV2/data_curation/gene/get_gene_features.py \
       --get-chromatin \
-      --roadmap-medians roadmap_stats/gencode.v19.canonical.pext_filtered.REP_chromatin_stats.mean.tsv.gz \
-      --roadmap-mads roadmap_stats/gencode.v19.canonical.pext_filtered.REP_chromatin_stats.sd.tsv.gz \
+      --roadmap-means roadmap_stats/gencode.v19.canonical.pext_filtered.REP_chromatin_stats.mean.tsv.gz \
+      --roadmap-sds roadmap_stats/gencode.v19.canonical.pext_filtered.REP_chromatin_stats.sd.tsv.gz \
       --roadmap-pca roadmap_stats/gencode.v19.canonical.pext_filtered.REP_chromatin_stats.pca.tsv.gz \
       --outbed ${prefix}.chromatin_features.${contig}.bed.gz \
       --bgzip \
@@ -254,8 +253,7 @@ task get_chromatin_data {
   >>>
 
   runtime {
-    # TODO: UPDATE DOCKER
-    # docker: "talkowski/rcnv@sha256:5239898782e9936bf377373935fce5829907f68276b35e196204ba3f4615496e"
+    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"
@@ -343,8 +341,7 @@ task join_data {
   >>>
 
   runtime {
-    # TODO: UPDATE DOCKER
-    # docker: "talkowski/rcnv@sha256:9da6bae9884d16b82a7bc702c52a6646529d014b529062b4df19d6f3ee1acc7d"
+    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
     preemptible: 1
     disks: "local-disk 50 SSD"
     bootDiskSizeGb: "20"

@@ -329,7 +329,7 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('cnvs', help='CNV BED file to compare vs windows.')
+    parser.add_argument('cnvs', help='CNV BED file to compare vs GTF.')
     parser.add_argument('gtf', help='GTF of genes to consider.')
     parser.add_argument('--pad-controls', help='Distance to be added to control ' +
                         'breakpoints. [default: 0]',

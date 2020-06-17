@@ -290,3 +290,40 @@ For completeness, we also performed identical analyses on a pooled dataset of al
 ![Ultra-rare CNV stats](https://storage.googleapis.com/rcnv_project/public/uCNV.metacohort.stats.jpg)  
 
 The information for these tables was collected using `collect_cohort_stats.sh` and visualized using `plot_cnv_stats_per_cohort.R`.  
+
+---  
+
+## Noncoding subsets  
+
+For certain analyses, we restricted this dataset further to rCNVs unlikely to directly disrupt disease-relevant protein-coding genes.  
+
+These subsets are defined as follows:  
+
+1. **Strictly noncoding**: all rCNVs were excluded based on any overlap with any canonical exon from any protein-coding gene ([as described here](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene#gene-definitions)).  
+
+2. **Loose noncoding**: to improve power for [noncoding association testing](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/noncoding), we supplemented the `Strictly noncoding` subset (described above) with any rCNVs that overlapped exons from any of 2,013 genes known to readily tolerate functional mutations in the general population ([described here](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene#gene-set-definitions)). This subset represents the subset of rare CNVs depleted for strong-effect, disease-relevant coding effects.  
+
+The code to apply these filters is contained in `extract_noncoding_subsets.sh`.  
+
+### Strictly noncoding rare CNV callset properties  
+
+| Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
+| meta1 | 44,229 | 8,341 | 0.19 | 195.0 kb | 1.44:1 | 19,585 | 5,111 | 0.26 | 157.0 kb | 1.82:1 |  
+| meta2 | 41,065 | 11,847 | 0.29 | 157.0 kb | 1.65:1 | 41,213 | 10,104 | 0.25 | 161.0 kb | 1.68:1 |  
+| meta3 | 153,870 | 35,960 | 0.23 | 165.0 kb | 1.91:1 | 24,161 | 7,358 | 0.3 | 165.0 kb | 2.26:1 |  
+| meta4 | 54,071 | 10,965 | 0.2 | 162.0 kb | 6.09:1 | 375,800 | 76,672 | 0.2 | 162.0 kb | 5.90:1 |  
+
+![Strictly noncoding rare CNV stats](https://storage.googleapis.com/rcnv_project/public/strict_noncoding.metacohort.stats.jpg)  
+
+### Loose noncoding rare CNV callset properties  
+
+| Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
+| meta1 | 44,229 | 23,208 | 0.52 | 225.0 kb | 1:1.26 | 19,585 | 10,311 | 0.53 | 170.0 kb | 1:1.11 |  
+| meta2 | 41,065 | 23,784 | 0.58 | 176.0 kb | 1:1.11 | 41,213 | 20,207 | 0.49 | 174.0 kb | 1:1.23 |  
+| meta3 | 153,870 | 68,771 | 0.45 | 184.0 kb | 1.04:1 | 24,161 | 13,085 | 0.54 | 182.0 kb | 1.14:1 |  
+| meta4 | 54,071 | 21,903 | 0.41 | 174.0 kb | 2.86:1 | 375,800 | 149,367 | 0.4 | 174.0 kb | 2.98:1 |  
+
+![Loose noncoding rare CNV stats](https://storage.googleapis.com/rcnv_project/public/loose_noncoding.metacohort.stats.jpg)  
+

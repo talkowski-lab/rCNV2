@@ -491,8 +491,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    # TODO: UPDATE DOCKER
-    # docker: "talkowski/rcnv@sha256:93ec0fee2b0ad415143eda627c2b3c8d2e1ef3c8ff4d3d620767637614fee5f8"
+    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
     preemptible: 1
     memory: "32 GB"
     disks: "local-disk 275 HDD"
@@ -639,8 +638,7 @@ task meta_analysis {
   }
 
   runtime {
-    # TODO: UPDATE DOCKER
-    # docker: "talkowski/rcnv@sha256:e91d9b5a78547e4572fa04366eb63de64b6f12ee99088c20ff017b4046fc8824"
+    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -780,8 +778,7 @@ task finemap_genes {
   }
 
   runtime {
-    # TODO: UPDATE DOCKER
-    # docker: "talkowski/rcnv@sha256:6e98f93c88fdebaa197dc6000c91fa9bcccd4b2a2b26fc6e42f4d3cc67a2c8ba"
+    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -843,8 +840,7 @@ task merge_finemap_res {
   }
 
   runtime {
-    # TODO: UPDATE DOCKER
-    # docker: "talkowski/rcnv@sha256:6e98f93c88fdebaa197dc6000c91fa9bcccd4b2a2b26fc6e42f4d3cc67a2c8ba"
+    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
     preemptible: 1
     bootDiskSizeGb: "20"
   }
@@ -1036,8 +1032,7 @@ task plot_finemap_res {
   }
 
   runtime {
-    # TODO: UPDATE DOCKER
-    # docker: "talkowski/rcnv@sha256:6e98f93c88fdebaa197dc6000c91fa9bcccd4b2a2b26fc6e42f4d3cc67a2c8ba"
+    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

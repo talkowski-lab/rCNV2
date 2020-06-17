@@ -600,7 +600,7 @@ plot.viohist <- function(perm.dat.vals, bins, y.at, width=0.8,
   points(x=obs.val, y=y.at, pch=obs.pch, bg=obs.color, 
          col=obs.border, cex=diamond.cex)
   if(!is.null(y.title)){
-    axis(2, at=y.at, line=-0.9, tick=F, las=2, labels=y.title)
+    axis(2, at=y.at, line=-0.8, tick=F, las=2, labels=y.title)
     if(left.ax.line==T){
       axis(2, at=c(y.at-(width/2), y.at+(width/2)), tck=0, labels=NA, col=blueblack)
     }
@@ -800,9 +800,9 @@ plot.seg.perms.multi <- function(segs, gw.perms, lit.perms, union.perms,
                    y.title=inner.row.labels[i], diamond.cex=diamond.cex, obs.val=segs.dat[[i]][j], 
                    obs.pch=obs.pch[i], obs.color=row.colors[j], obs.border=row.borders[j],
                    left.ax.line=T)
-      segments(x0=perm.means[[i]][j], x1=perm.means[[i]][j],
-               y0=y.at-0.2, y1=y.at+0.2, lwd=3, 
-               col=vio.borders[j], lend="round")
+      # segments(x0=perm.means[[i]][j], x1=perm.means[[i]][j],
+      #          y0=y.at-0.2, y1=y.at+0.2, lwd=3, 
+      #          col=vio.borders[j], lend="round")
       if(segs.dat[[i]][j] >= perm.means[[i]][j]){
         text(x=segs.dat[[i]][j]-(0.015*(par("usr")[2]-par("usr")[1])), y=y.at-0.2, pos=4, 
              labels=perm.pvals[[i]][2, ][[j]], xpd=T, cex=stats.cex)

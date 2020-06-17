@@ -138,4 +138,3 @@ while read cohort N; do
     ultrarare_cnv_curated/$cohort.uCNV.bed.gz
 done < <( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f1-2 )
 
-
