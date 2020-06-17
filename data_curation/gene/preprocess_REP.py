@@ -153,7 +153,7 @@ def calc_chrom_coverage(genes_bt, chrombeds, state, samples):
     gdf = genes_bt.to_dataframe(names='chrom start end gene'.split())
 
     for eid, cbts in  chrombeds.items():
-        print('Annotating {} in {}...'.format(state, samples['name'][eid]))
+        print('Annotating {} in {}...'.format(state, samples[eid]['name']))
         cov_bt = genes_bt.coverage(cbts[state])
         vals = pd.Series([x[-1] for x in cov_bt]).astype(float)
         gdf['_'.join([eid, state])] = vals

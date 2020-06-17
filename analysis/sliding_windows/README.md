@@ -110,24 +110,22 @@ Furthermore, as sample size imbalance between cases and controls has been shown 
 
 Each phenotype & CNV type were meta-analyzed separately for a total of two meta-analyses per phenotype.  
 
-#### Determining genome-wide significance threshold  
+#### Determining & calibrating genome-wide significance threshold  
 
-We next controlled false discovery rate (FDR) across all sliding window meta-analyses using a permutation-based approach.  
+We next controlled false discovery rate (FDR) across all sliding window meta-analyses.  
 
 Estimating the number of independent tests performed across all windows, phenotypes, and CNV types is difficult due to numerous necessary assumptions, such as the independence of samples between phenotypes, or the local correlation structure of CNV counts between neighboring windows, among others.    
 
-Instead, we targeted an "genome-wide" significance threshold of P ≤ 3.71x10<sup>-6</sup>, which corresonds to a Bonferroni correction if applied to the number of non-overlapping 200kb windows tested in our analysis.  
+Instead, we used a "genome-wide" significance threshold of P ≤ 3.72x10<sup>-6</sup>, which corresonds to a Bonferroni correction if applied to the number of non-overlapping 200kb windows tested in our analysis.  
 
-We empirically determined the primary P-value threshold for each CNV type that matched our desired genome-wide FDR as follows:  
+We empirically assessed the calibration of this primary P-value threshold using a permutation-based approach, as follows:  
 
 1. permute phenotype labels for all CNVs while matching on size (split by quantile) and CNV type (DEL/DUP);  
 2. rerun all association tests (described above), including meta-analysis, for each phenotype & CNV combination;   
 3. compute the fraction of significant windows for a broad range of primary P-value thresholds (_e.g._, -log<sub>10</sub>(_P_) ~ [0, 20] ); and
-4. report the least significant primary P-value threshold that results in an empirical FDR ≤ 3.86x10<sup>-6</sup>.  
+4. report the least significant primary P-value threshold that results in an empirical FDR ≤ 3.72x10<sup>-6</sup>.  
 
-Steps 1-3 were repeated 50 times for each CNV type and phenotype.  
-
-Following permutation, we computed the mean primary P-value threshold per phenotype and CNV type, and subsequently computed the overall mean P-value threshold across all phenotypes weighted by the square root of the case sample size per phenotype. We used this overall mean P-value threshold to assess exome-wide significance of primary P-values for gene discovery.    
+Steps 1-3 were repeated 50 times for each CNV type and phenotype, and the median value per phenotype was computed.
 
 #### Output files  
 
@@ -141,7 +139,7 @@ These files are stored in the same location as the per-metacohort analysis resul
 
 Lastly, we refined each association to the minimum interval(s) predicted to contain the causal factor(s).  
 
-In practice, we considered a window to be genome-wide significant if its primary P-value P exceeded the genome-wide significance threshold for that phenotype and CNV type, and it satisifed at least one of the following two criteria:
+In practice, we considered a window to be genome-wide significant if its primary P-value P exceeded the genome-wide significance threshold, and it satisifed at least one of the following two criteria:
 1. Secondary P-value (as [described above](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/sliding_windows/#3-combine-association-statistics-across-metacohorts)) was also nominally significant (P < 0.05); and/or
 2. At least two metacohorts were nominally significant (P < 0.05) per Fisher's exact test.  
 

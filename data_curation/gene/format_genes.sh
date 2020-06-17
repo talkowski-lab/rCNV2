@@ -137,7 +137,12 @@ mkdir roadmap_stats/
   --gzip \
   gencode.v19.canonical.pext_filtered.gtf.gz \
   ./
-
+# Copy precomputed Roadmap ChromHMM summary data to rCNV bucket (note: requires permissions)
+gsutil -m cp -r roadmap_stats \
+  ${rCNV_bucket}/cleaned_data/genes/annotations/
+# Print HTML-formatted rows for README from ChromHMM data (helper function)
+gsutil -m cp ${rCNV_bucket}/refs/REP_state_manifest.tsv ./
+/opt/rCNV2/data_curation/gene/print_chromhmm_readme_rows.py REP_state_manifest.tsv
 
 
 # Gather per-gene metadata (genomic)
@@ -173,6 +178,17 @@ done > gene_features.athena_tracklist.tsv
   gencode.v19.canonical.pext_filtered.gtf.gz
 
 
+# Gather per-gene metadata (chromatin)
+/opt/rCNV2/data_curation/gene/get_gene_features.py \
+  --get-chromatin \
+  --roadmap-means roadmap_stats/gencode.v19.canonical.pext_filtered.REP_chromatin_stats.mean.tsv.gz \
+  --roadmap-sds roadmap_stats/gencode.v19.canonical.pext_filtered.REP_chromatin_stats.sd.tsv.gz \
+  --roadmap-pca roadmap_stats/gencode.v19.canonical.pext_filtered.REP_chromatin_stats.pca.tsv.gz \
+  --outbed gencode.v19.canonical.pext_filtered.chromatin_features.bed.gz \
+  --bgzip \
+  gencode.v19.canonical.pext_filtered.gtf.gz
+
+
 # Gather per-gene constraint metadata
 wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
 wget http://genic-intolerance.org/data/RVIS_Unpublished_ExACv2_March2017.txt
@@ -197,6 +213,7 @@ wget https://doi.org/10.1371/journal.pgen.1001154.s002
 /opt/rCNV2/data_curation/gene/join_gene_metadata.R \
   gencode.v19.canonical.pext_filtered.genomic_features.bed.gz \
   gencode.v19.canonical.pext_filtered.expression_features.bed.gz \
+  gencode.v19.canonical.pext_filtered.chromatin_features.bed.gz \
   gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
 | bgzip -c \
 > gencode.v19.canonical.pext_filtered.all_features.bed.gz

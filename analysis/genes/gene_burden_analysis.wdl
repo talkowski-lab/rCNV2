@@ -35,6 +35,7 @@ workflow gene_burden_analysis {
   Float finemap_vconf_pip
   File finemap_genomic_features
   File finemap_expression_features
+  File finemap_chromatin_features
   File finemap_constraint_features
   File finemap_merged_features
   File raw_finemap_merged_features
@@ -108,21 +109,6 @@ workflow gene_burden_analysis {
         fdr_table_suffix="empirical_genome_wide_pval",
         p_val_column_name="meta_phred_p"
     }
-
-    # # Genome-wide, secondary
-    # call calc_meta_p_cutoff as calc_genome_wide_cutoffs_secondary {
-    #   input:
-    #     phenotype_list=phenotype_list,
-    #     metacohort_sample_table=metacohort_sample_table,
-    #     freq_code="rCNV",
-    #     CNV=cnv,
-    #     n_pheno_perms=n_pheno_perms,
-    #     fdr_target=p_cutoff,
-    #     rCNV_bucket=rCNV_bucket,
-    #     dummy_completion_markers=rCNV_perm_test.completion_marker,
-    #     fdr_table_suffix="empirical_genome_wide_pval_secondary",
-    #     p_val_column_name="meta_phred_p_secondary"
-    # }
   }
 
   # Perform meta-analysis of rCNV association statistics
@@ -135,7 +121,7 @@ workflow gene_burden_analysis {
         metacohort_list=metacohort_list,
         metacohort_sample_table=metacohort_sample_table,
         freq_code="rCNV",
-        meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+        meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
         max_manhattan_phred_p=max_manhattan_phred_p,
         meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
@@ -154,7 +140,7 @@ workflow gene_burden_analysis {
         metacohort_sample_table=metacohort_sample_table,
         freq_code="rCNV",
         CNV=cnv,
-        meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+        meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
         meta_secondary_p_cutoff=meta_secondary_p_cutoff,
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         finemap_elnet_alpha=finemap_elnet_alpha,
@@ -175,7 +161,7 @@ workflow gene_burden_analysis {
         metacohort_sample_table=metacohort_sample_table,
         freq_code="rCNV",
         CNV=cnv,
-        meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+        meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
         meta_secondary_p_cutoff=meta_secondary_p_cutoff,
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         finemap_elnet_alpha=finemap_elnet_alpha,
@@ -188,6 +174,27 @@ workflow gene_burden_analysis {
         rCNV_bucket=rCNV_bucket
     }
     
+    # Chromatin features
+    call finemap_genes as finemap_chromatin {
+      input:
+        completion_tokens=rCNV_meta_analysis.completion_token,
+        phenotype_list=phenotype_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code="rCNV",
+        CNV=cnv,
+        meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
+        meta_secondary_p_cutoff=meta_secondary_p_cutoff,
+        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+        finemap_elnet_alpha=finemap_elnet_alpha,
+        finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
+        finemap_distance=finemap_distance,
+        finemap_conf_pip=finemap_conf_pip,
+        finemap_vconf_pip=finemap_vconf_pip,
+        finemap_output_label="chromatin_features",
+        gene_features=finemap_chromatin_features,
+        rCNV_bucket=rCNV_bucket
+    }
+
     # Constraint features
     call finemap_genes as finemap_constraint {
       input:
@@ -196,7 +203,7 @@ workflow gene_burden_analysis {
         metacohort_sample_table=metacohort_sample_table,
         freq_code="rCNV",
         CNV=cnv,
-        meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+        meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
         meta_secondary_p_cutoff=meta_secondary_p_cutoff,
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         finemap_elnet_alpha=finemap_elnet_alpha,
@@ -217,7 +224,7 @@ workflow gene_burden_analysis {
         metacohort_sample_table=metacohort_sample_table,
         freq_code="rCNV",
         CNV=cnv,
-        meta_p_cutoff_tables=calc_genome_wide_cutoffs.p_cutoff_table,
+        meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
         meta_secondary_p_cutoff=meta_secondary_p_cutoff,
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         finemap_elnet_alpha=finemap_elnet_alpha,
@@ -245,7 +252,7 @@ workflow gene_burden_analysis {
   scatter( cnv in cnv_types ) {
     call plot_finemap_res {
       input:
-        completion_tokens=[finemap_genomic.completion_token, finemap_expression.completion_token, finemap_constraint.completion_token, finemap_merged.completion_token],
+        completion_tokens=[finemap_genomic.completion_token, finemap_expression.completion_token, finemap_chromatin.completion_token, finemap_constraint.completion_token, finemap_merged.completion_token],
         freq_code="rCNV",
         CNV=cnv,
         raw_features_merged=raw_finemap_merged_features,
@@ -469,15 +476,23 @@ task calc_meta_p_cutoff {
       ${metacohort_sample_table} \
       gene_burden.${freq_code}.${CNV}.${fdr_table_suffix}
 
+    # Also produce an optional table of flat Bonferroni P-value cutoffs
+    awk -v pval=${fdr_target} -v FS="\t" -v OFS="\t" \
+      '{ print $1, pval }' ${phenotype_list} \
+    > gene_burden.${freq_code}.${CNV}.bonferroni_pval.hpo_cutoffs.tsv
+
     # Copy cutoff tables to output bucket
     gsutil -m cp gene_burden.${freq_code}.${CNV}.${fdr_table_suffix}*tsv \
+      "${rCNV_bucket}/analysis/analysis_refs/"
+    gsutil -m cp gene_burden.${freq_code}.${CNV}.bonferroni_pval.hpo_cutoffs.tsv \
       "${rCNV_bucket}/analysis/analysis_refs/"
     gsutil -m cp gene_burden.${freq_code}.${CNV}.${fdr_table_suffix}_permutation_results.png \
       "${rCNV_bucket}/analysis/gene_burden/empirical_fdr_plots/"
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:93ec0fee2b0ad415143eda627c2b3c8d2e1ef3c8ff4d3d620767637614fee5f8"
+    # TODO: UPDATE DOCKER
+    # docker: "talkowski/rcnv@sha256:93ec0fee2b0ad415143eda627c2b3c8d2e1ef3c8ff4d3d620767637614fee5f8"
     preemptible: 1
     memory: "32 GB"
     disks: "local-disk 275 HDD"
@@ -488,6 +503,7 @@ task calc_meta_p_cutoff {
     File perm_results_plot = "gene_burden.${freq_code}.${CNV}.${fdr_table_suffix}_permutation_results.png"
     File p_cutoff_table = "gene_burden.${freq_code}.${CNV}.${fdr_table_suffix}.hpo_cutoffs.tsv"
     File p_cutoff_ladder = "gene_burden.${freq_code}.${CNV}.${fdr_table_suffix}.ncase_cutoff_ladder.tsv"
+    File bonferroni_cutoff_table = "gene_burden.${freq_code}.${CNV}.bonferroni_pval.hpo_cutoffs.tsv "
   }  
 }
 
@@ -512,7 +528,7 @@ task meta_analysis {
     # Copy burden counts & gene coordinates
     find / -name "*${prefix}.${freq_code}.*.gene_burden.stats.bed.gz*" \
     | xargs -I {} mv {} ./
-    find / -name "*gene_burden.${freq_code}.*.empirical_genome_wide_pval.hpo_cutoffs.tsv*" \
+    find / -name "*gene_burden.${freq_code}.*.bonferroni_pval.hpo_cutoffs.tsv*" \
     | xargs -I {} mv {} ./
     gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
     mkdir refs/
@@ -533,9 +549,9 @@ task meta_analysis {
                | awk -v FS="\t" '{ print $2 }' )
     title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
     DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                    gene_burden.${freq_code}.DEL.empirical_genome_wide_pval.hpo_cutoffs.tsv )
+                    gene_burden.${freq_code}.DEL.bonferroni_pval.hpo_cutoffs.tsv )
     DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                    gene_burden.${freq_code}.DUP.empirical_genome_wide_pval.hpo_cutoffs.tsv )
+                    gene_burden.${freq_code}.DUP.bonferroni_pval.hpo_cutoffs.tsv )
 
     # Set HPO-specific parameters
     descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
@@ -623,7 +639,8 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e91d9b5a78547e4572fa04366eb63de64b6f12ee99088c20ff017b4046fc8824"
+    # TODO: UPDATE DOCKER
+    # docker: "talkowski/rcnv@sha256:e91d9b5a78547e4572fa04366eb63de64b6f12ee99088c20ff017b4046fc8824"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -654,7 +671,7 @@ task finemap_genes {
     set -e
 
     # Copy p-value cutoff tables
-    find / -name "*gene_burden.${freq_code}.*.empirical_genome_wide_pval.hpo_cutoffs.tsv*" \
+    find / -name "*gene_burden.${freq_code}.*.bonferroni_pval.hpo_cutoffs.tsv*" \
     | xargs -I {} mv {} ./
 
     # Copy association stats & gene lists from the project Google Bucket (note: requires permissions)
@@ -672,7 +689,7 @@ task finemap_genes {
         echo "$hpo"
         echo "stats/$prefix.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz"
         awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' \
-          gene_burden.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv
+          gene_burden.${freq_code}.${CNV}.bonferroni_pval.hpo_cutoffs.tsv
       done | paste -s
     done < ${phenotype_list} \
     > ${freq_code}.${CNV}.gene_fine_mapping.stats_input.tsv
@@ -763,7 +780,8 @@ task finemap_genes {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:6e98f93c88fdebaa197dc6000c91fa9bcccd4b2a2b26fc6e42f4d3cc67a2c8ba"
+    # TODO: UPDATE DOCKER
+    # docker: "talkowski/rcnv@sha256:6e98f93c88fdebaa197dc6000c91fa9bcccd4b2a2b26fc6e42f4d3cc67a2c8ba"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -825,7 +843,8 @@ task merge_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:6e98f93c88fdebaa197dc6000c91fa9bcccd4b2a2b26fc6e42f4d3cc67a2c8ba"
+    # TODO: UPDATE DOCKER
+    # docker: "talkowski/rcnv@sha256:6e98f93c88fdebaa197dc6000c91fa9bcccd4b2a2b26fc6e42f4d3cc67a2c8ba"
     preemptible: 1
     bootDiskSizeGb: "20"
   }
@@ -840,6 +859,7 @@ task plot_finemap_res {
   File phenotype_list
   File raw_features_genomic
   File raw_features_expression
+  File raw_features_chromatin
   File raw_features_constraint
   File raw_features_merged
   String rCNV_bucket
@@ -859,12 +879,14 @@ task plot_finemap_res {
       echo -e "Posterior\t'#264653'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.genomic_features.tsv"
       echo -e "Genomic features\t'#E76F51'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.tsv"
       echo -e "Gene expression\t'#E9C46A'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.tsv"
+      echo -e "Chromatin\t'#ed80a6'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.chromatin_features.tsv"
       echo -e "Gene constraint\t'#F4A261'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.tsv"
       echo -e "Full model\t'#2A9D8F'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.tsv"
     done > finemap_roc_input.tsv
     for wrapper in 1; do
       echo -e "Genomic features\t'#E76F51'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.all_genes_from_blocks.tsv\t${raw_features_genomic}"
       echo -e "Gene expression\t'#E9C46A'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.all_genes_from_blocks.tsv\t${raw_features_expression}"
+      echo -e "Chromatin\t'#ed80a6'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.chromatin_features.all_genes_from_blocks.tsv\t${raw_features_chromatin}"
       echo -e "Gene constraint\t'#F4A261'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.all_genes_from_blocks.tsv\t${raw_features_constraint}"
       echo -e "Full model\t'#2A9D8F'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.all_genes_from_blocks.tsv\t${raw_features_merged}"
     done > finemap_feature_cor_input.tsv
@@ -1014,7 +1036,8 @@ task plot_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:6e98f93c88fdebaa197dc6000c91fa9bcccd4b2a2b26fc6e42f4d3cc67a2c8ba"
+    # TODO: UPDATE DOCKER
+    # docker: "talkowski/rcnv@sha256:6e98f93c88fdebaa197dc6000c91fa9bcccd4b2a2b26fc6e42f4d3cc67a2c8ba"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

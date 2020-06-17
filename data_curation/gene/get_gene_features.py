@@ -515,7 +515,7 @@ def get_expression_features(genes, ensg_ids, gtex_medians, gtex_mads, gtex_pca):
             else:
                 for col in pca_cols:
                     xfeats_tmp[gene].append(0)
-        header_cols += xmad_cols
+        header_cols += pca_cols
 
     # Format output string of all expression features per gene
     header = '\t'.join(header_cols)
@@ -525,6 +525,63 @@ def get_expression_features(genes, ensg_ids, gtex_medians, gtex_mads, gtex_pca):
         expression_features[gene] = xfeats_str
 
     return header, expression_features
+
+
+def get_chromatin_features(genes, ensg_ids, roadmap_means, roadmap_sds, roadmap_pca):
+    """
+    Collect various chromatin features per gene
+    """
+
+    cfeats_tmp = {g : [] for g in genes}
+    header_cols = []
+
+    # Load Roadmap means
+    if roadmap_means is not None:
+        cmeans_df = load_gtex(roadmap_means, expression_matrix=False)
+        cmean_cols = cmeans_df.columns.tolist()[1:]
+        for gene in genes:
+            if any(cmeans_df.gene == gene):
+                for v in cmean_cols:
+                    cfeats_tmp[gene].append(cmeans_df.loc[cmeans_df.gene == gene, v].iloc[0])
+            else:
+                for col in cmean_cols:
+                    cfeats_tmp[gene].append(0)
+        header_cols += ['_'.join(['chromhmm', x, 'mean']) for x in cmean_cols]
+
+    # Load Roadmap standard deviations
+    if roadmap_sds is not None:
+        csds_df = load_gtex(roadmap_sds, expression_matrix=False)
+        csd_cols = csds_df.columns.tolist()[1:]
+        for gene in genes:
+            if any(csds_df.gene == gene):
+                for v in csd_cols:
+                    cfeats_tmp[gene].append(csds_df.loc[csds_df.gene == gene, v].iloc[0])
+            else:
+                for col in csd_cols:
+                    cfeats_tmp[gene].append(0)
+        header_cols += ['_'.join(['chromhmm', x, 'sd']) for x in csd_cols]
+
+    # Load Roadmap principal components
+    if roadmap_pca is not None:
+        pca_df = load_gtex(roadmap_pca, expression_matrix=False)
+        pca_cols = pca_df.columns.tolist()[1:]
+        for gene in genes:
+            if any(pca_df.gene == gene):
+                for v in pca_cols:
+                    cfeats_tmp[gene].append(pca_df.loc[pca_df.gene == gene, v].iloc[0])
+            else:
+                for col in pca_cols:
+                    cfeats_tmp[gene].append(0)
+        header_cols += pca_cols
+
+    # Format output string of all chromatin features per gene
+    header = '\t'.join(header_cols)
+    chromatin_features = {}
+    for gene in genes:
+        cfeats_str = '\t'.join([str(x) for x in cfeats_tmp[gene]])
+        chromatin_features[gene] = cfeats_str
+
+    return header, chromatin_features
 
 
 def get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ensg,
@@ -690,7 +747,7 @@ def get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ens
 
 
 def write_outbed(outbed, header, genes, txbt, tx_stats, genomic_features,
-                 expression_features, constraint_features):
+                 expression_features, chromatin_features, constraint_features):
     """
     Format output table of features and write to output BED file
     """
@@ -711,6 +768,9 @@ def write_outbed(outbed, header, genes, txbt, tx_stats, genomic_features,
 
         if expression_features is not None:
             outstr = outstr + '\t' + expression_features[gene]
+
+        if chromatin_features is not None:
+            outstr = outstr + '\t' + chromatin_features[gene]
 
         if constraint_features is not None:
             outstr = outstr + '\t' + constraint_features[gene]            
@@ -735,6 +795,8 @@ def main():
                         'features. [default: False]')
     parser.add_argument('--get-expression', action='store_true', help='Collect ' +
                         'gene expression features. [default: False]')
+    parser.add_argument('--get-chromatin', action='store_true', help='Collect ' +
+                        'chromatin features. [default: False]')
     parser.add_argument('--get-constraint', action='store_true', help='Collect ' +
                         'evolutionary constraint features. [default: False]')
     parser.add_argument('--centro-telo-bed', help='BED file indicating ' + 
@@ -750,6 +812,12 @@ def main():
                         'Only used if --get-expression is specified.')
     parser.add_argument('--gtex-pca', help='GTEx gene X tissue principal components. ' +
                         'Only used if --get-expression is specified.')
+    parser.add_argument('--roadmap-means', help='Roadmap gene X chromatin state means. ' +
+                        'Only used if --get-chromatin is specified.')
+    parser.add_argument('--roadmap-sds', help='Roadmap gene X chromatin state standard deviations. ' +
+                        'Only used if --get-chromatin is specified.')
+    parser.add_argument('--roadmap-pca', help='Roadmap gene X tissue X state principal components. ' +
+                        'Only used if --get-chromatin is specified.')
     parser.add_argument('--gnomad-constraint', help='gnomAD constraint tsv. Only ' +
                         'used if --get-constraint is specified.')
     parser.add_argument('--exac-cnv', help='ExAC CNV constraint tsv. Only used ' +
@@ -818,6 +886,15 @@ def main():
     else:
         expression_features = None
 
+    # Get chromatin stats, if optioned
+    if args.get_chromatin:
+        header_add, chromatin_features = \
+            get_chromatin_features(genes, ensg_ids, args.roadmap_means, 
+                                   args.roadmap_sds, args.roadmap_pca)
+        outbed_header = outbed_header + '\t' + header_add
+    else:
+        chromatin_features = None
+
     # Get constraint stats, if optioned
     if args.get_constraint:
         header_add, constraint_features = \
@@ -832,7 +909,7 @@ def main():
 
     # Format output table of features
     write_outbed(outbed, outbed_header, genes, txbt, tx_stats, genomic_features,
-                 expression_features, constraint_features)
+                 expression_features, chromatin_features, constraint_features)
     if args.outbed is not None \
     and args.outbed not in 'stdout -'.split() \
     and args.bgzip:
