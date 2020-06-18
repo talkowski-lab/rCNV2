@@ -30,7 +30,7 @@ For each track, we:
 1. Excluded any elements covered at least 50% by the same set of blacklists used during [CNV curation](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs);  
 2. Standardized contig nomenclature to be consistent with GRCh37; 
 3. Merged overlapping elements; 
-4. Excluded merged elements <10bp or >100kb in size; and
+4. Excluded merged elements <5bp or >200kb in size; and
 5. Restricted to autosomes.  
 
 After curation, we computed the following statistics for each track:

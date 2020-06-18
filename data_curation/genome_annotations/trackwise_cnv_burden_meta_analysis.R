@@ -162,15 +162,33 @@ make.meta.lookup.table <- function(stats, cohorts, model, empirical.continuity=T
 }
 
 # Apply saddlepoint approximation to vector of Z-scores to generate adjusted P-values
-saddlepoint.adj <- function(zscores, phred=T){
+saddlepoint.adj <- function(zscores, phred=T, alternative="two.sided"){
   mu.hat <- mean(zscores, na.rm=T)
   sd.hat <- sd(zscores, na.rm=T)
   cumuls <- gaussianCumulants(mu.hat, sd.hat)
   dx <- 0.01
-  x <- seq(-40, 40, dx)
+  x <- seq(min(min(zscores, na.rm=T), -40), 
+           max(max(zscores, na.rm=T), 40), dx)
   saddle.pdf <- saddlepoint(x, 1, cumuls)$approx
   saddle.cdf <- cumsum(saddle.pdf * 0.01)
-  calc.saddle.p <- function(z){if(!is.na(z)){1 - tail(saddle.cdf[which(x<z)], 1)}else{NA}}
+  calc.saddle.p <- function(z){
+    if(!is.na(z)){
+      if(alternative=="greater"){
+        1 - tail(saddle.cdf[which(x<z)], 1)
+      }else if(alternative=="less"){
+        tail(saddle.cdf[which(x<z)], 1)
+      }else{
+        if(z>=0){
+          1 - tail(saddle.cdf[which(x<z)], 1)
+        }else{
+          tail(saddle.cdf[which(x<z)], 1)
+        }
+      }
+      
+    }else{
+      NA
+    }
+  }
   new.pvals <- sapply(zscores, calc.saddle.p)
   if(phred==T){
     return(-log10(new.pvals))
@@ -187,7 +205,6 @@ meta <- function(stats, cohorts, model="fe", saddle=T){
   
   # Merge stats into full list
   meta.res <- merge(stats, meta.lookup.table, sort=F, all.x=T, all.y=F)
-  meta.res <- meta.res[with(meta.res, order(trackname)), ]
   
   # Adjust P-values using saddlepoint approximation of null distribution, if optioned
   if(saddle==T){
@@ -196,7 +213,7 @@ meta <- function(stats, cohorts, model="fe", saddle=T){
   
   # Add FDR-adjusted q-value
   meta.res$meta_phred_fdr_q <- -log10(p.adjust(10^-meta.res$meta_phred_p, method="fdr"))
-
+  
   # Format output
   return(meta.res[, -unique(c(grep("_ref", colnames(meta.res), fixed=T),
                               grep("_alt", colnames(meta.res), fixed=T)))])
@@ -216,33 +233,59 @@ option_list <- list(
               help="specify meta-analysis model ('re': random effects, 'fe': fixed effects, 'mh': Mantel-Haenszel) [default '%default']",
               metavar="string"),
   make_option(c("--spa"), action="store_true", default=FALSE, 
-              help="apply saddlepoint approximation of null distribution [default %default]")
+              help="apply saddlepoint approximation of null distribution [default %default]"),
+  make_option(c("--fdr-cutoff"), type="numeric", default=0.05, 
+              help="FDR q-value cutoff to consider a track significant [default '%default']",
+              metavar="numeric"),
+  make_option(c("--signif-tracks"), type="character",  
+              help="output file for significant tracks", metavar="string")
 )
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage="%prog infile outfile",
+args <- parse_args(OptionParser(usage="%prog infile tracklist outfile",
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Writes args & opts to variable
 stats.in <- args$args[1]
-outfile <- args$args[2]
+tracklist.in <- args$args[2]
+outfile <- args$args[3]
 model <- opts$model
 spa <- opts$spa
+fdr.cutoff <- -log10(as.numeric(opts$`fdr-cutoff`))
+signif.outfile <- opts$`signif-tracklist`
 
 # # Dev parameters
-# stats.in <- "~/scratch/all_tracks.stats.with_counts.tsv.gz"
-# outfile <- "~/scratch/all_tracks.burden_stats.tsv.gz"
+# stats.in <- "~/scratch/rCNV.chromhmm.merged_stats.with_counts.tsv.gz"
+# tracklist.in <- "~/scratch/chromhmm_tracks.gs_paths.list"
+# outfile <- "~/scratch/rCNV.chromhmm.burden_stats.tsv.gz"
 # model <- "fe"
 # spa <- T
+# fdr.cutoff <- -log10(0.05)
+# signif.outfile <- "~/scratch/rCNV.chromhmm.signif_tracks.list"
 
 # Read track stats
 stats <- load.stats(stats.in)
 cohorts <- extract.cohorts(stats)
+
+# Read full tracklist
+tracklist <- read.table(tracklist.in, header=F, sep="\t", comment.char="")[, 1]
 
 # Run meta-analysis for all tracks
 meta.res <- meta(stats, cohorts, model, saddle=spa)
 colnames(meta.res)[1] <- paste("#", colnames(meta.res)[1], sep="")
 write.table(meta.res, outfile, sep="\t",
             row.names=F, col.names=T, quote=F)
+
+# Extract significant track names
+if(!is.null(signif.outfile)){
+  sig.idx <- which(meta.res$meta_phred_fdr_q >= fdr.cutoff)
+  if(length(sig.idx) > 0){
+    sig.names <- meta.res[sig.idx, 1]
+    sig.tracks <- t(sapply(sig.names, function(name){
+      c(tracklist[grep(name, tracklist, fixed=T)], name)}))
+    write.table(sig.tracks, signif.outfile,
+                col.names=F, row.names=F, quote=F, sep="\t")
+  }
+}

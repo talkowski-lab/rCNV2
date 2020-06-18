@@ -25,6 +25,7 @@ mkdir refs/
 gsutil -m cp ${rCNV_bucket}/refs/** refs/
 gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/GRCh37.genome refs/
 gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/rCNV_metacohort* refs/
+gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/HPOs_by_metacohort.table.tsv refs/
 mkdir cnvs/
 gsutil -m cp ${rCNV_bucket}/cleaned_data/cnv/noncoding/** cnvs/
 
@@ -53,10 +54,16 @@ gsutil -m cp \
   ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/
 
 
-# Curate all annotations in an arbitrary input list of paths
+# Development parameters for curate_annotations.wdl
+prefix="all_tracks"
 tracklist="test.annotations.list"
-min_element_size=10
-max_element_size=100000
+min_element_size=5
+max_element_size=200000
+case_hpo="HP:0000118"
+min_element_overlap=1.0
+
+
+# Curate all annotations in an arbitrary input list of paths
 while read path; do
   echo -e "Curating $path"
   /opt/rCNV2/data_curation/genome_annotations/curate_track.py \
@@ -77,14 +84,25 @@ cat *.curated.stats.tsv | fgrep -v "#" | sort -Vk1,1 | uniq \
 | cat <( cat *.curated.stats.tsv | grep -e '^#' | sed -n '1p' \
          | awk -v OFS="\t" '{ print $0, "local_path" }' ) \
       - \
-> all_tracks.stats.tsv
-fgrep -v mega refs/rCNV_metacohort_list.txt \
-| awk -v OFS="\t" '{ print $1, "cnvs/"$1".rCNV.strict_noncoding.bed.gz" }' \
-> metacohorts.cnv_paths.tsv
+> ${prefix}.stats.tsv
+while read cohort; do
+  for dummy in 1; do
+    echo $cohort
+    cidx=$( sed -n '1p' HPOs_by_metacohort.table.tsv \
+            | sed 's/\t/\n/g' \
+            | awk -v cohort=$cohort '{ if ($1==cohort) print NR }' )
+    fgrep -w ${case_hpo} HPOs_by_metacohort.table.tsv | cut -f$cidx
+    fgrep -w "HEALTHY_CONTROL" HPOs_by_metacohort.table.tsv | cut -f$cidx
+    echo -e "cnvs/$cohort.rCNV.strict_noncoding.bed.gz"
+  done | paste -s
+done < <( fgrep -v mega refs/rCNV_metacohort_list.txt | cut -f1 ) \
+> metacohorts.input.tsv
 /opt/rCNV2/data_curation/genome_annotations/count_cnvs_per_track.py \
-  --cohorts metacohorts.cnv_paths.tsv \
-  --track-stats all_tracks.stats.tsv \
-  --outfile all_tracks.stats.with_counts.tsv.gz \
+  --cohorts metacohorts.input.tsv \
+  --track-stats ${prefix}.stats.tsv \
+  --frac-overlap ${min_element_overlap} \
+  --case-hpo ${case_hpo} \
+  --outfile ${prefix}.stats.with_counts.tsv.gz \
   --gzip 
 
 
@@ -92,7 +110,7 @@ fgrep -v mega refs/rCNV_metacohort_list.txt \
 /opt/rCNV2/data_curation/genome_annotations/trackwise_cnv_burden_meta_analysis.R \
   --model "fe" \
   --spa \
-  all_tracks.stats.with_counts.tsv.gz \
-  all_tracks.burden_stats.tsv
-gzip -f all_tracks.burden_stats.tsv
+  ${prefix}.stats.with_counts.tsv.gz \
+  ${prefix}.burden_stats.tsv
+gzip -f ${prefix}.burden_stats.tsv
 

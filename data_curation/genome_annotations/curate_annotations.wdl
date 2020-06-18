@@ -13,6 +13,8 @@ workflow curate_annotations {
   Int tracks_per_shard
   Int min_element_size
   Int max_element_size
+  String case_hpo
+  Float min_element_overlap
   Float fdr_cutoff
   String rCNV_bucket
   String prefix
@@ -32,6 +34,8 @@ workflow curate_annotations {
         tracklist=shard,
         min_element_size=min_element_size,
         max_element_size=max_element_size,
+        case_hpo=case_hpo,
+        min_element_overlap=min_element_overlap,
         rCNV_bucket=rCNV_bucket,
         prefix="${prefix}.chromhmm_shard",
         keep_tracks="FALSE"
@@ -45,11 +49,26 @@ workflow curate_annotations {
       prefix="${prefix}.chromhmm"
   }
 
-  # Merge stats across all tracklists and compute meta-analysis burden stats
-  call merge_and_meta {
+  # Merge stats across all tracklists
+  call merge_shards as merge_all {
     input:
-      stats=[merge_chromhmm.merged_stats],
+      stat_shards=[merge_chromhmm.merged_stats],
+      prefix="${prefix}.all"
+  }
+
+  # Merge all tracklists
+  call merge_tracklists {
+    input:
+      tracklists=[chromhmm_tracklist],
+      prefix="${prefix}"
+  }
+
+  # Merge stats across all tracklists and compute meta-analysis burden stats
+  call meta_burden_test {
+    input:
+      stats=merge_all.merged_stats,
       fdr_cutoff=fdr_cutoff,
+      merged_tracklist=merge_tracklists.merged_tracklist,
       rCNV_bucket=rCNV_bucket,
       prefix=prefix
   }
@@ -69,6 +88,8 @@ workflow curate_annotations {
   #       tracklist=shard,
   #       min_element_size=min_element_size,
   #       max_element_size=max_element_size,
+  #       case_hpo=case_hpo,
+  #       min_element_overlap=min_element_overlap,
   #       rCNV_bucket=rCNV_bucket,
   #       prefix="${prefix}.signif_shard",
   #       keep_tracks="TRUE"
@@ -80,8 +101,8 @@ workflow curate_annotations {
 
   # Final outputs
   output {
-    File stats_all_tracks = merge_shards_and_meta.meta_stats
-    File signif_tracklist = merge_shards_and_meta.signif_tracklist
+    File stats_all_tracks = meta_burden_test.meta_stats
+    # File signif_tracklist = meta_burden_test.signif_tracklist
   }
 }
 
@@ -103,7 +124,7 @@ task shard_tracklist {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
+    docker: "talkowski/rcnv@sha256:7bc27c40820b1f3fe66beb438ef543b8e247bc8d040629b36701c75cd1ada90b"
     preemptible: 1
   }
 
@@ -118,6 +139,8 @@ task curate_and_burden_shard {
   File tracklist
   Int min_element_size
   Int max_element_size
+  Float min_element_overlap
+  String case_hpo
   String rCNV_bucket
   String prefix
   String keep_tracks
@@ -127,9 +150,12 @@ task curate_and_burden_shard {
 
     # Download necessary reference files
     mkdir refs/
-    gsutil -m cp ${rCNV_bucket}/refs/** refs/
-    gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/GRCh37.genome refs/
-    gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/rCNV_metacohort* refs/
+    gsutil -m cp \
+      ${rCNV_bucket}/refs/** 
+      ${rCNV_bucket}/analysis/analysis_refs/GRCh37.genome \
+      ${rCNV_bucket}/analysis/analysis_refs/rCNV_metacohort* \
+      ${rCNV_bucket}/analysis/analysis_refs/HPOs_by_metacohort.table.tsv \
+      refs/
 
     # Curate all tracks in tracklist
     while read path; do
@@ -169,19 +195,31 @@ task curate_and_burden_shard {
       gsutil -m cp ${rCNV_bucket}/cleaned_data/cnv/noncoding/** cnvs/
 
       # Compute CNV counts per annotation track per metacohort per CNV type
-      fgrep -v mega refs/rCNV_metacohort_list.txt \
-      | awk -v OFS="\t" '{ print $1, "cnvs/"$1".rCNV.strict_noncoding.bed.gz" }' \
-      > metacohorts.cnv_paths.tsv
+      while read cohort; do
+        for dummy in 1; do
+          echo $cohort
+          cidx=$( sed -n '1p' HPOs_by_metacohort.table.tsv \
+                  | sed 's/\t/\n/g' \
+                  | awk -v cohort=$cohort '{ if ($1==cohort) print NR }' )
+          fgrep -w ${case_hpo} HPOs_by_metacohort.table.tsv | cut -f$cidx
+          fgrep -w "HEALTHY_CONTROL" HPOs_by_metacohort.table.tsv | cut -f$cidx
+          echo -e "cnvs/$cohort.rCNV.strict_noncoding.bed.gz"
+        done | paste -s
+      done < <( fgrep -v mega refs/rCNV_metacohort_list.txt | cut -f1 ) \
+      > metacohorts.input.tsv
       /opt/rCNV2/data_curation/genome_annotations/count_cnvs_per_track.py \
-        --cohorts metacohorts.cnv_paths.tsv \
+        --cohorts metacohorts.input.tsv \
         --track-stats ${prefix}.stats.tsv \
+        --frac-overlap ${min_element_overlap} \
+        --case-hpo ${case_hpo} \
         --outfile ${prefix}.stats.with_counts.tsv.gz \
-        --gzip 
+        --gzip
     fi
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
+    # TODO: UPDATE DOCKER
+    # docker: "talkowski/rcnv@sha256:7bc27c40820b1f3fe66beb438ef543b8e247bc8d040629b36701c75cd1ada90b"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -210,7 +248,7 @@ task merge_shards {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
+    docker: "talkowski/rcnv@sha256:7bc27c40820b1f3fe66beb438ef543b8e247bc8d040629b36701c75cd1ada90b"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -223,31 +261,57 @@ task merge_shards {
 }
 
 
-# Combine track stat across tracklists and conduct unified meta-analysis burden test
-task merge_shards_and_meta {
-  Array[File] stats
+# Merge all tracklists
+task merge_tracklists {
+  Array[File] tracklists
+  String prefix
+
+  command <<<
+    set -e 
+
+    cat ${sep=" " tracklists} > ${prefix}.all_tracks.list
+  >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:7bc27c40820b1f3fe66beb438ef543b8e247bc8d040629b36701c75cd1ada90b"
+    preemptible: 1
+  }
+
+  output {
+    File merged_tracklist = "${prefix}.all_tracks.list"
+  }
+}
+
+# Conduct meta-analysis burden test for all tracks
+task meta_burden_test {
+  File stats
   Float fdr_cutoff
+  File merged_tracklist
   String rCNV_bucket
   String prefix
 
   command <<<
     set -e
 
-    # Merge all stats
-    zcat ${stats[0]} | sed -n '1p' > header.tsv
-    zcat ${sep=" " stats} | grep -ve '^#' | cat header.tsv - | gzip -c \
-    > ${prefix}.merged_stats.with_counts.tsv.gz
-
     /opt/rCNV2/data_curation/genome_annotations/trackwise_cnv_burden_meta_analysis.R \
       --model "fe" \
       --spa \
-      ${prefix}.merged_stats.with_counts.tsv.gz \
+      --fdr-cutoff ${fdr_cutoff} \
+      --signif-outfile ${prefix}.signif_paths_and_tracks.list \
+      ${stats} \
+      ${merged_tracklist} \
       ${prefix}.burden_stats.tsv
     gzip -f ${prefix}.burden_stats.tsv
+
+    cut -f1 ${prefix}.signif_paths_and_tracks.list \
+    > ${prefix}.signif_tracks.list
+    cut -f2 ${prefix}.signif_paths_and_tracks.list \
+    > ${prefix}.signif_tracknames.list
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
+    # TODO: UPDATE DOCKER
+    # docker: "talkowski/rcnv@sha256:7bc27c40820b1f3fe66beb438ef543b8e247bc8d040629b36701c75cd1ada90b"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -256,6 +320,7 @@ task merge_shards_and_meta {
 
   output {
     File meta_stats = "${prefix}.burden_stats.tsv.gz"
+    File signif_tracklist = "${prefix}.signif_tracks.list"
+    File signif_tracknames = "${prefix}.signif_tracknames.list"
   }
-
 }
