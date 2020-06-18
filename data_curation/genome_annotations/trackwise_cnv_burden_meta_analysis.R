@@ -18,11 +18,16 @@ options(scipen=1000, stringsAsFactors=F)
 ### FUNCTIONS ###
 #################
 # Load track stats 
-load.stats <- function(stats.in){
+load.stats <- function(stats.in, cnv.split=T){
   stats <- read.table(stats.in, sep="\t", comment.char="", 
                       check.names=F, header=T)
   colnames(stats)[1] <- gsub("#", "", colnames(stats)[1], fixed=T)
-  return(stats)
+  if(cnv.split==T){
+    list("DEL" = stats[which(stats$cnv=="DEL"), ],
+         "DUP" = stats[which(stats$cnv=="DUP"), ])
+  }else{
+    return(stats)
+  }
 }
 
 # Extract cohort names from an input stats file
@@ -184,7 +189,6 @@ saddlepoint.adj <- function(zscores, phred=T, alternative="two.sided"){
           tail(saddle.cdf[which(x<z)], 1)
         }
       }
-      
     }else{
       NA
     }
@@ -265,22 +269,25 @@ signif.outfile <- opts$`signif-tracklist`
 # fdr.cutoff <- -log10(0.05)
 # signif.outfile <- "~/scratch/rCNV.chromhmm.signif_tracks.list"
 
-# Read track stats
-stats <- load.stats(stats.in)
-cohorts <- extract.cohorts(stats)
+# Read track stats and split by CNV type
+stats <- load.stats(stats.in, cnv.split=T)
+cohorts <- extract.cohorts(stats[[1]])
 
 # Read full tracklist
 tracklist <- read.table(tracklist.in, header=F, sep="\t", comment.char="")[, 1]
 
 # Run meta-analysis for all tracks
-meta.res <- meta(stats, cohorts, model, saddle=spa)
+meta.res.split <- lapply(stats, function(stats.df){
+  meta(stats.df, cohorts, model, saddle=spa)
+})
+meta.res <- do.call("rbind", meta.res.split)
 colnames(meta.res)[1] <- paste("#", colnames(meta.res)[1], sep="")
 write.table(meta.res, outfile, sep="\t",
             row.names=F, col.names=T, quote=F)
 
 # Extract significant track names
 if(!is.null(signif.outfile)){
-  sig.idx <- which(meta.res$meta_phred_fdr_q >= fdr.cutoff)
+  sig.idx <- which(meta.res$meta_phred_fdr_q >= fdr.cutoff & meta.res$meta_z > 0)
   if(length(sig.idx) > 0){
     sig.names <- meta.res[sig.idx, 1]
     sig.tracks <- t(sapply(sig.names, function(name){

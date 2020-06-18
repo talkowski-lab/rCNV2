@@ -88,11 +88,11 @@ cat *.curated.stats.tsv | fgrep -v "#" | sort -Vk1,1 | uniq \
 while read cohort; do
   for dummy in 1; do
     echo $cohort
-    cidx=$( sed -n '1p' HPOs_by_metacohort.table.tsv \
+    cidx=$( sed -n '1p' refs/HPOs_by_metacohort.table.tsv \
             | sed 's/\t/\n/g' \
             | awk -v cohort=$cohort '{ if ($1==cohort) print NR }' )
-    fgrep -w ${case_hpo} HPOs_by_metacohort.table.tsv | cut -f$cidx
-    fgrep -w "HEALTHY_CONTROL" HPOs_by_metacohort.table.tsv | cut -f$cidx
+    fgrep -w ${case_hpo} refs/HPOs_by_metacohort.table.tsv | cut -f$cidx
+    fgrep -w "HEALTHY_CONTROL" refs/HPOs_by_metacohort.table.tsv | cut -f$cidx
     echo -e "cnvs/$cohort.rCNV.strict_noncoding.bed.gz"
   done | paste -s
 done < <( fgrep -v mega refs/rCNV_metacohort_list.txt | cut -f1 ) \
@@ -110,7 +110,20 @@ done < <( fgrep -v mega refs/rCNV_metacohort_list.txt | cut -f1 ) \
 /opt/rCNV2/data_curation/genome_annotations/trackwise_cnv_burden_meta_analysis.R \
   --model "fe" \
   --spa \
-  ${prefix}.stats.with_counts.tsv.gz \
+  --fdr-cutoff ${fdr_cutoff} \
+  --signif-outfile ${prefix}.signif_paths_and_tracks.list \
+  ${stats} \
+  ${merged_tracklist} \
   ${prefix}.burden_stats.tsv
 gzip -f ${prefix}.burden_stats.tsv
+cut -f1 ${prefix}.signif_paths_and_tracks.list \
+> ${prefix}.signif_tracks.list
+cut -f2 ${prefix}.signif_paths_and_tracks.list \
+> ${prefix}.signif_tracknames.list
+
+
+# Dev code for CRB clustering
+/opt/rCNV2/data_curation/genome_annotations/build_crbs.py \
+  --genome refs/GRCh37.genome \
+  *.curated.bed.gz
 

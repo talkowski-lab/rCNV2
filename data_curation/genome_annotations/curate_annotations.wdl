@@ -151,7 +151,7 @@ task curate_and_burden_shard {
     # Download necessary reference files
     mkdir refs/
     gsutil -m cp \
-      ${rCNV_bucket}/refs/** 
+      ${rCNV_bucket}/refs/** \
       ${rCNV_bucket}/analysis/analysis_refs/GRCh37.genome \
       ${rCNV_bucket}/analysis/analysis_refs/rCNV_metacohort* \
       ${rCNV_bucket}/analysis/analysis_refs/HPOs_by_metacohort.table.tsv \
@@ -198,11 +198,11 @@ task curate_and_burden_shard {
       while read cohort; do
         for dummy in 1; do
           echo $cohort
-          cidx=$( sed -n '1p' HPOs_by_metacohort.table.tsv \
+          cidx=$( sed -n '1p' refs/HPOs_by_metacohort.table.tsv \
                   | sed 's/\t/\n/g' \
                   | awk -v cohort=$cohort '{ if ($1==cohort) print NR }' )
-          fgrep -w ${case_hpo} HPOs_by_metacohort.table.tsv | cut -f$cidx
-          fgrep -w "HEALTHY_CONTROL" HPOs_by_metacohort.table.tsv | cut -f$cidx
+          fgrep -w ${case_hpo} refs/HPOs_by_metacohort.table.tsv | cut -f$cidx
+          fgrep -w "HEALTHY_CONTROL" refs/HPOs_by_metacohort.table.tsv | cut -f$cidx
           echo -e "cnvs/$cohort.rCNV.strict_noncoding.bed.gz"
         done | paste -s
       done < <( fgrep -v mega refs/rCNV_metacohort_list.txt | cut -f1 ) \
@@ -218,8 +218,7 @@ task curate_and_burden_shard {
   >>>
 
   runtime {
-    # TODO: UPDATE DOCKER
-    # docker: "talkowski/rcnv@sha256:7bc27c40820b1f3fe66beb438ef543b8e247bc8d040629b36701c75cd1ada90b"
+    docker: "talkowski/rcnv@sha256:b218b8c0eed6d8b2a081a22d4968bea87809afa8efd0a6242f2f5b54c47b7ed4"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -310,8 +309,7 @@ task meta_burden_test {
   >>>
 
   runtime {
-    # TODO: UPDATE DOCKER
-    # docker: "talkowski/rcnv@sha256:7bc27c40820b1f3fe66beb438ef543b8e247bc8d040629b36701c75cd1ada90b"
+    docker: "talkowski/rcnv@sha256:b218b8c0eed6d8b2a081a22d4968bea87809afa8efd0a6242f2f5b54c47b7ed4"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

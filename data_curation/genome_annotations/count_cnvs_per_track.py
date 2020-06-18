@@ -90,6 +90,9 @@ def main():
                         '[default: HP:0000118]', default='HP:0000118')
     parser.add_argument('--control-hpo', default='HEALTHY_CONTROL', help='HPO code ' +
                         'to use for control CNV counts. [default: HEALTHY_CONTROL]')
+    parser.add_argument('--norm-by-samplesize', action='store_true', help='Return ' +
+                        'the number of samples with no CNVs as "_ref" category. ' +
+                        '[default: returns number of CNVs not intersecting track]')
     parser.add_argument('-o', '--outfile', help='Path to output BED file. ' +
                         '[default: stdout]', default='stdout')
     parser.add_argument('-z', '--gzip', action='store_true', help='Compress ' +
@@ -137,8 +140,12 @@ def main():
                         cbt = cnvs[cohort][ptype][ctype]
                         hits = len(cbt.intersect(tpath, u=True, F=args.frac_overlap))
                         tvals_out_sub.append(str(hits))
-                        nohits = cohort_n[cohort][ptype] - hits
-                        tvals_out_sub.append(str(nohits))
+                        if args.norm_by_samplesize:
+                            nohits = cohort_n[cohort][ptype] - hits
+                            tvals_out_sub.append(str(nohits))
+                        else:
+                            nohits = cnv_counts[cohort][ptype][ctype] - hits
+                            tvals_out_sub.append(str(nohits))
                 outfile.write('\t'.join([str(x) for x in tvals_out_sub]) + '\n')
 
     # Close & compress output file (if optioned)
