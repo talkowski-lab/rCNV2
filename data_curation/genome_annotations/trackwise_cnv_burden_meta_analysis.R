@@ -38,135 +38,7 @@ extract.cohorts <- function(stats){
                    }))
 }
 
-# Apply empirical continuity correction to meta-analysis data frame
-# Per Sweeting et al., Stat. Med., 2004 (section 3.3)
-sweeting.correction <- function(meta.df, cc.sum=0.01){
-  # Count number of carriers & non-carriers
-  n.alt <- sum(meta.df[, grep("_alt", colnames(meta.df), fixed=T)])
-  n.ref <- sum(meta.df[, grep("_ref", colnames(meta.df), fixed=T)])
-  # Require at least one CNV to be observed
-  if(n.alt>0){
-    nt <- n.alt
-    R <- n.ref/n.alt
-    # Pooled odds ratio estimate of all non-zero studies with at least one case sample
-    nonzero.studies <- intersect(which(apply(meta.df[, grep("_alt", colnames(meta.df), fixed=T)], 1, sum)>0),
-                                 which(apply(meta.df[, grep("case_", colnames(meta.df), fixed=T)], 1, sum)>0))
-    nonzero.case.odds <- sum(meta.df$case_alt[nonzero.studies])/sum(meta.df$case_ref[nonzero.studies])
-    nonzero.control.odds <- sum(meta.df$control_alt[nonzero.studies])/sum(meta.df$control_ref[nonzero.studies])
-    if(!is.nan(nonzero.case.odds) & !is.nan(nonzero.control.odds)){
-      if(nonzero.control.odds>0){
-        ohat <- nonzero.case.odds/nonzero.control.odds
-        # Otherwise, apply standard continuity correction of 0.5 to pooled estimate if no CNVs observed in controls
-      }else{
-        nonzero.case.odds <- (sum(meta.df$case_alt[nonzero.studies])+0.5)/(sum(meta.df$case_ref[nonzero.studies])+0.5)
-        nonzero.control.odds <- (sum(meta.df$control_alt[nonzero.studies])+0.5)/(sum(meta.df$control_ref[nonzero.studies])+0.5)
-        ohat <- nonzero.case.odds/nonzero.control.odds
-      }
-      # Otherwise, apply standard continuity correction to pooled estimate of *all* studies
-    }else{
-      nonzero.case.odds <- (sum(meta.df$case_alt)+0.5)/(sum(meta.df$case_ref)+0.5)
-      nonzero.control.odds <- (sum(meta.df$control_alt)+0.5)/(sum(meta.df$control_ref)+0.5)
-      ohat <- nonzero.case.odds/nonzero.control.odds
-    }
-    
-    # Solve for kc & kt
-    kc <- R/(R+ohat)
-    kt <- ohat/(R+ohat)
-    # Compute continuity corrections
-    cor.case_alt <- cc.sum * kt
-    cor.case_ref <- cc.sum * kc
-    cor.control_alt <- cc.sum * (nt + kt)
-    cor.control_ref <- cc.sum * ((nt*R) + kc)
-    # Apply continuity corrections
-    meta.df$case_alt <- meta.df$case_alt + cor.case_alt
-    meta.df$case_ref <- meta.df$case_ref + cor.case_ref
-    meta.df$control_alt <- meta.df$control_alt + cor.control_alt
-    meta.df$control_ref <- meta.df$control_ref + cor.control_ref
-  }
-  return(meta.df)
-}
-
-# Make meta-analysis data frame for a single track
-make.meta.df <- function(stats, cohorts, row.idx, empirical.continuity=T){
-  ncohorts <- length(cohorts)
-  meta.df <- data.frame("cohort"=1:ncohorts,
-                        "control_ref"=as.numeric(stats[row.idx, grep("control_ref", colnames(stats), fixed=T)]),
-                        "case_ref"=as.numeric(stats[row.idx, grep("case_ref", colnames(stats), fixed=T)]),
-                        "control_alt"=as.numeric(stats[row.idx, grep("control_alt", colnames(stats), fixed=T)]),
-                        "case_alt"=as.numeric(stats[row.idx, grep("case_alt", colnames(stats), fixed=T)]),
-                        "cohort_name"=cohorts)
-  if(empirical.continuity==T){
-    meta.df <- sweeting.correction(meta.df)
-  }
-  return(meta.df)
-}
-
-# Perform meta-analysis for a single track
-meta.single <- function(stats, cohorts, row.idx, model="fe", empirical.continuity=T){
-  # If all CNVs are ref or all are alt, return all NAs
-  if(all(sum(stats[row.idx, grep("_alt", colnames(stats), fixed=T)])>0,
-         sum(stats[row.idx, grep("_ref", colnames(stats), fixed=T)])>0)){
-    meta.df <- make.meta.df(stats, cohorts, row.idx, empirical.continuity)
-    # If strictly zero case CNVs are observed, unable to estimate effect size
-    if(all(meta.df$case_alt==0)){
-      out.v <- c(rep(NA, 4), 0)
-    }else{
-      # Meta-analysis
-      if(model=="re"){
-        meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                                     measure="OR", data=meta.df, method="REML", random = ~ 1 | cohort, slab=cohort_name,
-                                     add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
-                             error=function(e){
-                               print(paste("row", row.idx, "failed to converge. Retrying with more iterations...", sep=" "))
-                               rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                                       measure="OR", data=meta.df, method="REML", random = ~ 1 | cohort, slab=cohort_name,
-                                       add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
-                             })
-        out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
-                              meta.res$zval, -log10(meta.res$pval)))
-      }else if(model=="mh"){
-        meta.res <- rma.mh(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                           measure="OR", data=meta.df, slab=cohort_name,
-                           add=0, drop00=F, correct=F)
-        out.v <- as.numeric(c(meta.res$b, meta.res$ci.lb, meta.res$ci.ub,
-                              meta.res$zval, -log10(meta.res$MHp)))
-      }else if(model=="fe"){
-        meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                                     measure="OR", data=meta.df, method="FE", slab=cohort_name,
-                                     add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
-                             error=function(e){
-                               print(paste("row", row.idx, "failed to converge. Retrying with more iterations...", sep=" "))
-                               rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                                       measure="OR", data=meta.df, method="FE", slab=cohort_name,
-                                       add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
-                             })
-        out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
-                              meta.res$zval, -log10(meta.res$pval)))
-      }
-    }
-    return(out.v)
-  }else{
-    rep(NA, 5)
-  }
-}
-
-# Make meta-analysis lookup table to shorten time required to run full meta-analysis
-make.meta.lookup.table <- function(stats, cohorts, model, empirical.continuity=T){
-  unique.counts.df <- unique(stats[, sort(unique(c(grep("_ref", colnames(stats), fixed=T),
-                                                   grep("_alt", colnames(stats), fixed=T))))])
-  
-  unique.stats <- t(sapply(1:nrow(unique.counts.df), function(i){
-    meta.single(unique.counts.df, cohorts, i, model, empirical.continuity)
-  }))
-  
-  lookup.table <- cbind(unique.counts.df, unique.stats)
-  stat.colnames <- c("meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper", "meta_z", "meta_phred_p")
-  colnames(lookup.table)[(ncol(lookup.table)-4):ncol(lookup.table)] <- stat.colnames
-  
-  return(lookup.table)
-}
-
-# Apply saddlepoint approximation to vector of Z-scores to generate adjusted P-values
+# Apply saddlepoint approximation to vector of Z-scores to generate adjusted P-values and Z-scores
 saddlepoint.adj <- function(zscores, phred=T, alternative="two.sided"){
   mu.hat <- mean(zscores, na.rm=T)
   sd.hat <- sd(zscores, na.rm=T)
@@ -176,52 +48,82 @@ saddlepoint.adj <- function(zscores, phred=T, alternative="two.sided"){
            max(max(zscores, na.rm=T), 40), dx)
   saddle.pdf <- saddlepoint(x, 1, cumuls)$approx
   saddle.cdf <- cumsum(saddle.pdf * 0.01)
-  calc.saddle.p <- function(z){
+  calc.saddle.p.z <- function(z){
     if(!is.na(z)){
       if(alternative=="greater"){
-        1 - tail(saddle.cdf[which(x<z)], 1)
+        p <- 1 - tail(saddle.cdf[which(x<z)], 1)
+        new.z <- qnorm(1 - p)
       }else if(alternative=="less"){
-        tail(saddle.cdf[which(x<z)], 1)
+        p <- tail(saddle.cdf[which(x<z)], 1)
+        new.z <- qnorm(p)
       }else{
-        if(z>=0){
-          1 - tail(saddle.cdf[which(x<z)], 1)
-        }else{
-          tail(saddle.cdf[which(x<z)], 1)
-        }
+          p <- tail(saddle.cdf[which(x<z)], 1)
+          new.z <- qnorm(p)
+          if(p>0.5){
+            p <- 1 - p
+          }
       }
     }else{
-      NA
+      p <- NA
+      new.z <- NA
     }
+    return(c(new.z, p))
   }
-  new.pvals <- sapply(zscores, calc.saddle.p)
+  new.stats <- t(sapply(zscores, calc.saddle.p.z))
+  colnames(new.stats) <- c("zscore", "p")
   if(phred==T){
-    return(-log10(new.pvals))
-  }else{
-    return(new.pvals)
+    new.stats[, 2] <- -log10(new.stats[, 2])
+    colnames(new.stats)[2] <- "phred_p"
   }
+  return(as.data.frame(new.stats))
 }
 
-# Wrapper function to perform a meta-analysis on all tracks
-meta <- function(stats, cohorts, model="fe", saddle=T){
-  # Make meta-analysis lookup table
-  meta.lookup.table <- make.meta.lookup.table(stats, cohorts, model, 
-                                              empirical.continuity=T)
-  
-  # Merge stats into full list
-  meta.res <- merge(stats, meta.lookup.table, sort=F, all.x=T, all.y=F)
-  
-  # Adjust P-values using saddlepoint approximation of null distribution, if optioned
-  if(saddle==T){
-    meta.res$meta_phred_p <- saddlepoint.adj(meta.res$meta_z)
-  }
-  
-  # Add FDR-adjusted q-value
-  meta.res$meta_phred_fdr_q <- -log10(p.adjust(10^-meta.res$meta_phred_p, method="fdr"))
-  
-  # Format output
-  return(meta.res[, -unique(c(grep("_ref", colnames(meta.res), fixed=T),
-                              grep("_alt", colnames(meta.res), fixed=T)))])
+# Calculate odds ratios, variance, and Z-scores per cohort (with SPA, if optioned)
+calc.ors <- function(stats, cohorts, spa=T){
+  or.df <- as.data.frame(do.call("cbind", lapply(cohorts, function(cohort){
+    ors <- as.data.frame(t(sapply(1:nrow(stats), function(i){
+      as.numeric(metafor::escalc("OR", 
+                      ai=stats[i, paste(cohort, "control", "ref", sep="_")],
+                      bi=stats[i, paste(cohort, "case", "ref", sep="_")],
+                      ci=stats[i, paste(cohort, "control", "alt", sep="_")],
+                      di=stats[i, paste(cohort, "case", "alt", sep="_")]))
+    })))
+    colnames(ors) <- c("lnOR", "var")
+    # Z-score computed against per-category variance and empirical mean across all categories
+    # Assumes the average category should _not_ have an effect, so any systematic deviance from
+    # mean = 0 is due to filtering biases
+    ors$zscore <- (ors$lnOR - mean(ors$lnOR, na.rm=T)) / sqrt(ors$var)
+    # Adjust Z-score with SPA, if optioned
+    if(spa==T){
+      adj.z.p <- saddlepoint.adj(ors$zscore, alternative="two.sided", phred=T)
+      ors$zscore <- adj.z.p$zscore
+      ors$phred_p <- adj.z.p$phred_p
+    }
+    colnames(ors) <- paste(cohort, colnames(ors), sep=".")
+    return(ors)
+  })))
+  return(as.data.frame(cbind(stats, or.df)))
 }
+
+# Meta analysis of Z-scores weighted by inverse variance
+weighted.z <- function(stats, cohorts, spa=T){
+  meta.z <- sapply(1:nrow(stats), function(i){
+    z <- stats[i, grep("zscore", colnames(stats), fixed=T)]
+    var <- stats[i, grep("var", colnames(stats), fixed=T)]
+    inv.var <- 1/var
+    weighted.mean(z, inv.var, na.rm=T)
+  })
+  if(spa==T){
+    meta.z.p <- saddlepoint.adj(meta.z, phred=T)
+  }else{
+    meta.z.p <- data.frame("zscore" = meta.z,
+                           "phred_p" = -log10(pnorm(abs(meta.z), lower.tail=F)))
+  }
+  meta.z.p$phred_fdr_q <- p.adjust(10^-meta.z.p$phred_p, method="fdr")
+  colnames(meta.z.p) <- paste("meta", colnames(meta.z.p), sep=".")
+  as.data.frame(cbind(stats, meta.z.p))
+}
+
 
 ################
 ###RSCRIPT BLOCK
@@ -233,13 +135,8 @@ require(EQL, quietly=T)
 
 # List of command-line options
 option_list <- list(
-  make_option(c("--model"), type="character", default="fe", 
-              help="specify meta-analysis model ('re': random effects, 'fe': fixed effects, 'mh': Mantel-Haenszel) [default '%default']",
-              metavar="string"),
-  make_option(c("--spa"), action="store_true", default=FALSE, 
-              help="apply saddlepoint approximation of null distribution [default %default]"),
-  make_option(c("--fdr-cutoff"), type="numeric", default=0.05, 
-              help="FDR q-value cutoff to consider a track significant [default '%default']",
+  make_option(c("--p-cutoff"), type="numeric", default=0.05, 
+              help="Meta-analysis P-value cutoff to consider a track significant [default '%default']",
               metavar="numeric"),
   make_option(c("--signif-tracks"), type="character",  
               help="output file for significant tracks", metavar="string")
@@ -255,39 +152,38 @@ opts <- args$options
 stats.in <- args$args[1]
 tracklist.in <- args$args[2]
 outfile <- args$args[3]
-model <- opts$model
-spa <- opts$spa
-fdr.cutoff <- -log10(as.numeric(opts$`fdr-cutoff`))
-signif.outfile <- opts$`signif-tracklist`
+p.cutoff <- -log10(as.numeric(opts$`p-cutoff`))
+signif.outfile <- opts$`signif-tracks`
 
 # # Dev parameters
 # stats.in <- "~/scratch/rCNV.chromhmm.merged_stats.with_counts.tsv.gz"
 # tracklist.in <- "~/scratch/chromhmm_tracks.gs_paths.list"
 # outfile <- "~/scratch/rCNV.chromhmm.burden_stats.tsv.gz"
-# model <- "fe"
-# spa <- T
-# fdr.cutoff <- -log10(0.05)
+# p.cutoff <- -log10(0.05)
 # signif.outfile <- "~/scratch/rCNV.chromhmm.signif_tracks.list"
+
+# Read full tracklist
+tracklist <- read.table(tracklist.in, header=F, sep="\t", comment.char="")[, 1]
 
 # Read track stats and split by CNV type
 stats <- load.stats(stats.in, cnv.split=T)
 cohorts <- extract.cohorts(stats[[1]])
 
-# Read full tracklist
-tracklist <- read.table(tracklist.in, header=F, sep="\t", comment.char="")[, 1]
+# Calculate case:control ORs, variance, and Z-scores for each track
+stats <- lapply(stats, calc.ors, cohorts)
 
-# Run meta-analysis for all tracks
-meta.res.split <- lapply(stats, function(stats.df){
-  meta(stats.df, cohorts, model, saddle=spa)
-})
-meta.res <- do.call("rbind", meta.res.split)
+# Weighted Z-score meta-analysis
+meta.res.split <- lapply(stats, weighted.z, cohorts)
+
+# Combine DEL & DUP, and write to outfile
+meta.res <- as.data.frame(do.call("rbind", meta.res.split))
 colnames(meta.res)[1] <- paste("#", colnames(meta.res)[1], sep="")
 write.table(meta.res, outfile, sep="\t",
             row.names=F, col.names=T, quote=F)
 
 # Extract significant track names
 if(!is.null(signif.outfile)){
-  sig.idx <- which(meta.res$meta_phred_fdr_q >= fdr.cutoff & meta.res$meta_z > 0)
+  sig.idx <- which(meta.res$meta.phred_p >= p.cutoff & meta.res$meta.zscore > 0)
   if(length(sig.idx) > 0){
     sig.names <- meta.res[sig.idx, 1]
     sig.tracks <- t(sapply(sig.names, function(name){

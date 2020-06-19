@@ -61,6 +61,7 @@ min_element_size=5
 max_element_size=200000
 case_hpo="HP:0000118"
 min_element_overlap=1.0
+p_cutoff=0.05
 
 
 # Curate all annotations in an arbitrary input list of paths
@@ -106,12 +107,19 @@ done < <( fgrep -v mega refs/rCNV_metacohort_list.txt | cut -f1 ) \
   --gzip 
 
 
+# Dev code:
+gsutil -m cp \
+  gs://fc-cc4e446a-02a8-44af-bb70-2ca6013099b4/83202b3d-9437-41aa-a82b-2d0c933d02d7/curate_annotations/84695746-fc0d-4781-9a64-b2b71323ea07/call-merge_chromhmm/rCNV.chromhmm.merged_stats.with_counts.tsv.gz \
+  gs://fc-cc4e446a-02a8-44af-bb70-2ca6013099b4/83202b3d-9437-41aa-a82b-2d0c933d02d7/curate_annotations/84695746-fc0d-4781-9a64-b2b71323ea07/call-merge_tracklists/cacheCopy/rCNV.all_tracks.list \
+  ./
+stats=rCNV.chromhmm.merged_stats.with_counts.tsv.gz
+merged_tracklist=rCNV.all_tracks.list
+
+
 # Burden meta-analysis of cohort CNV counts for each track
 /opt/rCNV2/data_curation/genome_annotations/trackwise_cnv_burden_meta_analysis.R \
-  --model "fe" \
-  --spa \
-  --fdr-cutoff ${fdr_cutoff} \
-  --signif-outfile ${prefix}.signif_paths_and_tracks.list \
+  --p-cutoff ${p_cutoff} \
+  --signif-tracks ${prefix}.signif_paths_and_tracks.list \
   ${stats} \
   ${merged_tracklist} \
   ${prefix}.burden_stats.tsv

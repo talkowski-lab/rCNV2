@@ -49,12 +49,12 @@ workflow curate_annotations {
       prefix="${prefix}.chromhmm"
   }
 
-  # Merge stats across all tracklists
-  call merge_shards as merge_all {
-    input:
-      stat_shards=[merge_chromhmm.merged_stats],
-      prefix="${prefix}.all"
-  }
+  # # Merge stats across all tracklists
+  # call merge_shards as merge_all {
+  #   input:
+  #     stat_shards=[merge_chromhmm.merged_stats],
+  #     prefix="${prefix}.all"
+  # }
 
   # Merge all tracklists
   call merge_tracklists {
@@ -63,15 +63,15 @@ workflow curate_annotations {
       prefix="${prefix}"
   }
 
-  # Merge stats across all tracklists and compute meta-analysis burden stats
-  call meta_burden_test {
-    input:
-      stats=merge_all.merged_stats,
-      fdr_cutoff=fdr_cutoff,
-      merged_tracklist=merge_tracklists.merged_tracklist,
-      rCNV_bucket=rCNV_bucket,
-      prefix=prefix
-  }
+  # # Merge stats across all tracklists and compute meta-analysis burden stats
+  # call meta_burden_test {
+  #   input:
+  #     stats=merge_all.merged_stats,
+  #     fdr_cutoff=fdr_cutoff,
+  #     merged_tracklist=merge_tracklists.merged_tracklist,
+  #     rCNV_bucket=rCNV_bucket,
+  #     prefix=prefix
+  # }
 
   # # Re-shard all significant tracks for final curation
   # call shard_tracklist as shard_tracklist_signif {
@@ -101,7 +101,7 @@ workflow curate_annotations {
 
   # Final outputs
   output {
-    File stats_all_tracks = meta_burden_test.meta_stats
+    # File stats_all_tracks = meta_burden_test.meta_stats
     # File signif_tracklist = meta_burden_test.signif_tracklist
   }
 }
@@ -212,13 +212,14 @@ task curate_and_burden_shard {
         --track-stats ${prefix}.stats.tsv \
         --frac-overlap ${min_element_overlap} \
         --case-hpo ${case_hpo} \
+        --norm-by-samplesize \
         --outfile ${prefix}.stats.with_counts.tsv.gz \
         --gzip
     fi
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b218b8c0eed6d8b2a081a22d4968bea87809afa8efd0a6242f2f5b54c47b7ed4"
+    docker: "talkowski/rcnv@sha256:302d6196b24a131ecfff2f3bf81837faca84431252402fe9897f087e0d92dd74"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -293,15 +294,12 @@ task meta_burden_test {
     set -e
 
     /opt/rCNV2/data_curation/genome_annotations/trackwise_cnv_burden_meta_analysis.R \
-      --model "fe" \
-      --spa \
-      --fdr-cutoff ${fdr_cutoff} \
-      --signif-outfile ${prefix}.signif_paths_and_tracks.list \
+      --p-cutoff ${p_cutoff} \
+      --signif-tracks ${prefix}.signif_paths_and_tracks.list \
       ${stats} \
       ${merged_tracklist} \
       ${prefix}.burden_stats.tsv
     gzip -f ${prefix}.burden_stats.tsv
-
     cut -f1 ${prefix}.signif_paths_and_tracks.list \
     > ${prefix}.signif_tracks.list
     cut -f2 ${prefix}.signif_paths_and_tracks.list \
