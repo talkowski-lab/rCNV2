@@ -107,13 +107,13 @@ done < <( fgrep -v mega refs/rCNV_metacohort_list.txt | cut -f1 ) \
   --gzip 
 
 
-# Dev code:
-gsutil -m cp \
-  gs://fc-cc4e446a-02a8-44af-bb70-2ca6013099b4/83202b3d-9437-41aa-a82b-2d0c933d02d7/curate_annotations/84695746-fc0d-4781-9a64-b2b71323ea07/call-merge_chromhmm/rCNV.chromhmm.merged_stats.with_counts.tsv.gz \
-  gs://fc-cc4e446a-02a8-44af-bb70-2ca6013099b4/83202b3d-9437-41aa-a82b-2d0c933d02d7/curate_annotations/84695746-fc0d-4781-9a64-b2b71323ea07/call-merge_tracklists/cacheCopy/rCNV.all_tracks.list \
-  ./
-stats=rCNV.chromhmm.merged_stats.with_counts.tsv.gz
-merged_tracklist=rCNV.all_tracks.list
+# # Dev code:
+# gsutil -m cp \
+#   gs://fc-cc4e446a-02a8-44af-bb70-2ca6013099b4/83202b3d-9437-41aa-a82b-2d0c933d02d7/curate_annotations/84695746-fc0d-4781-9a64-b2b71323ea07/call-merge_chromhmm/rCNV.chromhmm.merged_stats.with_counts.tsv.gz \
+#   gs://fc-cc4e446a-02a8-44af-bb70-2ca6013099b4/83202b3d-9437-41aa-a82b-2d0c933d02d7/curate_annotations/84695746-fc0d-4781-9a64-b2b71323ea07/call-merge_tracklists/cacheCopy/rCNV.all_tracks.list \
+#   ./
+# stats=rCNV.chromhmm.merged_stats.with_counts.tsv.gz
+# merged_tracklist=rCNV.all_tracks.list
 
 
 # Burden meta-analysis of cohort CNV counts for each track
@@ -130,8 +130,29 @@ cut -f2 ${prefix}.signif_paths_and_tracks.list \
 > ${prefix}.signif_tracknames.list
 
 
-# Dev code for CRB clustering
+# Dev code:
+min_prop_tracks_per_crb=0.1
+clustering_neighborhood_dist=10000
+clustering_neighborhood_dist=10000
+
+
+# Copy & index all final curated significant tracks locally
+mkdir sig_tracks/
+gsutil -m cp \
+  ${rCNV_bucket}/cleaned_data/genome_annotations/significant_tracks/*.curated.bed.gz \
+  sig_tracks/
+find sig_tracks/ -name "*.curated.bed.gz" \
+| xargs -I {} tabix -f {}
+
+# Cluster significant tracks into CRBs
 /opt/rCNV2/data_curation/genome_annotations/build_crbs.py \
-  --genome refs/GRCh37.genome \
-  *.curated.bed.gz
+  --genome <( grep -e '^[1-9]' refs/GRCh37.genome ) \
+  --prop-min-elements 0.1 \
+  --neighborhood-dist 10000 \
+  --min-crb-separation 10000 \
+  --crb-prefix "${prefix}_CRB" \
+  --crb-outbed ${prefix}.crbs.bed.gz \
+  --element-outbed ${prefix}.crb_elements.bed.gz \
+  --bgzip \
+  sig_tracks/*.curated.bed.gz
 

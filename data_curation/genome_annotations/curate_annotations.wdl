@@ -15,7 +15,7 @@ workflow curate_annotations {
   Int max_element_size
   String case_hpo
   Float min_element_overlap
-  Float fdr_cutoff
+  Float p_cutoff
   String rCNV_bucket
   String prefix
 
@@ -49,12 +49,12 @@ workflow curate_annotations {
       prefix="${prefix}.chromhmm"
   }
 
-  # # Merge stats across all tracklists
-  # call merge_shards as merge_all {
-  #   input:
-  #     stat_shards=[merge_chromhmm.merged_stats],
-  #     prefix="${prefix}.all"
-  # }
+  # Merge stats across all tracklists
+  call merge_shards as merge_all {
+    input:
+      stat_shards=[merge_chromhmm.merged_stats],
+      prefix="${prefix}.all"
+  }
 
   # Merge all tracklists
   call merge_tracklists {
@@ -63,46 +63,46 @@ workflow curate_annotations {
       prefix="${prefix}"
   }
 
-  # # Merge stats across all tracklists and compute meta-analysis burden stats
-  # call meta_burden_test {
-  #   input:
-  #     stats=merge_all.merged_stats,
-  #     fdr_cutoff=fdr_cutoff,
-  #     merged_tracklist=merge_tracklists.merged_tracklist,
-  #     rCNV_bucket=rCNV_bucket,
-  #     prefix=prefix
-  # }
+  # Merge stats across all tracklists and compute meta-analysis burden stats
+  call meta_burden_test {
+    input:
+      stats=merge_all.merged_stats,
+      p_cutoff=p_cutoff,
+      merged_tracklist=merge_tracklists.merged_tracklist,
+      rCNV_bucket=rCNV_bucket,
+      prefix=prefix
+  }
 
-  # # Re-shard all significant tracks for final curation
-  # call shard_tracklist as shard_tracklist_signif {
-  #   input:
-  #     tracklist=merge_shards_and_meta.signif_tracklist,
-  #     tracks_per_shard=tracks_per_shard,
-  #     prefix="${prefix}.signif_tracks"
-  # }
+  # Re-shard all significant tracks for final curation
+  call shard_tracklist as shard_tracklist_signif {
+    input:
+      tracklist=meta_burden_test.signif_tracklist,
+      tracks_per_shard=tracks_per_shard,
+      prefix="${prefix}.signif_tracks"
+  }
 
-  # # Scatter over sharded significant tracklist and curate tracks
-  # scatter ( shard in shard_tracklist_signif.shards ) {
-  #   call curate_and_burden_shard as curate_and_burden_shard_signif {
-  #     input:
-  #       tracklist=shard,
-  #       min_element_size=min_element_size,
-  #       max_element_size=max_element_size,
-  #       case_hpo=case_hpo,
-  #       min_element_overlap=min_element_overlap,
-  #       rCNV_bucket=rCNV_bucket,
-  #       prefix="${prefix}.signif_shard",
-  #       keep_tracks="TRUE"
-  #   }
-  # }
+  # Scatter over sharded significant tracklist and curate tracks
+  scatter ( shard in shard_tracklist_signif.shards ) {
+    call curate_and_burden_shard as curate_and_burden_shard_signif {
+      input:
+        tracklist=shard,
+        min_element_size=min_element_size,
+        max_element_size=max_element_size,
+        case_hpo=case_hpo,
+        min_element_overlap=min_element_overlap,
+        rCNV_bucket=rCNV_bucket,
+        prefix="${prefix}.signif_shard",
+        keep_tracks="TRUE"
+    }
+  }
 
   # Cluster final cis-regulatory blocks from significant tracks
   # TBD
 
   # Final outputs
   output {
-    # File stats_all_tracks = meta_burden_test.meta_stats
-    # File signif_tracklist = meta_burden_test.signif_tracklist
+    File stats_all_tracks = meta_burden_test.meta_stats
+    File signif_tracklist = meta_burden_test.signif_tracklist
   }
 }
 
@@ -285,7 +285,7 @@ task merge_tracklists {
 # Conduct meta-analysis burden test for all tracks
 task meta_burden_test {
   File stats
-  Float fdr_cutoff
+  Float p_cutoff
   File merged_tracklist
   String rCNV_bucket
   String prefix
@@ -307,7 +307,7 @@ task meta_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b218b8c0eed6d8b2a081a22d4968bea87809afa8efd0a6242f2f5b54c47b7ed4"
+    docker: "talkowski/rcnv@sha256:b4ffdd54084839d8346b88309913aa57d20b482ee59c862e1349f78ada53a0e6"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -318,5 +318,66 @@ task meta_burden_test {
     File meta_stats = "${prefix}.burden_stats.tsv.gz"
     File signif_tracklist = "${prefix}.signif_tracks.list"
     File signif_tracknames = "${prefix}.signif_tracknames.list"
+  }
+}
+
+
+# Cluster elements from significant tracks into CRBs
+task cluster_elements {
+  Float min_prop_tracks_per_crb
+  Int clustering_neighborhood_dist
+  Int min_crb_separation
+  String rCNV_bucket
+  String prefix
+
+  command <<<
+    set -e
+
+    # Copy necessary reference files
+    mkdir refs/
+    gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/GRCh37.genome refs/
+
+    # Copy & index all final curated significant tracks locally
+    mkdir sig_tracks/
+    gsutil -m cp \
+      ${rCNV_bucket}/cleaned_data/genome_annotations/significant_tracks/*.curated.bed.gz \
+      sig_tracks/
+    find sig_tracks/ -name "*.curated.bed.gz" \
+    | xargs -I {} tabix -f {}
+
+    # Cluster significant tracks into CRBs
+    /opt/rCNV2/data_curation/genome_annotations/build_crbs.py \
+      --genome <( grep -e '^[1-9]' refs/GRCh37.genome ) \
+      --prop-min-elements ${min_prop_tracks_per_crb} \
+      --neighborhood-dist ${clustering_neighborhood_dist} \
+      --min-crb-separation ${min_crb_separation} \
+      --crb-prefix "${prefix}_CRB" \
+      --crb-outbed ${prefix}.crbs.bed.gz \
+      --element-outbed ${prefix}.crb_elements.bed.gz \
+      --bgzip \
+      sig_tracks/*.curated.bed.gz
+
+    # Index CRBs and elements
+    tabix -f ${prefix}.crbs.bed.gz
+    tabix -f ${prefix}.crb_elements.bed.gz
+
+    # Copy final CRBs and elements to gs:// bucket
+    gsutil -m cp \
+      ${prefix}.crbs.bed.gz* \
+      ${prefix}.crb_elements.bed.gz* \
+      ${rCNV_bucket}/cleaned_data/genome_annotations/
+  >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:b4ffdd54084839d8346b88309913aa57d20b482ee59c862e1349f78ada53a0e6"
+    preemptible: 1
+    memory: "4 GB"
+    bootDiskSizeGb: "20"
+    disks: "local-disk 50 HDD"
+  }
+
+  output {
+    File final_crbs = "${prefix}.crbs.bed.gz"
+    File final_crb_elements = "${prefix}.crb_elements.bed.gz"
   }
 }

@@ -45,13 +45,13 @@ To reduce our search space for association testing, we next wanted to determine 
 
 We restricted subsequent analyses to a subset of tracks following the procedure described below:
 
-For each track, we counted the number of strictly noncoding rare CNVs that overlapped at least one element per track.  
+For each track, we counted the number of strictly noncoding rare CNVs that completely overlapped at least one element per track.  
 
 These counts of CNVs per track were split by [metacohort](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#case-control-metacohorts), CNV type, and [case/control status](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype#hpo-terms-per-metacohort).  
 
-After tabulating counts of CNVs per track, we conducted a fixed-effects meta-analysis for each track using the same approach as for our [sliding window](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/sliding_windows#3-combine-association-statistics-across-metacohorts) or [gene-based association tests](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/genes#3-combine-association-statistics-across-metacohorts).  
+After tabulating counts of CNVs per track, we conducted a fixed-effects meta-analysis using the inverse-variance weighted Z-score method for each track with saddlepoint approximation applied across all tracks per cohort.  
 
-We applied a Benjamini-Hochberg correction to the meta-analysis P-values across all tracks & CNV types, and considered any track with FDR q < 0.05 to have sufficient evidence for possible disease relevance to be included for subsequent association testing.  
+We considered any track with a meta-analysis P < 0.05 to have sufficient evidence for possible disease relevance to be included for subsequent association testing.  
 
 ### Cluster significant annotations into CRBs  
 

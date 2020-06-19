@@ -10,22 +10,31 @@ Clusters elements from input annotation tracks into cis-regulatory blocks (CRBs)
 """
 
 
+from pysam import TabixFile
 import pandas as pd
+from io import StringIO
 import pybedtools as pbt
+import numpy as np
+from sklearn.cluster import DBSCAN
 import argparse
+from os import path
+import subprocess
 
 
-def load_tracks(tracklist, genome=None):
+def load_tracks(tracklist, chrom, genome=None):
     """
-    Loads all tracks as pbt.BedTool and suffixes each with unique element ID
+    Loads all tracks for a single chromsome as pbt.BedTool
+    Suffixes each element with unique ID
     """
 
-    def _load_and_suffix_bt(btpath):
-        tdf = pd.read_csv(btpath, sep='\t', names='chrom start end name'.split())
-        tdf['name'] = ['{}_e{}'.format(n, i) for n, i in zip(tdf.name, tdf.index + 1)]
+    def _load_and_suffix_bt(btpath, chrom):
+        invals = StringIO('\n'.join([x for x in TabixFile(btpath).fetch(chrom)]))
+        tdf = pd.read_csv(invals, sep='\t', names='chrom start end name'.split())
+        tdf['name'] = ['{}.{}_e{}'.format(n, c, i) for n, c, i \
+                       in zip(tdf.name, tdf.chrom, tdf.index + 1)]
         return pbt.BedTool.from_dataframe(tdf)
 
-    tracks = [_load_and_suffix_bt(t) for t in tracklist]
+    tracks = [_load_and_suffix_bt(t, chrom) for t in tracklist]
 
     if len(tracks) == 1:
         all_bt = tracks[0]
@@ -38,29 +47,108 @@ def load_tracks(tracklist, genome=None):
         return all_bt.sort(g=genome).saveas()
 
 
-def build_dist_matrix(ebt):
+def make_clusters(ebt, pos_df, min_elements=1, neighborhood_dist=10000, genome=None):
     """
-    Builds an all X all distance matrix from a pbt.BedTool of elements
-    """
-
-    for feature in ebt:
-        fstr = '\t'.join([str(x) for x in [feature.chrom, feature.start, feature.end]]) + '\n'
-        # pbt.BedTool(fstr, from_string=True).
-
-
-def cluster_chrom(elements, chrom):
-    """
-    Cluster all elements for a single chromosome
+    Clusters elements based on 1D position
+    Returns:
+        1. pbt.BedTool of maximal coordinates per cluster
+        2. dict of {cluster_id : [element_ids]}
     """
 
-    # Filter to elements on chromosome
-    ebt = elements.filter(lambda x: x.chrom == chrom)
+    edf = ebt.to_dataframe()
 
-    # Build distance matrix of all elements
-    dmat = 
+    # Clusters elements with DBSCAN
+    clustering = DBSCAN(eps=neighborhood_dist, min_samples=min_elements, 
+                        metric='euclidean').fit(pos_df)
+    pos_df['cluster'] = clustering.labels_
+    cluster_members = {k : pos_df.index[pos_df.cluster == k].tolist() \
+                       for k in list(set(clustering.labels_.tolist())) \
+                       if k != -1}
+
+    # Gets maximal coordinates for each cluster
+    clust_bt_str = ''
+    for k, eids in cluster_members.items():
+        kchrom = edf.chrom[edf.name.isin(eids)].iloc[0]
+        kstart = np.nanmin(edf.start[edf.name.isin(eids)])
+        kend = np.nanmax(edf.end[edf.name.isin(eids)])
+        clust_bt_str += '\t'.join(str(x) for x in [kchrom, kstart, kend, k]) + '\n'
+    clust_bt = pbt.BedTool(clust_bt_str, from_string=True).sort(g=genome)
+
+    return clust_bt, cluster_members
 
 
-    import pdb; pdb.set_trace()
+def refine_clusters(clust_bt, clust_members, ebt, genome=None, 
+                    min_crb_separation=10000, prefix='CRB'):
+    """
+    Refine & reformat final clusters & their constituent elements
+    """
+
+    crb_bt_str = ''
+    crb_ele_bt_str = ''
+
+    clust_df = clust_bt.to_dataframe()
+    edf = ebt.to_dataframe()
+
+    # Aggregate clusters within min_crb_separation
+    clust_groups = clust_bt.merge(d=min_crb_separation, c=4, o='distinct')
+
+    # Iterate over cluster groups and reformat CRB & elements from each
+    k = 0
+    for g in clust_groups:
+        k += 1
+
+        # Format final CRB
+        crb_id = '_'.join([prefix, g.chrom, str(k)])
+        cidxs = [int(x) for x in g[3].split(',')]
+        cstart = str(np.nanmin(clust_df.start[clust_df.name.isin(cidxs)]))
+        cend = str(np.nanmax(clust_df.end[clust_df.name.isin(cidxs)]))
+        crb_bt_str += '\t'.join([g.chrom, cstart, cend, crb_id]) + '\n'
+
+        # Gather elements belonging to CRB and format them
+        elists = [clust_members[x] for x in cidxs]
+        crb_eles = [i for s in elists for i in s]
+        eles_df = edf[edf.name.isin(crb_eles)]
+        for edat in eles_df.values.tolist():
+            ename = '.'.join(edat[3].split('.')[:-1])
+            crb_ele_bt_str += '\t'.join([str(x) for x in edat[:-1] + [ename, crb_id]]) + '\n'
+
+    crb_bt = pbt.BedTool(crb_bt_str, from_string=True).sort(g=genome)
+    crb_ele_bt = pbt.BedTool(crb_ele_bt_str, from_string=True).sort(g=genome)
+
+    return crb_bt, crb_ele_bt
+
+
+def cluster_chrom(tracklist, chrom, genome, min_elements=None, n_ele_prop=0.1, 
+                  neighborhood_dist=10000, min_crb_separation=10000, prefix='CRB'):
+    """
+    Load & cluster all elements for a single chromosome
+    Returns:
+        1. pbt.BedTool of final clusters
+        2. pbt.BedTool of all elements belonging to final clusters
+    """
+
+    # Count number of input tracks & determine proportional min_elements
+    n_tracks = len(tracklist)
+    if min_elements is None:
+        min_elements = np.nanmax([np.floor(n_tracks * n_ele_prop), 1])
+
+    # Load elements for chromosome
+    ebt = load_tracks(tracklist, chrom, genome)
+
+    # Build pd.DataFrame of positions
+    pos_df = pd.DataFrame([(x.start + x.end)/2 for x in ebt],
+                          columns=['pos'], 
+                          index=[x.name for x in ebt])
+
+    # Initial clustering of CRBs
+    clust_bt, clust_members = make_clusters(ebt, pos_df, min_elements, 
+                                            neighborhood_dist, genome)
+
+    # Refine & annotate clusters
+    crb_bt, crb_ele_bt = refine_clusters(clust_bt, clust_members, ebt, genome,
+                                         min_crb_separation, prefix)
+
+    return crb_bt, crb_ele_bt
 
 
 def main():
@@ -74,25 +162,60 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('tracks', nargs='+', help='Annotation ' +
                         'tracks to be included in CRB clustering. Must specify ' +
-                        'at least one track')
-    parser.add_argument('-g', '--genome', help='BEDTools-style genome file to ' +
-                        'be used when sorting.')
+                        'at least one track.')
+    parser.add_argument('-g', '--genome', required=True, help='BEDTools-style ' +
+                        'genome file to be used when sorting.')
+    parser.add_argument('--min-elements', default=None, type=int, help='Minimum ' +
+                        'number of elements in CRB.')
+    parser.add_argument('--prop-min-elements', default=0.1, type=float, help='If ' +
+                        '--min-elements is not supplied, will automatically set ' +
+                        'minimum number of elements as a proportion of the total ' +
+                        'number of tracks.')
+    parser.add_argument('--neighborhood-dist', default=10000, type=int, help='Maximum ' +
+                        'distance between two elements to allow.')
+    parser.add_argument('--min-crb-separation', default=10000, type=int, help='Minimum ' +
+                        'distance between two CRBs before merging them.')
+    parser.add_argument('-p', '--crb-prefix', default='CRB', help='Prefix for ' +
+                        'CRB names.')
+    parser.add_argument('--crb-outbed', required=True, help='Output BED for final CRBs.')
+    parser.add_argument('--element-outbed', required=True, help='Output BED for ' +
+                        'elements belonging to final CRBs.')
+    parser.add_argument('-z', '--bgzip', action='store_true', help='Compress ' +
+                        'output BEDs with bgzip.')
     args = parser.parse_args()
 
-    # Load all tracks
-    elements = load_tracks(args.tracks, args.genome)
+    # Clean suffixes for outfiles
+    outpaths = {'crbs' : args.crb_outbed, 'elements' : args.element_outbed}
+    for key, outpath in outpaths.items():
+        if path.splitext(outpath)[-1] in '.gz .bz .bgz .bgzip .gzip'.split():
+            outpaths[key] = path.splitext(outpath)[0]
+            gzip_out = True
+        else:
+            gzip_out = args.gzip
 
     # Build list of contigs to consider
-    if args.genome is None:
-        contigs = list(set([x.chrom for x in elements]))
-    else:
-        contigs = [x.split('\t')[0] for x in open(args.genome).readlines()]
+    contigs = [x.split('\t')[0] for x in open(args.genome).readlines()]
 
-    # Cluster each chromosome
-    crbs_split = [cluster_chrom(elements, chrom) for chrom in contigs]
+    # Process elements from each chromosome in serial
+    final_elements = pbt.BedTool('', from_string=True)
+    final_crbs = pbt.BedTool('', from_string=True)
+    for chrom in contigs:
+        print('Clustering CRBs on chromosome {}...'.format(chrom))
+        new_crbs, new_elements = \
+            cluster_chrom(args.tracks, chrom, args.genome, args.min_elements, 
+                          args.prop_min_elements, args.neighborhood_dist,
+                          args.min_crb_separation, args.crb_prefix)
+        final_crbs = final_crbs.cat(new_crbs, postmerge=False)
+        final_elements = final_elements.cat(new_elements, postmerge=False)
 
+    # Write final tracks to file
+    final_crbs.saveas(outpaths['crbs'])
+    final_elements.saveas(outpaths['elements'])
 
-    import pdb; pdb.set_trace()
+    # Bgzip, if optioned
+    if gzip_out:
+        for outpath in outpaths.values():
+            subprocess.run(['gzip', '-f', outpath])
 
 
 if __name__ == '__main__':
