@@ -144,12 +144,16 @@ gsutil -m cp \
 find sig_tracks/ -name "*.curated.bed.gz" \
 | xargs -I {} tabix -f {}
 
+# Subset genome file to autosomes
+grep -e '^[1-9]' refs/GRCh37.genome \
+> autosomes.genome
+
 # Cluster significant tracks into CRBs
 /opt/rCNV2/data_curation/genome_annotations/build_crbs.py \
-  --genome <( grep -e '^[1-9]' refs/GRCh37.genome ) \
-  --prop-min-elements 0.1 \
-  --neighborhood-dist 10000 \
-  --min-crb-separation 10000 \
+  --genome autosomes.genome \
+  --prop-min-elements ${min_prop_tracks_per_crb} \
+  --neighborhood-dist ${clustering_neighborhood_dist} \
+  --min-crb-separation ${min_crb_separation} \
   --crb-prefix "${prefix}_CRB" \
   --crb-outbed ${prefix}.crbs.bed.gz \
   --element-outbed ${prefix}.crb_elements.bed.gz \

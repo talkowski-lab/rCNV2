@@ -97,20 +97,24 @@ def refine_clusters(clust_bt, clust_members, ebt, genome=None,
     for g in clust_groups:
         k += 1
 
-        # Format final CRB
+        # Gather final CRB info
         crb_id = '_'.join([prefix, g.chrom, str(k)])
         cidxs = [int(x) for x in g[3].split(',')]
         cstart = str(np.nanmin(clust_df.start[clust_df.name.isin(cidxs)]))
         cend = str(np.nanmax(clust_df.end[clust_df.name.isin(cidxs)]))
-        crb_bt_str += '\t'.join([g.chrom, cstart, cend, crb_id]) + '\n'
 
         # Gather elements belonging to CRB and format them
         elists = [clust_members[x] for x in cidxs]
         crb_eles = [i for s in elists for i in s]
+        n_ele = str(len(crb_eles))
         eles_df = edf[edf.name.isin(crb_eles)]
         for edat in eles_df.values.tolist():
             ename = '.'.join(edat[3].split('.')[:-1])
             crb_ele_bt_str += '\t'.join([str(x) for x in edat[:-1] + [ename, crb_id]]) + '\n'
+
+        # Format final CRB info & write to file
+        crb_bt_str += '\t'.join([g.chrom, cstart, cend, crb_id, n_ele]) + '\n'
+
 
     crb_bt = pbt.BedTool(crb_bt_str, from_string=True).sort(g=genome)
     crb_ele_bt = pbt.BedTool(crb_ele_bt_str, from_string=True).sort(g=genome)
@@ -209,8 +213,10 @@ def main():
         final_elements = final_elements.cat(new_elements, postmerge=False)
 
     # Write final tracks to file
-    final_crbs.saveas(outpaths['crbs'])
-    final_elements.saveas(outpaths['elements'])
+    final_crbs.saveas(outpaths['crbs'], 
+                      trackline='\t'.join('#chrom start end crb_id n_elements'.split()))
+    final_elements.saveas(outpaths['elements'],
+                          trackline='\t'.join('#chrom start end element_id crb_id'.split()))
 
     # Bgzip, if optioned
     if gzip_out:

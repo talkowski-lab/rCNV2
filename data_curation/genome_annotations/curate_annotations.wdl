@@ -16,6 +16,9 @@ workflow curate_annotations {
   String case_hpo
   Float min_element_overlap
   Float p_cutoff
+  Float min_prop_tracks_per_crb
+  Int clustering_neighborhood_dist
+  Int min_crb_separation
   String rCNV_bucket
   String prefix
 
@@ -29,7 +32,7 @@ workflow curate_annotations {
 
   # Scatter over sharded tracklists and curate tracks
   scatter ( shard in shard_tracklist_chromhmm.shards ) {
-    call curate_and_burden_shard as curate_and_burden_shard_chromhmm {
+    call curate_and_burden as curate_and_burden_chromhmm {
       input:
         tracklist=shard,
         min_element_size=min_element_size,
@@ -37,15 +40,14 @@ workflow curate_annotations {
         case_hpo=case_hpo,
         min_element_overlap=min_element_overlap,
         rCNV_bucket=rCNV_bucket,
-        prefix="${prefix}.chromhmm_shard",
-        keep_tracks="FALSE"
+        prefix="${prefix}.chromhmm_shard"
     }
   }
 
   # Collect shards for each tracklist
   call merge_shards as merge_chromhmm {
     input:
-      stat_shards=curate_and_burden_shard_chromhmm.stats,
+      stat_shards=curate_and_burden_chromhmm.stats,
       prefix="${prefix}.chromhmm"
   }
 
@@ -70,7 +72,8 @@ workflow curate_annotations {
       p_cutoff=p_cutoff,
       merged_tracklist=merge_tracklists.merged_tracklist,
       rCNV_bucket=rCNV_bucket,
-      prefix=prefix
+      prefix=prefix,
+      clear_sig="TRUE"
   }
 
   # Re-shard all significant tracks for final curation
@@ -83,26 +86,30 @@ workflow curate_annotations {
 
   # Scatter over sharded significant tracklist and curate tracks
   scatter ( shard in shard_tracklist_signif.shards ) {
-    call curate_and_burden_shard as curate_and_burden_shard_signif {
+    call curate_only as curate_only_signif {
       input:
         tracklist=shard,
         min_element_size=min_element_size,
         max_element_size=max_element_size,
-        case_hpo=case_hpo,
-        min_element_overlap=min_element_overlap,
         rCNV_bucket=rCNV_bucket,
-        prefix="${prefix}.signif_shard",
-        keep_tracks="TRUE"
+        prefix="${prefix}.signif_shard"
     }
   }
 
-  # Cluster final cis-regulatory blocks from significant tracks
-  # TBD
-
+  call cluster_elements {
+    input:
+      completion_tokens=curate_only_signif.completion_token,
+      min_prop_tracks_per_crb=min_prop_tracks_per_crb,
+      clustering_neighborhood_dist=clustering_neighborhood_dist,
+      min_crb_separation=min_crb_separation,
+      rCNV_bucket=rCNV_bucket,
+      prefix=prefix
+  }
+  
   # Final outputs
   output {
-    File stats_all_tracks = meta_burden_test.meta_stats
-    File signif_tracklist = meta_burden_test.signif_tracklist
+    File final_crbs = cluster_elements.final_crbs
+    File final_crb_elements = cluster_elements.final_crb_elements
   }
 }
 
@@ -134,8 +141,65 @@ task shard_tracklist {
 }
 
 
-# Download & curate tracks, and count CNVs for each track (optional)
-task curate_and_burden_shard {
+# Download & curate tracks (no burden test)
+task curate_only {
+  File tracklist
+  Int min_element_size
+  Int max_element_size
+  String rCNV_bucket
+  String prefix
+
+  command <<<
+    set -e
+
+    # Download necessary reference files
+    mkdir refs/
+    gsutil -m cp \
+      ${rCNV_bucket}/refs/** \
+      ${rCNV_bucket}/analysis/analysis_refs/GRCh37.genome \
+      ${rCNV_bucket}/analysis/analysis_refs/rCNV_metacohort* \
+      ${rCNV_bucket}/analysis/analysis_refs/HPOs_by_metacohort.table.tsv \
+      refs/
+
+    # Curate all tracks in tracklist
+    while read path; do
+      echo -e "Curating $path"
+      /opt/rCNV2/data_curation/genome_annotations/curate_track.py \
+        --genome refs/GRCh37.genome \
+        --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
+        --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+        --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
+        --min-size ${min_element_size} \
+        --max-size ${max_element_size} \
+        --stats \
+        $path
+    done < ${tracklist}
+
+    # Copy all curated tracks to final gs:// bucket
+    gsutil -m cp \
+      *.curated.bed.gz \
+      ${rCNV_bucket}/cleaned_data/genome_annotations/significant_tracks/
+
+    # Dummy output
+    touch completion.txt
+  >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:e2297640f2734f6374832df1ae5388df5bc0ccb692819be3442f4d9a319ab299"
+    preemptible: 1
+    memory: "4 GB"
+    bootDiskSizeGb: "20"
+    disks: "local-disk 50 HDD"
+  }
+
+  output {
+    File completion_token = "completion.txt"
+  }
+}
+
+
+# Download & curate tracks, and count CNVs for each track
+task curate_and_burden {
   File tracklist
   Int min_element_size
   Int max_element_size
@@ -143,7 +207,6 @@ task curate_and_burden_shard {
   String case_hpo
   String rCNV_bucket
   String prefix
-  String keep_tracks
 
   command <<<
     set -e
@@ -179,47 +242,35 @@ task curate_and_burden_shard {
           - \
     > ${prefix}.stats.tsv
 
-    # Final behavior depends on value of keep_tracks
-    if [ ${keep_tracks} == "TRUE" ]; then
-      # Copy all curated tracks to final gs:// bucket
-      gsutil -m cp \
-        *.curated.bed.gz \
-        ${rCNV_bucket}/cleaned_data/genome_annotations/significant_tracks/
+    # Localize noncoding CNV data
+    mkdir cnvs/
+    gsutil -m cp ${rCNV_bucket}/cleaned_data/cnv/noncoding/** cnvs/
 
-      # Dummy output
-      touch ${prefix}.stats.with_counts.tsv
-      gzip -f ${prefix}.stats.with_counts.tsv
-    else
-      # Localize noncoding CNV data
-      mkdir cnvs/
-      gsutil -m cp ${rCNV_bucket}/cleaned_data/cnv/noncoding/** cnvs/
-
-      # Compute CNV counts per annotation track per metacohort per CNV type
-      while read cohort; do
-        for dummy in 1; do
-          echo $cohort
-          cidx=$( sed -n '1p' refs/HPOs_by_metacohort.table.tsv \
-                  | sed 's/\t/\n/g' \
-                  | awk -v cohort=$cohort '{ if ($1==cohort) print NR }' )
-          fgrep -w ${case_hpo} refs/HPOs_by_metacohort.table.tsv | cut -f$cidx
-          fgrep -w "HEALTHY_CONTROL" refs/HPOs_by_metacohort.table.tsv | cut -f$cidx
-          echo -e "cnvs/$cohort.rCNV.strict_noncoding.bed.gz"
-        done | paste -s
-      done < <( fgrep -v mega refs/rCNV_metacohort_list.txt | cut -f1 ) \
-      > metacohorts.input.tsv
-      /opt/rCNV2/data_curation/genome_annotations/count_cnvs_per_track.py \
-        --cohorts metacohorts.input.tsv \
-        --track-stats ${prefix}.stats.tsv \
-        --frac-overlap ${min_element_overlap} \
-        --case-hpo ${case_hpo} \
-        --norm-by-samplesize \
-        --outfile ${prefix}.stats.with_counts.tsv.gz \
-        --gzip
-    fi
+    # Compute CNV counts per annotation track per metacohort per CNV type
+    while read cohort; do
+      for dummy in 1; do
+        echo $cohort
+        cidx=$( sed -n '1p' refs/HPOs_by_metacohort.table.tsv \
+                | sed 's/\t/\n/g' \
+                | awk -v cohort=$cohort '{ if ($1==cohort) print NR }' )
+        fgrep -w ${case_hpo} refs/HPOs_by_metacohort.table.tsv | cut -f$cidx
+        fgrep -w "HEALTHY_CONTROL" refs/HPOs_by_metacohort.table.tsv | cut -f$cidx
+        echo -e "cnvs/$cohort.rCNV.strict_noncoding.bed.gz"
+      done | paste -s
+    done < <( fgrep -v mega refs/rCNV_metacohort_list.txt | cut -f1 ) \
+    > metacohorts.input.tsv
+    /opt/rCNV2/data_curation/genome_annotations/count_cnvs_per_track.py \
+      --cohorts metacohorts.input.tsv \
+      --track-stats ${prefix}.stats.tsv \
+      --frac-overlap ${min_element_overlap} \
+      --case-hpo ${case_hpo} \
+      --norm-by-samplesize \
+      --outfile ${prefix}.stats.with_counts.tsv.gz \
+      --gzip
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:302d6196b24a131ecfff2f3bf81837faca84431252402fe9897f087e0d92dd74"
+    docker: "talkowski/rcnv@sha256:e2297640f2734f6374832df1ae5388df5bc0ccb692819be3442f4d9a319ab299"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -248,7 +299,7 @@ task merge_shards {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7bc27c40820b1f3fe66beb438ef543b8e247bc8d040629b36701c75cd1ada90b"
+    docker: "talkowski/rcnv@sha256:e2297640f2734f6374832df1ae5388df5bc0ccb692819be3442f4d9a319ab299"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -273,7 +324,7 @@ task merge_tracklists {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7bc27c40820b1f3fe66beb438ef543b8e247bc8d040629b36701c75cd1ada90b"
+    docker: "talkowski/rcnv@sha256:e2297640f2734f6374832df1ae5388df5bc0ccb692819be3442f4d9a319ab299"
     preemptible: 1
   }
 
@@ -289,25 +340,39 @@ task meta_burden_test {
   File merged_tracklist
   String rCNV_bucket
   String prefix
+  String clear_sig
 
   command <<<
     set -e
 
+    # Clear all old significant tracks
+    if [ ${clear_sig} == "TRUE" ]; then
+      gsutil -m rm ${rCNV_bucket}/cleaned_data/genome_annotations/significant_tracks/*.curated.bed.gz || true
+    fi
+
+    # Perform burden analysis
     /opt/rCNV2/data_curation/genome_annotations/trackwise_cnv_burden_meta_analysis.R \
       --p-cutoff ${p_cutoff} \
       --signif-tracks ${prefix}.signif_paths_and_tracks.list \
       ${stats} \
       ${merged_tracklist} \
       ${prefix}.burden_stats.tsv
+
+    # Extract significant tracks
     gzip -f ${prefix}.burden_stats.tsv
     cut -f1 ${prefix}.signif_paths_and_tracks.list \
     > ${prefix}.signif_tracks.list
     cut -f2 ${prefix}.signif_paths_and_tracks.list \
     > ${prefix}.signif_tracknames.list
+
+    # Copy final stats to gs:// bucket
+    gsutil -m cp \
+      ${prefix}.burden_stats.tsv.gz \
+      ${rCNV_bucket}/cleaned_data/genome_annotations/
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b4ffdd54084839d8346b88309913aa57d20b482ee59c862e1349f78ada53a0e6"
+    docker: "talkowski/rcnv@sha256:e2297640f2734f6374832df1ae5388df5bc0ccb692819be3442f4d9a319ab299"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -324,6 +389,7 @@ task meta_burden_test {
 
 # Cluster elements from significant tracks into CRBs
 task cluster_elements {
+  Array[File] completion_tokens
   Float min_prop_tracks_per_crb
   Int clustering_neighborhood_dist
   Int min_crb_separation
@@ -345,9 +411,13 @@ task cluster_elements {
     find sig_tracks/ -name "*.curated.bed.gz" \
     | xargs -I {} tabix -f {}
 
+    # Subset genome file to autosomes
+    grep -e '^[1-9]' refs/GRCh37.genome \
+    > autosomes.genome
+
     # Cluster significant tracks into CRBs
     /opt/rCNV2/data_curation/genome_annotations/build_crbs.py \
-      --genome <( grep -e '^[1-9]' refs/GRCh37.genome ) \
+      --genome autosomes.genome \
       --prop-min-elements ${min_prop_tracks_per_crb} \
       --neighborhood-dist ${clustering_neighborhood_dist} \
       --min-crb-separation ${min_crb_separation} \
@@ -369,7 +439,7 @@ task cluster_elements {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b4ffdd54084839d8346b88309913aa57d20b482ee59c862e1349f78ada53a0e6"
+    docker: "talkowski/rcnv@sha256:e2297640f2734f6374832df1ae5388df5bc0ccb692819be3442f4d9a319ab299"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -381,3 +451,4 @@ task cluster_elements {
     File final_crb_elements = "${prefix}.crb_elements.bed.gz"
   }
 }
+
