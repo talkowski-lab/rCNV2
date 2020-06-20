@@ -108,7 +108,7 @@ def make_clusters(ebt, pos_df, min_elements=1, neighborhood_dist=10000, genome=N
     return clust_bt, cluster_members
 
 
-def refine_clusters(clust_bt, clust_members, ebt, blacklist, xcov=0.5, genome=None, 
+def refine_clusters(clust_bt, clust_members, ebt, blacklist, xcov=0.3, genome=None, 
                     min_crb_separation=10000, prefix='CRB'):
     """
     Refine & reformat final clusters & their constituent elements
@@ -158,7 +158,7 @@ def refine_clusters(clust_bt, clust_members, ebt, blacklist, xcov=0.5, genome=No
     return crb_bt, crb_ele_bt
 
 
-def cluster_chrom(tracklist, chrom, genome, blacklist, xcov=0.5, min_elements=None,
+def cluster_chrom(tracklist, chrom, genome, blacklist, xcov=0.3, min_elements=None,
                   n_ele_prop=0.1, neighborhood_dist=10000, min_crb_separation=10000, 
                   prefix='CRB'):
     """
@@ -209,7 +209,7 @@ def main():
     parser.add_argument('-x', '--blacklist', nargs='*', action='append',
                         help='Blacklist BED files to exclude CRBs. May be ' +
                         'specified multiple times.')
-    parser.add_argument('--blacklist-cov', default=0.5, type=float, 
+    parser.add_argument('--blacklist-cov', default=0.3, type=float, 
                         help='Minimum fraction of CRB that must be covered ' +
                         'by any blacklist before being excluded.')
     parser.add_argument('--min-elements', default=None, type=int, help='Minimum ' +

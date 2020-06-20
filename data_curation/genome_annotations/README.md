@@ -78,7 +78,7 @@ All elements from significant annotations were clustered into CRBs per-chromosom
 
 After clustering, CRBs were assigned the minimum start and maximum end coordinate across all their constituent elements.  
 
-Finally, pairs of CRBs within ±10kb were merged, and CRBs with ≥50% coverage by our [CNV blacklist regions](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs) were excluded.
+Finally, pairs of CRBs within ±10kb were merged, and CRBs with ≥30% coverage by our [CNV blacklist regions](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs) were excluded.
 
 #### Output files  
 
