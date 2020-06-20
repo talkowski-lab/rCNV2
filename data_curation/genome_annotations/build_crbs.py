@@ -34,7 +34,14 @@ def load_tracks(tracklist, chrom, genome=None):
                        in zip(tdf.name, tdf.chrom, tdf.index + 1)]
         return pbt.BedTool.from_dataframe(tdf)
 
-    tracks = [_load_and_suffix_bt(t, chrom) for t in tracklist]
+    tracks = []
+    for t in tracklist:
+        try:
+            tracks.append(_load_and_suffix_bt(t, chrom))
+        except:
+            msg = 'WARNING: zero elements loaded for chromosome {} from track {}.\n' + \
+                  'This may indicate an error with this script, or with data preprocessing.'
+            print(msg.format(chrom, t))
 
     if len(tracks) == 1:
         all_bt = tracks[0]
@@ -199,6 +206,8 @@ def main():
 
     # Build list of contigs to consider
     contigs = [x.split('\t')[0] for x in open(args.genome).readlines()]
+    eligible_contigs = [str(x) for x in range(1, 23)]
+    contigs = [x for x in contigs if x in eligible_contigs]
 
     # Process elements from each chromosome in serial
     final_elements = pbt.BedTool('', from_string=True)
