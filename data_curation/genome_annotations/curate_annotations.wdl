@@ -401,7 +401,10 @@ task cluster_elements {
 
     # Copy necessary reference files
     mkdir refs/
-    gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/GRCh37.genome refs/
+    gsutil -m cp \
+      ${rCNV_bucket}/analysis/analysis_refs/GRCh37.genome \
+      ${rCNV_bucket}/refs/*.bed.gz \
+      refs/
 
     # Copy & index all final curated significant tracks locally
     mkdir sig_tracks/
@@ -418,6 +421,9 @@ task cluster_elements {
     # Cluster significant tracks into CRBs
     /opt/rCNV2/data_curation/genome_annotations/build_crbs.py \
       --genome autosomes.genome \
+      --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
+      --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+      --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
       --prop-min-elements ${min_prop_tracks_per_crb} \
       --neighborhood-dist ${clustering_neighborhood_dist} \
       --min-crb-separation ${min_crb_separation} \
@@ -439,7 +445,7 @@ task cluster_elements {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b0345a2b594dc51b0be4f75466be5f253bf6b024d707272ec9d44b6f5345912b"
+    docker: "talkowski/rcnv@sha256:e94211f5f9c43cd84eb7d1ab02726bb835aa1ab1a730a3b2a2a7552ea070962a"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

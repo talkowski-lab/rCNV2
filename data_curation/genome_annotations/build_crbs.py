@@ -124,9 +124,9 @@ def refine_clusters(clust_bt, clust_members, ebt, blacklist, xcov=0.5, genome=No
     clust_groups = clust_bt.merge(d=min_crb_separation, c=4, o='distinct')
 
     # Blacklist final CRB clusters
-    clust_groups.coverage(blacklist).\
-                 filter(lambda x: float(x[-1]) < xcov).\
-                 cut(range(4))
+    clust_groups = clust_groups.coverage(blacklist).\
+                                filter(lambda x: float(x[-1]) < xcov).\
+                                cut(range(4)).saveas()
 
     # Iterate over cluster groups and reformat CRB & elements from each
     k = 0
