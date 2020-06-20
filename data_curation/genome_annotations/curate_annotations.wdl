@@ -439,7 +439,7 @@ task cluster_elements {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:335921f6b3c4a2ed9fae11115b4fa8061f6ff8a0c2319d3c31860061be3d2769"
+    docker: "talkowski/rcnv@sha256:b735cd86175752df6759adfd35bc7f746a34a02bb1816bca77940d2f1eb9c58a"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

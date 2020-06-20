@@ -200,9 +200,9 @@ def main():
     for key, outpath in outpaths.items():
         if path.splitext(outpath)[-1] in '.gz .bz .bgz .bgzip .gzip'.split():
             outpaths[key] = path.splitext(outpath)[0]
-            gzip_out = True
+            bgzip_out = True
         else:
-            gzip_out = args.gzip
+            bgzip_out = args.gzip
 
     # Build list of contigs to consider
     contigs = [x.split('\t')[0] for x in open(args.genome).readlines()]
@@ -228,9 +228,9 @@ def main():
                           trackline='\t'.join('#chrom start end element_id crb_id'.split()))
 
     # Bgzip, if optioned
-    if gzip_out:
+    if bgzip_out:
         for outpath in outpaths.values():
-            subprocess.run(['gzip', '-f', outpath])
+            subprocess.run(['bgzip', '-f', outpath])
 
 
 if __name__ == '__main__':
