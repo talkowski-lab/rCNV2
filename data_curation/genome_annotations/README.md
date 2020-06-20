@@ -53,11 +53,44 @@ After tabulating counts of CNVs per track, we conducted a fixed-effects meta-ana
 
 We considered any track with a meta-analysis P < 0.05 to have sufficient evidence for possible disease relevance to be included for subsequent association testing.  
 
+#### Output files  
+
+From this process, we produced the following:  
+1. `rCNV.burden_stats.tsv.gz`: a tab-delimited file containing all statistics for each annotation track evaluated, including number & distribution of elements, number of CNVs per meta-cohort, burden statistics per meta-cohort, and meta-analysis statistics
+2. One BED file for each significant track.  
+
+The data are available from the below Google storage bucket (note: requires permissions):
+```
+$ gsutil ls gs://rcnv_project/cleaned_data/genome_annotations/
+gs://rcnv_project/cleaned_data/genome_annotations/rCNV.burden_stats.tsv.gz
+gs://rcnv_project/cleaned_data/genome_annotations/significant_tracks/
+```
+
 ### Cluster significant annotations into CRBs  
 
 Given that many genome annotations are correlated, we next clustered elements into CRBs for association testing.  
 
 This process was restricted to the subset of genome annotation tracks with statistical evidence for relevance in disease, as [described above](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/genome_annotations#identifying-annotation-classes-with-burdens-of-noncoding-rcnvs).  
 
-TBD
+All elements from significant annotations were clustered into CRBs per-chromosome using DBSCAN (a density-based clustering algorithm) with the following parameters:
+* Neighborhood distance < 10kb
+* Minimum number of elements per cluster proportional to 10% of the total number of annotation tracks being considered (rounding down)
 
+After clustering, CRBs were assigned the minimum start and maximum end coordinate across all their constituent elements.  
+
+Finally, pairs of CRBs within ±10kb were merged, and CRBs with ≥50% coverage by our [CNV blacklist regions](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs) were excluded.
+
+#### Output files  
+
+This process produced the following files:  
+1. `rCNV.crbs.bed.gz`: a BED file with one entry per final CRB
+2. `rCNV.crb_elements.bed.gz`: a BED file with one entry per element belonging to one of the final CRBs
+
+The data are available from the below Google storage bucket (note: requires permissions):
+```
+$ gsutil ls gs://rcnv_project/cleaned_data/genome_annotations/*bed.gz*
+gs://rcnv_project/cleaned_data/genome_annotations/rCNV.crb_elements.bed.gz
+gs://rcnv_project/cleaned_data/genome_annotations/rCNV.crb_elements.bed.gz.tbi
+gs://rcnv_project/cleaned_data/genome_annotations/rCNV.crbs.bed.gz
+gs://rcnv_project/cleaned_data/genome_annotations/rCNV.crbs.bed.gz.tbi
+```

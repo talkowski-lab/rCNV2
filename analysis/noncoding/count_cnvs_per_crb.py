@@ -60,6 +60,62 @@ def process_cnvs(bedpath, pad_controls, case_hpo, control_hpo, max_size=None):
     return cnvbt
 
 
+def count_cnvs_per_crb(cnvbt, crb_path, element_path, min_element_ovr=1e-10,
+                       min_frac_all_elements=1e-10):
+    """
+    Count CNVs per CRB based on intersection with CRB elements
+    """
+
+    cnv_ids = [x.name for x in cnvbt]
+
+    crbs = {x.name : {'cnvs' : [], 'n_ele' : int(x[-1])} for x in pbt.BedTool(crb_path)}
+
+    # Count number of elements hit per CRB per CNV
+    hit_dict = {cnv_id : {} for cnv_id in cnv_ids}
+    element_hits = cnvbt.intersect(element_path, wb=True, F=min_element_ovr)
+    for cnv_id, crb_id in [(x[3], x[-1]) for x in element_hits]:
+        if crb_id not in hit_dict[cnv_id].keys():
+            hit_dict[cnv_id][crb_id] = 1
+        else:
+            hit_dict[cnv_id][crb_id] += 1
+
+    # Count CNVs per CRB only if they hit >= (min_element_ovr * n_elements) total elements
+    for cnv_id, ecounts in hit_dict.items():
+        for crb_id, n_hit in ecounts.items():
+            n_total = crbs[crb_id]['n_ele']
+            if n_hit / n_total >= min_frac_all_elements:
+                crbs[crb_id]['cnvs'].append(cnv_id)
+
+    for crb_id in crbs.keys():
+        crbs[crb_id].pop('n_ele')
+
+    return crbs
+
+
+def make_output_table(outbed, cnvbt, crb_counts, crb_path, case_hpo, control_hpo):
+    """
+    Format master table of counts per CRB and write to outbed
+    """
+
+    cnv_hpos = {x.name : x[-1].split(';') for x in cnvbt}
+
+    h_cols = '#chr start end crb_id control_cnvs case_cnvs'
+    header = '\t'.join(h_cols.split())
+    outbed.write(header + '\n')
+
+    for i in pbt.BedTool(crb_path):
+        crb_id = i.name
+        crb_cnvs = crb_counts[crb_id]['cnvs']
+        k_case = len([c for c in crb_cnvs if case_hpo in cnv_hpos.get(c)])
+        k_control = len([c for c in crb_cnvs if control_hpo in cnv_hpos.get(c)])
+        crbline = [i.chrom, i.start, i.end, i.name, k_case, k_control]
+        crbline_str = '\t'.join([str(x) for x in crbline]) + '\n'
+        outbed.write(crbline_str)
+
+    # Must close output file to flush buffer (end of chr22 sometimes gets clipped)
+    outbed.close()
+
+
 def main():
     """
     Main block
@@ -125,40 +181,15 @@ def main():
         if args.type != 'CNV':
             cnvbt = cnvbt.filter(lambda x: args.type in x.fields).saveas()
 
-    # # Extract relevant data from input GTF
-    # gtfbt, txbt, exonbt, genes, transcripts, cds_dict \
-    #     = process_gtf(args.gtf, args.blacklist, args.xcov)
-    # if args.verbose:
-    #     msg = 'Loaded {:,} {} from input gtf'
-    #     print(msg.format(len(txbt), 'transcripts'))
-    #     print(msg.format(len(exonbt), 'exons'))
-    #     print(msg.format(len(genes), 'gene symbols'))
+    # Intersect CNVs with CRBs
+    crb_counts = \
+        count_cnvs_per_crb(cnvbt, args.crbs, args.elements, args.min_element_ovr, 
+                               args.min_frac_all_elements)
 
-    # # Intersect CNVs with exons
-    # case_cnvbt = cnvbt.filter(lambda x: args.control_hpo not in x[5].split(';')).saveas()
-    # case_counts, case_weights, case_cnv_weights \
-    #     = overlap_cnvs_exons(case_cnvbt, exonbt, cds_dict, args.weight_mode, 
-    #                          args.min_cds_ovr, args.max_genes)
-    # max_genes_controls = args.max_genes
-    # if args.max_genes_in_cases_only:
-    #     max_genes_controls = 20000
-    # control_cnvbt = cnvbt.filter(lambda x: args.control_hpo in x[5].split(';')).saveas()
-    # control_counts, control_weights, control_cnv_weights \
-    #     = overlap_cnvs_exons(control_cnvbt, exonbt, cds_dict, args.weight_mode, 
-    #                          args.min_cds_ovr, max_genes_controls)
-
-    # # Compute Bayesian weights, if optioned
-    # if args.weight_mode == 'bayesian' \
-    # and len(case_cnv_weights) > 0 \
-    # and len(control_cnv_weights) > 0:
-    #     case_weights, case_cnv_weights, control_weights, control_cnv_weights \
-    #         = get_bayes_weights(case_cnvbt, case_cnv_weights, control_cnvbt, control_cnv_weights)
-    
-    # # Format output main counts table and write to outfile
-    # make_output_table(outbed, txbt, genes, cds_dict, control_counts, 
-    #                   control_weights, case_counts, case_weights)
-    # if bgzip:
-    #     subprocess.run(['bgzip', '-f', outbed_path])
+    # Format output main counts table and write to outfile
+    make_output_table(outbed, cnvbt, crb_counts, args.crbs, args.hpo, args.control_hpo)
+    if bgzip:
+        subprocess.run(['bgzip', '-f', outbed_path])
 
 
 if __name__ == '__main__':

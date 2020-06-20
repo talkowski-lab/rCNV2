@@ -21,6 +21,30 @@ from os import path
 import subprocess
 
 
+def build_blacklist(blacklists):
+    """
+    Build universal blacklist from one or more inputs
+    """
+
+    if blacklists is None:
+        xbt = pbt.BedTool('', from_string=True)
+
+    else:
+        xlist = [x for s in blacklists for x in s]
+        n_bl = len(xlist)
+        if n_bl == 0:
+            xbt = pbt.BedTool('', from_string=True)
+        elif n_bl == 1:
+            xbt = pbt.BedTool(xlist[0])
+        else:
+            xbt = pbt.BedTool(xlist[0]).\
+                      cat(*[pbt.BedTool(bl) for bl in xlist[1:]])
+
+        xbt = xbt.sort().merge().saveas()
+
+    return xbt
+
+
 def load_tracks(tracklist, chrom, genome=None):
     """
     Loads all tracks for a single chromsome as pbt.BedTool
@@ -84,7 +108,7 @@ def make_clusters(ebt, pos_df, min_elements=1, neighborhood_dist=10000, genome=N
     return clust_bt, cluster_members
 
 
-def refine_clusters(clust_bt, clust_members, ebt, genome=None, 
+def refine_clusters(clust_bt, clust_members, ebt, blacklist, xcov=0.5, genome=None, 
                     min_crb_separation=10000, prefix='CRB'):
     """
     Refine & reformat final clusters & their constituent elements
@@ -98,6 +122,11 @@ def refine_clusters(clust_bt, clust_members, ebt, genome=None,
 
     # Aggregate clusters within min_crb_separation
     clust_groups = clust_bt.merge(d=min_crb_separation, c=4, o='distinct')
+
+    # Blacklist final CRB clusters
+    clust_groups.coverage(blacklist).\
+                 filter(lambda x: float(x[-1]) < xcov).\
+                 cut(range(4))
 
     # Iterate over cluster groups and reformat CRB & elements from each
     k = 0
@@ -129,8 +158,9 @@ def refine_clusters(clust_bt, clust_members, ebt, genome=None,
     return crb_bt, crb_ele_bt
 
 
-def cluster_chrom(tracklist, chrom, genome, min_elements=None, n_ele_prop=0.1, 
-                  neighborhood_dist=10000, min_crb_separation=10000, prefix='CRB'):
+def cluster_chrom(tracklist, chrom, genome, blacklist, xcov=0.5, min_elements=None,
+                  n_ele_prop=0.1, neighborhood_dist=10000, min_crb_separation=10000, 
+                  prefix='CRB'):
     """
     Load & cluster all elements for a single chromosome
     Returns:
@@ -156,8 +186,8 @@ def cluster_chrom(tracklist, chrom, genome, min_elements=None, n_ele_prop=0.1,
                                             neighborhood_dist, genome)
 
     # Refine & annotate clusters
-    crb_bt, crb_ele_bt = refine_clusters(clust_bt, clust_members, ebt, genome,
-                                         min_crb_separation, prefix)
+    crb_bt, crb_ele_bt = refine_clusters(clust_bt, clust_members, ebt, blacklist, 
+                                         xcov, genome, min_crb_separation, prefix)
 
     return crb_bt, crb_ele_bt
 
@@ -176,6 +206,12 @@ def main():
                         'at least one track.')
     parser.add_argument('-g', '--genome', required=True, help='BEDTools-style ' +
                         'genome file to be used when sorting.')
+    parser.add_argument('-x', '--blacklist', nargs='*', action='append',
+                        help='Blacklist BED files to exclude CRBs. May be ' +
+                        'specified multiple times.')
+    parser.add_argument('--blacklist-cov', default=0.5, type=float, 
+                        help='Minimum fraction of CRB that must be covered ' +
+                        'by any blacklist before being excluded.')
     parser.add_argument('--min-elements', default=None, type=int, help='Minimum ' +
                         'number of elements in CRB.')
     parser.add_argument('--prop-min-elements', default=0.1, type=float, help='If ' +
@@ -209,14 +245,18 @@ def main():
     eligible_contigs = [str(x) for x in range(1, 23)]
     contigs = [x for x in contigs if x in eligible_contigs]
 
+    # Load blacklists
+    blacklist = build_blacklist(args.blacklist)
+
     # Process elements from each chromosome in serial
     final_elements = pbt.BedTool('', from_string=True)
     final_crbs = pbt.BedTool('', from_string=True)
     for chrom in contigs:
         print('Clustering CRBs on chromosome {}...'.format(chrom))
         new_crbs, new_elements = \
-            cluster_chrom(args.tracks, chrom, args.genome, args.min_elements, 
-                          args.prop_min_elements, args.neighborhood_dist,
+            cluster_chrom(args.tracks, chrom, args.genome, blacklist, 
+                          args.blacklist_cov, args.min_elements, 
+                          args.prop_min_elements, args.neighborhood_dist, 
                           args.min_crb_separation, args.crb_prefix)
         final_crbs = final_crbs.cat(new_crbs, postmerge=False)
         final_elements = final_elements.cat(new_elements, postmerge=False)

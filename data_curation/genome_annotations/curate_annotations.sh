@@ -130,10 +130,10 @@ cut -f2 ${prefix}.signif_paths_and_tracks.list \
 > ${prefix}.signif_tracknames.list
 
 
-# Dev code:
-min_prop_tracks_per_crb=0.1
-clustering_neighborhood_dist=10000
-clustering_neighborhood_dist=10000
+# # Dev code:
+# min_prop_tracks_per_crb=0.1
+# clustering_neighborhood_dist=10000
+# min_crb_separation=10000
 
 
 # Copy & index all final curated significant tracks locally
@@ -151,6 +151,9 @@ grep -e '^[1-9]' refs/GRCh37.genome \
 # Cluster significant tracks into CRBs
 /opt/rCNV2/data_curation/genome_annotations/build_crbs.py \
   --genome autosomes.genome \
+  --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
+  --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+  --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
   --prop-min-elements ${min_prop_tracks_per_crb} \
   --neighborhood-dist ${clustering_neighborhood_dist} \
   --min-crb-separation ${min_crb_separation} \
