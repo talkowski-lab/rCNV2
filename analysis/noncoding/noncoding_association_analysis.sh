@@ -26,6 +26,10 @@ gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
 
 # Test/dev parameters
+# Params for seizures
+hpo="HP:0001250"
+prefix="HP0001250"
+meta="meta2"
 # Params for NDDs
 hpo="HP:0012759"
 prefix="HP0012759"
@@ -43,7 +47,8 @@ rCNV_bucket="gs://rcnv_project"
 pad_controls=0
 min_element_ovr=1.0
 min_frac_all_elements=0.05
-p_cutoff=0.000003741955
+p_cutoff=0.000003755163
+meta_p_cutoff=0.000003755163
 max_manhattan_phred_p=30
 n_pheno_perms=50
 meta_model_prefix="fe"
@@ -271,4 +276,86 @@ paste perm_res/*.crb_burden.meta_analysis.permuted_p_values.*.txt \
 
 
 
+
+# Run meta-analysis for each phenotype
+while read prefix hpo; do
+
+    # Get metadata for meta-analysis
+    mega_idx=$( head -n1 "${metacohort_sample_table}" \
+                | sed 's/\t/\n/g' \
+                | awk '{ if ($1=="mega") print NR }' )
+    ncase=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+             | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
+             | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+    nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
+             | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
+             | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+    descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+               | awk -v FS="\t" '{ print $2 }' )
+    title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
+    DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
+                    crb_burden.${freq_code}.${noncoding_filter}_noncoding.DEL.bonferroni_pval.hpo_cutoffs.tsv )
+    DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
+                    crb_burden.${freq_code}.${noncoding_filter}_noncoding.DUP.bonferroni_pval.hpo_cutoffs.tsv )
+
+    # Set HPO-specific parameters
+    descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+               | awk -v FS="\t" '{ print $2 }' )
+
+    # Run meta-analysis for each CNV type
+    for CNV in DEL DUP; do
+      # Set CNV-specific parameters
+      case "$CNV" in
+        DEL)
+          meta_p_cutoff=$DEL_p_cutoff
+          ;;
+        DUP)
+          meta_p_cutoff=$DUP_p_cutoff
+          ;;
+      esac
+
+      # Perform meta-analysis for unweighted CNVs
+      while read meta cohorts; do
+        echo -e "$meta\t$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.stats.bed.gz"
+      done < <( fgrep -v mega ${metacohort_list} ) \
+      > ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt
+      /opt/rCNV2/analysis/noncoding/crb_meta_analysis.R \
+        --or-corplot ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.or_corplot_grid.jpg \
+        --model ${meta_model_prefix} \
+        --p-is-phred \
+        --spa \
+        ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt \
+        ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed
+      bgzip -f ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed
+      tabix -f ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed.gz
+
+      # Generate Manhattan & QQ plots
+      /opt/rCNV2/utils/plot_manhattan_qq.R \
+        --p-col-name "meta_phred_p" \
+        --p-is-phred \
+        --max-phred-p ${max_manhattan_phred_p} \
+        --cutoff $meta_p_cutoff \
+        --label-prefix "$CNV" \
+        --title "$title" \
+        "${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed.gz" \
+        "${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis"
+    done
+
+    # Generate Miami & QQ plots
+    /opt/rCNV2/utils/plot_manhattan_qq.R \
+      --miami \
+      --p-col-name "meta_phred_p" \
+      --p-is-phred \
+      --max-phred-p ${max_manhattan_phred_p} \
+      --cutoff $DUP_p_cutoff \
+      --label-prefix "DUP" \
+      --cutoff-2 $DEL_p_cutoff \
+      --label-prefix-2 "DEL" \
+      --title "$title" \
+      "${prefix}.${freq_code}.${noncoding_filter}_noncoding.DUP.crb_burden.meta_analysis.stats.bed.gz" \
+      "${prefix}.${freq_code}.${noncoding_filter}_noncoding.DEL.crb_burden.meta_analysis.stats.bed.gz" \
+      "${prefix}.${freq_code}.${noncoding_filter}_noncoding.crb_burden.meta_analysis"
+
+  done
+done < refs/test_phenotypes.list
 

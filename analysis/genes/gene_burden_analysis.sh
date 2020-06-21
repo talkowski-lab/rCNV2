@@ -332,9 +332,9 @@ while read prefix hpo; do
                | awk -v FS="\t" '{ print $2 }' )
     title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
     DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                    gene_burden.${freq_code}.DEL.empirical_genome_wide_pval.hpo_cutoffs.tsv )
+                    gene_burden.${freq_code}.DEL.bonferroni_pval.hpo_cutoffs.tsv )
     DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                    gene_burden.${freq_code}.DUP.empirical_genome_wide_pval.hpo_cutoffs.tsv )
+                    gene_burden.${freq_code}.DUP.bonferroni_pval.hpo_cutoffs.tsv )
 
     # Set HPO-specific parameters
     descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
@@ -470,7 +470,7 @@ CNV="DEL"
 rCNV_bucket="gs://rcnv_project"
 phenotype_list="test_phenotypes.list"
 metacohort_sample_table="HPOs_by_metacohort.table.tsv"
-meta_p_cutoffs_tsv="gene_burden.rCNV.DEL.empirical_genome_wide_pval.hpo_cutoffs.tsv"
+meta_p_cutoffs_tsv="gene_burden.rCNV.DEL.bonferroni_pval.hpo_cutoffs.tsv"
 gene_features="gencode.v19.canonical.pext_filtered.all_features.eigenfeatures.bed.gz"
 finemap_output_label="all_features"
 meta_secondary_p_cutoff=0.05
@@ -496,7 +496,7 @@ while read prefix hpo; do
     echo "$hpo"
     echo "stats/$prefix.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz"
     awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' \
-      gene_burden.${freq_code}.${CNV}.empirical_genome_wide_pval.hpo_cutoffs.tsv
+      gene_burden.${freq_code}.${CNV}.bonferroni_pval.hpo_cutoffs.tsv
   done | paste -s
 done < ${phenotype_list} \
 > ${freq_code}.${CNV}.gene_fine_mapping.stats_input.tsv
