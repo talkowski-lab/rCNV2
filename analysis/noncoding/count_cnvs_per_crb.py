@@ -106,9 +106,9 @@ def make_output_table(outbed, cnvbt, crb_counts, crb_path, case_hpo, control_hpo
     for i in pbt.BedTool(crb_path):
         crb_id = i.name
         crb_cnvs = crb_counts[crb_id]['cnvs']
-        k_case = len([c for c in crb_cnvs if case_hpo in cnv_hpos.get(c)])
         k_control = len([c for c in crb_cnvs if control_hpo in cnv_hpos.get(c)])
-        crbline = [i.chrom, i.start, i.end, i.name, k_case, k_control]
+        k_case = len([c for c in crb_cnvs if case_hpo in cnv_hpos.get(c)])
+        crbline = [i.chrom, i.start, i.end, i.name, k_control, k_case]
         crbline_str = '\t'.join([str(x) for x in crbline]) + '\n'
         outbed.write(crbline_str)
 

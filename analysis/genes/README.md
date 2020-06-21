@@ -27,7 +27,7 @@ We also excluded any exons expressed in <20% of transcripts across all tissues i
 
 After all filtering, we retained 170,422 exons from 17,263 genes for these analyses.  
 
-We conducted this procedure a total of three times per phenotype group & metacohort: once each for deletions, duplications, and all CNVs (deletions + duplications).  
+We conducted this procedure a total of two times per phenotype group & metacohort: once each for deletions and duplications.  
 
 The code to perform this step is contained in `count_cnvs_per_gene.py`.  
 
@@ -62,7 +62,7 @@ Furthermore, for each pair of phenotype group & metacohort, two additional files
 
 All `.png` plots are annotated with a set of loss-of-function constrained genes associated with each HPO code. See [`gene curation/`](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene#gene-set-definitions) for more details about these gene sets.  
 
-All plots also feature a horizontal dashed line indicating Bonferroni-corrected significance threshold (P ≤ 2.90x10<sup>-6</sup>) for all 17,263 windows tested.  
+All plots also feature a horizontal dashed line indicating Bonferroni-corrected significance threshold (P ≤ 2.90x10<sup>-6</sup>) for all 17,263 genes tested.  
 
 These files are stored in a protected Google Cloud bucket with one subdirectory per HPO group, here:  
 ```
@@ -135,7 +135,7 @@ Steps 1-3 were repeated 50 times for each CNV type and phenotype, and the median
 
 [As described above for Step 2](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/genes#output-files), we generated the same combination of plots and statistics files for the meta-analyses results of each phenotype group.  
 
-Unlike the plots from Step 2, the dashed lines from Step 3 correspond to empirically-derived exome-wide significance thresholds [as determined via permutation](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/genes#determining-exome-wide-significance-threshold).  
+Unlike the plots from Step 2, the dashed lines from Step 3 correspond to empirically-derived exome-wide significance thresholds [as determined via permutation](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/genes#determining-and-calibrating-exome-wide-significance-threshold).  
 
 These files are stored in the same location as the per-metacohort analysis results.  
 

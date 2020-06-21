@@ -34,6 +34,10 @@ meta="meta2"
 hpo="HP:0012759"
 prefix="HP0012759"
 meta="meta1"
+# Params for UNKNOWN
+hpo="UNKNOWN"
+prefix="UNKNOWN"
+meta="meta2"
 # General params
 freq_code="rCNV"
 noncoding_filter="loose"
@@ -314,7 +318,7 @@ while read prefix hpo; do
           ;;
       esac
 
-      # Perform meta-analysis for unweighted CNVs
+      # Perform meta-analysis of CNV counts
       while read meta cohorts; do
         echo -e "$meta\t$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.stats.bed.gz"
       done < <( fgrep -v mega ${metacohort_list} ) \

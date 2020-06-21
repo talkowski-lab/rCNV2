@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens per cis-regulatory block (CRB)
 
 
-# import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_crb_burden_perm_test/versions/9/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_crb_burden_perm_test/versions/1/plain-WDL/descriptor" as scattered_perm
 
 
 workflow crb_burden_analysis {
@@ -242,8 +242,7 @@ task burden_test {
   >>>
 
   runtime {
-    # TODO: UPDATE DOCKER
-    # docker: "talkowski/rcnv@sha256:93ec0fee2b0ad415143eda627c2b3c8d2e1ef3c8ff4d3d620767637614fee5f8"
+    docker: "talkowski/rcnv@sha256:7ef678bfbffb9ec5690f6b21b2416e7d5e4dc458ed78f27e940a53cf3e45f6c9"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -322,8 +321,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    # TODO: UPDATE DOCKER
-    # docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
+    docker: "talkowski/rcnv@sha256:7ef678bfbffb9ec5690f6b21b2416e7d5e4dc458ed78f27e940a53cf3e45f6c9"
     preemptible: 1
     memory: "32 GB"
     disks: "local-disk 275 HDD"
@@ -338,536 +336,131 @@ task calc_meta_p_cutoff {
   }  
 }
 
-# # Run meta-analysis (both weighted and raw) across metacohorts for a single phenotype
-# task meta_analysis {
-#   Array[Array[File]] stats_beds
-#   Array[Array[File]] stats_bed_idxs
-#   String hpo
-#   File metacohort_list
-#   File metacohort_sample_table
-#   String freq_code
-#   Array[File] meta_p_cutoff_tables
-#   Int max_manhattan_phred_p
-#   String meta_model_prefix
-#   String rCNV_bucket
-#   String prefix
-#   String cache_string
+# Run meta-analysis (both weighted and raw) across metacohorts for a single phenotype
+task meta_analysis {
+  Array[Array[File]] stats_beds
+  Array[Array[File]] stats_bed_idxs
+  String hpo
+  File metacohort_list
+  File metacohort_sample_table
+  String freq_code
+  String noncoding_filter
+  Array[File] meta_p_cutoff_tables
+  Int max_manhattan_phred_p
+  String meta_model_prefix
+  String rCNV_bucket
+  String prefix
+  String cache_string
 
-#   command <<<
-#     set -e
+  command <<<
+    set -e
 
-#     # Copy burden counts & gene coordinates
-#     find / -name "*${prefix}.${freq_code}.*.crb_burden.stats.bed.gz*" \
-#     | xargs -I {} mv {} ./
-#     find / -name "*crb_burden.${freq_code}.*.bonferroni_pval.hpo_cutoffs.tsv*" \
-#     | xargs -I {} mv {} ./
-#     gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
-#     mkdir refs/
-#     gsutil -m cp ${rCNV_bucket}/refs/GRCh37.*.bed.gz refs/
-#     gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
+    # Copy burden counts & gene coordinates
+    find / -name "*${prefix}.${freq_code}.${noncoding_filter}_noncoding.*.crb_burden.stats.bed.gz*" \
+    | xargs -I {} mv {} ./
+    find / -name "*crb_burden.${freq_code}.${noncoding_filter}_noncoding.*.bonferroni_pval.hpo_cutoffs.tsv*" \
+    | xargs -I {} mv {} ./
+    mkdir refs/
+    gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
-#     # Get metadata for meta-analysis
-#     mega_idx=$( head -n1 "${metacohort_sample_table}" \
-#                 | sed 's/\t/\n/g' \
-#                 | awk '{ if ($1=="mega") print NR }' )
-#     ncase=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
-#              | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
-#              | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
-#     nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
-#              | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
-#              | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
-#     descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
-#                | awk -v FS="\t" '{ print $2 }' )
-#     title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
-#     DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-#                     crb_burden.${freq_code}.DEL.bonferroni_pval.hpo_cutoffs.tsv )
-#     DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-#                     crb_burden.${freq_code}.DUP.bonferroni_pval.hpo_cutoffs.tsv )
+    # Get metadata for meta-analysis
+    mega_idx=$( head -n1 "${metacohort_sample_table}" \
+                | sed 's/\t/\n/g' \
+                | awk '{ if ($1=="mega") print NR }' )
+    ncase=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+             | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
+             | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+    nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
+             | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
+             | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+    descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+               | awk -v FS="\t" '{ print $2 }' )
+    title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
+    DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
+                    crb_burden.${freq_code}.DEL.bonferroni_pval.hpo_cutoffs.tsv )
+    DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
+                    crb_burden.${freq_code}.DUP.bonferroni_pval.hpo_cutoffs.tsv )
 
-#     # Set HPO-specific parameters
-#     descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
-#                | awk -v FS="\t" '{ print $2 }' )
-#     zcat refs/gencode.v19.canonical.constrained.bed.gz \
-#     | fgrep -wf genes/gene_lists/${prefix}.HPOdb.constrained.genes.list \
-#     | cat <( echo -e "#chr\tstart\tend\tgene" ) - \
-#     > ${prefix}.highlight_regions.bed
+    # Set HPO-specific parameters
+    descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+               | awk -v FS="\t" '{ print $2 }' )
 
-
-#     # Run meta-analysis for each CNV type
-#     for CNV in DEL DUP; do
-#       # Set CNV-specific parameters
-#       case "$CNV" in
-#         DEL)
-#           meta_p_cutoff=$DEL_p_cutoff
-#           ;;
-#         DUP)
-#           meta_p_cutoff=$DUP_p_cutoff
-#           ;;
-#       esac
-
-#       # Perform meta-analysis for unweighted CNVs
-#       while read meta cohorts; do
-#         echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.crb_burden.stats.bed.gz"
-#       done < <( fgrep -v mega ${metacohort_list} ) \
-#       > ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.input.txt
-#       /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
-#         --or-corplot ${prefix}.${freq_code}.$CNV.crb_burden.or_corplot_grid.jpg \
-#         --model ${meta_model_prefix} \
-#         --p-is-phred \
-#         --spa \
-#         ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.input.txt \
-#         ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed
-#       bgzip -f ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed
-#       tabix -f ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed.gz
-
-#       # Generate Manhattan & QQ plots
-#       /opt/rCNV2/utils/plot_manhattan_qq.R \
-#         --p-col-name "meta_phred_p" \
-#         --p-is-phred \
-#         --max-phred-p ${max_manhattan_phred_p} \
-#         --cutoff $meta_p_cutoff \
-#         --highlight-bed "${prefix}.highlight_regions.bed" \
-#         --highlight-name "Constrained genes associated with this phenotype" \
-#         --label-prefix "$CNV" \
-#         --title "$title" \
-#         "${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed.gz" \
-#         "${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis"
-#     done
-
-#     # Generate Miami & QQ plots
-#     /opt/rCNV2/utils/plot_manhattan_qq.R \
-#       --miami \
-#       --p-col-name "meta_phred_p" \
-#       --p-is-phred \
-#       --max-phred-p ${max_manhattan_phred_p} \
-#       --cutoff $DUP_p_cutoff \
-#       --highlight-bed "${prefix}.highlight_regions.bed" \
-#       --highlight-name "Constrained genes associated with this phenotype" \
-#       --label-prefix "DUP" \
-#       --cutoff-2 $DEL_p_cutoff \
-#       --highlight-bed-2 "${prefix}.highlight_regions.bed" \
-#       --highlight-name-2 "Constrained genes associated with this phenotype" \
-#       --label-prefix-2 "DEL" \
-#       --title "$title" \
-#       "${prefix}.${freq_code}.DUP.crb_burden.meta_analysis.stats.bed.gz" \
-#       "${prefix}.${freq_code}.DEL.crb_burden.meta_analysis.stats.bed.gz" \
-#       "${prefix}.${freq_code}.crb_burden.meta_analysis"
-
-#     # Copy results to output bucket
-#     gsutil -m cp *.crb_burden.*meta_analysis.stats.bed.gz* \
-#       "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/stats/"
-#     gsutil -m cp *.crb_burden.*or_corplot_grid.jpg \
-#       "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/plots/"
-#     gsutil -m cp *.crb_burden.*meta_analysis.*.png \
-#       "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/plots/"
-
-#     # Must delocalize completion marker to prevent caching of final step
-#     echo "${cache_string}" > completion.txt
-#   >>>
-
-#   output {
-#     File completion_token = "completion.txt"
-#   }
-
-#   runtime {
-#     docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
-#     preemptible: 1
-#     memory: "4 GB"
-#     bootDiskSizeGb: "20"
-#   }
-# }
+    # Run meta-analysis for each CNV type
+    for CNV in DEL DUP; do
+      # Set CNV-specific parameters
+      case "$CNV" in
+        DEL)
+          meta_p_cutoff=$DEL_p_cutoff
+          ;;
+        DUP)
+          meta_p_cutoff=$DUP_p_cutoff
+          ;;
+      esac
 
 
-# # Fine-map genes
-# task finemap_genes {
-#   Array[File] completion_tokens # Must delocalize something from meta-analysis step to prevent caching
-#   File phenotype_list
-#   File metacohort_sample_table
-#   String freq_code
-#   String CNV
-#   Array[File] meta_p_cutoff_tables
-#   Float meta_secondary_p_cutoff
-#   Int meta_nominal_cohorts_cutoff
-#   Float finemap_elnet_alpha
-#   Float finemap_elnet_l1_l2_mix
-#   Int finemap_distance
-#   Float finemap_conf_pip
-#   Float finemap_vconf_pip
-#   String finemap_output_label
-#   File gene_features
-#   String rCNV_bucket
+      # Perform meta-analysis of CNV counts
+      while read meta cohorts; do
+        echo -e "$meta\t$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.stats.bed.gz"
+      done < <( fgrep -v mega ${metacohort_list} ) \
+      > ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt
+      /opt/rCNV2/analysis/noncoding/crb_meta_analysis.R \
+        --or-corplot ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.or_corplot_grid.jpg \
+        --model ${meta_model_prefix} \
+        --p-is-phred \
+        --spa \
+        ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt \
+        ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed
+      bgzip -f ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed
+      tabix -f ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed.gz
 
-#   command <<<
-#     set -e
+      # Generate Manhattan & QQ plots
+      /opt/rCNV2/utils/plot_manhattan_qq.R \
+        --p-col-name "meta_phred_p" \
+        --p-is-phred \
+        --max-phred-p ${max_manhattan_phred_p} \
+        --cutoff $meta_p_cutoff \
+        --label-prefix "$CNV" \
+        --title "$title" \
+        "${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed.gz" \
+        "${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis"
+    done
 
-#     # Copy p-value cutoff tables
-#     find / -name "*crb_burden.${freq_code}.*.bonferroni_pval.hpo_cutoffs.tsv*" \
-#     | xargs -I {} mv {} ./
+    # Generate Miami & QQ plots
+    /opt/rCNV2/utils/plot_manhattan_qq.R \
+      --miami \
+      --p-col-name "meta_phred_p" \
+      --p-is-phred \
+      --max-phred-p ${max_manhattan_phred_p} \
+      --cutoff $DUP_p_cutoff \
+      --label-prefix "DUP" \
+      --cutoff-2 $DEL_p_cutoff \
+      --label-prefix-2 "DEL" \
+      --title "$title" \
+      "${prefix}.${freq_code}.${noncoding_filter}_noncoding.DUP.crb_burden.meta_analysis.stats.bed.gz" \
+      "${prefix}.${freq_code}.${noncoding_filter}_noncoding.DEL.crb_burden.meta_analysis.stats.bed.gz" \
+      "${prefix}.${freq_code}.${noncoding_filter}_noncoding.crb_burden.meta_analysis"
 
-#     # Copy association stats & gene lists from the project Google Bucket (note: requires permissions)
-#     mkdir stats
-#     gsutil -m cp \
-#       ${rCNV_bucket}/analysis/crb_burden/**.${freq_code}.${noncoding_filter}_noncoding.${CNV}.crb_burden.meta_analysis.stats.bed.gz \
-#       stats/
-#     gsutil -m cp -r \
-#       ${rCNV_bucket}/cleaned_data/genes/gene_lists \
-#       ./
+    # Copy results to output bucket
+    gsutil -m cp *.crb_burden.*meta_analysis.stats.bed.gz* \
+      "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/stats/"
+    gsutil -m cp *.crb_burden.*or_corplot_grid.jpg \
+      "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/plots/"
+    gsutil -m cp *.crb_burden.*meta_analysis.*.png \
+      "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/plots/"
 
-#     # Write tsv input
-#     while read prefix hpo; do
-#       for wrapper in 1; do
-#         echo "$hpo"
-#         echo "stats/$prefix.${freq_code}.${noncoding_filter}_noncoding.${CNV}.crb_burden.meta_analysis.stats.bed.gz"
-#         awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' \
-#           crb_burden.${freq_code}.${noncoding_filter}_noncoding.${CNV}.bonferroni_pval.hpo_cutoffs.tsv
-#       done | paste -s
-#     done < ${phenotype_list} \
-#     > ${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.stats_input.tsv
+    # Must delocalize completion marker to prevent caching of final step
+    echo "${cache_string}" > completion.txt
+  >>>
 
-#     # Make lists of a priori "true causal" genes for null variance estimation
-#     case ${CNV} in
-#       "DEL")
-#         for wrapper in 1; do
-#           echo "gene_lists/DDG2P.hmc_lof.genes.list"
-#           echo "gene_lists/DDG2P.hmc_other.genes.list"
-#           echo "gene_lists/ClinGen.hmc_haploinsufficient.genes.list"
-#           echo "gene_lists/HP0000118.HPOdb.constrained.genes.list"
-#           echo "gene_lists/gnomad.v2.1.1.lof_constrained.genes.list"
-#         done > known_causal_gene_lists.tsv
-#         ;;
-#       "DUP")
-#         for wrapper in 1; do
-#           echo "gene_lists/DDG2P.all_gof.genes.list"
-#           echo "gene_lists/DDG2P.hmc_other.genes.list"
-#           echo "gene_lists/ClinGen.all_triplosensitive.genes.list"
-#           echo "gene_lists/HP0000118.HPOdb.constrained.genes.list"
-#           echo "gene_lists/gnomad.v2.1.1.lof_constrained.genes.list"
-#         done > known_causal_gene_lists.tsv
-#         ;;
-#     esac
+  output {
+    File completion_token = "completion.txt"
+  }
 
-#     # Run functional fine-mapping procedure
-#     /opt/rCNV2/analysis/genes/finemap_genes.py \
-#       --cnv ${CNV} \
-#       --secondary-p-cutoff ${meta_secondary_p_cutoff} \
-#       --min-nominal ${meta_nominal_cohorts_cutoff} \
-#       --secondary-or-nominal \
-#       --regularization-alpha ${finemap_elnet_alpha} \
-#       --regularization-l1-l2-mix ${finemap_elnet_l1_l2_mix} \
-#       --distance ${finemap_distance} \
-#       --confident-pip ${finemap_conf_pip} \
-#       --very-confident-pip ${finemap_vconf_pip} \
-#       --known-causal-gene-lists known_causal_gene_lists.tsv \
-#       --outfile ${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv \
-#       --sig-genes-bed ${freq_code}.${noncoding_filter}_noncoding.${CNV}.final_genes.genes.bed \
-#       --sig-assoc-bed ${freq_code}.${noncoding_filter}_noncoding.${CNV}.final_genes.associations.bed \
-#       --sig-credsets-bed ${freq_code}.${noncoding_filter}_noncoding.${CNV}.final_genes.credible_sets.bed \
-#       --all-genes-outfile ${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.all_genes_from_blocks.tsv \
-#       --naive-outfile ${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.tsv \
-#       --genetic-outfile ${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.genetics_only.${finemap_output_label}.tsv \
-#       --coeffs-out ${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.logit_coeffs.${finemap_output_label}.tsv \
-#       ${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.stats_input.tsv \
-#       ${gene_features} \
-#       ${metacohort_sample_table}
+  runtime {
+    docker: "talkowski/rcnv@sha256:7ef678bfbffb9ec5690f6b21b2416e7d5e4dc458ed78f27e940a53cf3e45f6c9"
+    preemptible: 1
+    memory: "4 GB"
+    bootDiskSizeGb: "20"
+  }
+}
 
-#     # Repeat functional fine-mapping with secondary association stats (for supplement)
-#     /opt/rCNV2/analysis/genes/finemap_genes.py \
-#       --secondary-p-cutoff ${meta_secondary_p_cutoff} \
-#       --min-nominal ${meta_nominal_cohorts_cutoff} \
-#       --secondary-or-nominal \
-#       --regularization-alpha ${finemap_elnet_alpha} \
-#       --regularization-l1-l2-mix ${finemap_elnet_l1_l2_mix} \
-#       --distance ${finemap_distance} \
-#       --known-causal-gene-lists known_causal_gene_lists.tsv \
-#       --finemap-secondary \
-#       --outfile ${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.secondary.tsv \
-#       --all-genes-outfile ${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.all_genes_from_blocks.secondary.tsv \
-#       ${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.stats_input.tsv \
-#       ${gene_features} \
-#       ${metacohort_sample_table}
-
-#     # Copy results to output bucket
-#     gsutil -m cp \
-#       ${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.*.${finemap_output_label}*tsv \
-#       ${rCNV_bucket}/analysis/crb_burden/fine_mapping/
-
-#     # Make completion token to track caching
-#     echo "Done" > completion.txt
-#   >>>
-
-#   output {
-#     File finemapped_output = "${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv"
-#     File finemapped_output_all_genes = "${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.all_genes_from_blocks.tsv"
-#     File naive_output = "${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.naive_priors.${finemap_output_label}.tsv"
-#     File genetic_output = "${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.genetics_only.${finemap_output_label}.tsv"
-#     File logit_coeffs = "${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.logit_coeffs.${finemap_output_label}.tsv"
-#     File finemapped_output_secondary = "${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.secondary.tsv"
-#     File finemapped_output_all_genes_secondary = "${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.all_genes_from_blocks.secondary.tsv"
-#     File sig_genes_bed = "${freq_code}.${noncoding_filter}_noncoding.${CNV}.final_genes.genes.bed"
-#     File sig_assocs_bed = "${freq_code}.${noncoding_filter}_noncoding.${CNV}.final_genes.associations.bed"
-#     File cred_sets_bed = "${freq_code}.${noncoding_filter}_noncoding.${CNV}.final_genes.credible_sets.bed"
-#     File completion_token = "completion.txt"
-#   }
-
-#   runtime {
-#     docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
-#     preemptible: 1
-#     memory: "8 GB"
-#     bootDiskSizeGb: "20"
-#     disks: "local-disk 50 HDD"
-#   }
-# }
-
-
-# # Merge final gene association results for public export
-# task merge_finemap_res {
-#   Array[File] gene_beds
-#   Array[File] assoc_beds
-#   Array[File] credset_beds
-#   String freq_code
-#   String rCNV_bucket
-
-#   command <<<
-#     set -e 
-
-#     # Get headers
-#     sed -n '1p' ${gene_beds[0]} > gene_header.tsv
-#     sed -n '1p' ${assoc_beds[0]} > assoc_header.tsv
-#     sed -n '1p' ${credset_beds[0]} > credset_header.tsv
-
-#     # Merge genes
-#     cat ${sep=" " gene_beds} \
-#     | grep -ve '^#' \
-#     | sort -Vk1,1 -k2,2n -k3,3n -k4,4V -k5,5V -k13,13V \
-#     | cat gene_header.tsv - \
-#     | bgzip -c \
-#     > ${freq_code}.final_genes.genes.bed.gz
-
-#     # Merge associations
-#     cat ${sep=" " assoc_beds} \
-#     | grep -ve '^#' \
-#     | sort -Vk1,1 -k2,2n -k3,3n -k4,4V -k5,5V -k6,6V \
-#     | cat assoc_header.tsv - \
-#     | bgzip -c \
-#     > ${freq_code}.final_genes.associations.bed.gz
-
-#     # Merge genes
-#     cat ${sep=" " credset_beds} \
-#     | grep -ve '^#' \
-#     | sort -Vk1,1 -k2,2n -k3,3n -k5,5V -k6,6V \
-#     | cat credset_header.tsv - \
-#     | bgzip -c \
-#     > ${freq_code}.final_genes.credible_sets.bed.gz
-
-#     # Copy final files to results bucket (note: requires permissions)
-#     gsutil -m cp \
-#       ${freq_code}.final_genes.*.bed.gz \
-#       ${rCNV_bucket}/results/gene_association/
-#   >>>
-
-#   output {
-#     File final_genes = "${freq_code}.final_genes.genes.bed.gz"
-#     File final_associations = "${freq_code}.final_genes.associations.bed.gz"
-#     File final_credsets = "${freq_code}.final_genes.credible_sets.bed.gz"
-#   }
-
-#   runtime {
-#     docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
-#     preemptible: 1
-#     bootDiskSizeGb: "20"
-#   }
-# }
-
-
-# # Plot fine-mapping results
-# task plot_finemap_res {
-#   Array[Array[File]] completion_tokens
-#   String freq_code
-#   String CNV
-#   File phenotype_list
-#   File raw_features_genomic
-#   File raw_features_expression
-#   File raw_features_chromatin
-#   File raw_features_constraint
-#   File raw_features_merged
-#   String rCNV_bucket
-
-#   command <<<
-#     set -e
-
-#     # Copy all fine-mapped gene lists
-#     mkdir finemap_stats/
-#     gsutil -m cp \
-#       ${rCNV_bucket}/analysis/crb_burden/fine_mapping/${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.*.tsv \
-#       finemap_stats/
-
-#     # Make input tsvs
-#     for wrapper in 1; do
-#       echo -e "Prior\tgrey70\t1\tfinemap_stats/${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.naive_priors.genomic_features.tsv"
-#       echo -e "Posterior\t'#264653'\t1\tfinemap_stats/${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.genetics_only.genomic_features.tsv"
-#       echo -e "Genomic features\t'#E76F51'\t1\tfinemap_stats/${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.genomic_features.tsv"
-#       echo -e "Gene expression\t'#E9C46A'\t1\tfinemap_stats/${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.expression_features.tsv"
-#       echo -e "Chromatin\t'#ed80a6'\t1\tfinemap_stats/${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.chromatin_features.tsv"
-#       echo -e "Gene constraint\t'#F4A261'\t1\tfinemap_stats/${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.constraint_features.tsv"
-#       echo -e "Full model\t'#2A9D8F'\t1\tfinemap_stats/${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.merged_features.tsv"
-#     done > finemap_roc_input.tsv
-#     for wrapper in 1; do
-#       echo -e "Genomic features\t'#E76F51'\tfinemap_stats/${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.genomic_features.all_genes_from_blocks.tsv\t${raw_features_genomic}"
-#       echo -e "Gene expression\t'#E9C46A'\tfinemap_stats/${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.expression_features.all_genes_from_blocks.tsv\t${raw_features_expression}"
-#       echo -e "Chromatin\t'#ed80a6'\tfinemap_stats/${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.chromatin_features.all_genes_from_blocks.tsv\t${raw_features_chromatin}"
-#       echo -e "Gene constraint\t'#F4A261'\tfinemap_stats/${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.constraint_features.all_genes_from_blocks.tsv\t${raw_features_constraint}"
-#       echo -e "Full model\t'#2A9D8F'\tfinemap_stats/${freq_code}.${noncoding_filter}_noncoding.${CNV}.gene_fine_mapping.gene_stats.merged_features.all_genes_from_blocks.tsv\t${raw_features_merged}"
-#     done > finemap_feature_cor_input.tsv
-
-#     # Make all gene truth sets
-#     gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes/gene_lists ./
-
-#     # HPO-associated
-#     while read prefix hpo; do
-#       awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }' \
-#         gene_lists/$prefix.HPOdb.genes.list
-#     done < ${phenotype_list} \
-#     | sort -Vk1,1 -k2,2V | uniq \
-#     | cat <( echo -e "#HPO\tgene" ) - \
-#     > hpo_truth_set.tsv
-
-#     # Make CNV type-dependent truth sets
-#     case ${CNV} in
-#       "DEL")
-#         # Union (ClinGen HI + DDG2P dominant LoF)
-#         while read prefix hpo; do
-#           cat gene_lists/ClinGen.hmc_haploinsufficient.genes.list \
-#               gene_lists/DDG2P.hmc_lof.genes.list \
-#           | awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }'
-#         done < ${phenotype_list} \
-#         | sort -Vk1,1 -k2,2V | uniq \
-#         | cat <( echo -e "#HPO\tgene" ) - \
-#         > union_truth_set.lof.tsv
-
-#         # Intersection (ClinGen HI + DDG2P dominant LoF)
-#         while read prefix hpo; do
-#           fgrep -wf \
-#             gene_lists/ClinGen.hmc_haploinsufficient.genes.list \
-#             gene_lists/DDG2P.hmc_lof.genes.list \
-#           | awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }'
-#         done < ${phenotype_list} \
-#         | sort -Vk1,1 -k2,2V | uniq \
-#         | cat <( echo -e "#HPO\tgene" ) - \
-#         > intersection_truth_set.lof.tsv
-
-#         # ClinGen HI alone
-#         while read prefix hpo; do
-#           awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }' \
-#             gene_lists/ClinGen.all_haploinsufficient.genes.list
-#         done < ${phenotype_list} \
-#         | sort -Vk1,1 -k2,2V | uniq \
-#         | cat <( echo -e "#HPO\tgene" ) - \
-#         > clingen_truth_set.lof.tsv
-
-#         # DDG2P lof + other alone
-#         while read prefix hpo; do
-#           cat gene_lists/DDG2P.all_lof.genes.list \
-#               gene_lists/DDG2P.all_other.genes.list \
-#           | awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }'
-#         done < ${phenotype_list} \
-#         | sort -Vk1,1 -k2,2V | uniq \
-#         | cat <( echo -e "#HPO\tgene" ) - \
-#         > ddg2p_truth_set.lof.tsv
-
-#         # Combine all truth sets into master union
-#         cat union_truth_set.lof.tsv \
-#             clingen_truth_set.lof.tsv \
-#             ddg2p_truth_set.lof.tsv \
-#             hpo_truth_set.tsv \
-#         | fgrep -v "#" | sort -Vk1,1 -k2,2V | uniq \
-#         | cat <( echo -e "#HPO\tgene" ) - \
-#         > master_union_truth_set.lof.tsv
-
-#         # Write truth set input tsv
-#         for wrapper in 1; do
-#           echo -e "Union of all truth sets\tmaster_union_truth_set.lof.tsv"
-#           echo -e "ClinGen HI & DECIPHER LoF (union)\tunion_truth_set.lof.tsv"
-#           echo -e "ClinGen HI & DECIPHER LoF (intersection)\tintersection_truth_set.lof.tsv"
-#           echo -e "ClinGen HI (any confidence)\tclingen_truth_set.lof.tsv"
-#           echo -e "DECIPHER dominant LoF/unk. (any confidence)\tddg2p_truth_set.lof.tsv"
-#           echo -e "HPO-matched disease genes\thpo_truth_set.tsv"
-#         done > finemap_roc_truth_sets.tsv
-#         ;;
-
-#       "DUP")
-#         # Union (ClinGen HI + DDG2P dominant CG)
-#         while read prefix hpo; do
-#           cat gene_lists/ClinGen.hmc_triplosensitive.genes.list \
-#               gene_lists/DDG2P.hmc_gof.genes.list \
-#           | awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }'
-#         done < ${phenotype_list} \
-#         | sort -Vk1,1 -k2,2V | uniq \
-#         | cat <( echo -e "#HPO\tgene" ) - \
-#         > union_truth_set.gof.tsv
-
-#         # ClinGen triplo alone
-#         while read prefix hpo; do
-#           awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }' \
-#             gene_lists/ClinGen.all_triplosensitive.genes.list
-#         done < ${phenotype_list} \
-#         | sort -Vk1,1 -k2,2V | uniq \
-#         | cat <( echo -e "#HPO\tgene" ) - \
-#         > clingen_truth_set.triplo.tsv
-
-#         # DDG2P gof + other alone
-#         while read prefix hpo; do
-#           cat gene_lists/DDG2P.all_gof.genes.list \
-#               gene_lists/DDG2P.all_other.genes.list \
-#           | awk -v OFS="\t" -v hpo=$hpo '{ print hpo, $1 }'
-#         done < ${phenotype_list} \
-#         | sort -Vk1,1 -k2,2V | uniq \
-#         | cat <( echo -e "#HPO\tgene" ) - \
-#         > ddg2p_truth_set.gof.tsv
-
-#         # Combine all truth sets into master union
-#         cat union_truth_set.gof.tsv \
-#             clingen_truth_set.gof.tsv \
-#             ddg2p_truth_set.gof.tsv \
-#             hpo_truth_set.tsv \
-#         | fgrep -v "#" | sort -Vk1,1 -k2,2V | uniq \
-#         | cat <( echo -e "#HPO\tgene" ) - \
-#         > master_union_truth_set.gof.tsv
-
-#         # Write truth set input tsv
-#         for wrapper in 1; do
-#           echo -e "Union of all truth sets\tmaster_union_truth_set.gof.tsv"
-#           echo -e "ClinGen TS & DECIPHER GoF (union)\tunion_truth_set.gof.tsv"
-#           echo -e "ClinGen TS (any confidence)\tclingen_truth_set.triplo.tsv"
-#           echo -e "DECIPHER dominant GoF/unk. (any confidence)\tddg2p_truth_set.gof.tsv"
-#           echo -e "HPO-matched disease genes\thpo_truth_set.tsv"
-#         done > finemap_roc_truth_sets.tsv
-#         ;;
-
-#     esac
-
-#     # Plot finemapping QC & feature correlations
-#     mkdir ${freq_code}_${CNV}_finemap_plots/
-#     /opt/rCNV2/analysis/genes/plot_finemap_results.R \
-#       finemap_roc_input.tsv \
-#       finemap_roc_truth_sets.tsv \
-#       ${freq_code}_${CNV}_finemap_plots/${freq_code}.${noncoding_filter}_noncoding.${CNV}.finemap_results
-#     /opt/rCNV2/analysis/genes/plot_finemap_coefficients.R \
-#       finemap_feature_cor_input.tsv \
-#       ${freq_code}_${CNV}_finemap_plots/${freq_code}.${noncoding_filter}_noncoding.${CNV}.finemap_feature_cors
-
-#     # Compress results
-#     tar -czvf ${freq_code}_${CNV}_finemap_plots.tgz ${freq_code}_${CNV}_finemap_plots
-#   >>>
-
-#   output {
-#     File plots_tarball = "${freq_code}_${CNV}_finemap_plots.tgz"
-#   }
-
-#   runtime {
-#     docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
-#     preemptible: 1
-#     memory: "4 GB"
-#     bootDiskSizeGb: "20"
-#     disks: "local-disk 50 HDD"
-#   }
-# }

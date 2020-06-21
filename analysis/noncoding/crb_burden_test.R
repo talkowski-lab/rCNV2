@@ -267,6 +267,18 @@ case.col.name <- opts$`case-column`
 control.col.name <- opts$`control-column`
 precision <- opts$precision
 
+# # Dev parameters:
+# bed.in <- "~/scratch/meta2.UNKNOWN.rCNV.loose_noncoding.DEL.crb_burden.counts.bed.gz"
+# outfile <- "~/scratch/meta2.UNKNOWN.rCNV.loose_noncoding.DEL.crb_burden.stats.bed"
+# pheno.table.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
+# cohort.name <- "meta2"
+# cnv <- "DEL"
+# case.hpo <- "UNKNOWN"
+# control.hpo <- "HEALTHY_CONTROL"
+# case.col.name <- "case_cnvs"
+# control.col.name <- "control_cnvs"
+# precision <- 6
+
 # Extract sample counts
 sample.counts <- get.sample.counts(pheno.table.in, cohort.name, 
                                    case.hpo, control.hpo)
