@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens per cis-regulatory block (CRB)
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_crb_burden_perm_test/versions/1/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_crb_burden_perm_test/versions/2/plain-WDL/descriptor" as scattered_perm
 
 
 workflow crb_burden_analysis {
@@ -242,7 +242,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7ef678bfbffb9ec5690f6b21b2416e7d5e4dc458ed78f27e940a53cf3e45f6c9"
+    docker: "talkowski/rcnv@sha256:cbeb85322bbd6b8e249c1e9135fc860d9fc34cc7758e45cc9790ee2d83a30f18"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -277,19 +277,19 @@ task calc_meta_p_cutoff {
     mkdir perm_res/
     while read prefix hpo; do
       gsutil -m cp \
-        "${rCNV_bucket}/analysis/crb_burden/$prefix/${freq_code}/permutations/$prefix.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.perm_*.bed.gz" \
+        "${rCNV_bucket}/analysis/crb_burden/$prefix/${freq_code}/permutations/$prefix.${freq_code}.${noncoding_filter}_noncoding.${CNV}.crb_burden.meta_analysis.stats.perm_*.bed.gz" \
         perm_res/
       for i in $( seq 1 ${n_pheno_perms} ); do
-        p_idx=$( zcat perm_res/$prefix.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.perm_$i.bed.gz \
+        p_idx=$( zcat perm_res/$prefix.${freq_code}.${noncoding_filter}_noncoding.${CNV}.crb_burden.meta_analysis.stats.perm_$i.bed.gz \
                  | sed -n '1p' | sed 's/\t/\n/g' | awk -v OFS="\t" '{ print $1, NR }' \
                  | fgrep -w ${p_val_column_name} | cut -f2 )
-        zcat perm_res/$prefix.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.perm_$i.bed.gz \
+        zcat perm_res/$prefix.${freq_code}.${noncoding_filter}_noncoding.${CNV}.crb_burden.meta_analysis.stats.perm_$i.bed.gz \
         | grep -ve '^#' \
         | awk -v p_idx=$p_idx '{ print $(p_idx) }' \
         | cat <( echo "$prefix.${CNV}.$i" ) - \
-        > perm_res/$prefix.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.permuted_p_values.$i.txt
+        > perm_res/$prefix.${freq_code}.${noncoding_filter}_noncoding.${CNV}.crb_burden.meta_analysis.permuted_p_values.$i.txt
       done
-      rm perm_res/$prefix.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.perm_*.bed.gz
+      rm perm_res/$prefix.${freq_code}.${noncoding_filter}_noncoding.${CNV}.crb_burden.meta_analysis.stats.perm_*.bed.gz
     done < ${phenotype_list}
     paste perm_res/*.crb_burden.meta_analysis.permuted_p_values.*.txt \
     | gzip -c \
@@ -321,7 +321,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7ef678bfbffb9ec5690f6b21b2416e7d5e4dc458ed78f27e940a53cf3e45f6c9"
+    docker: "talkowski/rcnv@sha256:cbeb85322bbd6b8e249c1e9135fc860d9fc34cc7758e45cc9790ee2d83a30f18"
     preemptible: 1
     memory: "32 GB"
     disks: "local-disk 275 HDD"
@@ -377,9 +377,9 @@ task meta_analysis {
                | awk -v FS="\t" '{ print $2 }' )
     title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
     DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                    crb_burden.${freq_code}.DEL.bonferroni_pval.hpo_cutoffs.tsv )
+                    crb_burden.${freq_code}.${noncoding_filter}_noncoding.DEL.bonferroni_pval.hpo_cutoffs.tsv )
     DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                    crb_burden.${freq_code}.DUP.bonferroni_pval.hpo_cutoffs.tsv )
+                    crb_burden.${freq_code}.${noncoding_filter}_noncoding.DUP.bonferroni_pval.hpo_cutoffs.tsv )
 
     # Set HPO-specific parameters
     descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
@@ -396,7 +396,6 @@ task meta_analysis {
           meta_p_cutoff=$DUP_p_cutoff
           ;;
       esac
-
 
       # Perform meta-analysis of CNV counts
       while read meta cohorts; do
@@ -457,7 +456,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7ef678bfbffb9ec5690f6b21b2416e7d5e4dc458ed78f27e940a53cf3e45f6c9"
+    docker: "talkowski/rcnv@sha256:cbeb85322bbd6b8e249c1e9135fc860d9fc34cc7758e45cc9790ee2d83a30f18"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

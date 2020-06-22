@@ -18,24 +18,41 @@ from os import path
 import subprocess
 
 
-def get_track(trackpath):
+def download_track(trackpath):
     """
-    Download (if necessary) and load annotation track
+    Download track (or locate its local copy, if already downloaded)
     """
 
-    # Download track, if necessary
     if trackpath.startswith('gs://'):
         localpath = path.basename(trackpath)
         if not any([path.exists(localpath), path.isfile(localpath)]):
-            subprocess.run(['gsutil', '-m', 'cp', trackpath, './'])
+            subprocess.run(['gsutil', '-m', 'cp', trackpath, './'], check=True)
 
     elif any(trackpath.startswith(prefix) for prefix in 'http:// https:// ftp://'.split()):
         localpath = path.basename(trackpath)
         if not any([path.exists(localpath), path.isfile(localpath)]):
-            subprocess.run(['wget', trackpath])
+            subprocess.run(['wget', '--no-check-certificate', trackpath], check=True)
 
     else:
         localpath = trackpath
+
+    return localpath
+
+
+def get_track(trackpath, n_download_retries=5):
+    """
+    Download (if necessary) and load annotation track
+    """
+
+    # Download track, if necessary, trying a total of n_download_retries times
+    for tries in range(1, n_download_retries+1):
+        try:
+            localpath = download_track(trackpath)
+            print('\nSuccessfully localized {} after {} attempts\n'.format(trackpath, tries))
+            break
+        except:
+            print('\nAttepmt {} to localize {} was unsuccessful. Retrying...\n'.format(tries, trackpath))
+            continue
 
     # Set track name equal to base filename without bed suffix
     if '.bed' in localpath:
@@ -162,6 +179,8 @@ def main():
                         '[default: trackname + .curated.bed.gz]')
     parser.add_argument('-s', '--stats', action='store_true', help='Compute ' +
                         'track statistics.')
+    parser.add_argument('--n-download-retries', default=5, type=int, 
+                        help='Number of times to retry downloading each track.')
     parser.add_argument('-z', '--bgzip', action='store_true', help='Compress ' +
                         'output BED file with bgzip.')
     args = parser.parse_args()
@@ -174,7 +193,7 @@ def main():
             outbed_path = args.outbed
 
     # Load annotation track
-    track, trackname = get_track(args.path)
+    track, trackname = get_track(args.path, args.n_download_retries)
 
     # Open connections to unspecified output files
     if args.outbed is None:

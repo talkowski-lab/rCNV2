@@ -10,6 +10,11 @@
 
 workflow curate_annotations {
 	File chromhmm_tracklist
+  File encode_dnaaccessibility_tracklist
+  File encode_histone_mods_tracklist
+  File encode_tfbs_tracklist
+  File encode_transcription_tracklist
+  File tad_boundaries_tracklist
   Int tracks_per_shard
   Int min_element_size
   Int max_element_size
@@ -22,15 +27,13 @@ workflow curate_annotations {
   String rCNV_bucket
   String prefix
 
-  # Shuffle & shard tracklists
+  # Process Roadmap ChromHMM tracks
   call shard_tracklist as shard_tracklist_chromhmm {
     input:
       tracklist=chromhmm_tracklist,
       tracks_per_shard=tracks_per_shard,
       prefix="${prefix}.chromhmm_shards"
   }
-
-  # Scatter over sharded tracklists and curate tracks
   scatter ( shard in shard_tracklist_chromhmm.shards ) {
     call curate_and_burden as curate_and_burden_chromhmm {
       input:
@@ -43,25 +46,148 @@ workflow curate_annotations {
         prefix="${prefix}.chromhmm_shard"
     }
   }
-
-  # Collect shards for each tracklist
   call merge_shards as merge_chromhmm {
     input:
       stat_shards=curate_and_burden_chromhmm.stats,
       prefix="${prefix}.chromhmm"
   }
 
+  # Process ENCODE DNA accessibility tracks
+  call shard_tracklist as shard_tracklist_encode_dnaaccessibility {
+    input:
+      tracklist=encode_dnaaccessibility_tracklist,
+      tracks_per_shard=tracks_per_shard,
+      prefix="${prefix}.encode_dnaaccessibility_shards"
+  }
+  scatter ( shard in shard_tracklist_encode_dnaaccessibility.shards ) {
+    call curate_and_burden as curate_and_burden_encode_dnaaccessibility {
+      input:
+        tracklist=shard,
+        min_element_size=min_element_size,
+        max_element_size=max_element_size,
+        case_hpo=case_hpo,
+        min_element_overlap=min_element_overlap,
+        rCNV_bucket=rCNV_bucket,
+        prefix="${prefix}.encode_dnaaccessibility_shard"
+    }
+  }
+  call merge_shards as merge_encode_dnaaccessibility {
+    input:
+      stat_shards=curate_and_burden_encode_dnaaccessibility.stats,
+      prefix="${prefix}.encode_dnaaccessibility"
+  }
+
+  # Process ENCODE histone modification tracks
+  call shard_tracklist as shard_tracklist_encode_histone_mods {
+    input:
+      tracklist=encode_histone_mods_tracklist,
+      tracks_per_shard=tracks_per_shard,
+      prefix="${prefix}.encode_histone_mods_shards"
+  }
+  scatter ( shard in shard_tracklist_encode_histone_mods.shards ) {
+    call curate_and_burden as curate_and_burden_encode_histone_mods {
+      input:
+        tracklist=shard,
+        min_element_size=min_element_size,
+        max_element_size=max_element_size,
+        case_hpo=case_hpo,
+        min_element_overlap=min_element_overlap,
+        rCNV_bucket=rCNV_bucket,
+        prefix="${prefix}.encode_histone_mods_shard"
+    }
+  }
+  call merge_shards as merge_encode_histone_mods {
+    input:
+      stat_shards=curate_and_burden_encode_histone_mods.stats,
+      prefix="${prefix}.encode_histone_mods"
+  }
+
+  # Process ENCODE TFBS tracks
+  call shard_tracklist as shard_tracklist_encode_tfbs {
+    input:
+      tracklist=encode_tfbs_tracklist,
+      tracks_per_shard=tracks_per_shard,
+      prefix="${prefix}.encode_tfbs_shards"
+  }
+  scatter ( shard in shard_tracklist_encode_tfbs.shards ) {
+    call curate_and_burden as curate_and_burden_encode_tfbs {
+      input:
+        tracklist=shard,
+        min_element_size=min_element_size,
+        max_element_size=max_element_size,
+        case_hpo=case_hpo,
+        min_element_overlap=min_element_overlap,
+        rCNV_bucket=rCNV_bucket,
+        prefix="${prefix}.encode_tfbs_shard"
+    }
+  }
+  call merge_shards as merge_encode_tfbs {
+    input:
+      stat_shards=curate_and_burden_encode_tfbs.stats,
+      prefix="${prefix}.encode_tfbs"
+  }
+
+  # Process ENCODE transcription tracks
+  call shard_tracklist as shard_tracklist_encode_transcription {
+    input:
+      tracklist=encode_transcription_tracklist,
+      tracks_per_shard=tracks_per_shard,
+      prefix="${prefix}.encode_transcription_shards"
+  }
+  scatter ( shard in shard_tracklist_encode_transcription.shards ) {
+    call curate_and_burden as curate_and_burden_encode_transcription {
+      input:
+        tracklist=shard,
+        min_element_size=min_element_size,
+        max_element_size=max_element_size,
+        case_hpo=case_hpo,
+        min_element_overlap=min_element_overlap,
+        rCNV_bucket=rCNV_bucket,
+        prefix="${prefix}.encode_transcription_shard"
+    }
+  }
+  call merge_shards as merge_encode_transcription {
+    input:
+      stat_shards=curate_and_burden_encode_transcription.stats,
+      prefix="${prefix}.encode_transcription"
+  }
+
+  # Process TAD boundaries
+  call shard_tracklist as shard_tracklist_tad_boundaries {
+    input:
+      tracklist=tad_boundaries_tracklist,
+      tracks_per_shard=tracks_per_shard,
+      prefix="${prefix}.tad_boundaries_shards"
+  }
+  scatter ( shard in shard_tracklist_tad_boundaries.shards ) {
+    call curate_and_burden as curate_and_burden_tad_boundaries {
+      input:
+        tracklist=shard,
+        min_element_size=min_element_size,
+        max_element_size=max_element_size,
+        case_hpo=case_hpo,
+        min_element_overlap=min_element_overlap,
+        rCNV_bucket=rCNV_bucket,
+        prefix="${prefix}.tad_boundaries_shard"
+    }
+  }
+  call merge_shards as merge_tad_boundaries {
+    input:
+      stat_shards=curate_and_burden_tad_boundaries.stats,
+      prefix="${prefix}.tad_boundaries"
+  }
+
   # Merge stats across all tracklists
   call merge_shards as merge_all {
     input:
-      stat_shards=[merge_chromhmm.merged_stats],
+      stat_shards=[merge_chromhmm.merged_stats, merge_encode_dnaaccessibility.merged_stats, merge_encode_histone_mods.merged_stats, merge_encode_tfbs.merged_stats, merge_encode_transcription.merged_stats, merge_tad_boundaries.merged_stats],
       prefix="${prefix}.all"
   }
 
   # Merge all tracklists
   call merge_tracklists {
     input:
-      tracklists=[chromhmm_tracklist],
+      tracklists=[chromhmm_tracklist, encode_dnaaccessibility_tracklist, encode_histone_mods_tracklist, encode_transcription_tracklist, tad_boundaries_tracklist],
       prefix="${prefix}"
   }
 
@@ -76,40 +202,40 @@ workflow curate_annotations {
       clear_sig="TRUE"
   }
 
-  # Re-shard all significant tracks for final curation
-  call shard_tracklist as shard_tracklist_signif {
-    input:
-      tracklist=meta_burden_test.signif_tracklist,
-      tracks_per_shard=tracks_per_shard,
-      prefix="${prefix}.signif_tracks"
-  }
+  # # Re-shard all significant tracks for final curation
+  # call shard_tracklist as shard_tracklist_signif {
+  #   input:
+  #     tracklist=meta_burden_test.signif_tracklist,
+  #     tracks_per_shard=tracks_per_shard,
+  #     prefix="${prefix}.signif_tracks"
+  # }
 
-  # Scatter over sharded significant tracklist and curate tracks
-  scatter ( shard in shard_tracklist_signif.shards ) {
-    call curate_only as curate_only_signif {
-      input:
-        tracklist=shard,
-        min_element_size=min_element_size,
-        max_element_size=max_element_size,
-        rCNV_bucket=rCNV_bucket,
-        prefix="${prefix}.signif_shard"
-    }
-  }
+  # # Scatter over sharded significant tracklist and curate tracks
+  # scatter ( shard in shard_tracklist_signif.shards ) {
+  #   call curate_only as curate_only_signif {
+  #     input:
+  #       tracklist=shard,
+  #       min_element_size=min_element_size,
+  #       max_element_size=max_element_size,
+  #       rCNV_bucket=rCNV_bucket,
+  #       prefix="${prefix}.signif_shard"
+  #   }
+  # }
 
-  call cluster_elements {
-    input:
-      completion_tokens=curate_only_signif.completion_token,
-      min_prop_tracks_per_crb=min_prop_tracks_per_crb,
-      clustering_neighborhood_dist=clustering_neighborhood_dist,
-      min_crb_separation=min_crb_separation,
-      rCNV_bucket=rCNV_bucket,
-      prefix=prefix
-  }
+  # call cluster_elements {
+  #   input:
+  #     completion_tokens=curate_only_signif.completion_token,
+  #     min_prop_tracks_per_crb=min_prop_tracks_per_crb,
+  #     clustering_neighborhood_dist=clustering_neighborhood_dist,
+  #     min_crb_separation=min_crb_separation,
+  #     rCNV_bucket=rCNV_bucket,
+  #     prefix=prefix
+  # }
   
   # Final outputs
   output {
-    File final_crbs = cluster_elements.final_crbs
-    File final_crb_elements = cluster_elements.final_crb_elements
+    # File final_crbs = cluster_elements.final_crbs
+    # File final_crb_elements = cluster_elements.final_crb_elements
   }
 }
 

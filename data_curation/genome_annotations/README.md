@@ -10,15 +10,36 @@ In practice, this analysis was parallelized on [FireCloud/Terra](https://terra.b
 
 We aimed to comprehensively assess all major repositories of genome annotations.
 
-In total, we evaluated TBD genome annotation tracks across all sources.  
+In total, we evaluated _TBD_ genome annotation tracks across all sources.  
 
 The following table outlines major sources considered in this analysis:
 
 | Source | Number of tracks | Description | Citation | Website |  
 | :--- | ---: | :--- | :--- | :--- |  
-| Roadmap Epigenomics (ChromHMM only) | 1,764 | Chromatin states inferred by the extended 18-way ChromHMM model across 98 tissues from the Roadmap Epigenomics Project | Roadmap Epigenomics Project [(Kundaje _et al._, _Nature_, 2015)](https://www.nature.com/articles/nature14248) | [Link](https://egg2.wustl.edu/roadmap/web_portal/chr_state_learning.html) |  
-| ENCODE Data Portal | TBD | All hg19-aligned BED files from any human tissue or cell line available for download from the ENCODE Data Portal (accessed June 2020) | ENCODE Data Portal [(Davis _et al._, _Nucleic Acids Res._, 2018)](https://pubmed.ncbi.nlm.nih.gov/29126249/) | [Link](https://www.encodeproject.org/matrix/) |  
+| Roadmap ChromHMM | 1,764 | Chromatin states inferred by the extended 18-way ChromHMM model across 98 tissues from the Roadmap Epigenomics Project | Roadmap Epigenomics Project [(Kundaje _et al._, _Nature_, 2015)](https://www.nature.com/articles/nature14248) | [Link](https://egg2.wustl.edu/roadmap/web_portal/chr_state_learning.html) |  
+| ENCODE DNA Accessibility | 1,228 | All DNA accessiblity assays meeting our [ENCODE data inclusion criteria](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/genome_annotations#encode-data-inclusion-criteria) available for download in broad- or narrow-peak format from the ENCODE Data Portal | ENCODE Data Portal [(Davis _et al._, _Nucleic Acids Res._, 2018)](https://pubmed.ncbi.nlm.nih.gov/29126249/) (accessed June 2020) | [Link](https://www.encodeproject.org/matrix/) |  
+| ENCODE Histone Modifications | 2,977 | All histone modification ChIP-seq tracks meeting our [ENCODE data inclusion criteria](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/genome_annotations#encode-data-inclusion-criteria) available for download in broad- or narrow-peak format from the ENCODE Data Portal | ENCODE Data Portal [(Davis _et al._, _Nucleic Acids Res._, 2018)](https://pubmed.ncbi.nlm.nih.gov/29126249/) (accessed June 2020) | [Link](https://www.encodeproject.org/matrix/) |  
+| ENCODE Transcription Factor Binding Sites | 2,859 | All transcription factor (or otherwise DNA-binding protein) ChIP-seq tracks meeting our [ENCODE data inclusion criteria](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/genome_annotations#encode-data-inclusion-criteria) available for download in broad- or narrow-peak format from the ENCODE Data Portal | ENCODE Data Portal [(Davis _et al._, _Nucleic Acids Res._, 2018)](https://pubmed.ncbi.nlm.nih.gov/29126249/) (accessed June 2020) | [Link](https://www.encodeproject.org/matrix/) |  
+| ENCODE Transcription | 458 | A subset of transcription assays (CAGE, RAMPAGE, small RNAseq, total RNAseq, polyA RNAseq) meeting our [ENCODE data inclusion criteria](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/genome_annotations#encode-data-inclusion-criteria) available for download in BED format from the ENCODE Data Portal | ENCODE Data Portal [(Davis _et al._, _Nucleic Acids Res._, 2018)](https://pubmed.ncbi.nlm.nih.gov/29126249/) (accessed June 2020) | [Link](https://www.encodeproject.org/matrix/) |  
+| ENCODE TAD boundaries | 30 | TAD boundaries (defined as the start and end coordinates for each TAD ± 5kb) from 30 samples meeting our [ENCODE data inclusion criteria](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/genome_annotations#encode-data-inclusion-criteria) available for download from the ENCODE Data Portal | ENCODE Data Portal [(Davis _et al._, _Nucleic Acids Res._, 2018)](https://pubmed.ncbi.nlm.nih.gov/29126249/) (accessed June 2020) | [Link](https://www.encodeproject.org/matrix/) |  
 
+
+#### ENCODE data inclusion criteria  
+
+To be considered in this analysis, ENCODE tracks had to meet all of the following criteria:  
+1. Available for download in BED format
+2. Aligned to hg19
+3. Sample from an unperturbed human cell type, tissue, or cell line
+4. No ENCODE data audit errors (color code: red) or non-compliances (color code: orange)
+5. Marked as "released" status (_i.e._, not archived and/or retracted)  
+6. Must be peaks-only (no background sample)  
+
+Manifests for all ENCODE tracks considered in this analysis are stored in the following Google Bucket (note: requires permissions):  
+```
+$ gsutil ls gs://rcnv_project/cleaned_data/genome_annotations/manifests/
+
+gs://rcnv_project/cleaned_data/genome_annotations/manifests/encode.dna_accessibility.manifest.tsv.gz
+```
 
 ## Track curation procedure  
 

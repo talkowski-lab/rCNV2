@@ -54,6 +54,37 @@ gsutil -m cp \
   ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/
 
 
+# Preprocess ENCODE TAD boundaries
+gsutil -m cp \
+  ${rCNV_bucket}/cleaned_data/genome_annotations/manifests/encode.hic_tads.manifest.tsv.gz \
+  ./
+mkdir encode_tad_boundaries/
+while read trackname path; do
+  wget -O $trackname.raw.bed.gz $path
+  bedtools flank \
+    -i $trackname.raw.bed.gz \
+    -g <( awk '{ print "chr"$0 }' refs/GRCh37.genome ) \
+    -b 5000 \
+  | cut -f1-3 \
+  | sort -Vk1,1 -k2,2n -k3,3n \
+  | bgzip -c \
+  > encode_tad_boundaries/$trackname.tad_boundaries.bed.gz
+done < <( zcat encode.hic_tads.manifest.tsv.gz \
+          | awk -v FS="\t" -v OFS="\t" '{ print $1, $NF }' \
+          | sed '1d' )
+# Copy ENCODE beds (and tracklist) to gs:// bucket (note: requires permissions)
+gsutil -m cp -r \
+  encode_tad_boundaries \
+  ${rCNV_bucket}/cleaned_data/genome_annotations/
+find encode_tad_boundaries/ -name "*.bed.gz" \
+| awk -v gs=${rCNV_bucket} '{ print gs"/cleaned_data/genome_annotations/"$1 }' \
+> encode.tad_boundaries.gs_paths.list
+gsutil -m cp \
+  encode.tad_boundaries.gs_paths.list \
+  ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/
+
+
+
 # Development parameters for curate_annotations.wdl
 prefix="all_tracks"
 tracklist="test.annotations.list"

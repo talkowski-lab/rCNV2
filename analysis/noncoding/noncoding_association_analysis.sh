@@ -249,19 +249,19 @@ done < ${phenotype_list}
 mkdir perm_res/
 while read prefix hpo; do
   gsutil -m cp \
-    "${rCNV_bucket}/analysis/crb_burden/$prefix/${freq_code}/permutations/$prefix.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.perm_*.bed.gz" \
+    "${rCNV_bucket}/analysis/crb_burden/$prefix/${freq_code}/permutations/$prefix.${freq_code}.${noncoding_filter}_noncoding.${CNV}.crb_burden.meta_analysis.stats.perm_*.bed.gz" \
     perm_res/
   for i in $( seq 1 ${n_pheno_perms} ); do
-    p_idx=$( zcat perm_res/$prefix.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.perm_$i.bed.gz \
+    p_idx=$( zcat perm_res/$prefix.${freq_code}.${noncoding_filter}_noncoding.${CNV}.crb_burden.meta_analysis.stats.perm_$i.bed.gz \
              | sed -n '1p' | sed 's/\t/\n/g' | awk -v OFS="\t" '{ print $1, NR }' \
              | fgrep -w ${p_val_column_name} | cut -f2 )
-    zcat perm_res/$prefix.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.perm_$i.bed.gz \
+    zcat perm_res/$prefix.${freq_code}.${noncoding_filter}_noncoding.${CNV}.crb_burden.meta_analysis.stats.perm_$i.bed.gz \
     | grep -ve '^#' \
     | awk -v p_idx=$p_idx '{ print $(p_idx) }' \
     | cat <( echo "$prefix.${CNV}.$i" ) - \
-    > perm_res/$prefix.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.permuted_p_values.$i.txt
+    > perm_res/$prefix.${freq_code}.${noncoding_filter}_noncoding.${CNV}.crb_burden.meta_analysis.permuted_p_values.$i.txt
   done
-  rm perm_res/$prefix.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.perm_*.bed.gz
+  rm perm_res/$prefix.${freq_code}.${noncoding_filter}_noncoding.${CNV}.crb_burden.meta_analysis.stats.perm_*.bed.gz
 done < ${phenotype_list}
 paste perm_res/*.crb_burden.meta_analysis.permuted_p_values.*.txt \
 | gzip -c \
