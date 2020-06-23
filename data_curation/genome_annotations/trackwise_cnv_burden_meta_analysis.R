@@ -119,6 +119,12 @@ weighted.z <- function(stats, cohorts, spa=T){
     meta.z.p <- data.frame("zscore" = meta.z,
                            "phred_p" = -log10(pnorm(abs(meta.z), lower.tail=F)))
   }
+  meta.z.p$lnOR <-  sapply(1:nrow(stats), function(i){
+    lnor <- stats[i, grep("lnOR", colnames(stats), fixed=T)]
+    var <- stats[i, grep("var", colnames(stats), fixed=T)]
+    inv.var <- 1/var
+    weighted.mean(lnor, inv.var, na.rm=T)
+  })
   meta.z.p$phred_fdr_q <- p.adjust(10^-meta.z.p$phred_p, method="fdr")
   colnames(meta.z.p) <- paste("meta", colnames(meta.z.p), sep=".")
   as.data.frame(cbind(stats, meta.z.p))
@@ -156,11 +162,11 @@ p.cutoff <- -log10(as.numeric(opts$`p-cutoff`))
 signif.outfile <- opts$`signif-tracks`
 
 # # Dev parameters
-# stats.in <- "~/scratch/rCNV.chromhmm.merged_stats.with_counts.tsv.gz"
-# tracklist.in <- "~/scratch/chromhmm_tracks.gs_paths.list"
-# outfile <- "~/scratch/rCNV.chromhmm.burden_stats.tsv.gz"
+# stats.in <- "~/scratch/rCNV.all.merged_stats.with_counts.tsv.gz"
+# tracklist.in <- "~/scratch/rCNV.all_tracks.list"
+# outfile <- "~/scratch/rCNV.chromhmm_plus_encode.test.tsv"
 # p.cutoff <- -log10(0.05)
-# signif.outfile <- "~/scratch/rCNV.chromhmm.signif_tracks.list"
+# signif.outfile <- "~/scratch/rCNV.chromhmm_plus_encode.test.signif_tracks.list"
 
 # Read full tracklist
 tracklist <- read.table(tracklist.in, header=F, sep="\t", comment.char="")[, 1]
@@ -170,7 +176,7 @@ stats <- load.stats(stats.in, cnv.split=T)
 cohorts <- extract.cohorts(stats[[1]])
 
 # Calculate case:control ORs, variance, and Z-scores for each track
-stats <- lapply(stats, calc.ors, cohorts)
+stats <- lapply(stats, calc.ors, cohorts, spa=T)
 
 # Weighted Z-score meta-analysis
 meta.res.split <- lapply(stats, weighted.z, cohorts)
@@ -185,9 +191,9 @@ write.table(meta.res, outfile, sep="\t",
 if(!is.null(signif.outfile)){
   sig.idx <- which(meta.res$meta.phred_p >= p.cutoff & meta.res$meta.zscore > 0)
   if(length(sig.idx) > 0){
-    sig.names <- meta.res[sig.idx, 1]
-    sig.tracks <- t(sapply(sig.names, function(name){
-      c(tracklist[grep(name, tracklist, fixed=T)], name)}))
+    sig.names <- as.character(sort(unique(meta.res[sig.idx, 1])))
+    sig.tracks <- as.data.frame(do.call("rbind", sapply(sig.names, function(name){
+      c(tracklist[grep(name, tracklist, fixed=T)], name)})))
     write.table(sig.tracks, signif.outfile,
                 col.names=F, row.names=F, quote=F, sep="\t")
   }

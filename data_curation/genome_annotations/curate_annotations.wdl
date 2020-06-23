@@ -14,7 +14,6 @@ workflow curate_annotations {
   File encode_histone_mods_tracklist
   File encode_tfbs_tracklist
   File encode_transcription_tracklist
-  File tad_boundaries_tracklist
   Int tracks_per_shard
   Int min_element_size
   Int max_element_size
@@ -152,42 +151,17 @@ workflow curate_annotations {
       prefix="${prefix}.encode_transcription"
   }
 
-  # Process TAD boundaries
-  call shard_tracklist as shard_tracklist_tad_boundaries {
-    input:
-      tracklist=tad_boundaries_tracklist,
-      tracks_per_shard=tracks_per_shard,
-      prefix="${prefix}.tad_boundaries_shards"
-  }
-  scatter ( shard in shard_tracklist_tad_boundaries.shards ) {
-    call curate_and_burden as curate_and_burden_tad_boundaries {
-      input:
-        tracklist=shard,
-        min_element_size=min_element_size,
-        max_element_size=max_element_size,
-        case_hpo=case_hpo,
-        min_element_overlap=min_element_overlap,
-        rCNV_bucket=rCNV_bucket,
-        prefix="${prefix}.tad_boundaries_shard"
-    }
-  }
-  call merge_shards as merge_tad_boundaries {
-    input:
-      stat_shards=curate_and_burden_tad_boundaries.stats,
-      prefix="${prefix}.tad_boundaries"
-  }
-
   # Merge stats across all tracklists
   call merge_shards as merge_all {
     input:
-      stat_shards=[merge_chromhmm.merged_stats, merge_encode_dnaaccessibility.merged_stats, merge_encode_histone_mods.merged_stats, merge_encode_tfbs.merged_stats, merge_encode_transcription.merged_stats, merge_tad_boundaries.merged_stats],
+      stat_shards=[merge_chromhmm.merged_stats, merge_encode_dnaaccessibility.merged_stats, merge_encode_histone_mods.merged_stats, merge_encode_tfbs.merged_stats, merge_encode_transcription.merged_stats],
       prefix="${prefix}.all"
   }
 
   # Merge all tracklists
   call merge_tracklists {
     input:
-      tracklists=[chromhmm_tracklist, encode_dnaaccessibility_tracklist, encode_histone_mods_tracklist, encode_transcription_tracklist, tad_boundaries_tracklist],
+      tracklists=[chromhmm_tracklist, encode_dnaaccessibility_tracklist, encode_histone_mods_tracklist, encode_tfbs_tracklist, encode_transcription_tracklist],
       prefix="${prefix}"
   }
 
@@ -390,13 +364,12 @@ task curate_and_burden {
       --track-stats ${prefix}.stats.tsv \
       --frac-overlap ${min_element_overlap} \
       --case-hpo ${case_hpo} \
-      --norm-by-samplesize \
       --outfile ${prefix}.stats.with_counts.tsv.gz \
       --gzip
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e2297640f2734f6374832df1ae5388df5bc0ccb692819be3442f4d9a319ab299"
+    docker: "talkowski/rcnv@sha256:775ba426224a47b16fd6e4feffb324b1dd63bc18e9f70f523ead7689180e1e0a"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -498,7 +471,7 @@ task meta_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e2297640f2734f6374832df1ae5388df5bc0ccb692819be3442f4d9a319ab299"
+    docker: "talkowski/rcnv@sha256:775ba426224a47b16fd6e4feffb324b1dd63bc18e9f70f523ead7689180e1e0a"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -571,7 +544,7 @@ task cluster_elements {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:64d6cb66ea7437ffabc21271c609a6760c329b5de58026db3b88a68508e6cbb6"
+    docker: "talkowski/rcnv@sha256:775ba426224a47b16fd6e4feffb324b1dd63bc18e9f70f523ead7689180e1e0a"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
