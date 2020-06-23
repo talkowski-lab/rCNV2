@@ -192,7 +192,7 @@ if(!is.null(signif.outfile)){
   sig.idx <- which(meta.res$meta.phred_p >= p.cutoff & meta.res$meta.zscore > 0)
   if(length(sig.idx) > 0){
     sig.names <- as.character(sort(unique(meta.res[sig.idx, 1])))
-    sig.tracks <- as.data.frame(do.call("rbind", sapply(sig.names, function(name){
+    sig.tracks <- as.data.frame(do.call("rbind", lapply(sig.names, function(name){
       c(tracklist[grep(name, tracklist, fixed=T)], name)})))
     write.table(sig.tracks, signif.outfile,
                 col.names=F, row.names=F, quote=F, sep="\t")
