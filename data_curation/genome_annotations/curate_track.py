@@ -122,18 +122,24 @@ def clean_track(track, trackname, xbt, xcov=0.5, genome=None,
     def _size_filter(feature, min_size, max_size):
         return all([len(feature) >= min_size, len(feature) <= max_size])
 
-    if genome is None:
-        track_df = track.sort().merge().\
-                         filter(_size_filter, min_size, max_size).\
-                         saveas().to_dataframe()
+    if len(track) > 0:
+
+        if genome is None:
+            track_df = track.sort().merge().\
+                             filter(_size_filter, min_size, max_size).\
+                             saveas().to_dataframe()
+        else:
+            track_df = track.sort(g=genome).merge().\
+                             filter(_size_filter, min_size, max_size).\
+                             saveas().to_dataframe()
+
+        track_df['name'] = trackname
+
+        return pbt.BedTool.from_dataframe(track_df)
+
     else:
-        track_df = track.sort(g=genome).merge().\
-                         filter(_size_filter, min_size, max_size).\
-                         saveas().to_dataframe()
 
-    track_df['name'] = trackname
-
-    return pbt.BedTool.from_dataframe(track_df)
+        return pbt.BedTool('', from_string=True).saveas()
 
 
 def get_track_stats(track, trackname, orig_trackpath, outfile):
@@ -146,17 +152,21 @@ def get_track_stats(track, trackname, orig_trackpath, outfile):
     outfile.write('\t'.join(hcols.split()) + '\n')
 
     # Compute stats
-    sizes = np.array([len(x) for x in track], dtype=float)
-    n_ele = len(track)
-    min_size = np.nanmin(sizes)
-    med_size = np.nanmedian(sizes)
-    mean_size = np.nanmean(sizes)
-    max_size = np.nanmax(sizes)
-    total_bp = np.nansum(sizes)
+    if (len(track) > 0):
+        sizes = np.array([len(x) for x in track], dtype=float)
+        n_ele = len(track)
+        min_size = np.nanmin(sizes)
+        med_size = np.nanmedian(sizes)
+        mean_size = np.nanmean(sizes)
+        max_size = np.nanmax(sizes)
+        total_bp = np.nansum(sizes)
+        svals = [str(round(x, 1)) for x in [n_ele, min_size, med_size, mean_size, max_size, total_bp]]
+
+    else:
+        svals = '0 NA NA NA NA NA'.split()
 
     # Write stats to outfile
-    svals = [n_ele, min_size, med_size, mean_size, max_size, total_bp]
-    outfile.write('\t'.join([trackname] + [str(round(x, 1)) for x in svals] + [orig_trackpath]) + '\n')
+    outfile.write('\t'.join([trackname] + svals + [orig_trackpath]) + '\n')
     outfile.close()
 
 
@@ -185,6 +195,7 @@ def main():
                         help='Minimum size of element to retain after merging.')
     parser.add_argument('-o', '--outbed', help='Path to output BED file. ' +
                         '[default: trackname + .curated.bed.gz]')
+    parser.add_argument('-n', '--override-trackname', help='Manually specify trackname.')
     parser.add_argument('-s', '--stats', action='store_true', help='Compute ' +
                         'track statistics.')
     parser.add_argument('--n-download-retries', default=5, type=int, 
@@ -203,6 +214,8 @@ def main():
 
     # Load annotation track
     track, trackname = get_track(args.path, args.n_download_retries, args.prefix)
+    if args.override_trackname is not None:
+        trackname = args.override_trackname
 
     # Open connections to unspecified output files
     if args.outbed is None:

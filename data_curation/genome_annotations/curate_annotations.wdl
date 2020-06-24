@@ -210,7 +210,7 @@ workflow curate_annotations {
   # # Re-shard all significant tracks for final curation
   # call shard_tracklist as shard_tracklist_signif {
   #   input:
-  #     tracklist=meta_burden_test.signif_tracklist,
+  #     tracklist=meta_burden_test.signif_tracks,
   #     tracks_per_shard=tracks_per_shard,
   #     prefix="${prefix}.signif_tracks"
   # }
@@ -219,12 +219,11 @@ workflow curate_annotations {
   # scatter ( shard in shard_tracklist_signif.shards ) {
   #   call curate_only as curate_only_signif {
   #     input:
-  #       tracklist=shard,
+  #       tracknames_and_paths=shard,
   #       min_element_size=min_element_size,
   #       max_element_size=max_element_size,
   #       rCNV_bucket=rCNV_bucket,
-  #       prefix="${prefix}.signif_shard",
-  #       track_prefix=""
+  #       prefix="${prefix}.signif_shard"
   #   }
   # }
 
@@ -275,7 +274,7 @@ task shard_tracklist {
 
 # Download & curate tracks (no burden test)
 task curate_only {
-  File tracklist
+  File tracknames_and_paths
   Int min_element_size
   Int max_element_size
   String rCNV_bucket
@@ -295,10 +294,7 @@ task curate_only {
       refs/
 
     # Curate all tracks in tracklist
-    while IFS=$'\t' read path tprefix; do
-      if [ -z $tprefix ]; then
-        tprefix=${track_prefix}
-      fi
+    while read trackname path; do
       echo -e "Curating $path"
       /opt/rCNV2/data_curation/genome_annotations/curate_track.py \
         --genome refs/GRCh37.genome \
@@ -307,10 +303,10 @@ task curate_only {
         --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
         --min-size ${min_element_size} \
         --max-size ${max_element_size} \
+        --override-trackname "$trackname" \
         --stats \
-        $path
-    done < ${tracklist}
-    export IFS=$' \t\n'
+        "$path"
+    done < ${tracknames_and_paths}
 
     # Copy all curated tracks to final gs:// bucket
     gsutil -m cp \
@@ -322,7 +318,8 @@ task curate_only {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:184c285552813ef487137d58d6a1ff74da4081987da89f6384175daccb04334d"
+    # TODO: UPDATE DOCKER
+    # docker: "talkowski/rcnv@sha256:24459dad13d9c55571cfd8487af050223fe24df2ab3b540a7f411ff2b5ca2647"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -412,7 +409,7 @@ task curate_and_burden {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:184c285552813ef487137d58d6a1ff74da4081987da89f6384175daccb04334d"
+    docker: "talkowski/rcnv@sha256:24459dad13d9c55571cfd8487af050223fe24df2ab3b540a7f411ff2b5ca2647"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -441,7 +438,7 @@ task merge_shards {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:184c285552813ef487137d58d6a1ff74da4081987da89f6384175daccb04334d"
+    docker: "talkowski/rcnv@sha256:24459dad13d9c55571cfd8487af050223fe24df2ab3b540a7f411ff2b5ca2647"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -466,7 +463,7 @@ task merge_tracklists {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:184c285552813ef487137d58d6a1ff74da4081987da89f6384175daccb04334d"
+    docker: "talkowski/rcnv@sha256:24459dad13d9c55571cfd8487af050223fe24df2ab3b540a7f411ff2b5ca2647"
     preemptible: 1
   }
 
@@ -497,13 +494,7 @@ task meta_burden_test {
       --signif-tracks ${prefix}.signif_paths_and_tracks.list \
       ${stats} \
       ${prefix}.burden_stats.tsv
-
-    # Extract significant tracks
     gzip -f ${prefix}.burden_stats.tsv
-    cut -f1 ${prefix}.signif_paths_and_tracks.list \
-    > ${prefix}.signif_tracks.list
-    cut -f2 ${prefix}.signif_paths_and_tracks.list \
-    > ${prefix}.signif_tracknames.list
 
     # Copy final stats to gs:// bucket
     gsutil -m cp \
@@ -512,7 +503,7 @@ task meta_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:184c285552813ef487137d58d6a1ff74da4081987da89f6384175daccb04334d"
+    docker: "talkowski/rcnv@sha256:24459dad13d9c55571cfd8487af050223fe24df2ab3b540a7f411ff2b5ca2647"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -521,8 +512,7 @@ task meta_burden_test {
 
   output {
     File meta_stats = "${prefix}.burden_stats.tsv.gz"
-    File signif_tracklist = "${prefix}.signif_tracks.list"
-    File signif_tracknames = "${prefix}.signif_tracknames.list"
+    File signif_tracks = "${prefix}.signif_paths_and_tracks.list"
   }
 }
 
@@ -585,7 +575,7 @@ task cluster_elements {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:184c285552813ef487137d58d6a1ff74da4081987da89f6384175daccb04334d"
+    docker: "talkowski/rcnv@sha256:24459dad13d9c55571cfd8487af050223fe24df2ab3b540a7f411ff2b5ca2647"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

@@ -351,10 +351,6 @@ done < <( fgrep -v mega refs/rCNV_metacohort_list.txt | cut -f1 ) \
   ${stats} \
   ${prefix}.burden_stats.tsv
 gzip -f ${prefix}.burden_stats.tsv
-cut -f1 ${prefix}.signif_paths_and_tracks.list \
-> ${prefix}.signif_tracks.list
-cut -f2 ${prefix}.signif_paths_and_tracks.list \
-> ${prefix}.signif_tracknames.list
 
 
 # # Dev code:
