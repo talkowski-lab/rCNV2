@@ -252,6 +252,7 @@ gsutil cat \
   ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/dbSUPER.gs_paths.list \
   ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/DENdb.gs_paths.list \
   ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/SEA.gs_paths.list \
+  ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/fantom_enh.track_urls.list \
 > enhancer_databases.track_urls.list
 echo -e \
 "${rCNV_bucket}/cleaned_data/genome_annotations/misc_tracks/vista_enhancers.bed.gz

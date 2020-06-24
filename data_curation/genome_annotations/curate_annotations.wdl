@@ -318,8 +318,7 @@ task curate_only {
   >>>
 
   runtime {
-    # TODO: UPDATE DOCKER
-    # docker: "talkowski/rcnv@sha256:24459dad13d9c55571cfd8487af050223fe24df2ab3b540a7f411ff2b5ca2647"
+    docker: "talkowski/rcnv@sha256:3259bb3804f42308562beb88dc6890a9d4b73161a928bebe8eefa3d354983b2d"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -409,7 +408,7 @@ task curate_and_burden {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:24459dad13d9c55571cfd8487af050223fe24df2ab3b540a7f411ff2b5ca2647"
+    docker: "talkowski/rcnv@sha256:3259bb3804f42308562beb88dc6890a9d4b73161a928bebe8eefa3d354983b2d"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -438,7 +437,7 @@ task merge_shards {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:24459dad13d9c55571cfd8487af050223fe24df2ab3b540a7f411ff2b5ca2647"
+    docker: "talkowski/rcnv@sha256:3259bb3804f42308562beb88dc6890a9d4b73161a928bebe8eefa3d354983b2d"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -463,7 +462,7 @@ task merge_tracklists {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:24459dad13d9c55571cfd8487af050223fe24df2ab3b540a7f411ff2b5ca2647"
+    docker: "talkowski/rcnv@sha256:3259bb3804f42308562beb88dc6890a9d4b73161a928bebe8eefa3d354983b2d"
     preemptible: 1
   }
 
@@ -503,7 +502,7 @@ task meta_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:24459dad13d9c55571cfd8487af050223fe24df2ab3b540a7f411ff2b5ca2647"
+    docker: "talkowski/rcnv@sha256:3259bb3804f42308562beb88dc6890a9d4b73161a928bebe8eefa3d354983b2d"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -575,7 +574,7 @@ task cluster_elements {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:24459dad13d9c55571cfd8487af050223fe24df2ab3b540a7f411ff2b5ca2647"
+    docker: "talkowski/rcnv@sha256:3259bb3804f42308562beb88dc6890a9d4b73161a928bebe8eefa3d354983b2d"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

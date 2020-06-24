@@ -29,6 +29,7 @@ The following table outlines all sources included in this analysis:
 | VISTA | 1 | Experimentally-validated mammalian enhancers | VISTA Browser [(Visel _et al._, _Nucleic Acids Res._, 2007)](https://dx.doi.org/10.1093%2Fnar%2Fgkl822) (accessed June 2020) | [Link](https://enhancer.lbl.gov/frnt_page_n.shtml) |  
 | DENdb | 15 | Enhancer predictions from 15 human cell lines | DENdb [(Ashoor _et al._, _Database_, 2015)](doi:10.1093/database/bav085) | [Link](https://www.cbrc.kaust.edu.sa/dendb/index.php) |  
 | SEA | 143 | Super enhancer predictions from 143 human cell lines and tissues (mapped back to hg19 using liftOver with minimum 75% match) | SEA v3.0 [(Ashoor _et al._, _Database_, 2015)](doi:10.1093/database/bav085) | [Link](http://sea.edbc.org/) |  
+| FANTOM Enhancers | 115 | Enhancer predictions for human tissues and cell types from the FANTOM5 consortium | FANTOM5 [(Andersson _et al._, _Nature_, 2014)](https://www.nature.com/articles/nature12787) | [Link](http://enhancer.binf.ku.dk/presets/#download_view_div) |  
 
 
 #### ENCODE data inclusion criteria  
