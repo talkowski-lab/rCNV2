@@ -36,6 +36,9 @@ def download_track(trackpath):
     else:
         localpath = trackpath
 
+    # Correct for URL convention of replacing spaces with "%20"
+    localpath = localpath.replace('%20', ' ')
+
     return localpath
 
 
@@ -65,6 +68,7 @@ def get_track(trackpath, n_download_retries=5, prefix=None):
     if prefix is not None:
         if prefix != '':
             trackname = '.'.join([prefix, trackname])
+    trackname = trackname.replace(' ', '_').replace('(', '').replace(')', '').replace('/', '')
 
     return pbt.BedTool(localpath), trackname
 

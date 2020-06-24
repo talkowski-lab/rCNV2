@@ -223,7 +223,8 @@ workflow curate_annotations {
   #       min_element_size=min_element_size,
   #       max_element_size=max_element_size,
   #       rCNV_bucket=rCNV_bucket,
-  #       prefix="${prefix}.signif_shard"
+  #       prefix="${prefix}.signif_shard",
+  #       track_prefix=""
   #   }
   # }
 
@@ -262,7 +263,7 @@ task shard_tracklist {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7bc27c40820b1f3fe66beb438ef543b8e247bc8d040629b36701c75cd1ada90b"
+    docker: "talkowski/rcnv@sha256:184c285552813ef487137d58d6a1ff74da4081987da89f6384175daccb04334d"
     preemptible: 1
   }
 
@@ -279,6 +280,7 @@ task curate_only {
   Int max_element_size
   String rCNV_bucket
   String prefix
+  String track_prefix
 
   command <<<
     set -e
@@ -293,7 +295,10 @@ task curate_only {
       refs/
 
     # Curate all tracks in tracklist
-    while read path; do
+    while IFS=$'\t' read path tprefix; do
+      if [ -z $tprefix ]; then
+        tprefix=${track_prefix}
+      fi
       echo -e "Curating $path"
       /opt/rCNV2/data_curation/genome_annotations/curate_track.py \
         --genome refs/GRCh37.genome \
@@ -305,6 +310,7 @@ task curate_only {
         --stats \
         $path
     done < ${tracklist}
+    export IFS=$' \t\n'
 
     # Copy all curated tracks to final gs:// bucket
     gsutil -m cp \
@@ -316,7 +322,7 @@ task curate_only {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e2297640f2734f6374832df1ae5388df5bc0ccb692819be3442f4d9a319ab299"
+    docker: "talkowski/rcnv@sha256:184c285552813ef487137d58d6a1ff74da4081987da89f6384175daccb04334d"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -406,7 +412,7 @@ task curate_and_burden {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:c4c737e2bc69d780e1b705ac783d4f0d482b752871e996401a14b68c7fa7c186"
+    docker: "talkowski/rcnv@sha256:184c285552813ef487137d58d6a1ff74da4081987da89f6384175daccb04334d"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -435,7 +441,7 @@ task merge_shards {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:a7ff61dbb3603d3468be5d4245e871830275e409a1ebc194e21cca35db369212"
+    docker: "talkowski/rcnv@sha256:184c285552813ef487137d58d6a1ff74da4081987da89f6384175daccb04334d"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -460,7 +466,7 @@ task merge_tracklists {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:a7ff61dbb3603d3468be5d4245e871830275e409a1ebc194e21cca35db369212"
+    docker: "talkowski/rcnv@sha256:184c285552813ef487137d58d6a1ff74da4081987da89f6384175daccb04334d"
     preemptible: 1
   }
 
@@ -506,7 +512,7 @@ task meta_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:c4c737e2bc69d780e1b705ac783d4f0d482b752871e996401a14b68c7fa7c186"
+    docker: "talkowski/rcnv@sha256:184c285552813ef487137d58d6a1ff74da4081987da89f6384175daccb04334d"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -579,7 +585,7 @@ task cluster_elements {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:a7ff61dbb3603d3468be5d4245e871830275e409a1ebc194e21cca35db369212"
+    docker: "talkowski/rcnv@sha256:184c285552813ef487137d58d6a1ff74da4081987da89f6384175daccb04334d"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
