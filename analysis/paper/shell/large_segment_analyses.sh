@@ -265,6 +265,13 @@ mkdir nahr_vs_nonrecurrent
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   nahr_vs_nonrecurrent/${prefix}
+
+
+# Plot oligogenicity index analysis (distributions of de novo PTVs & missense across segments)
+if [ -e dnm_distributions ]; then
+  rm -rf dnm_distributions
+fi
+mkdir dnm_distributions
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_oligogenicity_index_comparisons.R \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.final_segments.loci.bed.gz \
@@ -272,7 +279,7 @@ mkdir nahr_vs_nonrecurrent
   refs/ddd_dnm_counts.tsv.gz \
   refs/asc_dnm_counts.tsv.gz \
   refs/gene_mutation_rates.tsv.gz \
-  nahr_vs_nonrecurrent/${prefix}
+  dnm_distributions/${prefix}
 
 
 # Generate mini Miami plot of example phenotype for main figure panel
@@ -450,6 +457,7 @@ gsutil -m cp -r \
   effect_size_plots \
   pleiotropy_plots \
   nahr_vs_nonrecurrent \
+  dnm_distributions \
   assoc_stat_plots \
   association_grid \
   ${rCNV_bucket}/analysis/paper/plots/large_segments/

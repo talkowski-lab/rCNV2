@@ -210,7 +210,7 @@ neuro.segs <- segs[which(segs$region_id %in% neuro.plus.lit.ids), ]
 
 # Plot proportion of constrained genes vs. # of genes
 pdf(paste(out.prefix, "prop_constrained_vs_ngenes.pdf", sep="."),
-    height=2.2, width=3)
+    height=2.2, width=2.8)
 scatter.vsGenes(segs, feature="gnomAD_constrained_prop", y.title="Constrained Genes",
                 y.pct=T, pt.cex=0.85,
                 horiz.line=prop_constrained.genome_avg,
@@ -241,7 +241,7 @@ dev.off()
 # Plot average enrichment of DDD DNMs vs. # of genes
 # Note: LoF panel is intentionally larger than other three for placement in main figure
 pdf(paste(out.prefix, "DDD_dnPTVs_vs_ngenes.pdf", sep="."),
-    height=2.2, width=3)
+    height=2.2, width=2.8)
 scatter.vsGenes(neuro.segs, feature="DDD_dnm_lof_norm_excess_per_gene", 
                 y.title=bquote("Excess" ~ italic("dn") * "PTVs / Gene"),
                 y.pct=F, pt.cex=0.85, horiz.line=0,

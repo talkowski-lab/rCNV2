@@ -135,91 +135,86 @@ pdf(paste(out.prefix, "neuro_segs.ddd_lof_oligogenicity_index.pdf", sep="."),
 segs.simple.vioswarm(neuro.segs, y=neuro.segs$ddd.lof.oligo, add.pvalue=T, ytitle="",
                      pt.cex=0.65, parmar=c(1.2, 3.5, 1.5, 0))
 mtext(2, line=2.35, text=bquote("Genes Capturing" >= "90%"))
-mtext(2, line=1.45, text=bquote("of Excess" ~ italic("De Novo") ~ "PTVs"))
+mtext(2, line=1.45, text=bquote("of Excess" ~ italic("dn") * "PTVs"))
 dev.off()
 pdf(paste(out.prefix, "neuro_segs.ddd_mis_oligogenicity_index.pdf", sep="."),
-    height=2.25, width=2)
-segs.simple.vioswarm(neuro.segs, y=neuro.segs$ddd.mis.oligo, add.pvalue=T, ytitle="",
-                     pt.cex=0.65, parmar=c(1.2, 3.5, 1.5, 0))
-mtext(2, line=2.35, text=bquote("Genes Capturing" >= "90%"))
-mtext(2, line=1.45, text=bquote("of Excess" ~ italic("De Novo") ~ "Mis."))
+    height=2.25, width=1.6)
+segs.simple.vioswarm(neuro.segs, y=neuro.segs$ddd.mis.oligo, add.pvalue=T, 
+                     ytitle="Oligogenicity Index",
+                     pt.cex=0.65, parmar=c(1.2, 2.65, 1.5, 0))
 dev.off()
 
 # Scatterplots of DDD oligogenicity index vs genes in segment for all deletions & duplications
 pdf(paste(out.prefix, "neuro_segs.ddd_lof_oligogenicity_index_vs_ngenes.pdf", sep="."),
     height=2.4, width=2.4)
-segs.scatter(neuro.segs, x=log2(neuro.segs$n_genes), y=log2(neuro.segs$ddd.lof.oligo),
-             xlims=c(0, max(log2(neuro.segs$n_genes), na.rm=T)), 
-             ylims=c(0, max(log2(neuro.segs$n_genes), na.rm=T)), 
-             x.labs=prettyNum(2^(0:10), big.mark=","), x.labs.at=0:10,
-             xtitle=bquote("log"[2]("Genes in Segment")), 
-             ytitle="", 
-             y.labs=prettyNum(2^(0:10), big.mark=","), y.labs.at=0:10,
-             add.lm=F, abline.a=0, abline.b=0.9, abline.lty=2,
-             parmar=c(3.5, 3.5, 0.8, 0.8))
-mtext(2, line=2.35, text=bquote("log"[2] * "(Genes with" >= "90%"))
-mtext(2, line=1.45, text=bquote("of Excess" ~ italic("dn") * "PTVs)"))
+segs.scatter(neuro.segs, x=neuro.segs$n_genes, y=neuro.segs$ddd.lof.oligo,
+             xlims=c(0, max(neuro.segs$n_genes, na.rm=T)), 
+             ylims=c(0, max(neuro.segs$n_genes, na.rm=T)), 
+             xtitle="Genes in Segment", x.title.line=1.4, ytitle="",
+             add.lm=T, abline.a=0, abline.b=0.9, abline.lty=2,
+             pt.cex=0.85, parmar=c(3.5, 3.5, 1, 1))
+text(x=mean(par("usr")[1:2]), y=mean(par("usr")[3:4])+(0.04*(par("usr")[4]-par("usr")[3])),
+     col=control.cnv.colors[2], labels=bquote("Uniform" ~ italic("dn") * "PTV" ~ "distribution"), 
+     srt=45*0.925, font=3, cex=0.9)
+mtext(2, line=2.35, text=bquote("Genes Capturing" >= "90%"))
+mtext(2, line=1.55, text=bquote("of Excess" ~ italic("dn") * "PTVs"))
 dev.off()
 pdf(paste(out.prefix, "neuro_segs.ddd_mis_oligogenicity_index_vs_ngenes.pdf", sep="."),
-    height=2.4, width=2.4)
-segs.scatter(neuro.segs, x=log2(neuro.segs$n_genes), y=log2(neuro.segs$ddd.mis.oligo),
-             xlims=c(0, max(log2(neuro.segs$n_genes), na.rm=T)), 
-             ylims=c(0, max(log2(neuro.segs$n_genes), na.rm=T)), 
-             x.labs=prettyNum(2^(0:10), big.mark=","), x.labs.at=0:10,
-             xtitle=bquote("log"[2]("Genes in Segment")), 
-             ytitle="", 
-             y.labs=prettyNum(2^(0:10), big.mark=","), y.labs.at=0:10,
-             add.lm=F, abline.a=0, abline.b=0.9, abline.lty=2,
-             parmar=c(3.5, 3.5, 0.8, 0.8))
-mtext(2, line=2.35, text=bquote("log"[2] * "(Genes with" >= "90%"))
-mtext(2, line=1.45, text=bquote("of Excess" ~ italic("dn") * "Mis.)"))
+    height=2, width=2)
+segs.scatter(neuro.segs, x=neuro.segs$n_genes, y=neuro.segs$ddd.mis.oligo,
+             xlims=c(0, max(neuro.segs$n_genes, na.rm=T)), 
+             ylims=c(0, max(neuro.segs$n_genes, na.rm=T)), 
+             xtitle="Genes in Segment", x.title.line=1.4,
+             ytitle="Oligogenicity Index", y.title.line=1.5,
+             add.lm=T, abline.a=0, abline.b=0.9, abline.lty=2,
+             pt.cex=0.85, parmar=c(2.6, 2.6, 0.2, 0.2))
+text(x=mean(par("usr")[1:2]), y=mean(par("usr")[3:4])+(0.04*(par("usr")[4]-par("usr")[3])),
+     col=control.cnv.colors[2], labels=bquote("Uniform" ~ italic("dn") * "Mis." ~ "distribution"), 
+     srt=45*0.925, font=3, cex=0.9)
 dev.off()
 
 # Swarmplot of ASC oligogenicity index for all deletions & duplications
 pdf(paste(out.prefix, "neuro_segs.asc_lof_oligogenicity_index.pdf", sep="."),
-    height=2.25, width=2)
-segs.simple.vioswarm(neuro.segs, y=neuro.segs$asc.lof.oligo, add.pvalue=T, ytitle="",
-                     pt.cex=0.65, parmar=c(1.2, 3.5, 1.5, 0))
-mtext(2, line=2.35, text=bquote("Genes Capturing" >= "90%"))
-mtext(2, line=1.45, text=bquote("of Excess" ~ italic("De Novo") ~ "PTVs"))
+    height=2.25, width=1.6)
+segs.simple.vioswarm(neuro.segs, y=neuro.segs$asc.lof.oligo, add.pvalue=T, 
+                     ytitle="Oligogenicity Index",
+                     pt.cex=0.65, parmar=c(1.2, 2.65, 1.5, 0))
 dev.off()
 pdf(paste(out.prefix, "neuro_segs.asc_mis_oligogenicity_index.pdf", sep="."),
-    height=2.25, width=2)
-segs.simple.vioswarm(neuro.segs, y=neuro.segs$asc.mis.oligo, add.pvalue=T, ytitle="",
-                     pt.cex=0.65, parmar=c(1.2, 3.5, 1.5, 0))
-mtext(2, line=2.35, text=bquote("Genes Capturing" >= "90%"))
-mtext(2, line=1.45, text=bquote("of Excess" ~ italic("De Novo") ~ "Mis."))
+    height=2.25, width=1.6)
+segs.simple.vioswarm(neuro.segs, y=neuro.segs$asc.mis.oligo, add.pvalue=T, 
+                     ytitle="Oligogenicity Index",
+                     pt.cex=0.65, parmar=c(1.2, 2.65, 1.5, 0))
 dev.off()
 
 # Scatterplots of ASC oligogenicity index vs genes in segment for all deletions & duplications
 pdf(paste(out.prefix, "neuro_segs.asc_lof_oligogenicity_index_vs_ngenes.pdf", sep="."),
-    height=2.4, width=2.4)
-segs.scatter(neuro.segs, x=log2(neuro.segs$n_genes), y=log2(neuro.segs$asc.lof.oligo),
-             xlims=c(0, max(log2(neuro.segs$n_genes), na.rm=T)), 
-             ylims=c(0, max(log2(neuro.segs$n_genes), na.rm=T)), 
-             x.labs=prettyNum(2^(0:10), big.mark=","), x.labs.at=0:10,
-             xtitle=bquote("log"[2]("Genes in Segment")), 
-             ytitle="", 
-             y.labs=prettyNum(2^(0:10), big.mark=","), y.labs.at=0:10,
-             add.lm=F, abline.a=0, abline.b=0.9, abline.lty=2,
-             parmar=c(3.5, 3.5, 0.8, 0.8))
-mtext(2, line=2.35, text=bquote("log"[2] * "(Genes with" >= "90%"))
-mtext(2, line=1.45, text=bquote("of Excess" ~ italic("dn") * "PTVs)"))
+    height=2, width=2)
+segs.scatter(neuro.segs, x=neuro.segs$n_genes, y=neuro.segs$asc.lof.oligo,
+             xlims=c(0, max(neuro.segs$n_genes, na.rm=T)), 
+             ylims=c(0, max(neuro.segs$n_genes, na.rm=T)), 
+             xtitle="Genes in Segment", x.title.line=1.4,
+             ytitle="Oligogenicity Index", y.title.line=1.5,
+             add.lm=T, abline.a=0, abline.b=0.9, abline.lty=2,
+             pt.cex=0.85, parmar=c(2.6, 2.6, 0.2, 0.2))
+text(x=mean(par("usr")[1:2]), y=mean(par("usr")[3:4])+(0.04*(par("usr")[4]-par("usr")[3])),
+     col=control.cnv.colors[2], labels=bquote("Uniform" ~ italic("dn") * "PTV" ~ "distribution"), 
+     srt=45*0.925, font=3, cex=0.9)
 dev.off()
 pdf(paste(out.prefix, "neuro_segs.asc_mis_oligogenicity_index_vs_ngenes.pdf", sep="."),
-    height=2.4, width=2.4)
-segs.scatter(neuro.segs, x=log2(neuro.segs$n_genes), y=log2(neuro.segs$asc.mis.oligo),
-             xlims=c(0, max(log2(neuro.segs$n_genes), na.rm=T)), 
-             ylims=c(0, max(log2(neuro.segs$n_genes), na.rm=T)), 
-             x.labs=prettyNum(2^(0:10), big.mark=","), x.labs.at=0:10,
-             xtitle=bquote("log"[2]("Genes in Segment")), 
-             ytitle="", 
-             y.labs=prettyNum(2^(0:10), big.mark=","), y.labs.at=0:10,
-             add.lm=F, abline.a=0, abline.b=0.9, abline.lty=2,
-             parmar=c(3.5, 3.5, 0.8, 0.8))
-mtext(2, line=2.35, text=bquote("log"[2] * "(Genes with" >= "90%"))
-mtext(2, line=1.45, text=bquote("of Excess" ~ italic("dn") * "Mis.)"))
+    height=2, width=2)
+segs.scatter(neuro.segs, x=neuro.segs$n_genes, y=neuro.segs$asc.mis.oligo,
+             xlims=c(0, max(neuro.segs$n_genes, na.rm=T)), 
+             ylims=c(0, max(neuro.segs$n_genes, na.rm=T)), 
+             xtitle="Genes in Segment", x.title.line=1.4,
+             ytitle="Oligogenicity Index", y.title.line=1.5,
+             add.lm=T, abline.a=0, abline.b=0.9, abline.lty=2,
+             pt.cex=0.85, parmar=c(2.6, 2.6, 0.2, 0.2))
+text(x=mean(par("usr")[1:2]), y=mean(par("usr")[3:4])+(0.04*(par("usr")[4]-par("usr")[3])),
+     col=control.cnv.colors[2], labels=bquote("Uniform" ~ italic("dn") * "Mis." ~ "distribution"), 
+     srt=45*0.925, font=3, cex=0.9)
 dev.off()
+
 
 # Swarmplot of DDD oligogenicity indexes vs. mechanism
 pdf(paste(out.prefix, "segs_by_mechanism.ddd_lof_oligogenicity_index.pdf", sep="."),

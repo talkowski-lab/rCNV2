@@ -11,7 +11,7 @@
 # Burden meta-analysis of noncoding rCNV counts across annotation tracks
 
 
-options(scipen=1000, stringsAsFactors=F)
+options(scipen=10000, stringsAsFactors=F)
 
 
 #################
@@ -39,30 +39,27 @@ extract.cohorts <- function(stats){
 }
 
 # Apply saddlepoint approximation to vector of Z-scores to generate adjusted P-values and Z-scores
-saddlepoint.adj <- function(zscores, phred=T, alternative="two.sided"){
+saddlepoint.adj <- function(zscores, phred=T, min.p=10e-300){
   mu.hat <- mean(zscores, na.rm=T)
   sd.hat <- sd(zscores, na.rm=T)
-  cumuls <- gaussianCumulants(mu.hat, sd.hat)
+  zscores <- zscores - mu.hat
+  cumuls <- gaussianCumulants(0, sd.hat)
   dx <- 0.01
   x <- seq(min(min(zscores, na.rm=T), -40), 
            max(max(zscores, na.rm=T), 40), dx)
   saddle.pdf <- saddlepoint(x, 1, cumuls)$approx
-  saddle.cdf <- cumsum(saddle.pdf * 0.01)
+  saddle.cdf <- caTools::cumsumexact(saddle.pdf * dx)
   calc.saddle.p.z <- function(z){
     if(!is.na(z)){
-      if(alternative=="greater"){
-        p <- 1 - tail(saddle.cdf[which(x<z)], 1)
-        new.z <- qnorm(1 - p)
-      }else if(alternative=="less"){
-        p <- tail(saddle.cdf[which(x<z)], 1)
-        new.z <- qnorm(p)
+      # negative absolute value trick to account for R floating point precision producing p=1 too early
+      if(z>=0){
+        s <- -1
       }else{
-          p <- tail(saddle.cdf[which(x<z)], 1)
-          new.z <- qnorm(p)
-          if(p>0.5){
-            p <- 1 - p
-          }
+        s <- 1
       }
+      mirror.z <- -abs(z)
+      p <- max(c(tail(saddle.cdf[which(x<mirror.z)], 1), min.p), na.rm=T)
+      new.z <- s * qnorm(p)
     }else{
       p <- NA
       new.z <- NA
@@ -95,7 +92,7 @@ calc.ors <- function(stats, cohorts, spa=T){
     ors$zscore <- (ors$lnOR - mean(ors$lnOR, na.rm=T)) / sqrt(ors$var)
     # Adjust Z-score with SPA, if optioned
     if(spa==T){
-      adj.z.p <- saddlepoint.adj(ors$zscore, alternative="two.sided", phred=T)
+      adj.z.p <- saddlepoint.adj(ors$zscore, phred=T)
       ors$zscore <- adj.z.p$zscore
       ors$phred_p <- adj.z.p$phred_p
     }
@@ -138,6 +135,7 @@ weighted.z <- function(stats, cohorts, spa=T){
 require(optparse, quietly=T)
 require(metafor, quietly=T)
 require(EQL, quietly=T)
+require(caTools, quietly=T)
 
 # List of command-line options
 option_list <- list(
@@ -162,9 +160,9 @@ signif.outfile <- opts$`signif-tracks`
 
 # # Dev parameters
 # stats.in <- "~/scratch/rCNV.all.merged_stats.with_counts.tsv.gz"
-# outfile <- "~/scratch/rCNV.chromhmm_plus_encode.test.tsv"
+# outfile <- "~/scratch/rCNV.chromhmm_plus_encode_plus_enhancers.test.tsv"
 # p.cutoff <- -log10(0.05)
-# signif.outfile <- "~/scratch/rCNV.chromhmm_plus_encode.test.signif_tracks.list"
+# signif.outfile <- "~/scratch/rCNV.rCNV.chromhmm_plus_encode_plus_enhancers.test.signif_tracks.list"
 
 # Read track stats and split by CNV type
 stats <- load.stats(stats.in, cnv.split=T)
@@ -175,12 +173,7 @@ stats <- lapply(stats, calc.ors, cohorts, spa=T)
 
 # Weighted Z-score meta-analysis
 meta.res.split <- lapply(stats, weighted.z, cohorts)
-
-# Combine DEL & DUP, and write to outfile
 meta.res <- as.data.frame(do.call("rbind", meta.res.split))
-colnames(meta.res)[1] <- paste("#", colnames(meta.res)[1], sep="")
-write.table(meta.res, outfile, sep="\t",
-            row.names=F, col.names=T, quote=F)
 
 # Extract significant track names
 if(!is.null(signif.outfile)){
@@ -191,3 +184,8 @@ if(!is.null(signif.outfile)){
                 col.names=F, row.names=F, quote=F, sep="\t")
   }
 }
+
+# Write stats to outfile
+colnames(meta.res)[1] <- paste("#", colnames(meta.res)[1], sep="")
+write.table(meta.res, outfile, sep="\t",
+            row.names=F, col.names=T, quote=F)
