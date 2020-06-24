@@ -68,6 +68,11 @@ RUN conda install -n rcnv -y r-psych r-funr r-plotrix
 RUN Rscript -e "sapply(c('beeswarm','EQL','vioplot','flux','VennDiagram'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 
+# Download liftOver
+RUN wget -P /opt/ http://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/liftOver \
+    && chmod a+x /opt/liftOver
+ENV PATH /opt:$PATH
+
 # Install Athena toolkit
 RUN git clone https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/athena /opt/athena \
     && cd /opt/athena \
@@ -79,10 +84,12 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 4b856e01bf0931caf1d0ecf4d151f1a925588e57 && \
+    git checkout 1a3d805d94ea2f7b16a7142c1569a7f1bccefb60 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)
+RUN apt-get -qqy update \
+    && apt-get -qqy install --fix-missing unzip
 RUN echo "source ~/.bash_aliases" >> ~/.bashrc \
     && echo 'alias l="ls -ltrha"' >> ~/.bash_aliases \
     && echo 'alias less="zless"' >> ~/.bash_aliases \

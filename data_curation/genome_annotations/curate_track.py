@@ -39,7 +39,7 @@ def download_track(trackpath):
     return localpath
 
 
-def get_track(trackpath, n_download_retries=5):
+def get_track(trackpath, n_download_retries=5, prefix=None):
     """
     Download (if necessary) and load annotation track
     """
@@ -61,6 +61,10 @@ def get_track(trackpath, n_download_retries=5):
         trackname = path.basename(localpath).split('.txt')[0]
     elif '.tsv' in localpath:
         trackname = path.basename(localpath).split('.tsv')[0]
+
+    if prefix is not None:
+        if prefix != '':
+            trackname = '.'.join([prefix, trackname])
 
     return pbt.BedTool(localpath), trackname
 
@@ -128,13 +132,13 @@ def clean_track(track, trackname, xbt, xcov=0.5, genome=None,
     return pbt.BedTool.from_dataframe(track_df)
 
 
-def get_track_stats(track, trackname, outfile):
+def get_track_stats(track, trackname, orig_trackpath, outfile):
     """
     Compute basic statistics for elements in track
     """
 
     # Add header to outfile
-    hcols = '#trackname n_elements min_size median_size mean_size max_size total_bp'
+    hcols = '#trackname n_elements min_size median_size mean_size max_size total_bp original_path'
     outfile.write('\t'.join(hcols.split()) + '\n')
 
     # Compute stats
@@ -148,7 +152,7 @@ def get_track_stats(track, trackname, outfile):
 
     # Write stats to outfile
     svals = [n_ele, min_size, med_size, mean_size, max_size, total_bp]
-    outfile.write('\t'.join([trackname] + [str(round(x, 1)) for x in svals]) + '\n')
+    outfile.write('\t'.join([trackname] + [str(round(x, 1)) for x in svals] + [orig_trackpath]) + '\n')
     outfile.close()
 
 
@@ -181,6 +185,7 @@ def main():
                         'track statistics.')
     parser.add_argument('--n-download-retries', default=5, type=int, 
                         help='Number of times to retry downloading each track.')
+    parser.add_argument('-p', '--prefix',  help='Prefix for track and element names.')
     parser.add_argument('-z', '--bgzip', action='store_true', help='Compress ' +
                         'output BED file with bgzip.')
     args = parser.parse_args()
@@ -193,7 +198,7 @@ def main():
             outbed_path = args.outbed
 
     # Load annotation track
-    track, trackname = get_track(args.path, args.n_download_retries)
+    track, trackname = get_track(args.path, args.n_download_retries, args.prefix)
 
     # Open connections to unspecified output files
     if args.outbed is None:
@@ -212,7 +217,7 @@ def main():
                         args.min_size, args.max_size)
 
     # Compute track stats, if optioned
-    get_track_stats(track, trackname, stats_out)
+    get_track_stats(track, trackname, args.path, stats_out)
     
     # Write cleaned track to file
     track.saveas(outbed_path)

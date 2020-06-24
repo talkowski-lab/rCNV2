@@ -149,27 +149,22 @@ option_list <- list(
 )
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage="%prog infile tracklist outfile",
+args <- parse_args(OptionParser(usage="%prog infile outfile",
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Writes args & opts to variable
 stats.in <- args$args[1]
-tracklist.in <- args$args[2]
-outfile <- args$args[3]
+outfile <- args$args[2]
 p.cutoff <- -log10(as.numeric(opts$`p-cutoff`))
 signif.outfile <- opts$`signif-tracks`
 
 # # Dev parameters
 # stats.in <- "~/scratch/rCNV.all.merged_stats.with_counts.tsv.gz"
-# tracklist.in <- "~/scratch/rCNV.all_tracks.list"
 # outfile <- "~/scratch/rCNV.chromhmm_plus_encode.test.tsv"
 # p.cutoff <- -log10(0.05)
 # signif.outfile <- "~/scratch/rCNV.chromhmm_plus_encode.test.signif_tracks.list"
-
-# Read full tracklist
-tracklist <- read.table(tracklist.in, header=F, sep="\t", comment.char="")[, 1]
 
 # Read track stats and split by CNV type
 stats <- load.stats(stats.in, cnv.split=T)
@@ -191,9 +186,7 @@ write.table(meta.res, outfile, sep="\t",
 if(!is.null(signif.outfile)){
   sig.idx <- which(meta.res$meta.phred_p >= p.cutoff & meta.res$meta.zscore > 0)
   if(length(sig.idx) > 0){
-    sig.names <- as.character(sort(unique(meta.res[sig.idx, 1])))
-    sig.tracks <- as.data.frame(do.call("rbind", lapply(sig.names, function(name){
-      c(tracklist[grep(name, tracklist, fixed=T)], name)})))
+    sig.tracks <- unique(meta.res[sig.idx, which(colnames(meta.res) %in% c("trackname", "original_path"))])
     write.table(sig.tracks, signif.outfile,
                 col.names=F, row.names=F, quote=F, sep="\t")
   }

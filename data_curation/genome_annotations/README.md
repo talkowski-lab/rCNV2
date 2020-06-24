@@ -12,7 +12,7 @@ We aimed to comprehensively assess all major repositories of genome annotations.
 
 In total, we evaluated _TBD_ genome annotation tracks across all sources.  
 
-The following table outlines major sources considered in this analysis:
+The following table outlines all sources included in this analysis:
 
 | Source | Number of tracks | Description | Citation | Website |  
 | :--- | ---: | :--- | :--- | :--- |  
@@ -22,6 +22,13 @@ The following table outlines major sources considered in this analysis:
 | ENCODE Transcription Factor Binding Sites | 2,859 | All transcription factor (or otherwise DNA-binding protein) ChIP-seq tracks meeting our [ENCODE data inclusion criteria](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/genome_annotations#encode-data-inclusion-criteria) available for download in broad- or narrow-peak format from the ENCODE Data Portal | ENCODE Data Portal [(Davis _et al._, _Nucleic Acids Res._, 2018)](https://pubmed.ncbi.nlm.nih.gov/29126249/) (accessed June 2020) | [Link](https://www.encodeproject.org/matrix/) |  
 | ENCODE Transcription | 458 | A subset of transcription assays (CAGE, RAMPAGE, small RNAseq, total RNAseq, polyA RNAseq) meeting our [ENCODE data inclusion criteria](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/genome_annotations#encode-data-inclusion-criteria) available for download in BED format from the ENCODE Data Portal | ENCODE Data Portal [(Davis _et al._, _Nucleic Acids Res._, 2018)](https://pubmed.ncbi.nlm.nih.gov/29126249/) (accessed June 2020) | [Link](https://www.encodeproject.org/matrix/) |  
 | ENCODE TAD boundaries | 30 | TAD boundaries (defined as the start and end coordinates for each TAD ± 5kb) from 30 samples meeting our [ENCODE data inclusion criteria](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/genome_annotations#encode-data-inclusion-criteria) available for download from the ENCODE Data Portal | ENCODE Data Portal [(Davis _et al._, _Nucleic Acids Res._, 2018)](https://pubmed.ncbi.nlm.nih.gov/29126249/) (accessed June 2020) | [Link](https://www.encodeproject.org/matrix/) |  
+| EnhancerAtlas 2.0 | 197 | Enhancer predictions in 197 human cell lines & tissues | EnhancerAtlas 2.0 [(Gao _et al._, _Nucleic Acids Res._, 2019)](https://doi.org/10.1093/nar/gkz980) | [Link](http://www.enhanceratlas.org/indexv2.php) |  
+| HACER | 289 | Active enhancer predictions in human cell lines & tissues based on PRO-seq, GRO-seq, or CAGE data | HACER [(Wang _et al._, _Nucleic Acids Res._, 2019)](https://doi.org/10.1093/nar/gky864) | [Link](http://bioinfo.vanderbilt.edu/AE/HACER/index.html) |  
+| SEdb | 1,082 | Super enhancer and typical enhancer predictions from 541 human cell lines and tissues | SEdb v1.03 [(Jiang _et al._, _Nucleic Acids Res._, 2018)](https://doi.org/10.1093/nar/gky1025) | [Link](http://www.licpathway.net/sedb/index.php) |  
+| dbSUPER | 99 | Super enhancers from 99 human cell lines and tissues | dbSUPER [(Khan _et al._, _Nucleic Acids Res._, 2016)](https://academic.oup.com/nar/article/44/D1/D164/2502575) | [Link](http://asntech.org/dbsuper/index.php) |  
+| VISTA | 1 | Experimentally-validated mammalian enhancers | VISTA Browser [(Visel _et al._, _Nucleic Acids Res._, 2007)](https://dx.doi.org/10.1093%2Fnar%2Fgkl822) (accessed June 2020) | [Link](https://enhancer.lbl.gov/frnt_page_n.shtml) |  
+| DENdb | 15 | Enhancer predictions from 15 human cell lines | DENdb [(Ashoor _et al._, _Database_, 2015)](doi:10.1093/database/bav085) | [Link](https://www.cbrc.kaust.edu.sa/dendb/index.php) |  
+| SEA | 143 | Super enhancer predictions from 143 human cell lines and tissues (mapped back to hg19 using liftOver with minimum 75% match) | SEA v3.0 [(Ashoor _et al._, _Database_, 2015)](doi:10.1093/database/bav085) | [Link](http://sea.edbc.org/) |  
 
 
 #### ENCODE data inclusion criteria  
@@ -39,6 +46,10 @@ Manifests for all ENCODE tracks considered in this analysis are stored in the fo
 $ gsutil ls gs://rcnv_project/cleaned_data/genome_annotations/manifests/
 
 gs://rcnv_project/cleaned_data/genome_annotations/manifests/encode.dna_accessibility.manifest.tsv.gz
+gs://rcnv_project/cleaned_data/genome_annotations/manifests/encode.hic_tads.manifest.tsv.gz
+gs://rcnv_project/cleaned_data/genome_annotations/manifests/encode.histone_mods.manifest.tsv.gz
+gs://rcnv_project/cleaned_data/genome_annotations/manifests/encode.tfbs.manifest.tsv.gz
+gs://rcnv_project/cleaned_data/genome_annotations/manifests/encode.transcription.manifest.tsv.gz
 ```
 
 ## Track curation procedure  

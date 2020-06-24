@@ -14,6 +14,7 @@ workflow curate_annotations {
   File encode_histone_mods_tracklist
   File encode_tfbs_tracklist
   File encode_transcription_tracklist
+  File enhancer_databases_tracklist
   Int tracks_per_shard
   Int min_element_size
   Int max_element_size
@@ -42,7 +43,8 @@ workflow curate_annotations {
         case_hpo=case_hpo,
         min_element_overlap=min_element_overlap,
         rCNV_bucket=rCNV_bucket,
-        prefix="${prefix}.chromhmm_shard"
+        prefix="${prefix}.chromhmm_shard",
+        track_prefix=""
     }
   }
   call merge_shards as merge_chromhmm {
@@ -67,7 +69,8 @@ workflow curate_annotations {
         case_hpo=case_hpo,
         min_element_overlap=min_element_overlap,
         rCNV_bucket=rCNV_bucket,
-        prefix="${prefix}.encode_dnaaccessibility_shard"
+        prefix="${prefix}.encode_dnaaccessibility_shard",
+        track_prefix="encode_dnaaccessibility"
     }
   }
   call merge_shards as merge_encode_dnaaccessibility {
@@ -92,7 +95,8 @@ workflow curate_annotations {
         case_hpo=case_hpo,
         min_element_overlap=min_element_overlap,
         rCNV_bucket=rCNV_bucket,
-        prefix="${prefix}.encode_histone_mods_shard"
+        prefix="${prefix}.encode_histone_mods_shard",
+        track_prefix="encode_histone_mods"
     }
   }
   call merge_shards as merge_encode_histone_mods {
@@ -117,7 +121,8 @@ workflow curate_annotations {
         case_hpo=case_hpo,
         min_element_overlap=min_element_overlap,
         rCNV_bucket=rCNV_bucket,
-        prefix="${prefix}.encode_tfbs_shard"
+        prefix="${prefix}.encode_tfbs_shard",
+        track_prefix="encode_tfbs"
     }
   }
   call merge_shards as merge_encode_tfbs {
@@ -142,7 +147,8 @@ workflow curate_annotations {
         case_hpo=case_hpo,
         min_element_overlap=min_element_overlap,
         rCNV_bucket=rCNV_bucket,
-        prefix="${prefix}.encode_transcription_shard"
+        prefix="${prefix}.encode_transcription_shard",
+        track_prefix="encode_transcription"
     }
   }
   call merge_shards as merge_encode_transcription {
@@ -151,26 +157,51 @@ workflow curate_annotations {
       prefix="${prefix}.encode_transcription"
   }
 
+  # Process various enhancer database tracks
+  call shard_tracklist as shard_tracklist_enhancer_databases {
+    input:
+      tracklist=enhancer_databases_tracklist,
+      tracks_per_shard=tracks_per_shard,
+      prefix="${prefix}.enhancer_databases_shards"
+  }
+  scatter ( shard in shard_tracklist_enhancer_databases.shards ) {
+    call curate_and_burden as curate_and_burden_enhancer_databases {
+      input:
+        tracklist=shard,
+        min_element_size=min_element_size,
+        max_element_size=max_element_size,
+        case_hpo=case_hpo,
+        min_element_overlap=min_element_overlap,
+        rCNV_bucket=rCNV_bucket,
+        prefix="${prefix}.enhancer_databases_shard",
+        track_prefix="enhancer_databases"
+    }
+  }
+  call merge_shards as merge_enhancer_databases {
+    input:
+      stat_shards=curate_and_burden_enhancer_databases.stats,
+      prefix="${prefix}.enhancer_databases"
+  }
+
   # Merge stats across all tracklists
   call merge_shards as merge_all {
     input:
-      stat_shards=[merge_chromhmm.merged_stats, merge_encode_dnaaccessibility.merged_stats, merge_encode_histone_mods.merged_stats, merge_encode_tfbs.merged_stats, merge_encode_transcription.merged_stats],
+      stat_shards=[merge_chromhmm.merged_stats, merge_encode_dnaaccessibility.merged_stats, merge_encode_histone_mods.merged_stats, merge_encode_tfbs.merged_stats, merge_encode_transcription.merged_stats, merge_enhancer_databases.merged_stats],
       prefix="${prefix}.all"
   }
 
-  # Merge all tracklists
-  call merge_tracklists {
-    input:
-      tracklists=[chromhmm_tracklist, encode_dnaaccessibility_tracklist, encode_histone_mods_tracklist, encode_tfbs_tracklist, encode_transcription_tracklist],
-      prefix="${prefix}"
-  }
+  # # Merge all tracklists
+  # call merge_tracklists {
+  #   input:
+  #     tracklists=[chromhmm_tracklist, encode_dnaaccessibility_tracklist, encode_histone_mods_tracklist, encode_tfbs_tracklist, encode_transcription_tracklist, enhancer_databases_tracklist],
+  #     prefix="${prefix}"
+  # }
 
   # Merge stats across all tracklists and compute meta-analysis burden stats
   call meta_burden_test {
     input:
       stats=merge_all.merged_stats,
       p_cutoff=p_cutoff,
-      merged_tracklist=merge_tracklists.merged_tracklist,
       rCNV_bucket=rCNV_bucket,
       prefix=prefix,
       clear_sig="TRUE"
@@ -307,6 +338,7 @@ task curate_and_burden {
   String case_hpo
   String rCNV_bucket
   String prefix
+  String track_prefix
 
   command <<<
     set -e
@@ -320,8 +352,11 @@ task curate_and_burden {
       ${rCNV_bucket}/analysis/analysis_refs/HPOs_by_metacohort.table.tsv \
       refs/
 
-    # Curate all tracks in tracklist
-    while read path; do
+    # Curate all tracks in tracklist, using second column as track-specific prefix (if provided)
+    while IFS=$'\t' read path tprefix; do
+      if [ -z $tprefix ]; then
+        tprefix=${track_prefix}
+      fi
       echo -e "Curating $path"
       /opt/rCNV2/data_curation/genome_annotations/curate_track.py \
         --genome refs/GRCh37.genome \
@@ -331,8 +366,10 @@ task curate_and_burden {
         --min-size ${min_element_size} \
         --max-size ${max_element_size} \
         --stats \
-        $path
+        --prefix "$tprefix" \
+        "$path"
     done < ${tracklist}
+    export IFS=$' \t\n'
 
     # Collect table of curated stats
     cat *.curated.stats.tsv | fgrep -v "#" | sort -Vk1,1 | uniq \
@@ -436,7 +473,6 @@ task merge_tracklists {
 task meta_burden_test {
   File stats
   Float p_cutoff
-  File merged_tracklist
   String rCNV_bucket
   String prefix
   String clear_sig
@@ -454,7 +490,6 @@ task meta_burden_test {
       --p-cutoff ${p_cutoff} \
       --signif-tracks ${prefix}.signif_paths_and_tracks.list \
       ${stats} \
-      ${merged_tracklist} \
       ${prefix}.burden_stats.tsv
 
     # Extract significant tracks
@@ -471,7 +506,8 @@ task meta_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:a7ff61dbb3603d3468be5d4245e871830275e409a1ebc194e21cca35db369212"
+    #TODO: UPDATE DOCKER
+    # docker: "talkowski/rcnv@sha256:9616d3af43f290826b52c3c8d6f5af621ecdda7b6c85fd1865bf12252b960389"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
