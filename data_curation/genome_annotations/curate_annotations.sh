@@ -243,7 +243,6 @@ gsutil -m cp psychencode.enhancers.bed.gz \
   ${rCNV_bucket}/cleaned_data/genome_annotations/misc_tracks/
 
 
-
 # Combine all enhancer tracks into single tracklist for sharding on FireCloud
 gsutil cat \
   ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/EnhancerAtlas2.track_urls.list \

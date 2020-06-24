@@ -224,6 +224,7 @@ calc.segs.dat <- function(segs, feature, measure, subset_to_regions=NULL){
 segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
                          xlims=NULL, ylims=NULL, add.lm=T, pt.cex=1,
                          horiz.lines.at=NULL, horiz.lines.lty=1,
+                         abline.a=NULL, abline.b=NULL, abline.lty=1,
                          xtitle=NULL, x.title.line=1.75, x.at=NULL, x.labs=NULL, x.labs.at=NULL, parse.x.labs=FALSE,
                          ytitle=NULL, y.title.line=1.75, y.at=NULL, y.labs=NULL, y.labs.at=NULL, parse.y.labs=FALSE,
                          parmar=c(3, 3, 0.8, 0.8)){
@@ -261,6 +262,11 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
   if(!is.null(horiz.lines.at)){
     sapply(1:length(horiz.lines.at), function(i){
       abline(h=horiz.lines.at[i], lty=horiz.lines.lty[i], col=blueblack)
+    })
+  }
+  if(!is.null(abline.a)){
+    sapply(1:length(abline.a), function(i){
+      abline(a=abline.a[i], b=abline.b[i], lty=abline.lty[i], col=blueblack)
     })
   }
   
