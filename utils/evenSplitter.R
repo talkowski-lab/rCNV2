@@ -10,7 +10,7 @@
 ####################################
 #####Set parameters & load libraries
 ####################################
-options(scipen=1000,stringsAsFactors=F)
+options(scipen=1000, stringsAsFactors=F)
 require(optparse)
 
 
@@ -74,14 +74,15 @@ if(n.modes.set > 1 ){
 #####Read & format input file
 #############################
 #Read file as data frame
-dat <- as.data.frame(read.table(INFILE,sep="\t",header=F))
+dat <- as.data.frame(read.table(INFILE, sep="\t", header=F, na.strings="", fill=T))
+dat <- apply(dat, 2, function(vals){vals[which(is.na(vals))] <- ""; return(vals)})
 
 #Count number of lines
 nlines <- nrow(dat)
 
 #Randomly shuffle lines (if optioned)
 if(shuf == T){
-  dat <- as.data.frame(dat[sample(1:nlines,size=nlines,replace=F),])
+  dat <- as.data.frame(dat[sample(1:nlines, size=nlines, replace=F),])
 }
 
 
@@ -105,8 +106,8 @@ splits.df <- data.frame("split.no"=1:target.splits,
 excess.lines <- nlines-sum(splits.df$lines)
 
 #Increment random splits by 1
-excess.sinks <- sample(1:nrow(splits.df),size=excess.lines,replace=F)
-splits.df[excess.sinks,2] <- splits.df[excess.sinks,2]+1
+excess.sinks <- sample(1:nrow(splits.df), size=excess.lines, replace=F)
+splits.df[excess.sinks, 2] <- splits.df[excess.sinks, 2]+1
 
 
 ##############################
@@ -116,7 +117,7 @@ if(quiet == F){
   schema <- table(splits.df[,2])
   cat("SPLITTING SCHEMA:\n")
   for(i in 1:length(schema)){
-    cat(paste(schema[i]," splits @ ",names(schema)[i]," lines\n",sep=""))
+    cat(paste(schema[i], " splits @ ", names(schema)[i], " lines\n", sep=""))
   }
 }
 
@@ -127,12 +128,12 @@ if(quiet == F){
 #Set start and stop lines for splits
 splits.df$start <- NA
 splits.df$end <- cumsum(splits.df$lines)
-splits.df$start <- c(1,splits.df$end[1:(nrow(splits.df)-1)]+1)
+splits.df$start <- c(1, splits.df$end[1:(nrow(splits.df)-1)]+1)
 
 #Iterate over splits and write to file
-apply(splits.df,1,function(vals){
+apply(splits.df, 1, function(vals){
   vals <- as.integer(vals)
-  chunk <- as.data.frame(dat[vals[3]:vals[4],])
-  write.table(chunk,paste(PREFIX,vals[1],sep=""),sep="\t",quote=F,
-              row.names=F,col.names=F)
+  chunk <- as.data.frame(dat[vals[3]:vals[4], ])
+  write.table(chunk,paste(PREFIX,vals[1],sep=""), sep="\t", quote=F,
+              row.names=F, col.names=F)
 })
