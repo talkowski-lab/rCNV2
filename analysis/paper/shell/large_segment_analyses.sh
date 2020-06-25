@@ -278,6 +278,7 @@ mkdir dnm_distributions
   ${prefix}.master_segments.bed.gz \
   refs/ddd_dnm_counts.tsv.gz \
   refs/asc_dnm_counts.tsv.gz \
+  refs/asc_dnm_counts.unaffecteds.tsv.gz \
   refs/gene_mutation_rates.tsv.gz \
   dnm_distributions/${prefix}
 

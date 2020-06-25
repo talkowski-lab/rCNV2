@@ -207,40 +207,40 @@ workflow curate_annotations {
       clear_sig="TRUE"
   }
 
-  # # Re-shard all significant tracks for final curation
-  # call shard_tracklist as shard_tracklist_signif {
-  #   input:
-  #     tracklist=meta_burden_test.signif_tracks,
-  #     tracks_per_shard=tracks_per_shard,
-  #     prefix="${prefix}.signif_tracks"
-  # }
+  # Re-shard all significant tracks for final curation
+  call shard_tracklist as shard_tracklist_signif {
+    input:
+      tracklist=meta_burden_test.signif_tracks,
+      tracks_per_shard=tracks_per_shard,
+      prefix="${prefix}.signif_tracks"
+  }
 
-  # # Scatter over sharded significant tracklist and curate tracks
-  # scatter ( shard in shard_tracklist_signif.shards ) {
-  #   call curate_only as curate_only_signif {
-  #     input:
-  #       tracknames_and_paths=shard,
-  #       min_element_size=min_element_size,
-  #       max_element_size=max_element_size,
-  #       rCNV_bucket=rCNV_bucket,
-  #       prefix="${prefix}.signif_shard"
-  #   }
-  # }
+  # Scatter over sharded significant tracklist and curate tracks
+  scatter ( shard in shard_tracklist_signif.shards ) {
+    call curate_only as curate_only_signif {
+      input:
+        tracknames_and_paths=shard,
+        min_element_size=min_element_size,
+        max_element_size=max_element_size,
+        rCNV_bucket=rCNV_bucket,
+        prefix="${prefix}.signif_shard"
+    }
+  }
 
-  # call cluster_elements {
-  #   input:
-  #     completion_tokens=curate_only_signif.completion_token,
-  #     min_prop_tracks_per_crb=min_prop_tracks_per_crb,
-  #     clustering_neighborhood_dist=clustering_neighborhood_dist,
-  #     min_crb_separation=min_crb_separation,
-  #     rCNV_bucket=rCNV_bucket,
-  #     prefix=prefix
-  # }
+  call cluster_elements {
+    input:
+      completion_tokens=curate_only_signif.completion_token,
+      min_prop_tracks_per_crb=min_prop_tracks_per_crb,
+      clustering_neighborhood_dist=clustering_neighborhood_dist,
+      min_crb_separation=min_crb_separation,
+      rCNV_bucket=rCNV_bucket,
+      prefix=prefix
+  }
   
   # Final outputs
   output {
-    # File final_crbs = cluster_elements.final_crbs
-    # File final_crb_elements = cluster_elements.final_crb_elements
+    File final_crbs = cluster_elements.final_crbs
+    File final_crb_elements = cluster_elements.final_crb_elements
   }
 }
 
@@ -279,7 +279,6 @@ task curate_only {
   Int max_element_size
   String rCNV_bucket
   String prefix
-  String track_prefix
 
   command <<<
     set -e
@@ -318,7 +317,7 @@ task curate_only {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3259bb3804f42308562beb88dc6890a9d4b73161a928bebe8eefa3d354983b2d"
+    docker: "talkowski/rcnv@sha256:e6fad02a3eba364dfc4a303ac8a47df9ea1254483e7867db61bcb151b2565f47"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -502,7 +501,7 @@ task meta_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3259bb3804f42308562beb88dc6890a9d4b73161a928bebe8eefa3d354983b2d"
+    docker: "talkowski/rcnv@sha256:e6fad02a3eba364dfc4a303ac8a47df9ea1254483e7867db61bcb151b2565f47"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -574,7 +573,7 @@ task cluster_elements {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3259bb3804f42308562beb88dc6890a9d4b73161a928bebe8eefa3d354983b2d"
+    docker: "talkowski/rcnv@sha256:e6fad02a3eba364dfc4a303ac8a47df9ea1254483e7867db61bcb151b2565f47"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

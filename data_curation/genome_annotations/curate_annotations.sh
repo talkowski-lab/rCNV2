@@ -178,6 +178,7 @@ zcat vista_raw.fa.gz \
 | fgrep positive | fgrep Human \
 | awk -v FS="|" '{ print $2 }' \
 | sed -e 's/:\|-/\t/g' \
+| awk -v OFS="\t" '{ print $1, $2, $3 }' \
 | sort -Vk1,1 -k2,2n -k3,3n \
 | bgzip -c \
 > vista_enhancers.bed.gz
