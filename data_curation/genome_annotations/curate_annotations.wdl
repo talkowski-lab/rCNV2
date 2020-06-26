@@ -20,15 +20,12 @@ workflow curate_annotations {
   Int max_element_size
   String case_hpo
   Float min_element_overlap
-  Float p_cutoff
+  Float fdr_cutoff
   Float min_prop_tracks_per_crb
   Int clustering_neighborhood_dist
   Int min_crb_separation
-  File contiglist
   String rCNV_bucket
   String prefix
-
-  Array[Array[String]] contigs = read_tsv(contiglist)
 
   # Process Roadmap ChromHMM tracks
   call shard_tracklist as shard_tracklist_chromhmm {
@@ -204,46 +201,46 @@ workflow curate_annotations {
   call meta_burden_test {
     input:
       stats=merge_all.merged_stats,
-      p_cutoff=p_cutoff,
+      fdr_cutoff=fdr_cutoff,
       rCNV_bucket=rCNV_bucket,
       prefix=prefix,
       clear_sig="TRUE"
   }
 
-  # Re-shard all significant tracks for final curation
-  call shard_tracklist as shard_tracklist_signif {
-    input:
-      tracklist=meta_burden_test.signif_tracks,
-      tracks_per_shard=tracks_per_shard,
-      prefix="${prefix}.signif_tracks"
-  }
+  # # Re-shard all significant tracks for final curation
+  # call shard_tracklist as shard_tracklist_signif {
+  #   input:
+  #     tracklist=meta_burden_test.signif_tracks,
+  #     tracks_per_shard=tracks_per_shard,
+  #     prefix="${prefix}.signif_tracks"
+  # }
 
-  # Scatter over sharded significant tracklist and curate tracks
-  scatter ( shard in shard_tracklist_signif.shards ) {
-    call curate_only as curate_only_signif {
-      input:
-        tracknames_and_paths=shard,
-        min_element_size=min_element_size,
-        max_element_size=max_element_size,
-        rCNV_bucket=rCNV_bucket,
-        prefix="${prefix}.signif_shard"
-    }
-  }
+  # # Scatter over sharded significant tracklist and curate tracks
+  # scatter ( shard in shard_tracklist_signif.shards ) {
+  #   call curate_only as curate_only_signif {
+  #     input:
+  #       tracknames_and_paths=shard,
+  #       min_element_size=min_element_size,
+  #       max_element_size=max_element_size,
+  #       rCNV_bucket=rCNV_bucket,
+  #       prefix="${prefix}.signif_shard"
+  #   }
+  # }
 
-  call cluster_elements {
-    input:
-      completion_tokens=curate_only_signif.completion_token,
-      min_prop_tracks_per_crb=min_prop_tracks_per_crb,
-      clustering_neighborhood_dist=clustering_neighborhood_dist,
-      min_crb_separation=min_crb_separation,
-      rCNV_bucket=rCNV_bucket,
-      prefix=prefix
-  }
+  # call cluster_elements {
+  #   input:
+  #     completion_tokens=curate_only_signif.completion_token,
+  #     min_prop_tracks_per_crb=min_prop_tracks_per_crb,
+  #     clustering_neighborhood_dist=clustering_neighborhood_dist,
+  #     min_crb_separation=min_crb_separation,
+  #     rCNV_bucket=rCNV_bucket,
+  #     prefix=prefix
+  # }
   
   # Final outputs
   output {
-    File final_crbs = cluster_elements.final_crbs
-    File final_crb_elements = cluster_elements.final_crb_elements
+    # File final_crbs = cluster_elements.final_crbs
+    # File final_crb_elements = cluster_elements.final_crb_elements
   }
 }
 
@@ -476,7 +473,7 @@ task merge_tracklists {
 # Conduct meta-analysis burden test for all tracks
 task meta_burden_test {
   File stats
-  Float p_cutoff
+  Float fdr_cutoff
   String rCNV_bucket
   String prefix
   String clear_sig
@@ -491,7 +488,7 @@ task meta_burden_test {
 
     # Perform burden analysis
     /opt/rCNV2/data_curation/genome_annotations/trackwise_cnv_burden_meta_analysis.R \
-      --p-cutoff ${p_cutoff} \
+      --fdr-cutoff ${fdr_cutoff} \
       --signif-tracks ${prefix}.signif_paths_and_tracks.list \
       ${stats} \
       ${prefix}.burden_stats.tsv

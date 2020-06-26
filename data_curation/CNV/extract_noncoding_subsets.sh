@@ -22,7 +22,7 @@ mkdir cleaned_cnvs/
 gsutil -m cp gs://rcnv_project/cleaned_data/cnv/*rCNV* cleaned_cnvs/
 gsutil -m cp gs://rcnv_project/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* ./
 gsutil -m cp gs://rcnv_project/analysis/analysis_refs/rCNV_metacohort_list.txt ./
-gsutil -m cp gs://rcnv_project/cleaned_data/genes/gene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list ./
+gsutil -m cp gs://rcnv_project/cleaned_data/genes/gene_lists/gnomad.v2.1.1.likely_unconstrained.genes.list ./
 
 
 # Extract noncoding CNVs for each metacohort
@@ -32,7 +32,7 @@ while read cohort; do
   /opt/rCNV2/data_curation/CNV/extract_noncoding_cnvs.py \
     --strict-outbed noncoding/$cohort.rCNV.strict_noncoding.bed.gz \
     --loose-outbed noncoding/$cohort.rCNV.loose_noncoding.bed.gz \
-    --whitelist gnomad.v2.1.1.mutation_tolerant.genes.list \
+    --whitelist gnomad.v2.1.1.likely_unconstrained.genes.list \
     --bgzip \
     cleaned_cnvs/$cohort.rCNV.bed.gz \
     gencode.v19.canonical.pext_filtered.gtf.gz

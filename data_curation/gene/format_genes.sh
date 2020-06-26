@@ -229,58 +229,16 @@ gsutil -m cp genes_lost_during_pext_filtering.genes.list \
 
 # Generate BED file of pLoF constrained genes and mutationally tolerant genes from gnomAD
 # wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
-pli_idx=$( zcat gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
-           | head -n1 | sed 's/\t/\n/g' \
-           | awk '{ if ($1=="pLI") print NR }' )
-loeuf_idx=$( zcat gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
-             | head -n1 | sed 's/\t/\n/g' \
-             | awk '{ if ($1=="oe_lof_upper_bin_6") print NR }' )
-mis_z_idx=$( zcat gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
-             | head -n1 | sed 's/\t/\n/g' \
-             | awk '{ if ($1=="mis_z") print NR }' )
-moeuf_idx=$( zcat gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
-             | head -n1 | sed 's/\t/\n/g' \
-             | awk '{ if ($1=="oe_mis_upper") print NR }' )
-syn_z_idx=$( zcat gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
-             | head -n1 | sed 's/\t/\n/g' \
-             | awk '{ if ($1=="syn_z") print NR }' )
-# Constrained
-zcat gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
-| fgrep -wf gencode.v19.canonical.pext_filtered.genes.list \
-| awk -v pli_idx=${pli_idx} -v loeuf_idx=${loeuf_idx} -v FS="\t" \
-  '{ if ( ($pli_idx >= 0.9 && $pli_idx != "NA") || ($loeuf_idx == 0 && $loeuf_idx != "NA") ) print $1 }' \
-| sort -Vk1,1 \
-> gnomad.v2.1.1.lof_constrained.genes.list
-awk '{ print "gene_name \""$1"\"" }' \
-gnomad.v2.1.1.lof_constrained.genes.list \
-| fgrep -wf - <( zcat gencode.v19.canonical.pext_filtered.gtf.gz ) \
-| awk -v FS="\t" '{ if ($3=="transcript") print }' \
-> gencode.v19.canonical.pext_filtered.constrained.gtf
-while read gene; do
-  fgrep -w "\"$gene\"" gencode.v19.canonical.pext_filtered.constrained.gtf \
-  | awk -v OFS="\t" -v gene=$gene '{ print $1, $4, $5, gene }'
-done < gnomad.v2.1.1.lof_constrained.genes.list \
-| sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
-| cat <( echo -e "#chr\tstart\tend\tgene" ) - \
-| bgzip -c \
-> gencode.v19.canonical.pext_filtered.constrained.bed.gz
-# Tolerant
-zcat gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
-| fgrep -wf gencode.v19.canonical.pext_filtered.genes.list \
-| awk -v pli_idx=${pli_idx} -v loeuf_idx=${loeuf_idx} -v mis_z_idx=${mis_z_idx} \
-      -v moeuf_idx=${moeuf_idx} -v syn_z_idx=${syn_z_idx} -v FS="\t" \
-  '{ if ($pli_idx <= 0.01 && $pli_idx != "NA" && $loeuf_idx > 3 && $loeuf_idx != "NA" \
-         && $mis_z_idx <= 0 && $moeuf_idx >= 1 && $syn_z_idx > -3 && $syn_z_idx < 3) print $1 }' \
-| sort -Vk1,1 \
-> gnomad.v2.1.1.mutation_tolerant.genes.list
-
+/opt/rCNV2/data_curation/gene/get_gnomad_genelists.R \
+  gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
+  gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
+  "gnomad.v2.1.1"
 
 
 # Copy gnomAD gene files to rCNV bucket (note: requires permissions)
 gsutil -m cp gencode.v19.canonical.pext_filtered.constrained.bed.gz \
   ${rCNV_bucket}/analysis/analysis_refs/
-gsutil -m cp gnomad.v2.1.1.lof_constrained.genes.list \
-  gnomad.v2.1.1.mutation_tolerant.genes.list \
+gsutil -m cp gnomad.v2.1.1.*.genes.list \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists/
 
 
@@ -361,6 +319,18 @@ for wrapper in 1; do
   | sed 's/\.genes\.list//g' | addcom
   echo "gnomAD v2.1.1 [Karczewski _et al._, _bioRxiv_, 2019](https://www.biorxiv.org/content/10.1101/531210v3)"
   echo "pLI ≥ 0.9 or in the first LOEUF sextile"
+done | paste -s \
+| sed 's/\t/\ \|\ /g' \
+| sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' \
+>> genelist_table.html.txt
+# Likely unconstrained genes
+for wrapper in 1; do
+  echo "Likely unconstrained genes"
+  wc -l gnomad.v2.1.1.likely_unconstrained.genes.list \
+  | awk -v OFS="\t" '{ print $1, "`"$2"`" }' \
+  | sed 's/\.genes\.list//g' | addcom
+  echo "gnomAD v2.1.1 [Karczewski _et al._, _bioRxiv_, 2019](https://www.biorxiv.org/content/10.1101/531210v3)"
+  echo "LOEUF ≥ 1, mis. OEUF ≥ 1, synonymous Z-score ~ [-3, 3], pLI ≤ 0.1, LoF O/E in upper 50% of all genes, mis. OE in upper 50% of all genes, observed LoF > 0, observed mis. > 0"
 done | paste -s \
 | sed 's/\t/\ \|\ /g' \
 | sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' \

@@ -320,10 +320,10 @@ The code to apply these filters is contained in `extract_noncoding_subsets.sh`.
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
-| meta1 | 44,229 | 8,909 | 0.2 | 192.0 kb | 1.38:1 | 19,585 | 5,407 | 0.28 | 156.0 kb | 1.71:1 |  
-| meta2 | 41,065 | 12,472 | 0.3 | 156.0 kb | 1.55:1 | 41,213 | 10,618 | 0.26 | 160.0 kb | 1.58:1 |  
-| meta3 | 153,870 | 37,715 | 0.25 | 165.0 kb | 1.82:1 | 24,161 | 7,693 | 0.32 | 164.0 kb | 2.15:1 |  
-| meta4 | 54,071 | 11,552 | 0.21 | 161.0 kb | 5.52:1 | 375,800 | 80,810 | 0.22 | 162.0 kb | 5.37:1 | 
+| meta1 | 44,229 | 10,333 | 0.23 | 194.0 kb | 1.29:1 | 19,585 | 6,018 | 0.31 | 158.0 kb | 1.61:1 |  
+| meta2 | 41,065 | 13,937 | 0.34 | 158.0 kb | 1.44:1 | 41,213 | 12,001 | 0.29 | 160.0 kb | 1.44:1 |  
+| meta3 | 153,870 | 42,391 | 0.28 | 167.0 kb | 1.69:1 | 24,161 | 8,583 | 0.36 | 166.0 kb | 1.96:1 |  
+| meta4 | 54,071 | 12,927 | 0.24 | 161.0 kb | 4.62:1 | 375,800 | 90,250 | 0.24 | 162.0 kb | 4.60:1 |  
 
 ![Loose noncoding rare CNV stats](https://storage.googleapis.com/rcnv_project/public/loose_noncoding.metacohort.stats.jpg)  
 
