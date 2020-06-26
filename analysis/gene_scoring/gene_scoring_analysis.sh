@@ -117,7 +117,7 @@ for CNV in DEL DUP; do
   echo $CNV
 
   # Make list of stats files to be considered
-  find / -name "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.*.bed.gz" \
+  find / -name "*.${prefix}.${freq_code}.${CNV}.gene_burden.stats.*.bed.gz" \
   > stats.paths.list
 
   # Merge burden stats per cohort
@@ -130,7 +130,7 @@ for CNV in DEL DUP; do
     | bgzip -c \
     > "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
     tabix -f "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
-  done < ${metacohort_list}
+  done < <( fgrep -v mega ${metacohort_list} )
 
   # Make input for meta-analysis
   while read meta cohorts; do
@@ -146,7 +146,7 @@ for CNV in DEL DUP; do
     ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt \
     ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed
   bgzip -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed
-  tabix -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz
+  tabix -p bed -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz
 
   # Extract list of genes with < min_cnvs_per_gene_training (to be used as blacklist later for training)
   /opt/rCNV2/analysis/gene_scoring/get_underpowered_genes.R \
@@ -154,7 +154,7 @@ for CNV in DEL DUP; do
     ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt \
     ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed
   bgzip -f ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed
-  tabix -f ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed.gz
+  tabix -p bed -f ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed.gz
 done
 
 

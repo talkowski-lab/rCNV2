@@ -102,7 +102,7 @@ workflow gene_burden_analysis {
         underpowered_genes=rCNV_meta_analysis.underpowered_genes[0],
         gene_features=gene_features,
         model=model,
-        max_true_bfdpmax_true_bfdp,
+        max_true_bfdp=max_true_bfdp,
         min_false_bfdp=min_false_bfdp,
         elnet_alpha=elnet_alpha,
         elnet_l1_l2_mix=elnet_l1_l2_mix,
@@ -117,7 +117,7 @@ workflow gene_burden_analysis {
         underpowered_genes=rCNV_meta_analysis.underpowered_genes[1],
         gene_features=gene_features,
         model=model,
-        max_true_bfdpmax_true_bfdp,
+        max_true_bfdp=max_true_bfdp,
         min_false_bfdp=min_false_bfdp,
         elnet_alpha=elnet_alpha,
         elnet_l1_l2_mix=elnet_l1_l2_mix,
@@ -228,7 +228,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:da2df0f4afcfa93d17e27ae5752f1665f0c53c8feed06d6d98d1da53144d8e1f"
+    docker: "talkowski/rcnv@sha256:db7d61867bb7e0b027f9a61470e40a59a93e8841878e3b8a702e92ae2cde09b6"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -273,12 +273,12 @@ task merge_and_meta_analysis {
       | bgzip -c \
       > "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
       tabix -f "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
-    done < ${metacohort_list}
+    done < <( fgrep -v "mega" ${metacohort_list} )
 
     # Make input for meta-analysis
     while read meta cohorts; do
       echo -e "$meta\t$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
-    done < <( fgrep -v mega ${metacohort_list} ) \
+    done < <( fgrep -v "mega" ${metacohort_list} ) \
     > ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt
     
     # Run meta-analysis
@@ -289,29 +289,32 @@ task merge_and_meta_analysis {
       ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt \
       ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed
     bgzip -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed
-    tabix -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz
+    tabix -p bed -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz
 
     # Extract list of genes with < min_cnvs_per_gene_training (to be used as blacklist later for training)
     /opt/rCNV2/analysis/gene_scoring/get_underpowered_genes.R \
       --min-cnvs ${min_cnvs_per_gene_training} \
       ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt \
       ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed
-    bgzip -f ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed
-    tabix -f ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed.gz
+    awk -v OFS="\t" '{ print $1, $2, $3, $4 }' \
+      ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed \
+    | bgzip -c \
+    > ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed.gz
+    tabix -p bed -f ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed.gz
 
     # Copy meta-analysis results to Google bucket
     gsutil -m cp \
       ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz* \
-      ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.list \
+      ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed.gz \
       ${rCNV_bucket}/analysis/gene_scoring/data/
   >>>
 
   runtime {
-    # TODO: update docker
-    # docker: "talkowski/rcnv@sha256:da2df0f4afcfa93d17e27ae5752f1665f0c53c8feed06d6d98d1da53144d8e1f"
+    docker: "talkowski/rcnv@sha256:db7d61867bb7e0b027f9a61470e40a59a93e8841878e3b8a702e92ae2cde09b6"
     preemptible: 1
-    memory: "4 GB"
-    bootDiskSizeGb: "20"
+    memory: "8 GB"
+    bootDiskSizeGb: "30"
+    disks: "local-disk 50 HDD"
   }
 
   output {
@@ -438,7 +441,7 @@ task blacklist_priors_bfdp {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0489fe64e3f34b3751a15930c2d85b5b7291fe5cdc0db98f3ba001d06f8f6617"
+    docker: "talkowski/rcnv@sha256:db7d61867bb7e0b027f9a61470e40a59a93e8841878e3b8a702e92ae2cde09b6"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -508,7 +511,7 @@ task score_genes {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:ab9eeb96ddc5a72af3c3c67d2ea82bd3410dfe6e4ece81b7660868b1c546846d"
+    docker: "talkowski/rcnv@sha256:db7d61867bb7e0b027f9a61470e40a59a93e8841878e3b8a702e92ae2cde09b6"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -681,7 +684,7 @@ task qc_scores {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:bde36542e44b22b1cc17940a4faa3ec79a386e8e3d7f7214e0b8d5c6150fed58"
+    docker: "talkowski/rcnv@sha256:db7d61867bb7e0b027f9a61470e40a59a93e8841878e3b8a702e92ae2cde09b6"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

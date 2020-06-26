@@ -85,5 +85,6 @@ names(stats.list) <- cohort.info[, 1]
 stats.merged <- combine.stats(stats.list)
 
 # Extract BED of genes with total_alt < min.cnvs and write to table
-write.table(stats.merged[which(stats.merged$total_alt < min.cnvs), 1:4],
-            outfile, col.names=F, row.names=F, quote=F)
+out.bed <- stats.merged[which(stats.merged$total_alt < min.cnvs), 1:4]
+colnames(out.bed)[1] <- paste("#", colnames(out.bed)[1], sep="")
+write.table(out.bed, outfile, col.names=T, row.names=F, quote=F, sep="\t")
