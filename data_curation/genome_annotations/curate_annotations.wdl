@@ -24,8 +24,11 @@ workflow curate_annotations {
   Float min_prop_tracks_per_crb
   Int clustering_neighborhood_dist
   Int min_crb_separation
+  File contiglist
   String rCNV_bucket
   String prefix
+
+  Array[Array[String]] contigs = read_tsv(contiglist)
 
   # Process Roadmap ChromHMM tracks
   call shard_tracklist as shard_tracklist_chromhmm {
@@ -575,9 +578,9 @@ task cluster_elements {
   runtime {
     docker: "talkowski/rcnv@sha256:e6fad02a3eba364dfc4a303ac8a47df9ea1254483e7867db61bcb151b2565f47"
     preemptible: 1
-    memory: "4 GB"
-    bootDiskSizeGb: "20"
-    disks: "local-disk 50 HDD"
+    memory: "15 GB"
+    bootDiskSizeGb: "30"
+    disks: "local-disk 100 HDD"
   }
 
   output {

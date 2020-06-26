@@ -126,9 +126,9 @@ dnm.excess.cdf.barplots <- function(segs, dnms, csq, n.max.genes=5, norm=F,
   
   # Add legend, if optioned
   if(legend==T){
-    legend.labs <- c(expression(1^"st" ~ "Gene"), expression(2^"nd" ~ "Gene"), expression(3^"rd" ~ "Gene"), 
+    legend.labs <- c("Top Gene", expression(2^"nd" ~ "Gene"), expression(3^"rd" ~ "Gene"), 
                      sapply(4:100, function(x){bquote(.(x)^"th" ~ "Gene")}))
-    legend.labs <- c(legend.labs[1:n.max.genes], "Others")
+    legend.labs <- c(legend.labs[1:n.max.genes], "All Others")
     legend("topright", fill=colors, legend=legend.labs, bty="n", border=NA)
   }
 }

@@ -122,7 +122,7 @@ weighted.z <- function(stats, cohorts, spa=T){
     inv.var <- 1/var
     weighted.mean(lnor, inv.var, na.rm=T)
   })
-  meta.z.p$phred_fdr_q <- p.adjust(10^-meta.z.p$phred_p, method="fdr")
+  meta.z.p$phred_fdr_q <- -log10(p.adjust(10^-meta.z.p$phred_p, method="fdr"))
   colnames(meta.z.p) <- paste("meta", colnames(meta.z.p), sep=".")
   as.data.frame(cbind(stats, meta.z.p))
 }
@@ -139,8 +139,8 @@ require(caTools, quietly=T)
 
 # List of command-line options
 option_list <- list(
-  make_option(c("--p-cutoff"), type="numeric", default=0.05, 
-              help="Meta-analysis P-value cutoff to consider a track significant [default '%default']",
+  make_option(c("--fdr-cutoff"), type="numeric", default=0.05, 
+              help="Meta-analysis FDR q-value cutoff to consider a track significant [default '%default']",
               metavar="numeric"),
   make_option(c("--signif-tracks"), type="character",  
               help="output file for significant tracks", metavar="string")
@@ -155,13 +155,13 @@ opts <- args$options
 # Writes args & opts to variable
 stats.in <- args$args[1]
 outfile <- args$args[2]
-p.cutoff <- -log10(as.numeric(opts$`p-cutoff`))
+fdr.cutoff <- -log10(as.numeric(opts$`p-cutoff`))
 signif.outfile <- opts$`signif-tracks`
 
 # # Dev parameters
 # stats.in <- "~/scratch/rCNV.all.merged_stats.with_counts.tsv.gz"
 # outfile <- "~/scratch/rCNV.chromhmm_plus_encode_plus_enhancers.test.tsv"
-# p.cutoff <- -log10(0.05)
+# fdr.cutoff <- -log10(0.05)
 # signif.outfile <- "~/scratch/rCNV.rCNV.chromhmm_plus_encode_plus_enhancers.test.signif_tracks.list"
 
 # Read track stats and split by CNV type
@@ -177,7 +177,7 @@ meta.res <- as.data.frame(do.call("rbind", meta.res.split))
 
 # Extract significant track names
 if(!is.null(signif.outfile)){
-  sig.idx <- which(meta.res$meta.phred_p >= p.cutoff & meta.res$meta.zscore > 0)
+  sig.idx <- which(meta.res$meta.phred_fdr_q >= fdr.cutoff & meta.res$meta.zscore > 0)
   if(length(sig.idx) > 0){
     sig.tracks <- unique(meta.res[sig.idx, which(colnames(meta.res) %in% c("trackname", "original_path"))])
     write.table(sig.tracks, signif.outfile,
