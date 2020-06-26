@@ -79,13 +79,13 @@ To reduce our search space for association testing, we next wanted to determine 
 
 We restricted subsequent analyses to a subset of tracks following the procedure described below:
 
-For each track, we counted the number of strictly noncoding rare CNVs that completely overlapped at least one element per track.  
+For each track, we counted the number of [loose noncoding rare CNVs](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#noncoding-subsets) that completely overlapped at least one element per track.  
 
 These counts of CNVs per track were split by [metacohort](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#case-control-metacohorts), CNV type, and [case/control status](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype#hpo-terms-per-metacohort).  
 
 After tabulating counts of CNVs per track, we conducted a fixed-effects meta-analysis using the inverse-variance weighted Z-score method for each track with saddlepoint approximation applied across all tracks per cohort.  
 
-We considered any track with a meta-analysis P < 0.05 to have sufficient evidence for possible disease relevance to be included for subsequent association testing.  
+We considered any track with a Benjamini-Hochberg FDR q < 0.1 to have sufficient evidence for possible disease relevance to be included for subsequent association testing.  
 
 #### Output files  
 

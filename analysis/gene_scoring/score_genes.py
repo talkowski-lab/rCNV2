@@ -57,7 +57,7 @@ def get_chrom_arms(features_in, centromeres_in):
     return arm_dict
 
 
-def load_stats(stats_in, arm_dict=None):
+def load_stats(stats_in, arm_dict=None, max_true=0.5, min_false=0.5):
     """
     Load & format stats per gene
     """
@@ -67,6 +67,17 @@ def load_stats(stats_in, arm_dict=None):
     ss = pd.read_csv(stats_in, delimiter='\t').loc[:, keep_cols]
     ss.set_axis(ss.gene, axis=0, inplace=True)
     ss.drop(labels='gene', axis=1, inplace=True)
+
+    # Reassign probabilities as binary indicators based on max_true and min_false
+    def _bfdp2indicator(bfdp, max_true=0.5, min_false=0.5):
+        bfdp = float(bfdp)
+        if bfdp <= max_true:
+            return 0
+        elif bfdp > min_false:
+            return 1
+        else:
+            return np.nan
+    ss['bfdp'] = ss['bfdp'].map(lambda x: _bfdp2indicator(x, max_true, min_false))
 
     # Rewrite gene chromosomes, if optioned
     if arm_dict is not None:
@@ -337,6 +348,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('stats', help='.tsv of stats with bfdp per gene.')
     parser.add_argument('features', help='.bed.gz of functional features per gene.')
+    parser.add_argument('--max-true-bfdp', default=0.5, type=float, help='Maximum ' +
+                        'BFDP to consider as dosage sensitive for training.')
+    parser.add_argument('--min-false-bfdp', default=0.5, type=float, help='Minimum ' +
+                        'BFDP to consider as dosage sensitive for training.')
     parser.add_argument('-c', '--centromeres', help='Centromeres BED.')
     parser.add_argument('-x', '--blacklist', help='Training blacklist BED.')
     parser.add_argument('-m', '--model', choices=model_options, default='logit',
@@ -369,7 +384,7 @@ def main():
         arm_dict = None
 
     # Import gene stats
-    sumstats = load_stats(args.stats, arm_dict)
+    sumstats = load_stats(args.stats, arm_dict, args.max_true_bfdp, args.min_false_bfdp)
     chroms = sorted(np.unique(sumstats.chrom.values))
 
     # Pair all chromosomes (or group chromosome arms, if optioned)

@@ -317,7 +317,7 @@ task curate_only {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e6fad02a3eba364dfc4a303ac8a47df9ea1254483e7867db61bcb151b2565f47"
+    docker: "talkowski/rcnv@sha256:584fa5f13a729535a1f22773026004a37629bbe018ebf21580a5a39062c8a7eb"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -393,7 +393,7 @@ task curate_and_burden {
                 | awk -v cohort=$cohort '{ if ($1==cohort) print NR }' )
         fgrep -w ${case_hpo} refs/HPOs_by_metacohort.table.tsv | cut -f$cidx
         fgrep -w "HEALTHY_CONTROL" refs/HPOs_by_metacohort.table.tsv | cut -f$cidx
-        echo -e "cnvs/$cohort.rCNV.strict_noncoding.bed.gz"
+        echo -e "cnvs/$cohort.rCNV.loose_noncoding.bed.gz"
       done | paste -s
     done < <( fgrep -v mega refs/rCNV_metacohort_list.txt | cut -f1 ) \
     > metacohorts.input.tsv
@@ -407,7 +407,7 @@ task curate_and_burden {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3259bb3804f42308562beb88dc6890a9d4b73161a928bebe8eefa3d354983b2d"
+    docker: "talkowski/rcnv@sha256:584fa5f13a729535a1f22773026004a37629bbe018ebf21580a5a39062c8a7eb"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -501,7 +501,7 @@ task meta_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e6fad02a3eba364dfc4a303ac8a47df9ea1254483e7867db61bcb151b2565f47"
+    docker: "talkowski/rcnv@sha256:584fa5f13a729535a1f22773026004a37629bbe018ebf21580a5a39062c8a7eb"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -573,7 +573,7 @@ task cluster_elements {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:e6fad02a3eba364dfc4a303ac8a47df9ea1254483e7867db61bcb151b2565f47"
+    docker: "talkowski/rcnv@sha256:584fa5f13a729535a1f22773026004a37629bbe018ebf21580a5a39062c8a7eb"
     preemptible: 1
     memory: "15 GB"
     bootDiskSizeGb: "30"

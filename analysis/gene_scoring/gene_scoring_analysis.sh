@@ -16,14 +16,19 @@ docker run --rm -it talkowski/rcnv
 gcloud auth login
 
 
+# Set parameters
+export rCNV_bucket="gs://rcnv_project"
+
+
 # Copy all filtered CNV data, gene coordinates, and other references 
 # from the project Google Bucket (note: requires permissions)
 mkdir cleaned_cnv/
-gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
-gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
+gsutil -m cp -r ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
+gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes ./
 mkdir refs/
-gsutil -m cp gs://rcnv_project/refs/GRCh37.*.bed.gz refs/
-gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
+gsutil -m cp ${rCNV_bucket}/refs/GRCh37.*.bed.gz refs/
+gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/* refs/
+gsutil -m cp ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz refs/
 
 
 # Test/dev parameters
@@ -38,14 +43,14 @@ metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 gtf="genes/gencode.v19.canonical.gtf.gz"
 gtf_index="genes/gencode.v19.canonical.gtf.gz.tbi"
 contig=18
-rCNV_bucket="gs://rcnv_project"
 pad_controls=0
 max_cnv_size=5000000
 weight_mode="weak"
-min_cds_ovr_del=0.05
+min_cds_ovr_del=1.0
 min_cds_ovr_dup=1.0
-max_genes_per_cnv=20
+max_genes_per_cnv=10
 meta_model_prefix="fe"
+min_cnvs_per_gene_training=5
 
 
 for contig in $( seq 1 22 ); do
@@ -142,6 +147,14 @@ for CNV in DEL DUP; do
     ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed
   bgzip -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed
   tabix -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz
+
+  # Extract list of genes with < min_cnvs_per_gene_training (to be used as blacklist later for training)
+  /opt/rCNV2/analysis/gene_scoring/get_underpowered_genes.R \
+    --min-cnvs ${min_cnvs_per_gene_training} \
+    ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt \
+    ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed
+  bgzip -f ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed
+  tabix -f ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed.gz
 done
 
 
@@ -150,7 +163,7 @@ done
 # 2. Estimate effect size priors
 # 3. Compute BFDP per gene
 freq_code="rCNV"
-rCNV_bucket="gs://rcnv_project"
+rCNV_bucket="${rCNV_bucket}"
 del_meta_stats="HP0000118.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz"
 dup_meta_stats="HP0000118.rCNV.DUP.gene_burden.meta_analysis.stats.bed.gz"
 cen_tel_dist=1000000
@@ -163,7 +176,7 @@ gsutil -m cp ${rCNV_bucket}/refs/GRCh37.centromeres_telomeres.bed.gz ./
 zcat GRCh37.centromeres_telomeres.bed.gz \
 | awk -v FS="\t" -v OFS="\t" -v d=${cen_tel_dist} \
   '{ if ($2-d<0) print $1, "0", $3+d; else print $1, $2-d, $3+d }' \
-| cat - <( zcat /opt/rCNV2/refs/UKBB_GD.Owen_2018.bed.gz | cut -f1-3 ) \
+| cat - <( zcat refs/lit_GDs.*.bed.gz | cut -f1-3 | fgrep -v "#" ) \
 | sort -Vk1,1 -k2,2n -k3,3n \
 | bedtools merge -i - \
 > ${freq_code}.gene_scoring.training_mask.bed.gz
@@ -249,12 +262,15 @@ done
 # Score genes for a single model & CNV type
 # Dev/test parameters
 freq_code="rCNV"
-rCNV_bucket="gs://rcnv_project"
+rCNV_bucket="${rCNV_bucket}"
 CNV="DEL"
 BFDP_stats="${freq_code}.${CNV}.gene_abfs.tsv"
 blacklist="${freq_code}.gene_scoring.training_gene_blacklist.bed.gz"
+underpowered_genes="underpowered_genes.test.bed.gz"
 gene_features="gencode.v19.canonical.pext_filtered.all_features.eigenfeatures.bed.gz"
 raw_gene_features="gencode.v19.canonical.pext_filtered.all_features.bed.gz"
+max_true_bfdp=0.2
+min_false_bfdp=0.8
 model="logit"
 elnet_alpha=0.1
 elnet_l1_l2_mix=1
@@ -262,11 +278,22 @@ elnet_l1_l2_mix=1
 # Copy centromeres bed
 gsutil -m cp ${rCNV_bucket}/refs/GRCh37.centromeres_telomeres.bed.gz ./
 
+# Merge blacklist and list of underpowered genes
+zcat ${blacklist} ${underpowered_genes} \
+| grep -ve '^#' \
+| sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
+| uniq \
+| cat <( zcat ${blacklist} | grep -e '^#' ) - \
+| bgzip -c  \
+> blacklist_plus_underpowered.bed.gz
+
 # Score genes
 /opt/rCNV2/analysis/gene_scoring/score_genes.py \
   --centromeres GRCh37.centromeres_telomeres.bed.gz \
-  --blacklist ${blacklist} \
+  --blacklist blacklist_plus_underpowered.bed.gz \
   --model ${model} \
+  --max-true-bfdp ${max_true_bfdp} \
+  --min-false-bfdp ${min_false_bfdp} \
   --regularization-alpha ${elnet_alpha} \
   --regularization-l1-l2-mix ${elnet_l1_l2_mix} \
   --outfile ${freq_code}.${CNV}.gene_scores.${model}.tsv \
