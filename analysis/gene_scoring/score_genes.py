@@ -68,15 +68,13 @@ def load_stats(stats_in, arm_dict=None, max_true=0.5, min_false=0.5):
     ss.set_axis(ss.gene, axis=0, inplace=True)
     ss.drop(labels='gene', axis=1, inplace=True)
 
-    # Reassign probabilities as binary indicators based on max_true and min_false
-    def _bfdp2indicator(bfdp, max_true=0.5, min_false=0.5):
+    # Null out probabilities based on max_true and min_false
+    def _bfdp_cleanup(bfdp, max_true=0.5, min_false=0.5):
         bfdp = float(bfdp)
-        if bfdp <= max_true:
-            return 0
-        elif bfdp > min_false:
-            return 1
-        else:
+        if bfdp > max_true and bfdp < min_false:
             return np.nan
+        else:
+            return bfdp
     ss['bfdp'] = ss['bfdp'].map(lambda x: _bfdp2indicator(x, max_true, min_false))
 
     # Rewrite gene chromosomes, if optioned

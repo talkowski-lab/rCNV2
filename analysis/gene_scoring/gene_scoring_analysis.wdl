@@ -310,7 +310,7 @@ task merge_and_meta_analysis {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:db7d61867bb7e0b027f9a61470e40a59a93e8841878e3b8a702e92ae2cde09b6"
+    docker: "talkowski/rcnv@sha256:79920b5e5b88923d1813daa8cf04d3e39817a83000b06961c3a7fefb75c4ea37"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "30"
@@ -397,6 +397,9 @@ task blacklist_priors_bfdp {
     awk -v FS="\t" '{ if ($1=="theta1" && $2=="DEL") print $3 }' \
       ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
     > theta1.tsv
+    awk -v FS="\t" '{ if ($1=="var0" && $2=="DEL") print $3 }' \
+      ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+    > var0.tsv
     awk -v FS="\t" '{ if ($1=="var1" && $2=="DEL") print $3 }' \
       ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
     > var1.tsv
@@ -419,7 +422,7 @@ task blacklist_priors_bfdp {
       /opt/rCNV2/analysis/gene_scoring/calc_gene_bfs.py \
         --theta0 $theta0 \
         --theta1 $( cat theta1.tsv ) \
-        --var0 $( cat var1.tsv ) \
+        --var0 1 \
         --prior ${prior_frac} \
         --blacklist ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
         --outfile ${freq_code}.$CNV.gene_abfs.tsv \
@@ -441,7 +444,7 @@ task blacklist_priors_bfdp {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:db7d61867bb7e0b027f9a61470e40a59a93e8841878e3b8a702e92ae2cde09b6"
+    docker: "talkowski/rcnv@sha256:79920b5e5b88923d1813daa8cf04d3e39817a83000b06961c3a7fefb75c4ea37"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -511,7 +514,7 @@ task score_genes {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:db7d61867bb7e0b027f9a61470e40a59a93e8841878e3b8a702e92ae2cde09b6"
+    docker: "talkowski/rcnv@sha256:79920b5e5b88923d1813daa8cf04d3e39817a83000b06961c3a7fefb75c4ea37"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -684,7 +687,7 @@ task qc_scores {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:db7d61867bb7e0b027f9a61470e40a59a93e8841878e3b8a702e92ae2cde09b6"
+    docker: "talkowski/rcnv@sha256:79920b5e5b88923d1813daa8cf04d3e39817a83000b06961c3a7fefb75c4ea37"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

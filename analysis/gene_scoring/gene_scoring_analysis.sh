@@ -153,7 +153,10 @@ for CNV in DEL DUP; do
     --min-cnvs ${min_cnvs_per_gene_training} \
     ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt \
     ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed
-  bgzip -f ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed
+  awk -v OFS="\t" '{ print $1, $2, $3, $4 }' \
+    ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed \
+  | bgzip -c \
+  > ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed.gz
   tabix -p bed -f ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed.gz
 done
 
@@ -227,6 +230,9 @@ awk -v FS="\t" '{ if ($1=="theta0" && $2=="DUP") print $3 }' \
 awk -v FS="\t" '{ if ($1=="theta1" && $2=="DEL") print $3 }' \
   ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
 > theta1.tsv
+awk -v FS="\t" '{ if ($1=="var0" && $2=="DEL") print $3 }' \
+  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+> var0.tsv
 awk -v FS="\t" '{ if ($1=="var1" && $2=="DEL") print $3 }' \
   ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
 > var1.tsv
@@ -249,7 +255,7 @@ for CNV in DEL DUP; do
   /opt/rCNV2/analysis/gene_scoring/calc_gene_bfs.py \
     --theta0 $theta0 \
     --theta1 $( cat theta1.tsv ) \
-    --var0 $( cat var1.tsv ) \
+    --var0 1 \
     --prior ${prior_frac} \
     --blacklist ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
     --outfile ${freq_code}.$CNV.gene_abfs.tsv \
