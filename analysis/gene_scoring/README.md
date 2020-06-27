@@ -20,12 +20,11 @@ We counted CNVs per gene between all [cases and controls](https://github.com/tal
 
 This process was executed identically to gene-level disease association analyses, described in detail [here](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/genes/#gene-based-burden-test-procedure), with the following exceptions:  
 1. CNVs restricted to ≤5Mb and ≤10 genes to better isolate gene-specific effect sizes
-2. Deletion CDS overlap increased from 10% to 50% to enrich for true loss-of-function effects  
-3. Duplication CDS overlap increased from 75% to 100% to enrich for true copy-gain effects  
+2. Deletion and duplication CDS overlap increased to 100% to enrich for true loss-of-function and copy-gain effects  
 
 ### 2a. Empirical Bayes estimation of prior effect sizes  
 
-We next empirically estimated the average effect size and variance expected for true dosage-sensitive genes and true dosage-insensitive genes based on the rCNV data in this study.  
+We next empirically estimated the average effect size expected for true dosage-sensitive genes and true dosage-insensitive genes based on the rCNV data in this study.  
 
 We computed the median odds ratio and variance across these gold-standard genes (described below), and used those values as priors for subsequent steps.
 
@@ -68,10 +67,10 @@ We defined `no known disease association` genes as those present in none of the 
 To protect against certain regions of the genome with recurrent CNVs contributing noise to our effect size estimates for individual genes, we did not consider a subset of genes for any step of prior estimation or training.  
 
 Specifically, we blacklisted genes which:  
-1. Overlapped 54 known genomic disorder loci, as described in [Owen et al., 2018](https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-018-5292-7); or
+1. Overlapped 114 known genomic disorder loci curated from the literature (described [here](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/other#genomic-disorders)); or
 2. Were within 1Mb of any centromere or telomere.  
 
-This resulted in blacklisting a total of 1,067 genes for all prior estimation and model training (described below).  
+This resulted in blacklisting a total of 1,848 genes for all prior estimation and model training (described below).  
 
 ### 2b. Estimation of prior fraction of dosage-sensitive genes  
 
@@ -94,13 +93,12 @@ Given a gene with an estimated log odds ratio `T_hat`  and standard error `V_hat
 H0 : T_hat ≤ T_null
 H1 : T_hat ≥ T_alt
 
-BF = ( 1 - N(T_hat - T_null, W) ) / N(T_hat - T_alt)
+BF = ( 1 - N(T_hat - T_null, 1) ) / N(T_hat - T_alt)
 ```
 
 Where:  
-*  `T_null` was the estimated null effect size computed from [gold-standard dosage-insensitive genes](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/gene_scoring#gold-standard-dosage-insensitive-genes),  
-*  `T_alt` was the estimated alternative effect size computed from [gold-standard haploinsufficient genes](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/gene_scoring#gold-standard-dosage-sensitive-genes), and  
-*  `W` was the null standard error computed from gold-standard haploinsufficient genes.  
+*  `T_null` was the estimated null effect size computed from [gold-standard dosage-insensitive genes](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/gene_scoring#gold-standard-dosage-insensitive-genes), and  
+*  `T_alt` was the estimated alternative effect size computed from [gold-standard haploinsufficient genes](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/gene_scoring#gold-standard-dosage-sensitive-genes).  
 
 Per equation (2) from [Wakefield, _Am. J. Hum. Genet._, 2007](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1950810/), we can further define a Bayesian false discovery probability (BFDP) for each gene as:  
 
@@ -123,7 +121,27 @@ Specifically, we evaluated each of the following models using the same strategy 
 *  Logistic stochastic gradient descent (SGD)  
 *  Neural network (MLP) with logistic activation  
 
+For this analysis, we additionally blacklisted any gene with fewer than five observed CNVs (counted separately for deletions and duplications). Five was determined as the minimum number of CNVs required to obtain a nominally significant (_i.e._, informative) enrichment in cases from a Fisher's exact test.  
+
 For each model, we first split each autosome into its respective p and q arms, then partitioned all chromsome arms into 11 groups while balancing the total number of non-blacklisted genes per group, as follows:  
+
+**Chromosome arm pairings for deletion model** 
+
+| Chromosome arms | Genes used in training | Blacklisted genes |  
+| ---: | ---: | ---: |  
+| 2q, 3p, 7p | 1,400 | 58 |  
+| 19q, 15q, 12p | 1,404 | 141 |  
+| 12q, 6p, 22q | 1,416 | 105 |  
+| 11q, 6q, 13q | 1,425 | 38 |  
+| 5q, 7q, 17p, 18p | 1,452 | 123 |  
+| 3q, 9q, 11p, 20p | 1,505 | 107 |  
+| 1p, 16q, 4p | 1,509 | 50 |  
+| 19p, 4q, 20q, 9p | 1,514 | 89 |  
+| 1q, 8q, 18q, 5p | 1,519 | 96 |  
+| 17q, 2p, 8p, 21q | 1,519 | 105 |  
+| 14q, 10q, 16p, 10p | 1,533 | 155 |  
+
+**Chromosome arm pairings for duplication model**  
 
 | Chromosome arms | Genes used in training | Blacklisted genes |  
 | ---: | ---: | ---: |  

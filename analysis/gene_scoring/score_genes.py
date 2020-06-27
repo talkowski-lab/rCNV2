@@ -75,7 +75,7 @@ def load_stats(stats_in, arm_dict=None, max_true=0.5, min_false=0.5):
             return np.nan
         else:
             return bfdp
-    ss['bfdp'] = ss['bfdp'].map(lambda x: _bfdp2indicator(x, max_true, min_false))
+    ss['bfdp'] = ss['bfdp'].map(lambda x: _bfdp_cleanup(x, max_true, min_false))
 
     # Rewrite gene chromosomes, if optioned
     if arm_dict is not None:
