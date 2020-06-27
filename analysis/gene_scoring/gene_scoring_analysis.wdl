@@ -514,7 +514,7 @@ task score_genes {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:ff967ff80cb30c28e837ebe0445f1b202265962ea676e4b90f5235eb68b50af0"
+    docker: "talkowski/rcnv@sha256:a3707d6db2a0411458b0999943dad90a2c5d1adeb6aedd4baaa8f299bc70cfbb"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -687,7 +687,7 @@ task qc_scores {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:79920b5e5b88923d1813daa8cf04d3e39817a83000b06961c3a7fefb75c4ea37"
+    docker: "talkowski/rcnv@sha256:a3707d6db2a0411458b0999943dad90a2c5d1adeb6aedd4baaa8f299bc70cfbb"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

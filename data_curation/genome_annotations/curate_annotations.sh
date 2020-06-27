@@ -332,6 +332,7 @@ done < <( fgrep -v mega refs/rCNV_metacohort_list.txt | cut -f1 ) \
   --track-stats ${prefix}.stats.tsv \
   --frac-overlap ${min_element_overlap} \
   --case-hpo ${case_hpo} \
+  --norm-by-samplesize \
   --outfile ${prefix}.stats.with_counts.tsv.gz \
   --gzip 
 
@@ -347,7 +348,7 @@ done < <( fgrep -v mega refs/rCNV_metacohort_list.txt | cut -f1 ) \
 
 # Burden meta-analysis of cohort CNV counts for each track
 /opt/rCNV2/data_curation/genome_annotations/trackwise_cnv_burden_meta_analysis.R \
-  --p-cutoff ${p_cutoff} \
+  --cutoff ${p_cutoff} \
   --signif-tracks ${prefix}.signif_paths_and_tracks.list \
   ${stats} \
   ${prefix}.burden_stats.tsv

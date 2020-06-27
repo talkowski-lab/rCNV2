@@ -20,7 +20,7 @@ workflow curate_annotations {
   Int max_element_size
   String case_hpo
   Float min_element_overlap
-  Float fdr_cutoff
+  Float p_cutoff
   Float min_prop_tracks_per_crb
   Int clustering_neighborhood_dist
   Int min_crb_separation
@@ -201,7 +201,7 @@ workflow curate_annotations {
   call meta_burden_test {
     input:
       stats=merge_all.merged_stats,
-      fdr_cutoff=fdr_cutoff,
+      p_cutoff=p_cutoff,
       rCNV_bucket=rCNV_bucket,
       prefix=prefix,
       clear_sig="TRUE"
@@ -402,6 +402,7 @@ task curate_and_burden {
       --track-stats ${prefix}.stats.tsv \
       --frac-overlap ${min_element_overlap} \
       --case-hpo ${case_hpo} \
+      --norm-by-samplesize \
       --outfile ${prefix}.stats.with_counts.tsv.gz \
       --gzip
   >>>
@@ -473,7 +474,7 @@ task merge_tracklists {
 # Conduct meta-analysis burden test for all tracks
 task meta_burden_test {
   File stats
-  Float fdr_cutoff
+  Float p_cutoff
   String rCNV_bucket
   String prefix
   String clear_sig
@@ -488,7 +489,7 @@ task meta_burden_test {
 
     # Perform burden analysis
     /opt/rCNV2/data_curation/genome_annotations/trackwise_cnv_burden_meta_analysis.R \
-      --fdr-cutoff ${fdr_cutoff} \
+      --cutoff ${p_cutoff} \
       --signif-tracks ${prefix}.signif_paths_and_tracks.list \
       ${stats} \
       ${prefix}.burden_stats.tsv
@@ -501,7 +502,8 @@ task meta_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:584fa5f13a729535a1f22773026004a37629bbe018ebf21580a5a39062c8a7eb"
+    # TODO: UPDATE DOCKER
+    # docker: "talkowski/rcnv@sha256:584fa5f13a729535a1f22773026004a37629bbe018ebf21580a5a39062c8a7eb"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
