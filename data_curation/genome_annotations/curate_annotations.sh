@@ -359,6 +359,7 @@ done < <( fgrep -v mega refs/rCNV_metacohort_list.txt | cut -f1 ) \
 /opt/rCNV2/data_curation/genome_annotations/trackwise_cnv_burden_meta_analysis.R \
   --cutoff ${p_cutoff} \
   --signif-tracks ${prefix}.signif_paths_and_tracks.list \
+  --volcano ${prefix}.track_volcanos.png \
   ${stats} \
   ${prefix}.burden_stats.tsv
 gzip -f ${prefix}.burden_stats.tsv

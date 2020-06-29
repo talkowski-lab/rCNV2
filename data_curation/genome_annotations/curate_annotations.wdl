@@ -227,40 +227,40 @@ workflow curate_annotations {
       clear_sig="TRUE"
   }
 
-  # Re-shard all significant tracks for final curation
-  call shard_tracklist as shard_tracklist_signif {
-    input:
-      tracklist=meta_burden_test.signif_tracks,
-      tracks_per_shard=tracks_per_shard,
-      prefix="${prefix}.signif_tracks"
-  }
+  # # Re-shard all significant tracks for final curation
+  # call shard_tracklist as shard_tracklist_signif {
+  #   input:
+  #     tracklist=meta_burden_test.signif_tracks,
+  #     tracks_per_shard=tracks_per_shard,
+  #     prefix="${prefix}.signif_tracks"
+  # }
 
-  # Scatter over sharded significant tracklist and curate tracks
-  scatter ( shard in shard_tracklist_signif.shards ) {
-    call curate_only as curate_only_signif {
-      input:
-        tracknames_and_paths=shard,
-        min_element_size=min_element_size,
-        max_element_size=max_element_size,
-        rCNV_bucket=rCNV_bucket,
-        prefix="${prefix}.signif_shard"
-    }
-  }
+  # # Scatter over sharded significant tracklist and curate tracks
+  # scatter ( shard in shard_tracklist_signif.shards ) {
+  #   call curate_only as curate_only_signif {
+  #     input:
+  #       tracknames_and_paths=shard,
+  #       min_element_size=min_element_size,
+  #       max_element_size=max_element_size,
+  #       rCNV_bucket=rCNV_bucket,
+  #       prefix="${prefix}.signif_shard"
+  #   }
+  # }
 
-  call cluster_elements {
-    input:
-      completion_tokens=curate_only_signif.completion_token,
-      min_prop_tracks_per_crb=min_prop_tracks_per_crb,
-      clustering_neighborhood_dist=clustering_neighborhood_dist,
-      min_crb_separation=min_crb_separation,
-      rCNV_bucket=rCNV_bucket,
-      prefix=prefix
-  }
+  # call cluster_elements {
+  #   input:
+  #     completion_tokens=curate_only_signif.completion_token,
+  #     min_prop_tracks_per_crb=min_prop_tracks_per_crb,
+  #     clustering_neighborhood_dist=clustering_neighborhood_dist,
+  #     min_crb_separation=min_crb_separation,
+  #     rCNV_bucket=rCNV_bucket,
+  #     prefix=prefix
+  # }
   
   # Final outputs
   output {
-    File final_crbs = cluster_elements.final_crbs
-    File final_crb_elements = cluster_elements.final_crb_elements
+    # File final_crbs = cluster_elements.final_crbs
+    # File final_crb_elements = cluster_elements.final_crb_elements
   }
 }
 
@@ -337,8 +337,7 @@ task curate_only {
   >>>
 
   runtime {
-    # TODO: UPDATE DOCKER
-    # docker: "talkowski/rcnv@sha256:3270ea9497c2db9a1c7a229f5c38fbaf2e2690c1974006c03e9b4e36a0f91705"
+    docker: "talkowski/rcnv@sha256:0f035a577af472446284444e59f7074bec70f429aca0aff62959d9f1978c51c1"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -429,8 +428,7 @@ task curate_and_burden {
   >>>
 
   runtime {
-    # TODO: UPDATE DOCKER
-    # docker: "talkowski/rcnv@sha256:3270ea9497c2db9a1c7a229f5c38fbaf2e2690c1974006c03e9b4e36a0f91705"
+    docker: "talkowski/rcnv@sha256:0f035a577af472446284444e59f7074bec70f429aca0aff62959d9f1978c51c1"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -513,6 +511,7 @@ task meta_burden_test {
     /opt/rCNV2/data_curation/genome_annotations/trackwise_cnv_burden_meta_analysis.R \
       --cutoff ${p_cutoff} \
       --signif-tracks ${prefix}.signif_paths_and_tracks.list \
+      --volcano ${prefix}.track_volcanos.png \
       ${stats} \
       ${prefix}.burden_stats.tsv
     gzip -f ${prefix}.burden_stats.tsv
@@ -524,6 +523,7 @@ task meta_burden_test {
   >>>
 
   runtime {
+    # TODO: UPDATE DOCKER
     docker: "talkowski/rcnv@sha256:3270ea9497c2db9a1c7a229f5c38fbaf2e2690c1974006c03e9b4e36a0f91705"
     preemptible: 1
     memory: "4 GB"
@@ -534,6 +534,7 @@ task meta_burden_test {
   output {
     File meta_stats = "${prefix}.burden_stats.tsv.gz"
     File signif_tracks = "${prefix}.signif_paths_and_tracks.list"
+    File volcano_plots = "${prefix}.track_volcanos.png"
   }
 }
 

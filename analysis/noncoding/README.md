@@ -27,7 +27,7 @@ The steps of this procedure are described below:
 
 For each [metacohort](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/), we intersected [rCNVs](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs) against [CRBs](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/genome_annotations) separately for cases and controls.  
 
-As [described here](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#noncoding-subsets), rCNVs were restricted to a loose definition of "noncoding," where each rCNV was allowed to intersect only exons from a subset of strict [mutation-tolerant genes](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene#gene-set-definitions) (or no genes at all; _i.e._, completely noncoding), but no other genes.  
+As [described here](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#noncoding-subsets), rCNVs were restricted to a loose definition of "noncoding," where each rCNV was allowed to intersect only exons from a subset of [likely unconstrained genes](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene#gene-set-definitions) (or no genes at all; _i.e._, completely noncoding), but no other genes.  
 
 We conducted this procedure a total of two times per phenotype group & metacohort: once each for deletions and duplications.  
 

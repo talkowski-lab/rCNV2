@@ -67,8 +67,7 @@ For each track, we:
 4. Excluded merged elements <10bp or >200kb in size; and
 5. Restricted to autosomes.  
 
-_*Note: given the small size of many annotations and the dozens of transcript isoforms for many T-cell receptor gene clusters, we merged all somatic hypermutable loci using a distance of ±100kb prior to track curation for the purposes of this analysis._ 
-
+_*Note: given the small size of many annotations and the dozens of transcript isoforms for many T-cell receptor gene clusters, we merged all somatic hypermutable loci using a distance of ±100kb prior to track curation for the purposes of this analysis._   
 
 After curation, we computed the following statistics for each track:
 * Number of elements in track

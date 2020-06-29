@@ -127,6 +127,24 @@ weighted.z <- function(stats, cohorts, spa=T){
   as.data.frame(cbind(stats, meta.z.p))
 }
 
+# Volcano plot
+volcano <- function(meta.res, p.cutoff=-log10(0.05), color="red", ymax=NULL){
+  if(is.null(ymax)){
+    ymax <- max(p.cutoff, max(meta.res$meta.phred_p, na.rm=T))
+  }
+  ylims <- c(0, ymax)
+  xlims <- range(meta.res$meta.lnOR)
+  sig <- which(meta.res$meta.zscore>0 & meta.res$meta.phred_p>=p.cutoff)
+  par(mar=c(3.5, 3.5, 1.3, 1))
+  plot(NA, xlim=xlims, ylim=ylims, xlab="", ylab="")
+  abline(v=0)
+  segments(x0=0, x1=par("usr")[2], y0=p.cutoff, y1=p.cutoff, lty=2, col=color)
+  points(meta.res$meta.lnOR[-sig], meta.res$meta.phred_p[-sig], cex=0.2, col="gray30")
+  points(meta.res$meta.lnOR[sig], meta.res$meta.phred_p[sig], cex=0.2, col=color)
+  mtext(1, line=2.25, text=bquote(italic("ln") * (OR)))
+  mtext(2, line=2, text=bquote(-log[10](italic(P))))
+}
+
 
 ################
 ###RSCRIPT BLOCK
@@ -145,7 +163,9 @@ option_list <- list(
   make_option(c("--use-fdr"), action="store_true", default=FALSE,
               help="use FDR q-value for determining significance (rather than P-value) [default %default]"),
   make_option(c("--signif-tracks"), type="character",  
-              help="output file for significant tracks", metavar="string")
+              help="output file for significant tracks", metavar="string"),
+  make_option(c("--volcano"), type="character",  
+              help="path to (optional) volcano plot .png", metavar="string")
 )
 
 # Get command-line arguments & options
@@ -160,13 +180,15 @@ outfile <- args$args[2]
 cutoff <- -log10(as.numeric(opts$cutoff))
 use.fdr <- opts$`use-fdr`
 signif.outfile <- opts$`signif-tracks`
+volcano.out <- opts$`volcano`
 
 # # Dev parameters
 # stats.in <- "~/scratch/rCNV.all.merged_stats.with_counts.tsv.gz"
 # outfile <- "~/scratch/rCNV.chromhmm_plus_encode_plus_enhancers.test.tsv"
-# cutoff <- -log10(0.01)
+# cutoff <- -log10(0.05)
 # use.fdr <- F
 # signif.outfile <- "~/scratch/rCNV.rCNV.chromhmm_plus_encode_plus_enhancers.test.signif_tracks.list"
+# volcano.out <- "~/scratch/test.volcano.png"
 
 # Read track stats and split by CNV type
 stats <- load.stats(stats.in, cnv.split=T)
@@ -197,3 +219,14 @@ if(!is.null(signif.outfile)){
 colnames(meta.res)[1] <- paste("#", colnames(meta.res)[1], sep="")
 write.table(meta.res, outfile, sep="\t",
             row.names=F, col.names=T, quote=F)
+
+# Volcano plots, if optioned
+if(!is.null(volcano.out)){
+  png(volcano.out, height=4*300, width=8*300, res=300)
+  par(mfrow=c(1, 2))
+  volcano(meta.res.split$DEL, p.cutoff=cutoff, color="red", ymax=max(meta.res$meta.phred_p, na.rm=T))
+  mtext(3, line=0.1, text="Deletions", col="red", font=2)
+  volcano(meta.res.split$DUP, p.cutoff=cutoff, color="blue", ymax=max(meta.res$meta.phred_p, na.rm=T))
+  mtext(3, line=0.1, text="Duplications", col="blue", font=2)
+  dev.off()
+}
