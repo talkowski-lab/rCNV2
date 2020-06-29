@@ -371,13 +371,13 @@ gsutil -m cp \
 find sig_tracks/ -name "*.curated.bed.gz" \
 | xargs -I {} tabix -f {}
 
-# Subset genome file to chromosome of interest
-awk -v contig=${contig} '{ if ($1==contig) print $0 }' refs/GRCh37.genome \
-> contig.genome
+# Subset genome file to autosomes
+grep -e '^[1-9]' refs/GRCh37.genome \
+> autosomes.genome
 
 # Cluster significant tracks into CRBs
 /opt/rCNV2/data_curation/genome_annotations/build_crbs.py \
-  --genome contig.genome \
+  --genome autosomes.genome \
   --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
   --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
   --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
@@ -385,8 +385,8 @@ awk -v contig=${contig} '{ if ($1==contig) print $0 }' refs/GRCh37.genome \
   --neighborhood-dist ${clustering_neighborhood_dist} \
   --min-crb-separation ${min_crb_separation} \
   --crb-prefix "${prefix}_CRB" \
-  --crb-outbed ${prefix}.crbs.${contig}.bed.gz \
-  --element-outbed ${prefix}.crb_elements.${contig}.bed.gz \
+  --crb-outbed ${prefix}.crbs.bed.gz \
+  --element-outbed ${prefix}.crb_elements.bed.gz \
   --bgzip \
   sig_tracks/*.curated.bed.gz
 

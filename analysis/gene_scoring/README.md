@@ -19,8 +19,8 @@ The steps of this model are described below:
 We counted CNVs per gene between all [cases and controls](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype/) for each metacohort, and then [meta-analyzed](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/genes/#3-combine-association-statistics-across-metacohorts) those CNV counts to derive an odds ratio for each gene.  
 
 This process was executed identically to gene-level disease association analyses, described in detail [here](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/genes/#gene-based-burden-test-procedure), with the following exceptions:  
-1. CNVs restricted to ≤5Mb and ≤10 genes to better isolate gene-specific effect sizes
-2. Deletion and duplication CDS overlap increased to 100% to enrich for true loss-of-function and copy-gain effects  
+1. CNVs restricted to ≤5 genes to better isolate gene-specific effect sizes
+2. Deletion and duplication CDS overlap increased to 80% to enrich for true loss-of-function and copy-gain effects, while still allowing for (i) CNV breakpoint imprecision and/or (ii) exon/gene body misannotation  
 
 ### 2a. Empirical Bayes estimation of prior effect sizes  
 
@@ -121,7 +121,9 @@ Specifically, we evaluated each of the following models using the same strategy 
 *  Logistic stochastic gradient descent (SGD)  
 *  Neural network (MLP) with logistic activation  
 
-For this analysis, we additionally blacklisted any gene with fewer than five observed CNVs (counted separately for deletions and duplications). Five was determined as the minimum number of CNVs required to obtain a nominally significant (_i.e._, informative) enrichment in cases from a Fisher's exact test.  
+For this analysis, we additionally blacklisted any gene with fewer than three observed CNVs (counted separately for deletions and duplications). Five was determined as the minimum number of CNVs required to obtain a nominally significant (_i.e._, informative) enrichment in cases from a Fisher's exact test.  
+
+We also excluded genes with less informative intermediate BFDPs ( ~ [0.2, 0.8]) from training.  
 
 For each model, we first split each autosome into its respective p and q arms, then partitioned all chromsome arms into 11 groups while balancing the total number of non-blacklisted genes per group, as follows:  
 
