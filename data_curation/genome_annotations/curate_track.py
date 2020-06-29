@@ -186,7 +186,7 @@ def main():
     parser.add_argument('-x', '--blacklist', nargs='*', action='append',
                         help='Blacklist BED files to exclude elements. May be ' +
                         'specified multiple times.')
-    parser.add_argument('--blacklist-cov', default=0.5, type=float, 
+    parser.add_argument('--blacklist-cov', default=0.1, type=float, 
                         help='Minimum fraction of element that must be covered ' +
                         'by any blacklist before being excluded.')
     parser.add_argument('--min-size', default=10, type=int, 

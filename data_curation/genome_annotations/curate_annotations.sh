@@ -30,6 +30,14 @@ mkdir cnvs/
 gsutil -m cp ${rCNV_bucket}/cleaned_data/cnv/noncoding/** cnvs/
 
 
+# Prepare clustered somatic hypermutability reference blacklist
+bedtools merge -d 200000 -i refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+| bgzip -c \
+> GRCh37.somatic_hypermutable_sites.200kb_clustered.bed.gz
+gsutil -m cp \
+  GRCh37.somatic_hypermutable_sites.200kb_clustered.bed.gz \
+  ${rCNV_bucket}/refs/
+
 
 # Preprocess Roadmap Epigenomics ChromHMM states
 wget https://egg2.wustl.edu/roadmap/data/byFileType/chromhmmSegmentations/ChmmModels/core_K27ac/jointModel/final/all.mnemonics.bedFiles.tgz
@@ -282,7 +290,7 @@ gsutil -m cp \
 # Development parameters for curate_annotations.wdl
 prefix="all_tracks"
 tracklist="test.annotations.list"
-min_element_size=5
+min_element_size=10
 max_element_size=200000
 case_hpo="HP:0000707"
 min_element_overlap=1.0
@@ -298,7 +306,7 @@ while IFS=$'\t' read path tprefix; do
   /opt/rCNV2/data_curation/genome_annotations/curate_track.py \
     --genome refs/GRCh37.genome \
     --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
-    --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+    --blacklist refs/GRCh37.somatic_hypermutable_sites.200kb_clustered.bed.gz \
     --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
     --min-size ${min_element_size} \
     --max-size ${max_element_size} \
@@ -380,7 +388,7 @@ grep -e '^[1-9]' refs/GRCh37.genome \
 /opt/rCNV2/data_curation/genome_annotations/build_crbs.py \
   --genome autosomes.genome \
   --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
-  --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+  --blacklist refs/GRCh37.somatic_hypermutable_sites.200kb_clustered.bed.gz \
   --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
   --prop-min-elements ${min_prop_tracks_per_crb} \
   --neighborhood-dist ${clustering_neighborhood_dist} \

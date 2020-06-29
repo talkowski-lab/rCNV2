@@ -164,7 +164,7 @@ signif.outfile <- opts$`signif-tracks`
 # # Dev parameters
 # stats.in <- "~/scratch/rCNV.all.merged_stats.with_counts.tsv.gz"
 # outfile <- "~/scratch/rCNV.chromhmm_plus_encode_plus_enhancers.test.tsv"
-# cutoff <- -log10(0.05)
+# cutoff <- -log10(0.01)
 # use.fdr <- F
 # signif.outfile <- "~/scratch/rCNV.rCNV.chromhmm_plus_encode_plus_enhancers.test.signif_tracks.list"
 

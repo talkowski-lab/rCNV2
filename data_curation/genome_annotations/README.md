@@ -61,11 +61,14 @@ We subjected each annotation track to an identical set of curation steps.
 This procedure was performed using `curate_track.py`, and is described below.
 
 For each track, we:
-1. Excluded any elements covered at least 50% by the same set of blacklists used during [CNV curation](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs);  
+1. Excluded any elements covered at least 10% by the same<sup>_*see note_</sup> set of blacklists used during [CNV curation](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs);  
 2. Standardized contig nomenclature to be consistent with GRCh37; 
 3. Merged overlapping elements; 
-4. Excluded merged elements <10bp or >100kb in size; and
+4. Excluded merged elements <10bp or >200kb in size; and
 5. Restricted to autosomes.  
+
+_*Note: given the small size of many annotations and the dozens of transcript isoforms for many T-cell receptor gene clusters, we merged all somatic hypermutable loci using a distance of ±100kb prior to track curation for the purposes of this analysis._ 
+
 
 After curation, we computed the following statistics for each track:
 * Number of elements in track
