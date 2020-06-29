@@ -118,8 +118,9 @@ def make_clusters(ebt, pos_df, min_elements=1, min_tracks=0,
     return clust_bt, cluster_members
 
 
-def refine_clusters(clust_bt, clust_members, ebt, blacklist, xcov=0.3, genome=None, 
-                    min_crb_separation=10000, prefix='CRB'):
+def refine_clusters(clust_bt, clust_members, ebt, blacklist, xcov=0.3, 
+                    whitelist=None, genome=None, min_crb_separation=10000, 
+                    prefix='CRB'):
     """
     Refine & reformat final clusters & their constituent elements
     """
@@ -133,10 +134,13 @@ def refine_clusters(clust_bt, clust_members, ebt, blacklist, xcov=0.3, genome=No
     # Aggregate clusters within min_crb_separation
     clust_groups = clust_bt.merge(d=min_crb_separation, c=4, o='distinct')
 
-    # Blacklist final CRB clusters
+    # Blacklist & whitelist final CRB clusters
     clust_groups = clust_groups.coverage(blacklist).\
                                 filter(lambda x: float(x[-1]) < xcov).\
                                 cut(range(4)).saveas()
+    if whitelist is not None:
+        clust_groups = clust_groups.intersect(whitelist, wa=True, u=True).\
+                                    cut(range(4)).saveas()
 
     # Iterate over cluster groups and reformat CRB & elements from each
     k = 0
@@ -168,9 +172,10 @@ def refine_clusters(clust_bt, clust_members, ebt, blacklist, xcov=0.3, genome=No
     return crb_bt, crb_ele_bt
 
 
-def cluster_chrom(tracklist, chrom, genome, blacklist, xcov=0.3, min_elements=None,
-                  n_ele_prop=0.1, min_tracks=None, n_track_rep_prop=10e-10, 
-                  neighborhood_dist=10000, min_crb_separation=10000, prefix='CRB'):
+def cluster_chrom(tracklist, chrom, genome, blacklist, xcov=0.3, whitelist=None,
+                  min_elements=None, n_ele_prop=0.1, min_tracks=None, 
+                  n_track_rep_prop=10e-10, neighborhood_dist=10000, 
+                  min_crb_separation=10000, prefix='CRB'):
     """
     Load & cluster all elements for a single chromosome
     Returns:
@@ -199,7 +204,8 @@ def cluster_chrom(tracklist, chrom, genome, blacklist, xcov=0.3, min_elements=No
 
     # Refine & annotate clusters
     crb_bt, crb_ele_bt = refine_clusters(clust_bt, clust_members, ebt, blacklist, 
-                                         xcov, genome, min_crb_separation, prefix)
+                                         xcov, whitelist, genome, min_crb_separation, 
+                                         prefix)
 
     return crb_bt, crb_ele_bt
 
@@ -224,6 +230,8 @@ def main():
     parser.add_argument('--blacklist-cov', default=0.3, type=float, 
                         help='Minimum fraction of CRB that must be covered ' +
                         'by any blacklist before being excluded.')
+    parser.add_argument('--whitelist', help='BED of intervals to require CRB ' + 
+                        'overlap.')
     parser.add_argument('--min-elements', default=None, type=int, help='Minimum ' +
                         'number of elements in CRB.')
     parser.add_argument('--prop-min-elements', default=0.1, type=float, help='If ' +
@@ -273,7 +281,7 @@ def main():
         print('Clustering CRBs on chromosome {}...'.format(chrom))
         new_crbs, new_elements = \
             cluster_chrom(args.tracks, chrom, args.genome, 
-                          blacklist, args.blacklist_cov, 
+                          blacklist, args.blacklist_cov, args.whitelist,
                           args.min_elements, args.prop_min_elements, 
                           args.min_tracks, args.prop_min_tracks,
                           args.neighborhood_dist, args.min_crb_separation, 

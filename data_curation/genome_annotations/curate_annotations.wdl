@@ -24,6 +24,7 @@ workflow curate_annotations {
   Float p_cutoff
   File contiglist
   Float min_prop_tracks_per_crb
+  Float min_prop_track_representation
   Int clustering_neighborhood_dist
   Int min_crb_separation
   String rCNV_bucket
@@ -256,6 +257,7 @@ workflow curate_annotations {
     input:
       completion_tokens=curate_only_signif.completion_token,
       min_prop_tracks_per_crb=min_prop_tracks_per_crb,
+      min_prop_track_representation=min_prop_track_representation,
       clustering_neighborhood_dist=clustering_neighborhood_dist,
       min_crb_separation=min_crb_separation,
       contig=contig[0],
@@ -263,16 +265,17 @@ workflow curate_annotations {
       prefix=prefix
     }
   }
-  call merge_beds as merge_crbs {
+  call merge_final_beds as merge_crbs {
     input:
       beds=cluster_elements.final_crbs,
       outfile_prefix="${prefix}.crbs",
       out_bucket="${rCNV_bucket}/cleaned_data/genome_annotations/"
   }
-  call merge_beds as merge_crb_elements {
+  call merge_final_beds as merge_crb_elements {
     input:
       beds=cluster_elements.final_crb_elements,
-      outfile_prefix="${prefix}.crb_elements"
+      outfile_prefix="${prefix}.crb_elements",
+      out_bucket="${rCNV_bucket}/cleaned_data/genome_annotations/"
   }
   
   
@@ -561,6 +564,7 @@ task meta_burden_test {
 task cluster_elements {
   Array[File] completion_tokens
   Float min_prop_tracks_per_crb
+  Float min_prop_track_representation
   Int clustering_neighborhood_dist
   Int min_crb_separation
   String contig
@@ -588,7 +592,23 @@ task cluster_elements {
     # Subset genome file to contig of interest
     awk -v FS="\t" -v OFS="\t" -v contig=${contig} \
       '{ if ($1==contig) print $0 }' refs/GRCh37.genome \
-    > contig.genome
+    > ${contig}.genome
+
+    # Create whitelist for CRB clustering
+    gsutil -m cp \
+      ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
+      ${rCNV_bucket}/cleaned_data/genes/gene_lists/gnomad.v2.1.1.likely_unconstrained.genes.list \
+      ./
+    tabix gencode.v19.canonical.pext_filtered.gtf.gz ${contig} \
+    | gzip -c \
+    > ${contig}.gtf.gz
+    /opt/rCNV2/data_curation/genome_annotations/make_crb_whitelist.py \
+      --bgzip \
+      ${contig}.gtf.gz \
+      gnomad.v2.1.1.likely_unconstrained.genes.list \
+      ${contig}.genome \
+      ${contig}.crb_whitelist.bed.gz
+
 
     # Cluster significant tracks into CRBs
     /opt/rCNV2/data_curation/genome_annotations/build_crbs.py \
@@ -596,6 +616,7 @@ task cluster_elements {
       --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
       --blacklist refs/GRCh37.somatic_hypermutable_sites.200kb_clustered.bed.gz \
       --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
+      --whitelist ${contig}.crb_whitelist.bed.gz \
       --prop-min-elements ${min_prop_tracks_per_crb} \
       --prop-min-tracks ${min_prop_track_representation} \
       --neighborhood-dist ${clustering_neighborhood_dist} \
@@ -612,7 +633,7 @@ task cluster_elements {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3270ea9497c2db9a1c7a229f5c38fbaf2e2690c1974006c03e9b4e36a0f91705"
+    docker: "talkowski/rcnv@sha256:4faa44831f0839e8e1018b9bf7773d3290e5b7fa80cd071e0fa1a7e30693ee51"
     preemptible: 1
     memory: "15 GB"
     bootDiskSizeGb: "30"
@@ -620,8 +641,9 @@ task cluster_elements {
   }
 
   output {
-    File final_crbs = "${prefix}.crbs.bed.gz"
-    File final_crb_elements = "${prefix}.crb_elements.bed.gz"
+    File final_crbs = "${prefix}.${contig}.crbs.bed.gz"
+    File final_crb_elements = "${prefix}.${contig}.crb_elements.bed.gz"
+    File crb_whitelist = "${contig}.crb_whitelist.bed.gz"
   }
 }
 
@@ -642,12 +664,12 @@ task merge_final_beds {
 
     # Copy merged BED gs:// bucket
     gsutil -m cp \
-      ${outfile_prefix}.bed.gz
+      ${outfile_prefix}.bed.gz \
       ${out_bucket}/
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:3270ea9497c2db9a1c7a229f5c38fbaf2e2690c1974006c03e9b4e36a0f91705"
+    docker: "talkowski/rcnv@sha256:4faa44831f0839e8e1018b9bf7773d3290e5b7fa80cd071e0fa1a7e30693ee51"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
