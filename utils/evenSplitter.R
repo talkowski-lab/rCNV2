@@ -92,7 +92,7 @@ if(shuf == T){
 #Perform different operations based on input mode
 if(!is.null(target.lines)){
   #Determine optimum number of splits
-  target.splits <- round(nlines/target.lines)
+  target.splits <- ceiling(nlines/target.lines)
 }
 
 #Determine minimum number of lines per file

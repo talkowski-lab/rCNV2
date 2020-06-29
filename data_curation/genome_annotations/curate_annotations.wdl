@@ -15,6 +15,7 @@ workflow curate_annotations {
   File encode_tfbs_tracklist
   File encode_transcription_tracklist
   File enhancer_databases_tracklist
+  File misc_tracklist
   Int tracks_per_shard
   Int min_element_size
   Int max_element_size
@@ -183,19 +184,38 @@ workflow curate_annotations {
       prefix="${prefix}.enhancer_databases"
   }
 
+  # Process miscellaneous tracks
+  call shard_tracklist as shard_tracklist_misc {
+    input:
+      tracklist=misc_tracklist,
+      tracks_per_shard=tracks_per_shard,
+      prefix="${prefix}.misc_shards"
+  }
+  scatter ( shard in shard_tracklist_misc.shards ) {
+    call curate_and_burden as curate_and_burden_misc {
+      input:
+        tracklist=shard,
+        min_element_size=min_element_size,
+        max_element_size=max_element_size,
+        case_hpo=case_hpo,
+        min_element_overlap=min_element_overlap,
+        rCNV_bucket=rCNV_bucket,
+        prefix="${prefix}.misc_shard",
+        track_prefix="misc"
+    }
+  }
+  call merge_shards as merge_misc {
+    input:
+      stat_shards=curate_and_burden_misc.stats,
+      prefix="${prefix}.misc"
+  }
+
   # Merge stats across all tracklists
   call merge_shards as merge_all {
     input:
-      stat_shards=[merge_chromhmm.merged_stats, merge_encode_dnaaccessibility.merged_stats, merge_encode_histone_mods.merged_stats, merge_encode_tfbs.merged_stats, merge_encode_transcription.merged_stats, merge_enhancer_databases.merged_stats],
+      stat_shards=[merge_chromhmm.merged_stats, merge_encode_dnaaccessibility.merged_stats, merge_encode_histone_mods.merged_stats, merge_encode_tfbs.merged_stats, merge_encode_transcription.merged_stats, merge_enhancer_databases.merged_stats, merge_misc.merged_stats],
       prefix="${prefix}.all"
   }
-
-  # # Merge all tracklists
-  # call merge_tracklists {
-  #   input:
-  #     tracklists=[chromhmm_tracklist, encode_dnaaccessibility_tracklist, encode_histone_mods_tracklist, encode_tfbs_tracklist, encode_transcription_tracklist, enhancer_databases_tracklist],
-  #     prefix="${prefix}"
-  # }
 
   # Merge stats across all tracklists and compute meta-analysis burden stats
   call meta_burden_test {
@@ -262,7 +282,7 @@ task shard_tracklist {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:184c285552813ef487137d58d6a1ff74da4081987da89f6384175daccb04334d"
+    docker: "talkowski/rcnv@sha256:f877baad8b7c2b81e6ee7ed319f5e978ffcd0bd3ee009bde6ce1f2bc3d32aace"
     preemptible: 1
   }
 
@@ -317,7 +337,7 @@ task curate_only {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:584fa5f13a729535a1f22773026004a37629bbe018ebf21580a5a39062c8a7eb"
+    docker: "talkowski/rcnv@sha256:f877baad8b7c2b81e6ee7ed319f5e978ffcd0bd3ee009bde6ce1f2bc3d32aace"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -408,7 +428,7 @@ task curate_and_burden {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:800364e0b75481441671f4169524d8783e2bbf39325a7d0769d9cac9e4c59f92"
+    docker: "talkowski/rcnv@sha256:f877baad8b7c2b81e6ee7ed319f5e978ffcd0bd3ee009bde6ce1f2bc3d32aace"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -437,7 +457,7 @@ task merge_shards {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:800364e0b75481441671f4169524d8783e2bbf39325a7d0769d9cac9e4c59f92"
+    docker: "talkowski/rcnv@sha256:f877baad8b7c2b81e6ee7ed319f5e978ffcd0bd3ee009bde6ce1f2bc3d32aace"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -462,7 +482,7 @@ task merge_tracklists {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:800364e0b75481441671f4169524d8783e2bbf39325a7d0769d9cac9e4c59f92"
+    docker: "talkowski/rcnv@sha256:f877baad8b7c2b81e6ee7ed319f5e978ffcd0bd3ee009bde6ce1f2bc3d32aace"
     preemptible: 1
   }
 
@@ -502,7 +522,7 @@ task meta_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:800364e0b75481441671f4169524d8783e2bbf39325a7d0769d9cac9e4c59f92"
+    docker: "talkowski/rcnv@sha256:f877baad8b7c2b81e6ee7ed319f5e978ffcd0bd3ee009bde6ce1f2bc3d32aace"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -574,7 +594,7 @@ task cluster_elements {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:800364e0b75481441671f4169524d8783e2bbf39325a7d0769d9cac9e4c59f92"
+    docker: "talkowski/rcnv@sha256:f877baad8b7c2b81e6ee7ed319f5e978ffcd0bd3ee009bde6ce1f2bc3d32aace"
     preemptible: 1
     memory: "15 GB"
     bootDiskSizeGb: "30"

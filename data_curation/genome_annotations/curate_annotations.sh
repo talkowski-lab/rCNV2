@@ -30,6 +30,7 @@ mkdir cnvs/
 gsutil -m cp ${rCNV_bucket}/cleaned_data/cnv/noncoding/** cnvs/
 
 
+
 # Preprocess Roadmap Epigenomics ChromHMM states
 wget https://egg2.wustl.edu/roadmap/data/byFileType/chromhmmSegmentations/ChmmModels/core_K27ac/jointModel/final/all.mnemonics.bedFiles.tgz
 mkdir roadmap_raw/
@@ -283,9 +284,9 @@ prefix="all_tracks"
 tracklist="test.annotations.list"
 min_element_size=5
 max_element_size=200000
-case_hpo="HP:0000118"
+case_hpo="HP:0000707"
 min_element_overlap=1.0
-p_cutoff=0.05
+p_cutoff=0.01
 track_prefix="encode_tfbs"
 
 # Curate all annotations in an arbitrary input list of paths
