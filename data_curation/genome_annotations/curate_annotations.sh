@@ -367,8 +367,9 @@ gzip -f ${prefix}.burden_stats.tsv
 
 # # Dev code:
 # prefix="crb_clustering_test"
-# min_prop_tracks_per_crb=0.01
-# clustering_neighborhood_dist=10000
+# min_prop_tracks_per_crb=0.02
+# min_prop_track_representation=0.01
+# clustering_neighborhood_dist=5000
 # min_crb_separation=10000
 # contig=22
 
@@ -385,18 +386,24 @@ find sig_tracks/ -name "*.curated.bed.gz" \
 grep -e '^[1-9]' refs/GRCh37.genome \
 > autosomes.genome
 
+# Subset genome file to contig of interest
+awk -v FS="\t" -v OFS="\t" -v contig=${contig} \
+  '{ if ($1==contig) print $0 }' refs/GRCh37.genome \
+> contig.genome
+
 # Cluster significant tracks into CRBs
 /opt/rCNV2/data_curation/genome_annotations/build_crbs.py \
-  --genome autosomes.genome \
+  --genome contig.genome \
   --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
   --blacklist refs/GRCh37.somatic_hypermutable_sites.200kb_clustered.bed.gz \
   --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
   --prop-min-elements ${min_prop_tracks_per_crb} \
+  --prop-min-tracks ${min_prop_track_representation} \
   --neighborhood-dist ${clustering_neighborhood_dist} \
   --min-crb-separation ${min_crb_separation} \
   --crb-prefix "${prefix}_CRB" \
-  --crb-outbed ${prefix}.crbs.bed.gz \
-  --element-outbed ${prefix}.crb_elements.bed.gz \
+  --crb-outbed ${prefix}.${contig}.crbs.bed.gz \
+  --element-outbed ${prefix}.${contig}.crb_elements.bed.gz \
   --bgzip \
   sig_tracks/*.curated.bed.gz
 

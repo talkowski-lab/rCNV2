@@ -78,7 +78,8 @@ def load_tracks(tracklist, chrom, genome=None):
         return all_bt.sort(g=genome).saveas()
 
 
-def make_clusters(ebt, pos_df, min_elements=1, neighborhood_dist=10000, genome=None):
+def make_clusters(ebt, pos_df, min_elements=1, min_tracks=0, 
+                  neighborhood_dist=10000, genome=None):
     """
     Clusters elements based on 1D position
     Returns:
@@ -95,6 +96,15 @@ def make_clusters(ebt, pos_df, min_elements=1, neighborhood_dist=10000, genome=N
     cluster_members = {k : pos_df.index[pos_df.cluster == k].tolist() \
                        for k in list(set(clustering.labels_.tolist())) \
                        if k != -1}
+
+    # Restrict to clusters with representation of at least min_tracks
+    ks = list(cluster_members.keys())
+    for k in ks:
+        eids = cluster_members[k]
+        if len(set(['_'.join(e.split('_')[-1]) for e in eids])) < min_tracks:
+            # DEV: debug statement
+            # print('Dropped cluster {} due to insufficient representation'.format(k))
+            cluster_members.pop(k)
 
     # Gets maximal coordinates for each cluster
     clust_bt_str = ''
@@ -159,8 +169,8 @@ def refine_clusters(clust_bt, clust_members, ebt, blacklist, xcov=0.3, genome=No
 
 
 def cluster_chrom(tracklist, chrom, genome, blacklist, xcov=0.3, min_elements=None,
-                  n_ele_prop=0.1, neighborhood_dist=10000, min_crb_separation=10000, 
-                  prefix='CRB'):
+                  n_ele_prop=0.1, min_tracks=None, n_track_rep_prop=10e-10, 
+                  neighborhood_dist=10000, min_crb_separation=10000, prefix='CRB'):
     """
     Load & cluster all elements for a single chromosome
     Returns:
@@ -172,6 +182,8 @@ def cluster_chrom(tracklist, chrom, genome, blacklist, xcov=0.3, min_elements=No
     n_tracks = len(tracklist)
     if min_elements is None:
         min_elements = np.nanmax([np.floor(n_tracks * n_ele_prop), 1])
+    if min_tracks is None:
+        min_tracks = np.nanmax([np.floor(n_tracks * n_track_rep_prop), 1])
 
     # Load elements for chromosome
     ebt = load_tracks(tracklist, chrom, genome)
@@ -182,7 +194,7 @@ def cluster_chrom(tracklist, chrom, genome, blacklist, xcov=0.3, min_elements=No
                           index=[x.name for x in ebt])
 
     # Initial clustering of CRBs
-    clust_bt, clust_members = make_clusters(ebt, pos_df, min_elements, 
+    clust_bt, clust_members = make_clusters(ebt, pos_df, min_elements, min_tracks,
                                             neighborhood_dist, genome)
 
     # Refine & annotate clusters
@@ -217,6 +229,12 @@ def main():
     parser.add_argument('--prop-min-elements', default=0.1, type=float, help='If ' +
                         '--min-elements is not supplied, will automatically set ' +
                         'minimum number of elements as a proportion of the total ' +
+                        'number of tracks.')
+    parser.add_argument('--min-tracks', default=None, type=int, help='Minimum ' +
+                        'number of tracks represented per CRB.')
+    parser.add_argument('--prop-min-tracks', default=10e-10, type=float, help='If ' +
+                        '--min-tracks is not supplied, will automatically set ' +
+                        'minimum number of tracks as a proportion of the total ' +
                         'number of tracks.')
     parser.add_argument('--neighborhood-dist', default=10000, type=int, help='Maximum ' +
                         'distance between two elements to allow.')
@@ -254,10 +272,12 @@ def main():
     for chrom in contigs:
         print('Clustering CRBs on chromosome {}...'.format(chrom))
         new_crbs, new_elements = \
-            cluster_chrom(args.tracks, chrom, args.genome, blacklist, 
-                          args.blacklist_cov, args.min_elements, 
-                          args.prop_min_elements, args.neighborhood_dist, 
-                          args.min_crb_separation, args.crb_prefix)
+            cluster_chrom(args.tracks, chrom, args.genome, 
+                          blacklist, args.blacklist_cov, 
+                          args.min_elements, args.prop_min_elements, 
+                          args.min_tracks, args.prop_min_tracks,
+                          args.neighborhood_dist, args.min_crb_separation, 
+                          args.crb_prefix)
         final_crbs = final_crbs.cat(new_crbs, postmerge=False)
         final_elements = final_elements.cat(new_elements, postmerge=False)
 

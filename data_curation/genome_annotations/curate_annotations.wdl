@@ -22,11 +22,14 @@ workflow curate_annotations {
   String case_hpo
   Float min_element_overlap
   Float p_cutoff
+  File contiglist
   Float min_prop_tracks_per_crb
   Int clustering_neighborhood_dist
   Int min_crb_separation
   String rCNV_bucket
   String prefix
+
+  Array[Array[String]] contigs = read_tsv(contiglist)
 
   # Process Roadmap ChromHMM tracks
   call shard_tracklist as shard_tracklist_chromhmm {
@@ -227,40 +230,56 @@ workflow curate_annotations {
       clear_sig="TRUE"
   }
 
-  # # Re-shard all significant tracks for final curation
-  # call shard_tracklist as shard_tracklist_signif {
-  #   input:
-  #     tracklist=meta_burden_test.signif_tracks,
-  #     tracks_per_shard=tracks_per_shard,
-  #     prefix="${prefix}.signif_tracks"
-  # }
+  # Re-shard all significant tracks for final curation
+  call shard_tracklist as shard_tracklist_signif {
+    input:
+      tracklist=meta_burden_test.signif_tracks,
+      tracks_per_shard=tracks_per_shard,
+      prefix="${prefix}.signif_tracks"
+  }
 
-  # # Scatter over sharded significant tracklist and curate tracks
-  # scatter ( shard in shard_tracklist_signif.shards ) {
-  #   call curate_only as curate_only_signif {
-  #     input:
-  #       tracknames_and_paths=shard,
-  #       min_element_size=min_element_size,
-  #       max_element_size=max_element_size,
-  #       rCNV_bucket=rCNV_bucket,
-  #       prefix="${prefix}.signif_shard"
-  #   }
-  # }
+  # Scatter over sharded significant tracklist and curate tracks
+  scatter ( shard in shard_tracklist_signif.shards ) {
+    call curate_only as curate_only_signif {
+      input:
+        tracknames_and_paths=shard,
+        min_element_size=min_element_size,
+        max_element_size=max_element_size,
+        rCNV_bucket=rCNV_bucket,
+        prefix="${prefix}.signif_shard"
+    }
+  }
 
-  # call cluster_elements {
-  #   input:
-  #     completion_tokens=curate_only_signif.completion_token,
-  #     min_prop_tracks_per_crb=min_prop_tracks_per_crb,
-  #     clustering_neighborhood_dist=clustering_neighborhood_dist,
-  #     min_crb_separation=min_crb_separation,
-  #     rCNV_bucket=rCNV_bucket,
-  #     prefix=prefix
-  # }
+  # Cluster CRBs, parallelized per chromosome
+  scatter ( contig in contigs ) {
+    call cluster_elements {
+    input:
+      completion_tokens=curate_only_signif.completion_token,
+      min_prop_tracks_per_crb=min_prop_tracks_per_crb,
+      clustering_neighborhood_dist=clustering_neighborhood_dist,
+      min_crb_separation=min_crb_separation,
+      contig=contig[0],
+      rCNV_bucket=rCNV_bucket,
+      prefix=prefix
+    }
+  }
+  call merge_beds as merge_crbs {
+    input:
+      beds=cluster_elements.final_crbs,
+      outfile_prefix="${prefix}.crbs",
+      out_bucket="${rCNV_bucket}/cleaned_data/genome_annotations/"
+  }
+  call merge_beds as merge_crb_elements {
+    input:
+      beds=cluster_elements.final_crb_elements,
+      outfile_prefix="${prefix}.crb_elements"
+  }
+  
   
   # Final outputs
   output {
-    # File final_crbs = cluster_elements.final_crbs
-    # File final_crb_elements = cluster_elements.final_crb_elements
+    File final_crbs = merge_crbs.merged_bed
+    File final_crb_elements = merge_crb_elements.merged_bed
   }
 }
 
@@ -523,8 +542,7 @@ task meta_burden_test {
   >>>
 
   runtime {
-    # TODO: UPDATE DOCKER
-    docker: "talkowski/rcnv@sha256:3270ea9497c2db9a1c7a229f5c38fbaf2e2690c1974006c03e9b4e36a0f91705"
+    docker: "talkowski/rcnv@sha256:9f840c5cdb6c22e8f7d66bbe6528cc620c76120111e038b3976d1a84a77bb3af"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -539,12 +557,13 @@ task meta_burden_test {
 }
 
 
-# Cluster elements from significant tracks into CRBs
+# Cluster elements from significant tracks into CRBs (per chromosome)
 task cluster_elements {
   Array[File] completion_tokens
   Float min_prop_tracks_per_crb
   Int clustering_neighborhood_dist
   Int min_crb_separation
+  String contig
   String rCNV_bucket
   String prefix
 
@@ -566,34 +585,30 @@ task cluster_elements {
     find sig_tracks/ -name "*.curated.bed.gz" \
     | xargs -I {} tabix -f {}
 
-    # Subset genome file to autosomes
-    grep -e '^[1-9]' refs/GRCh37.genome \
-    > autosomes.genome
+    # Subset genome file to contig of interest
+    awk -v FS="\t" -v OFS="\t" -v contig=${contig} \
+      '{ if ($1==contig) print $0 }' refs/GRCh37.genome \
+    > contig.genome
 
     # Cluster significant tracks into CRBs
     /opt/rCNV2/data_curation/genome_annotations/build_crbs.py \
-      --genome autosomes.genome \
+      --genome contig.genome \
       --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
-      --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+      --blacklist refs/GRCh37.somatic_hypermutable_sites.200kb_clustered.bed.gz \
       --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
       --prop-min-elements ${min_prop_tracks_per_crb} \
+      --prop-min-tracks ${min_prop_track_representation} \
       --neighborhood-dist ${clustering_neighborhood_dist} \
       --min-crb-separation ${min_crb_separation} \
       --crb-prefix "${prefix}_CRB" \
-      --crb-outbed ${prefix}.crbs.bed.gz \
-      --element-outbed ${prefix}.crb_elements.bed.gz \
+      --crb-outbed ${prefix}.${contig}.crbs.bed.gz \
+      --element-outbed ${prefix}.${contig}.crb_elements.bed.gz \
       --bgzip \
       sig_tracks/*.curated.bed.gz
 
     # Index CRBs and elements
-    tabix -f ${prefix}.crbs.bed.gz
-    tabix -f ${prefix}.crb_elements.bed.gz
-
-    # Copy final CRBs and elements to gs:// bucket
-    gsutil -m cp \
-      ${prefix}.crbs.bed.gz* \
-      ${prefix}.crb_elements.bed.gz* \
-      ${rCNV_bucket}/cleaned_data/genome_annotations/
+    tabix -f ${prefix}.${contig}.crbs.bed.gz
+    tabix -f ${prefix}.${contig}.crb_elements.bed.gz
   >>>
 
   runtime {
@@ -607,6 +622,40 @@ task cluster_elements {
   output {
     File final_crbs = "${prefix}.crbs.bed.gz"
     File final_crb_elements = "${prefix}.crb_elements.bed.gz"
+  }
+}
+
+
+# Merge array of BEDs (with header) and copy to gs:// bucket
+task merge_final_beds {
+  Array[File] beds
+  String outfile_prefix
+  String out_bucket
+
+  command <<<
+    set -e
+
+    # Merge all stats
+    zcat ${beds[0]} | sed -n '1p' > header.tsv
+    zcat ${sep=" " beds} | grep -ve '^#' | cat header.tsv - | gzip -c \
+    > ${outfile_prefix}.bed.gz
+
+    # Copy merged BED gs:// bucket
+    gsutil -m cp \
+      ${outfile_prefix}.bed.gz
+      ${out_bucket}/
+  >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:3270ea9497c2db9a1c7a229f5c38fbaf2e2690c1974006c03e9b4e36a0f91705"
+    preemptible: 1
+    memory: "4 GB"
+    bootDiskSizeGb: "20"
+    disks: "local-disk 50 HDD"
+  }
+
+  output {
+    File merged_bed = "${outfile_prefix}.bed.gz"
   }
 }
 

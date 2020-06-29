@@ -29,6 +29,8 @@ For each [metacohort](https://github.com/talkowski-lab/rCNV2/tree/master/data_cu
 
 As [described here](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#noncoding-subsets), rCNVs were restricted to a loose definition of "noncoding," where each rCNV was allowed to intersect only exons from a subset of [likely unconstrained genes](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene#gene-set-definitions) (or no genes at all; _i.e._, completely noncoding), but no other genes.  
 
+Finally, given that CNV breakpoint precision varies by locus, platform, and CNV calling algorithm, we systematically extended the breakpoints of each control CNV by +50kb. CNV breakpoints in cases were **not** extended. We did this to conservatively protect against spurrious associations arising from situations where control CNVs breakpoints might be underestimated compared to case breakpoints.  
+
 We conducted this procedure a total of two times per phenotype group & metacohort: once each for deletions and duplications.  
 
 The code to perform this step is contained in `count_cnvs_per_crb.py`.  
