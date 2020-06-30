@@ -301,7 +301,13 @@ These subsets are defined as follows:
 
 1. **Strictly noncoding**: all rCNVs were excluded based on any overlap with any canonical exon from any protein-coding gene ([as described here](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene#gene-definitions)).  
 
-2. **Loose noncoding**: to improve power for [noncoding association testing](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/noncoding), we supplemented the `Strictly noncoding` subset (described above) with any rCNVs that overlapped exons from any of 2,013 genes known to readily tolerate functional mutations in the general population ([described here](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene#gene-set-definitions)). This subset represents the subset of rare CNVs depleted for strong-effect, disease-relevant coding effects.  
+2. **Loose noncoding**: to improve power for [noncoding association testing](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/noncoding), we supplemented the `Strictly noncoding` subset (described above) with any rCNVs that overlapped exons from the 4,793 genes meeting both of the following criteria:  
+* Known to readily tolerate functional mutations in the general population ([described here](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/gene#gene-set-definitions)); and  
+* No known disease association [per OMIM](https://www.omim.org/).  
+
+This second subset ("`loose noncoding`") represents the subset of rare CNVs depleted for strong-effect, disease-relevant coding effects.  
+
+For both sets of noncoding CNVs, we padded all exons from all genes by ±50kb to protect against CNV breakpoint imprecision.  
 
 The code to apply these filters is contained in `extract_noncoding_subsets.sh`.  
 
@@ -309,10 +315,10 @@ The code to apply these filters is contained in `extract_noncoding_subsets.sh`.
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
-| meta1 | 44,229 | 8,341 | 0.19 | 195.0 kb | 1.44:1 | 19,585 | 5,111 | 0.26 | 157.0 kb | 1.82:1 |  
-| meta2 | 41,065 | 11,847 | 0.29 | 157.0 kb | 1.65:1 | 41,213 | 10,104 | 0.25 | 161.0 kb | 1.68:1 |  
-| meta3 | 153,870 | 35,960 | 0.23 | 165.0 kb | 1.91:1 | 24,161 | 7,358 | 0.3 | 165.0 kb | 2.26:1 |  
-| meta4 | 54,071 | 10,965 | 0.2 | 162.0 kb | 6.09:1 | 375,800 | 76,672 | 0.2 | 162.0 kb | 5.90:1 | 
+| meta1 | 44,229 | 6,917 | 0.16 | 202.0 kb | 1.52:1 | 19,585 | 4,202 | 0.21 | 158.0 kb | 2.06:1 |  
+| meta2 | 41,065 | 9,938 | 0.24 | 158.0 kb | 1.77:1 | 41,213 | 8,379 | 0.2 | 163.0 kb | 1.82:1 |  
+| meta3 | 153,870 | 30,785 | 0.2 | 167.0 kb | 2.06:1 | 24,161 | 6,344 | 0.26 | 167.0 kb | 2.49:1 |  
+| meta4 | 54,071 | 9,104 | 0.17 | 164.0 kb | 6.01:1 | 375,800 | 63,918 | 0.17 | 164.0 kb | 5.87:1 |  
 
 ![Strictly noncoding rare CNV stats](https://storage.googleapis.com/rcnv_project/public/strict_noncoding.metacohort.stats.jpg)  
 
@@ -320,10 +326,10 @@ The code to apply these filters is contained in `extract_noncoding_subsets.sh`.
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
-| meta1 | 44,229 | 10,333 | 0.23 | 194.0 kb | 1.29:1 | 19,585 | 6,018 | 0.31 | 158.0 kb | 1.61:1 |  
-| meta2 | 41,065 | 13,937 | 0.34 | 158.0 kb | 1.44:1 | 41,213 | 12,001 | 0.29 | 160.0 kb | 1.44:1 |  
-| meta3 | 153,870 | 42,391 | 0.28 | 167.0 kb | 1.69:1 | 24,161 | 8,583 | 0.36 | 166.0 kb | 1.96:1 |  
-| meta4 | 54,071 | 12,927 | 0.24 | 161.0 kb | 4.62:1 | 375,800 | 90,250 | 0.24 | 162.0 kb | 4.60:1 |  
+| meta1 | 44,229 | 8,439 | 0.19 | 197.0 kb | 1.44:1 | 19,585 | 5,008 | 0.26 | 158.0 kb | 1.88:1 |  
+| meta2 | 41,065 | 11,778 | 0.29 | 159.0 kb | 1.60:1 | 41,213 | 10,052 | 0.24 | 163.0 kb | 1.65:1 |  
+| meta3 | 153,870 | 36,132 | 0.23 | 170.0 kb | 1.90:1 | 24,161 | 7,397 | 0.31 | 169.0 kb | 2.28:1 |  
+| meta4 | 54,071 | 10,945 | 0.2 | 163.0 kb | 4.70:1 | 375,800 | 76,634 | 0.2 | 163.0 kb | 4.76:1 |  
 
 ![Loose noncoding rare CNV stats](https://storage.googleapis.com/rcnv_project/public/loose_noncoding.metacohort.stats.jpg)  
 

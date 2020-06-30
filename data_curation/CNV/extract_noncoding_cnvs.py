@@ -21,7 +21,7 @@ import subprocess
 import gzip
 
 
-def process_gtf(gtf_in, blacklist=[]):
+def process_gtf(gtf_in, blacklist=[], pad_exons=0):
     """
     Read gtf and extract exons as pbt.BedTool
     Returns:
@@ -54,14 +54,16 @@ def process_gtf(gtf_in, blacklist=[]):
         else:
             return False
 
-    def _simplify(feature):
+    def _simplify(feature, pad_exons=0):
         """
         Simplify feature to BED4
         """
-        return '\t'.join([str(x) for x in [feature.chrom, feature.start, feature.end, 
+        newstart = max([0, int(feature.start) - pad_exons])
+        newend = int(feature.end) + pad_exons
+        return '\t'.join([str(x) for x in [feature.chrom, newstart, newend, 
                                            feature.attrs['gene_name']]])
 
-    exonbt = pbt.BedTool('\n'.join([_simplify(x) for x in gtfbt.filter(_filter_gtf)]),
+    exonbt = pbt.BedTool('\n'.join([_simplify(x, pad_exons) for x in gtfbt.filter(_filter_gtf)]),
                          from_string=True)
     sub_exonbt = exonbt.filter(lambda x: x[3] not in blacklist).saveas()
 
@@ -85,6 +87,8 @@ def main():
                         'noncoding CNVs.')
     parser.add_argument('--loose-outbed', help='Path to output BED for more ' +
                         'lenient noncoding CNVs.')
+    parser.add_argument('--pad-exons', default=0, type=int, help='Nucleotides to ' +
+                        'add to the boundaries of each exon.')
     parser.add_argument('-z', '--bgzip', dest='bgzip', action='store_true',
                         help='Compress output BED(s) with bgzip.')
     args = parser.parse_args()
@@ -112,7 +116,7 @@ def main():
 
     # Extract relevant data from input GTF
     strict_exonbt, loose_exonbt \
-        = process_gtf(args.gtf, whitelist)
+        = process_gtf(args.gtf, whitelist, args.pad_exons)
 
     # Filter CNVs based on exon overlap
     strict_cnvbt = cnvbt.intersect(strict_exonbt, v=True, wa=True, header=True)
