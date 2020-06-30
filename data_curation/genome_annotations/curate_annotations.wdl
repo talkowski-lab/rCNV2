@@ -609,10 +609,9 @@ task cluster_elements {
       ${contig}.genome \
       ${contig}.crb_whitelist.bed.gz
 
-
     # Cluster significant tracks into CRBs
     /opt/rCNV2/data_curation/genome_annotations/build_crbs.py \
-      --genome contig.genome \
+      --genome ${contig}.genome \
       --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
       --blacklist refs/GRCh37.somatic_hypermutable_sites.200kb_clustered.bed.gz \
       --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
@@ -633,7 +632,7 @@ task cluster_elements {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:4faa44831f0839e8e1018b9bf7773d3290e5b7fa80cd071e0fa1a7e30693ee51"
+    docker: "talkowski/rcnv@sha256:7d70cf3115e4a99652db564b213abbaa5fc5bdb5605f6bc1bfd9ee622deb6328"
     preemptible: 1
     memory: "15 GB"
     bootDiskSizeGb: "30"
@@ -659,17 +658,18 @@ task merge_final_beds {
 
     # Merge all stats
     zcat ${beds[0]} | sed -n '1p' > header.tsv
-    zcat ${sep=" " beds} | grep -ve '^#' | cat header.tsv - | gzip -c \
+    zcat ${sep=" " beds} | grep -ve '^#' | cat header.tsv - | bgzip -c \
     > ${outfile_prefix}.bed.gz
+    tabix -f ${outfile_prefix}.bed.gz
 
     # Copy merged BED gs:// bucket
     gsutil -m cp \
-      ${outfile_prefix}.bed.gz \
+      ${outfile_prefix}.bed.gz* \
       ${out_bucket}/
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:4faa44831f0839e8e1018b9bf7773d3290e5b7fa80cd071e0fa1a7e30693ee51"
+    docker: "talkowski/rcnv@sha256:7d70cf3115e4a99652db564b213abbaa5fc5bdb5605f6bc1bfd9ee622deb6328"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

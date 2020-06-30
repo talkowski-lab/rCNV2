@@ -405,7 +405,7 @@ tabix gencode.v19.canonical.pext_filtered.gtf.gz ${contig} \
 
 # Cluster significant tracks into CRBs
 /opt/rCNV2/data_curation/genome_annotations/build_crbs.py \
-  --genome contig.genome \
+  --genome ${contig}.genome \
   --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
   --blacklist refs/GRCh37.somatic_hypermutable_sites.200kb_clustered.bed.gz \
   --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \

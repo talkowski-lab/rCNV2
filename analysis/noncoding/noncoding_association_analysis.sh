@@ -51,8 +51,8 @@ rCNV_bucket="gs://rcnv_project"
 pad_controls=0
 min_element_ovr=1.0
 min_frac_all_elements=0.05
-p_cutoff=0.000003755163
-meta_p_cutoff=0.000003755163
+p_cutoff=0.00000206603
+meta_p_cutoff=0.00000206603
 max_manhattan_phred_p=30
 n_pheno_perms=50
 meta_model_prefix="fe"
@@ -363,3 +363,69 @@ while read prefix hpo; do
   done
 done < refs/test_phenotypes.list
 
+# Collapse all meta-analysis p-values into single matrix for visualizing calibration
+mkdir meta_res/
+# Download data
+while read prefix hpo; do
+  for CNV in DEL DUP; do
+    echo -e "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/stats/${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed.gz"
+  done
+done < ${phenotype_list} \
+| gsutil -m cp -I meta_res/
+# Primary p-values
+p_val_column_name="meta_phred_p"
+while read prefix hpo; do
+  echo -e "$prefix\n\n"
+  for CNV in DEL DUP; do
+      stats=meta_res/${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed.gz
+      if [ -e $stats ]; then
+        p_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
+                 | awk -v OFS="\t" '{ print $1, NR }' \
+                 | fgrep -w ${p_val_column_name} | cut -f2 )
+        zcat $stats | grep -ve '^#' \
+        | awk -v p_idx=$p_idx '{ print $(p_idx) }' \
+        | cat <( echo "$prefix.$CNV" ) - \
+        > meta_res/$prefix.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.p_values.txt
+      fi
+  done
+done < ${phenotype_list}
+paste meta_res/*.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.p_values.txt \
+| gzip -c \
+> ${freq_code}.observed_pval_matrix.txt.gz
+# Secondary p-values
+p_val_column_name="meta_phred_p_secondary"
+while read prefix hpo; do
+  echo -e "$prefix\n\n"
+  for CNV in DEL DUP; do
+      stats=meta_res/${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed.gz
+      if [ -e $stats ]; then
+        p_idx=$( zcat $stats | sed -n '1p' | sed 's/\t/\n/g' \
+                 | awk -v OFS="\t" '{ print $1, NR }' \
+                 | fgrep -w ${p_val_column_name} | cut -f2 )
+        zcat $stats | grep -ve '^#' \
+        | awk -v p_idx=$p_idx '{ print $(p_idx) }' \
+        | cat <( echo "$prefix.$CNV" ) - \
+        > meta_res/$prefix.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.secondary_p_values.txt
+      fi
+  done
+done < ${phenotype_list}
+paste meta_res/*.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.secondary_p_values.txt \
+| gzip -c \
+> ${freq_code}.observed_pval_matrix_secondary.txt.gz
+# DEV NOTE: these p-values can be visualized with plot_gene_burden_meta_analysis_p_values.R,
+#           which is currently just a code snippet referencing local filepaths
+
+
+
+
+# # DEV: get significant CRBs
+# for CNV in DEL DUP; do
+#   echo -e "\n\n\n${CNV}"
+#   while read prefix hpo; do
+#     zcat meta_res/${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed.gz \
+#     | fgrep -v "#" \
+#     | awk -v FS="\t" -v OFS="\t" -v prefix=$prefix -v CNV=$CNV \
+#       '{ if ($13>=5.684863 && $13!="NA" && ($5>1 || ($18>=1.30103 && $18!="NA"))) print $1, $2, $3, $4, CNV, prefix, $9 }'
+#   done < ${phenotype_list} \
+#   | sort -k4,4V -Vk1,1 -k2,2n -k3,3n -k6,6V -k5,5V 
+# done
