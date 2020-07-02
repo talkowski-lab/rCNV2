@@ -248,9 +248,141 @@ sed '1d' DER-03a_hg19_PEC_enhancers.bed \
 | sort -Vk1,1 -k2,2n -k3,3n \
 | bgzip -c \
 > psychencode.enhancers.bed.gz
-wget http://resource.psychencode.org/Datasets/Derived/DER-18_TAD_adultbrain.bed
-gsutil -m cp psychencode.enhancers.bed.gz \
+curl -s http://resource.psychencode.org/Datasets/Derived/DER-18_TAD_adultbrain.bed \
+| awk -v OFS="\t" -v buffer=5000 \
+  '{ print $1, $2-buffer, $2+buffer"\n"$1, $3-buffer, $3+buffer }' \
+  DER-18_TAD_adultbrain.bed \
+| awk -v OFS="\t" '{ if ($2<0) $2=0; print $1, $2, $3 }' \
+| sort -Vk1,1 -k2,2n -k3,3n | uniq \
+| bgzip -c \
+> psychencode.tad_boundaries.bed.gz
+gsutil -m cp \
+  psychencode.enhancers.bed.gz \
+  psychencode.tad_boundaries.bed.gz \
   ${rCNV_bucket}/cleaned_data/genome_annotations/misc_tracks/
+
+
+# Curate human TFs from JASPAR 2020
+gsutil -m cp \
+  ${rCNV_bucket}/raw_data/genome_annotations/jaspar_2020.human.tf_ids.manifest.tsv.gz \
+  ./
+if ! [ -e hg38ToHg19.over.chain.gz ]; then
+  wget http://hgdownload.cse.ucsc.edu/goldenPath/hg38/liftOver/hg38ToHg19.over.chain.gz
+fi
+mkdir jaspar_tfbs
+while read id tfname; do
+  echo $tfname
+  curl -s http://jaspar.genereg.net/download/bed_files/${id}.bed \
+  | fgrep hg19 | cut -f1-3 \
+  | sort -Vk1,1 -k2,2 -k3,3n \
+  > jaspar_tfbs/${tfname}.bed
+  if [ $( cat jaspar_tfbs/${tfname}.bed | wc -l ) -gt 0 ]; then
+    bgzip -f jaspar_tfbs/${tfname}.bed
+  else
+    rm jaspar_tfbs/${tfname}.bed
+    curl -s http://jaspar.genereg.net/download/bed_files/${id}.bed \
+    | fgrep hg38 | cut -f1-3 \
+    | sort -Vk1,1 -k2,2 -k3,3n \
+    > jaspar_tfbs/${tfname}.hg38.bed
+    if [ $( cat jaspar_tfbs/${tfname}.hg38.bed | wc -l ) -gt 0 ]; then
+      liftOver \
+        -minMatch=1.0 \
+        -bedPlus=5 \
+        jaspar_tfbs/${tfname}.hg38.bed \
+        hg38ToHg19.over.chain.gz \
+        jaspar_tfbs/${tfname}.bed \
+        jaspar_tfbs/${tfname}.hg38_fail.bed
+        rm jaspar_tfbs/${tfname}.hg38.bed jaspar_tfbs/${tfname}.hg38_fail.bed
+        bgzip -f jaspar_tfbs/${tfname}.bed
+    else
+      rm jaspar_tfbs/${tfname}.hg38.bed
+    fi
+  fi
+done < <( zcat jaspar_2020.human.tf_ids.manifest.tsv.gz | fgrep -v "#" )
+gsutil -m cp -r \
+  jaspar_tfbs \
+  ${rCNV_bucket}/cleaned_data/genome_annotations/  
+find jaspar_tfbs/ -name "*.bed.gz" \
+| awk -v gs=${rCNV_bucket} -v OFS="\t" \
+  '{ print gs"/cleaned_data/genome_annotations/"$1, "jaspar" }' \
+> jaspar_tfbs.gs_paths.list
+gsutil -m cp \
+  jaspar_tfbs.gs_paths.list \
+  ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/
+
+
+# Curate BOCA brain chromatin accessibility data
+wget https://bendlj01.u.hpc.mssm.edu//multireg/resources/boca_peaks.zip
+mkdir boca_beds
+unzip boca_peaks.zip -d boca_beds/
+wget \
+  https://bendlj01.u.hpc.mssm.edu/multireg/resources/boca_peaks_consensus_no_blacklisted_regions.bed \
+  -O boca_beds/BOCA_consensus.bed
+find boca_beds/*.bed | xargs -I {} bgzip -f {}
+gsutil -m cp -r \
+  boca_beds \
+  ${rCNV_bucket}/cleaned_data/genome_annotations/
+find boca_beds/ -name "*.bed.gz" \
+| awk -v gs=${rCNV_bucket} -v OFS="\t" \
+  '{ print gs"/cleaned_data/genome_annotations/"$1, "boca" }' \
+> boca.gs_paths.list
+gsutil -m cp \
+  boca.gs_paths.list \
+  ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/
+
+
+# Curate misc. TAD datasets
+mkdir misc_tad_boundaries
+gsutil -m cp -r ${rCNV_bucket}/raw_data/genome_annotations/dixon_tbrs ./
+if ! [ -e hg18ToHg19.over.chain.gz ]; then
+  wget http://hgdownload.cse.ucsc.edu/goldenPath/hg18/liftOver/hg18ToHg19.over.chain.gz
+fi
+for ctype in hESC IMR90; do
+  liftOver \
+    -minMatch=0.5 \
+    dixon_tbrs/dixon_2012.tad_boundaries.$ctype.hg18.bed.gz \
+    hg18ToHg19.over.chain.gz \
+    misc_tad_boundaries/dixon_2012.$ctype.bed \
+    dixon_2012.liftFail.$ctype.bed
+  bgzip -f misc_tad_boundaries/dixon_2012.$ctype.bed
+done
+for ctype in GM12878_primary+replicate K562 IMR90 HMEC KBM7 NHEK HUVEC HeLa; do
+  echo $ctype
+  curl -s https://ftp.ncbi.nlm.nih.gov/geo/series/GSE63nnn/GSE63525/suppl/GSE63525_${ctype}_Arrowhead_domainlist.txt.gz \
+  | gunzip -c | sed '1d' \
+  | awk -v OFS="\t" -v buffer=5000 '{ print $1, $2-buffer, $2+buffer"\n"$1, $3-buffer, $3+buffer }' \
+  | awk -v OFS="\t" '{ if ($2<0) $2=0; print $1, $2, $3 }' \
+  | sort -Vk1,1 -k2,2n -k3,3n | uniq \
+  | bgzip -c \
+  > misc_tad_boundaries/rao_2014.$ctype.arrowhead_domain_boundaries.bed.gz
+  curl -s https://ftp.ncbi.nlm.nih.gov/geo/series/GSE63nnn/GSE63525/suppl/GSE63525_${ctype}_HiCCUPS_looplist.txt.gz \
+  | gunzip -c | sed '1d' \
+  | awk -v OFS="\t" '{ print $1, $2, $3"\n"$4, $5, $6 }' \
+  | awk -v OFS="\t" '{ if ($2<0) $2=0; print $1, $2, $3 }' \
+  | sort -Vk1,1 -k2,2n -k3,3n | uniq \
+  | bgzip -c \
+  > misc_tad_boundaries/rao_2014.$ctype.loop_domain_boundaries.bed.gz
+done
+for ctype in CP GZ; do
+  echo $ctype
+  curl -s https://ftp.ncbi.nlm.nih.gov/geo/series/GSE77nnn/GSE77565/suppl/GSE77565_${ctype}_TAD.bed.gz \
+  | gunzip -c | sed '1d' \
+  | awk -v OFS="\t" -v buffer=5000 '{ print $1, $2-buffer, $2+buffer"\n"$1, $3-buffer, $3+buffer }' \
+  | awk -v OFS="\t" '{ if ($2<0) $2=0; print $1, $2, $3 }' \
+  | sort -Vk1,1 -k2,2n -k3,3n | uniq \
+  | bgzip -c \
+  > misc_tad_boundaries/gao_2016.$ctype.tad_boundaries.bed.gz
+done
+gsutil -m cp -r \
+  misc_tad_boundaries \
+  ${rCNV_bucket}/cleaned_data/genome_annotations/
+find misc_tad_boundaries/ -name "*.bed.gz" \
+| awk -v gs=${rCNV_bucket} -v OFS="\t" \
+  '{ print gs"/cleaned_data/genome_annotations/"$1 }' \
+> misc_tad_boundaries.gs_paths.list
+gsutil -m cp \
+  misc_tad_boundaries.gs_paths.list \
+  ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/
 
 
 # Combine all enhancer tracks into single tracklist for sharding on FireCloud
@@ -262,6 +394,7 @@ gsutil cat \
   ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/DENdb.gs_paths.list \
   ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/SEA.gs_paths.list \
   ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/fantom_enh.track_urls.list \
+  ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/plac_brain_enhancer.gs_paths.list \
 > enhancer_databases.track_urls.list
 echo -e \
 "${rCNV_bucket}/cleaned_data/genome_annotations/misc_tracks/vista_enhancers.bed.gz
@@ -276,12 +409,20 @@ gsutil -m cp \
 # Combine all miscellaneous tracks into single tracklist for sharding on FireCloud
 gsutil cat \
   ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/encode.tad_boundaries.gs_paths.list \
+  ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/jaspar_tfbs.gs_paths.list \
+  ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/boca.gs_paths.list \
+  ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/misc_tad_boundaries.gs_paths.list \
 > misc_genome_annotations.track_urls.list
 echo -e \
 "http://resource.psychencode.org/Datasets/Derived/DER-05_PFC_H3K27ac_peaks.bed\tpsychencode
 http://resource.psychencode.org/Datasets/Derived/DER-06_TC_H3K27ac_peaks.bed\tpsychencode
 http://resource.psychencode.org/Datasets/Derived/DER-07_CBC_H3K27ac_peaks.bed\tpsychencode
-http://resource.psychencode.org/Datasets/Pipeline/TARs/PIP-04_all_TARs.70pc.active.bed\tpsychencode"
+http://resource.psychencode.org/Datasets/Pipeline/TARs/PIP-04_all_TARs.70pc.active.bed\tpsychencode
+https://ccg.epfl.ch/UCNEbase/data/download/ucnes/hg19_UCNE_coord.bed\tUCNEbase
+${rCNV_bucket}/cleaned_data/genome_annotations/dev_cerebrum_beds/dev_cerebrum_pREs.bed.gz
+${rCNV_bucket}/cleaned_data/genome_annotations/dev_cerebrum_beds/dev_cerebrum_OCRs.bed.gz
+${rCNV_bucket}/cleaned_data/genome_annotations/misc_tracks/psychencode.tad_boundaries.bed.gz" \
+>> misc_genome_annotations.track_urls.list
 gsutil -m cp \
   misc_genome_annotations.track_urls.list \
   ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/

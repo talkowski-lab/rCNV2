@@ -450,7 +450,8 @@ task curate_and_burden {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0f035a577af472446284444e59f7074bec70f429aca0aff62959d9f1978c51c1"
+    # TODO: UPDATE DOCKER
+    # docker: "talkowski/rcnv@sha256:0f035a577af472446284444e59f7074bec70f429aca0aff62959d9f1978c51c1"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
