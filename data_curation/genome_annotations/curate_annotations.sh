@@ -452,7 +452,7 @@ gsutil -m cp \
 # Development parameters for curate_annotations.wdl
 prefix="all_tracks"
 tracklist="test.annotations.list"
-min_element_size=10
+min_element_size=5
 max_element_size=200000
 case_hpo="HP:0000707"
 min_element_overlap=1.0
@@ -533,7 +533,7 @@ gzip -f ${prefix}.burden_stats.tsv
 # min_prop_track_representation=0.01
 # clustering_neighborhood_dist=5000
 # min_crb_separation=10000
-# max_crb_size=200000
+# max_crb_size=500000
 # blacklist_buffer=100000
 # blacklist_buffer_min_size=100000
 # contig=22

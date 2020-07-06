@@ -28,18 +28,18 @@ The following table outlines all sources included in this analysis:
 | dbSUPER | 99 | Super enhancers from 99 human cell lines and tissues | dbSUPER [(Khan _et al._, _Nucleic Acids Res._, 2016)](https://academic.oup.com/nar/article/44/D1/D164/2502575) | [Link](http://asntech.org/dbsuper/index.php) |  
 | VISTA | 1 | Experimentally-validated mammalian enhancers | VISTA Browser [(Visel _et al._, _Nucleic Acids Res._, 2007)](https://dx.doi.org/10.1093%2Fnar%2Fgkl822) (accessed June 2020) | [Link](https://enhancer.lbl.gov/frnt_page_n.shtml) |  
 | DENdb | 15 | Enhancer predictions from 15 human cell lines | DENdb [(Ashoor _et al._, _Database_, 2015)](doi:10.1093/database/bav085) | [Link](https://www.cbrc.kaust.edu.sa/dendb/index.php) |  
-| SEA | 143 | Super enhancer predictions from 143 human cell lines and tissues (mapped back to hg19 using liftOver with minimum 75% match) | SEA v3.0 [(Ashoor _et al._, _Database_, 2015)](doi:10.1093/database/bav085) | [Link](http://sea.edbc.org/) |  
+| SEA | 143 | Super enhancer predictions from 143 human cell lines and tissues (mapped back to hg19 using liftOver with minimum 75% match) | SEA v3.0 [(Chen _et al._, _Nucleic Acids Res._, 2019)](https://academic.oup.com/nar/article/48/D1/D198/5610346) | [Link](http://sea.edbc.org/) |  
 | FANTOM Enhancers | 115 | Enhancer predictions for human tissues and cell types from the FANTOM5 consortium | FANTOM5 [(Andersson _et al._, _Nature_, 2014)](https://www.nature.com/articles/nature12787) | [Link](http://enhancer.binf.ku.dk/presets/#download_view_div) |  
 | PsychENCODE | 7 | Selected "derived" datasets from PsychENCODE Integrated Analysis Package, including cortex enhancers, transcriptionally active regions, TAD boundaries, and H3k27ac peaks | PsychEncode [(Wang _et al._, _Science_, 2018)](https://science.sciencemag.org/content/362/6420/eaat8464) | [Link](http://resource.psychencode.org/#Derived) |  
 | JASPAR | 264 | Predicted binding sites for all human transcription factors available for download in BED format from the JASPAR website (mapping back to hg19 using liftOver with 100% match, where necessary) | JASPAR 2020 [(Fornes _et al._, _Nucleic Acids Res_, 2020)](https://academic.oup.com/nar/article/48/D1/D87/5614568) | [Link](http://jaspar.genereg.net) |  
 | UCNEBase | 1 | Ultraconserved noncoding elements | UCNEBase [(Dimitrieva _et al._, _Nucleic Acids Res_, 2013)](https://dx.doi.org/10.1093%2Fnar%2Fgks1092) | [Link](https://ccg.epfl.ch/UCNEbase/download.php) |  
 | Developing telencephalon open chromatin atlas | 2 | Open chromatin regions (OCRs) and potential regulatory elements (pREs) identified in the developing cerebrum | [Markenscoff-Papadimitriou _et al._, _Cell_ (2020)](https://www.cell.com/cell/fulltext/S0092-8674(20)30689-9) | [Link](https://www.cell.com/cell/fulltext/S0092-8674(20)30689-9) |  
-| BOCA | 29 | Open chromatin tracks from adult brain samples across brain regions | BOCA [Fuller _et al._, _Genome Res._ (2018)](https://dx.doi.org/10.1101%2Fgr.232488.117) | [Link](https://bendlj01.u.hpc.mssm.edu/multireg/) |  
-| Brain cell type-specific enhancers | 4 | Enhancers for four primary brain cell types identified by PLAC-seq | [Nott _et al._, _Science_ (2019)](https://science.sciencemag.org/content/366/6469/1134) | [Link](https://science.sciencemag.org/content/suppl/2019/11/13/science.aay0793.DC1) |  
-| Dixon TAD boundaries | 2 | TAD boundaries identified in hESC and IMR90 cells, mapped to hg19 using liftOver with minimum 50% match | [Dixon _et al._, _Nature_ (2012)](https://www.nature.com/articles/nature11082) | [Link](https://www.nature.com/articles/nature11082#Sec6) |  
-| Rao chromatin domains | 16 | TAD boundaries and loop domain boundaries identified in eight human cell types (using ±5kb windows for TAD boundaries) | [Rao _et al._, _Cell_ (2014)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5635824) | [Link](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE63525) |    
-| Fetal brain TAD boundaries | 2 | TAD boundaries identified in fetal brain tissue | [Won _et al._, _Nature_ (2016)](https://www.nature.com/articles/nature19847) | [Link](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE77565) |  
-| Gencode noncoding RNAs | 28 | Non-protein-coding classes of RNAs in the Gencode v19 comprehensive GTF | Gencode v19 ([Harrow _et al._, _Genome Res._ (2012)](https://pubmed.ncbi.nlm.nih.gov/22955987)) | [Link](https://www.gencodegenes.org/human/release_19.html) |    
+| BOCA | 29 | Open chromatin tracks from adult brain samples across brain regions | BOCA [(Fuller _et al._, _Genome Res._, 2018)](https://dx.doi.org/10.1101%2Fgr.232488.117) | [Link](https://bendlj01.u.hpc.mssm.edu/multireg/) |  
+| Brain cell type-specific enhancers | 4 | Enhancers for four primary brain cell types identified by PLAC-seq | [Nott _et al._, _Science_, 2019](https://science.sciencemag.org/content/366/6469/1134) | [Link](https://science.sciencemag.org/content/suppl/2019/11/13/science.aay0793.DC1) |  
+| Dixon TAD boundaries | 2 | TAD boundaries identified in hESC and IMR90 cells, mapped to hg19 using liftOver with minimum 50% match | [Dixon _et al._, _Nature_, 2012](https://www.nature.com/articles/nature11082) | [Link](https://www.nature.com/articles/nature11082#Sec6) |  
+| Rao chromatin domains | 16 | TAD boundaries and loop domain boundaries identified in eight human cell types (using ±5kb windows for TAD boundaries) | [Rao _et al._, _Cell_, 2014](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5635824) | [Link](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE63525) |    
+| Fetal brain TAD boundaries | 2 | TAD boundaries identified in fetal brain tissue | [Won _et al._, _Nature_, 2016](https://www.nature.com/articles/nature19847) | [Link](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE77565) |  
+| Gencode noncoding RNAs | 28 | Non-protein-coding classes of RNAs in the Gencode v19 comprehensive GTF | Gencode v19 ([Harrow _et al._, _Genome Res._, 2012](https://pubmed.ncbi.nlm.nih.gov/22955987)) | [Link](https://www.gencodegenes.org/human/release_19.html) |    
 
 
 #### ENCODE data inclusion criteria  
@@ -124,7 +124,7 @@ All elements from significant annotations were clustered into CRBs per-chromosom
 After clustering, CRBs were assigned the minimum start and maximum end coordinate across all their constituent elements.  
 
 Finally, pairs of CRBs within ±10kb were merged, and we excluded CRBs meeting any of the following three criteria:  
-1. >200kb in size; or
+1. \>500kb in size; or
 2. ≥30% coverage by our [CNV blacklist regions](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs); or
 3. Within ±100kb of an element from the [CNV blacklist regions](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs) that was ≥100kb in size.  
 

@@ -125,20 +125,23 @@ def clean_track(track, trackname, xbt, xcov=0.5, genome=None,
     if len(track) > 0:
 
         if genome is None:
-            track_df = track.sort().merge().\
-                             filter(_size_filter, min_size, max_size).\
-                             saveas().to_dataframe()
+            track = track.sort().merge().\
+                          filter(_size_filter, min_size, max_size).\
+                          saveas()
         else:
-            track_df = track.sort(g=genome).merge().\
-                             filter(_size_filter, min_size, max_size).\
-                             saveas().to_dataframe()
+            track = track.sort(g=genome).merge().\
+                          filter(_size_filter, min_size, max_size).\
+                          saveas()
 
-        track_df['name'] = trackname
+        if len(track) > 0:
+            track_df = track.to_dataframe()
+            track_df['name'] = trackname
+            return pbt.BedTool.from_dataframe(track_df)
 
-        return pbt.BedTool.from_dataframe(track_df)
+        else:
+            return pbt.BedTool('', from_string=True).saveas()            
 
     else:
-
         return pbt.BedTool('', from_string=True).saveas()
 
 
