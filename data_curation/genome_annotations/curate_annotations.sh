@@ -385,6 +385,26 @@ gsutil -m cp \
   ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/
 
 
+# Curate noncoding RNAs from Gencode GTF
+wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/gencode.v19.annotation.gtf.gz
+wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/gencode.v19.pc_transcripts.fa.gz
+/opt/rCNV2/data_curation/gene/get_noncoding_rnas.py \
+  --outdir gencode_noncoding_rnas/ \
+  --prefix gencode.v19 \
+  gencode.v19.annotation.gtf.gz \
+  gencode.v19.pc_transcripts.fa.gz
+gsutil -m cp -r \
+  gencode_noncoding_rnas \
+  ${rCNV_bucket}/cleaned_data/genome_annotations/
+find gencode_noncoding_rnas/ -name "*.bed.gz" \
+| awk -v gs=${rCNV_bucket} -v OFS="\t" \
+  '{ print gs"/cleaned_data/genome_annotations/"$1 }' \
+> gencode_noncoding_rnas.gs_paths.list
+gsutil -m cp \
+  gencode_noncoding_rnas.gs_paths.list \
+  ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/
+
+
 # Combine all enhancer tracks into single tracklist for sharding on FireCloud
 gsutil cat \
   ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/EnhancerAtlas2.track_urls.list \
@@ -412,6 +432,7 @@ gsutil cat \
   ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/jaspar_tfbs.gs_paths.list \
   ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/boca.gs_paths.list \
   ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/misc_tad_boundaries.gs_paths.list \
+  ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/gencode_noncoding_rnas.gs_paths.list \
 > misc_genome_annotations.track_urls.list
 echo -e \
 "http://resource.psychencode.org/Datasets/Derived/DER-05_PFC_H3K27ac_peaks.bed\tpsychencode
@@ -512,6 +533,9 @@ gzip -f ${prefix}.burden_stats.tsv
 # min_prop_track_representation=0.01
 # clustering_neighborhood_dist=5000
 # min_crb_separation=10000
+# max_crb_size=200000
+# blacklist_buffer=100000
+# blacklist_buffer_min_size=100000
 # contig=22
 
 
@@ -550,11 +574,14 @@ tabix gencode.v19.canonical.pext_filtered.gtf.gz ${contig} \
   --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
   --blacklist refs/GRCh37.somatic_hypermutable_sites.200kb_clustered.bed.gz \
   --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
+  --blacklist-buffer ${blacklist_buffer} \
+  --blacklist-buffer-min-size ${blacklist_buffer_min_size} \
   --whitelist ${contig}.crb_whitelist.bed.gz \
   --prop-min-elements ${min_prop_tracks_per_crb} \
   --prop-min-tracks ${min_prop_track_representation} \
   --neighborhood-dist ${clustering_neighborhood_dist} \
   --min-crb-separation ${min_crb_separation} \
+  --max-crb-size ${max_crb_size} \
   --crb-prefix "${prefix}_CRB" \
   --crb-outbed ${prefix}.${contig}.crbs.bed.gz \
   --element-outbed ${prefix}.${contig}.crb_elements.bed.gz \

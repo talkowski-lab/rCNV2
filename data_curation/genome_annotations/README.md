@@ -38,7 +38,9 @@ The following table outlines all sources included in this analysis:
 | Brain cell type-specific enhancers | 4 | Enhancers for four primary brain cell types identified by PLAC-seq | [Nott _et al._, _Science_ (2019)](https://science.sciencemag.org/content/366/6469/1134) | [Link](https://science.sciencemag.org/content/suppl/2019/11/13/science.aay0793.DC1) |  
 | Dixon TAD boundaries | 2 | TAD boundaries identified in hESC and IMR90 cells, mapped to hg19 using liftOver with minimum 50% match | [Dixon _et al._, _Nature_ (2012)](https://www.nature.com/articles/nature11082) | [Link](https://www.nature.com/articles/nature11082#Sec6) |  
 | Rao chromatin domains | 16 | TAD boundaries and loop domain boundaries identified in eight human cell types (using ±5kb windows for TAD boundaries) | [Rao _et al._, _Cell_ (2014)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5635824) | [Link](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE63525) |    
-| Fetal brain TAD boundaries | TBD | TAD boundaries identified in fetal brain tissue | [Won _et al._, _Nature_ (2016)](https://www.nature.com/articles/nature19847) | [Link]() |  
+| Fetal brain TAD boundaries | 2 | TAD boundaries identified in fetal brain tissue | [Won _et al._, _Nature_ (2016)](https://www.nature.com/articles/nature19847) | [Link](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE77565) |  
+| Gencode noncoding RNAs | 28 | Non-protein-coding classes of RNAs in the Gencode v19 comprehensive GTF | Gencode v19 ([Harrow _et al._, _Genome Res._ (2012)](https://pubmed.ncbi.nlm.nih.gov/22955987)) | [Link](https://www.gencodegenes.org/human/release_19.html) |    
+
 
 #### ENCODE data inclusion criteria  
 
@@ -92,15 +94,15 @@ For each track, we counted the number of [loose noncoding rare CNVs](https://git
 
 These counts of CNVs per track were split by [metacohort](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#case-control-metacohorts), CNV type, and [case/control status](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/phenotype#hpo-terms-per-metacohort).  
 
-After tabulating counts of CNVs per track, we conducted a fixed-effects meta-analysis using the inverse-variance weighted Z-score method for each track with saddlepoint approximation applied across all tracks per cohort.  
+After tabulating counts of CNVs per track, we conducted an inverse-variance weighted Z-score meta-analysis for each track with saddlepoint approximation applied across all tracks per cohort.  
 
-We considered any track with a Benjamini-Hochberg FDR q < 0.1 to have sufficient evidence for possible disease relevance to be included for subsequent association testing.  
+We considered any track with P < 0.05 to have some evidence for possible disease relevance to be included for subsequent association testing.  
 
 #### Output files  
 
 From this process, we produced the following:  
 1. `rCNV.burden_stats.tsv.gz`: a tab-delimited file containing all statistics for each annotation track evaluated, including number & distribution of elements, number of CNVs per meta-cohort, burden statistics per meta-cohort, and meta-analysis statistics
-2. One BED file for each significant track.  
+2. One BED file for each nominally significant track.  
 
 The data are available from the below Google storage bucket (note: requires permissions):
 ```
@@ -116,12 +118,16 @@ Given that many genome annotations are correlated, we next clustered elements in
 This process was restricted to the subset of genome annotation tracks with statistical evidence for relevance in disease, as [described above](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/genome_annotations#identifying-annotation-classes-with-burdens-of-noncoding-rcnvs).  
 
 All elements from significant annotations were clustered into CRBs per-chromosome using DBSCAN (a density-based clustering algorithm) with the following parameters:
-* Neighborhood distance < 10kb
+* Neighborhood distance < 5kb
 * Minimum number of elements per cluster proportional to 10% of the total number of annotation tracks being considered (rounding down)
 
 After clustering, CRBs were assigned the minimum start and maximum end coordinate across all their constituent elements.  
 
-Finally, pairs of CRBs within ±10kb were merged, and CRBs with ≥30% coverage by our [CNV blacklist regions](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs) were excluded.
+Finally, pairs of CRBs within ±10kb were merged, and we excluded CRBs meeting any of the following three criteria:  
+1. >200kb in size; or
+2. ≥30% coverage by our [CNV blacklist regions](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs); or
+3. Within ±100kb of an element from the [CNV blacklist regions](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs) that was ≥100kb in size.  
+
 
 #### Output files  
 

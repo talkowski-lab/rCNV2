@@ -27,6 +27,9 @@ workflow curate_annotations {
   Float min_prop_track_representation
   Int clustering_neighborhood_dist
   Int min_crb_separation
+  Int max_crb_size
+  Int blacklist_buffer
+  Int blacklist_buffer_min_size
   String rCNV_bucket
   String prefix
 
@@ -260,6 +263,9 @@ workflow curate_annotations {
       min_prop_track_representation=min_prop_track_representation,
       clustering_neighborhood_dist=clustering_neighborhood_dist,
       min_crb_separation=min_crb_separation,
+      max_crb_size=max_crb_size,
+      blacklist_buffer=blacklist_buffer,
+      blacklist_buffer_min_size=blacklist_buffer_min_size,
       contig=contig[0],
       rCNV_bucket=rCNV_bucket,
       prefix=prefix
@@ -568,6 +574,9 @@ task cluster_elements {
   Float min_prop_track_representation
   Int clustering_neighborhood_dist
   Int min_crb_separation
+  Int max_crb_size
+  Int blacklist_buffer
+  Int blacklist_buffer_min_size
   String contig
   String rCNV_bucket
   String prefix
@@ -616,11 +625,14 @@ task cluster_elements {
       --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
       --blacklist refs/GRCh37.somatic_hypermutable_sites.200kb_clustered.bed.gz \
       --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
+      --blacklist-buffer ${blacklist_buffer} \
+      --blacklist-buffer-min-size ${blacklist_buffer_min_size} \
       --whitelist ${contig}.crb_whitelist.bed.gz \
       --prop-min-elements ${min_prop_tracks_per_crb} \
       --prop-min-tracks ${min_prop_track_representation} \
       --neighborhood-dist ${clustering_neighborhood_dist} \
       --min-crb-separation ${min_crb_separation} \
+      --max-crb-size ${max_crb_size} \
       --crb-prefix "${prefix}_CRB" \
       --crb-outbed ${prefix}.${contig}.crbs.bed.gz \
       --element-outbed ${prefix}.${contig}.crb_elements.bed.gz \
@@ -633,7 +645,8 @@ task cluster_elements {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7d70cf3115e4a99652db564b213abbaa5fc5bdb5605f6bc1bfd9ee622deb6328"
+    # TODO: UPDATE DOCKER
+    # docker: "talkowski/rcnv@sha256:7d70cf3115e4a99652db564b213abbaa5fc5bdb5605f6bc1bfd9ee622deb6328"
     preemptible: 1
     memory: "15 GB"
     bootDiskSizeGb: "30"

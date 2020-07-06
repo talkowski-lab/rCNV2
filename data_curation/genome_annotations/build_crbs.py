@@ -21,7 +21,7 @@ from os import path
 import subprocess
 
 
-def build_blacklist(blacklists):
+def build_blacklist(blacklists, buffer_dist=0, buffer_min_size=0):
     """
     Build universal blacklist from one or more inputs
     """
@@ -41,6 +41,17 @@ def build_blacklist(blacklists):
                       cat(*[pbt.BedTool(bl) for bl in xlist[1:]])
 
         xbt = xbt.sort().merge().saveas()
+
+    # Expand blacklist elements according to parameters
+    def _expand_bl(feature, buffer_dist=0, buffer_min_size=0):
+        if len(feature) >= buffer_min_size:
+            newstart = np.max([0, feature.start - buffer_dist])
+            newend = feature.end + buffer_dist
+            feature.start = newstart
+            feature.end = newend
+        return feature
+    if buffer_dist > 0:
+        xbt = xbt.each(_expand_bl, buffer_dist, buffer_min_size)
 
     return xbt
 
@@ -120,7 +131,7 @@ def make_clusters(ebt, pos_df, min_elements=1, min_tracks=0,
 
 def refine_clusters(clust_bt, clust_members, ebt, blacklist, xcov=0.3, 
                     whitelist=None, genome=None, min_crb_separation=10000, 
-                    prefix='CRB'):
+                    max_crb_size=3e10, prefix='CRB'):
     """
     Refine & reformat final clusters & their constituent elements
     """
@@ -141,6 +152,9 @@ def refine_clusters(clust_bt, clust_members, ebt, blacklist, xcov=0.3,
     if whitelist is not None:
         clust_groups = clust_groups.intersect(whitelist, wa=True, u=True).\
                                     cut(range(4)).saveas()
+
+    # Apply final CRB size filter
+    clust_groups = clust_groups.filter(lambda x: len(x) <= max_crb_size).saveas()
 
     # Iterate over cluster groups and reformat CRB & elements from each
     k = 0
@@ -175,7 +189,7 @@ def refine_clusters(clust_bt, clust_members, ebt, blacklist, xcov=0.3,
 def cluster_chrom(tracklist, chrom, genome, blacklist, xcov=0.3, whitelist=None,
                   min_elements=None, n_ele_prop=0.1, min_tracks=None, 
                   n_track_rep_prop=10e-10, neighborhood_dist=10000, 
-                  min_crb_separation=10000, prefix='CRB'):
+                  min_crb_separation=10000, max_crb_size=3e10, prefix='CRB'):
     """
     Load & cluster all elements for a single chromosome
     Returns:
@@ -205,7 +219,7 @@ def cluster_chrom(tracklist, chrom, genome, blacklist, xcov=0.3, whitelist=None,
     # Refine & annotate clusters
     crb_bt, crb_ele_bt = refine_clusters(clust_bt, clust_members, ebt, blacklist, 
                                          xcov, whitelist, genome, min_crb_separation, 
-                                         prefix)
+                                         max_crb_size, prefix)
 
     return crb_bt, crb_ele_bt
 
@@ -230,6 +244,12 @@ def main():
     parser.add_argument('--blacklist-cov', default=0.3, type=float, 
                         help='Minimum fraction of CRB that must be covered ' +
                         'by any blacklist before being excluded.')
+    parser.add_argument('--blacklist-buffer', default=0, type=int, 
+                        help='Bases to pad blacklist elements. Only applied to ' +
+                        'elements larger than --blacklist-buffer-min-size')
+    parser.add_argument('--blacklist-buffer-min-size', default=0, type=int, 
+                        help='Minimum size of blacklist element to have ' +
+                        '--blacklist-buffer applied')
     parser.add_argument('--whitelist', help='BED of intervals to require CRB ' + 
                         'overlap.')
     parser.add_argument('--min-elements', default=None, type=int, help='Minimum ' +
@@ -248,6 +268,8 @@ def main():
                         'distance between two elements to allow.')
     parser.add_argument('--min-crb-separation', default=10000, type=int, help='Minimum ' +
                         'distance between two CRBs before merging them.')
+    parser.add_argument('--max-crb-size', default=3e10, type=int, help='Maximum ' +
+                        'size of clustered CRB to be reported.')
     parser.add_argument('-p', '--crb-prefix', default='CRB', help='Prefix for ' +
                         'CRB names.')
     parser.add_argument('--crb-outbed', required=True, help='Output BED for final CRBs.')
@@ -272,7 +294,8 @@ def main():
     contigs = [x for x in contigs if x in eligible_contigs]
 
     # Load blacklists
-    blacklist = build_blacklist(args.blacklist)
+    blacklist = build_blacklist(args.blacklist, args.blacklist_buffer, 
+                                args.blacklist_buffer_min_size)
 
     # Process elements from each chromosome in serial
     final_elements = pbt.BedTool('', from_string=True)
@@ -285,7 +308,7 @@ def main():
                           args.min_elements, args.prop_min_elements, 
                           args.min_tracks, args.prop_min_tracks,
                           args.neighborhood_dist, args.min_crb_separation, 
-                          args.crb_prefix)
+                          args.max_crb_size, args.crb_prefix)
         final_crbs = final_crbs.cat(new_crbs, postmerge=False)
         final_elements = final_elements.cat(new_elements, postmerge=False)
 
