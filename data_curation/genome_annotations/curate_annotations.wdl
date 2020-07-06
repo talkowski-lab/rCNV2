@@ -310,7 +310,7 @@ task shard_tracklist {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:04c655286051c7bbdd15d751dee846cab10b2c3e2230fde7a317902c343ebbf9"
+    docker: "talkowski/rcnv@sha256:90f47bc9fe55578e830ec617328188267e5449104a3b0b8d36fdf9d9a9fd37a0"
     preemptible: 1
   }
 
@@ -365,7 +365,7 @@ task curate_only {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:04c655286051c7bbdd15d751dee846cab10b2c3e2230fde7a317902c343ebbf9"
+    docker: "talkowski/rcnv@sha256:90f47bc9fe55578e830ec617328188267e5449104a3b0b8d36fdf9d9a9fd37a0"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -456,7 +456,7 @@ task curate_and_burden {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:04c655286051c7bbdd15d751dee846cab10b2c3e2230fde7a317902c343ebbf9"
+    docker: "talkowski/rcnv@sha256:90f47bc9fe55578e830ec617328188267e5449104a3b0b8d36fdf9d9a9fd37a0"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -485,7 +485,7 @@ task merge_shards {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:04c655286051c7bbdd15d751dee846cab10b2c3e2230fde7a317902c343ebbf9"
+    docker: "talkowski/rcnv@sha256:90f47bc9fe55578e830ec617328188267e5449104a3b0b8d36fdf9d9a9fd37a0"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -510,7 +510,7 @@ task merge_tracklists {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:04c655286051c7bbdd15d751dee846cab10b2c3e2230fde7a317902c343ebbf9"
+    docker: "talkowski/rcnv@sha256:90f47bc9fe55578e830ec617328188267e5449104a3b0b8d36fdf9d9a9fd37a0"
     preemptible: 1
   }
 
@@ -551,7 +551,7 @@ task meta_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:04c655286051c7bbdd15d751dee846cab10b2c3e2230fde7a317902c343ebbf9"
+    docker: "talkowski/rcnv@sha256:90f47bc9fe55578e830ec617328188267e5449104a3b0b8d36fdf9d9a9fd37a0"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -644,7 +644,7 @@ task cluster_elements {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:04c655286051c7bbdd15d751dee846cab10b2c3e2230fde7a317902c343ebbf9"
+    docker: "talkowski/rcnv@sha256:90f47bc9fe55578e830ec617328188267e5449104a3b0b8d36fdf9d9a9fd37a0"
     preemptible: 1
     memory: "15 GB"
     bootDiskSizeGb: "30"
@@ -681,7 +681,7 @@ task merge_final_beds {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:04c655286051c7bbdd15d751dee846cab10b2c3e2230fde7a317902c343ebbf9"
+    docker: "talkowski/rcnv@sha256:90f47bc9fe55578e830ec617328188267e5449104a3b0b8d36fdf9d9a9fd37a0"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

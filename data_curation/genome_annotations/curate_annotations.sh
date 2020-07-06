@@ -313,12 +313,16 @@ gsutil -m cp \
 
 # Curate BOCA brain chromatin accessibility data
 wget https://bendlj01.u.hpc.mssm.edu//multireg/resources/boca_peaks.zip
-mkdir boca_beds
-unzip boca_peaks.zip -d boca_beds/
+mkdir boca_beds_tmp boca_beds
+unzip boca_peaks.zip -d boca_beds_tmp/
 wget \
   https://bendlj01.u.hpc.mssm.edu/multireg/resources/boca_peaks_consensus_no_blacklisted_regions.bed \
-  -O boca_beds/BOCA_consensus.bed
-find boca_beds/*.bed | xargs -I {} bgzip -f {}
+  -O boca_beds_tmp/BOCA_consensus.bed
+for file in boca_beds_tmp/*bed; do
+  awk -v FS="\t" '{ printf "%s\t%.0f\t%.0f\n", $1, $2, $3 }' $file \
+  | bgzip -c \
+  > boca_beds/$( basename $file ).gz
+done
 gsutil -m cp -r \
   boca_beds \
   ${rCNV_bucket}/cleaned_data/genome_annotations/
@@ -529,14 +533,14 @@ gzip -f ${prefix}.burden_stats.tsv
 
 # # Dev code:
 # prefix="crb_clustering_test"
-# min_prop_tracks_per_crb=0.02
+# min_prop_tracks_per_crb=0.05
 # min_prop_track_representation=0.01
 # clustering_neighborhood_dist=5000
 # min_crb_separation=10000
 # max_crb_size=500000
 # blacklist_buffer=100000
 # blacklist_buffer_min_size=100000
-# contig=22
+# contig=3
 
 
 # Copy & index all final curated significant tracks locally

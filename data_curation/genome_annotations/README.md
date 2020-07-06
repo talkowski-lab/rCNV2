@@ -73,7 +73,7 @@ For each track, we:
 1. Excluded any elements covered at least 10% by the same<sup>_*see note_</sup> set of blacklists used during [CNV curation](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs);  
 2. Standardized contig nomenclature to be consistent with GRCh37; 
 3. Merged overlapping elements; 
-4. Excluded merged elements <10bp or >200kb in size; and
+4. Excluded merged elements <5bp or >200kb in size; and
 5. Restricted to autosomes.  
 
 _*Note: given the small size of many annotations and the dozens of transcript isoforms for many T-cell receptor gene clusters, we merged all somatic hypermutable loci using a distance of ±100kb prior to track curation for the purposes of this analysis._   
@@ -118,15 +118,17 @@ Given that many genome annotations are correlated, we next clustered elements in
 This process was restricted to the subset of genome annotation tracks with statistical evidence for relevance in disease, as [described above](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/genome_annotations#identifying-annotation-classes-with-burdens-of-noncoding-rcnvs).  
 
 All elements from significant annotations were clustered into CRBs per-chromosome using DBSCAN (a density-based clustering algorithm) with the following parameters:
-* Neighborhood distance < 5kb
-* Minimum number of elements per cluster proportional to 10% of the total number of annotation tracks being considered (rounding down)
+* Neighborhood distance = ±5kb
+* Minimum number of elements per cluster proportional to 5% of the total number of annotation tracks being considered (rounding down)
+* Minimum number of tracks with at least one element per cluster proportional to 1% of the total number of tracks being considered (rounding down)  
 
 After clustering, CRBs were assigned the minimum start and maximum end coordinate across all their constituent elements.  
 
 Finally, pairs of CRBs within ±10kb were merged, and we excluded CRBs meeting any of the following three criteria:  
 1. \>500kb in size; or
 2. ≥30% coverage by our [CNV blacklist regions](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs); or
-3. Within ±100kb of an element from the [CNV blacklist regions](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs) that was ≥100kb in size.  
+3. Within ±100kb of an element from the [CNV blacklist regions](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs) that was ≥100kb in size; or
+4. Did not overlap a hypothetically testable interval (i.e., any contiguous 100kb interval with no protein-coding exons excluded during [noncoding rCNV filtering](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#noncoding-subsets))
 
 
 #### Output files  

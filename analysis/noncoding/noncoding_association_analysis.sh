@@ -20,6 +20,7 @@ gcloud auth login
 # from the project Google Bucket (note: requires permissions)
 mkdir cleaned_cnv/
 gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/noncoding/* cleaned_cnv/
+gsutil -m cp gs://rcnv_project/cleaned_data/cnv/*bed.gz* cleaned_cnv/
 gsutil -m cp -r gs://rcnv_project/cleaned_data/genome_annotations/*bed.gz* ./
 mkdir refs/
 gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
@@ -51,8 +52,8 @@ rCNV_bucket="gs://rcnv_project"
 pad_controls=0
 min_element_ovr=1.0
 min_frac_all_elements=0.05
-p_cutoff=0.00000206603
-meta_p_cutoff=0.00000206603
+p_cutoff=0.000003226431
+meta_p_cutoff=0.000003226431
 max_manhattan_phred_p=30
 n_pheno_perms=50
 meta_model_prefix="fe"
@@ -137,6 +138,50 @@ while read pheno hpo; do
       "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.DUP.crb_burden.stats.bed.gz" \
       "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.DEL.crb_burden.stats.bed.gz" \
       "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.crb_burden"
+  done < ${metacohort_list}
+done < ${phenotype_list}
+
+
+
+
+# Count *all* CNVs in cases and controls per phenotype, split by metacohort and CNV type
+# NOTE: without restricting on noncoding CNVs
+# Iterate over phenotypes
+while read pheno hpo; do
+  # Iterate over metacohorts
+  while read meta cohorts; do
+    echo $meta
+    cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
+
+    # Iterate over CNV types
+    for CNV in DEL DUP; do
+      echo $CNV
+
+      # Count CNVs
+      /opt/rCNV2/analysis/noncoding/count_cnvs_per_crb.py \
+        --cnvs $cnv_bed \
+        --crbs ${crbs} \
+        --elements ${crb_elements} \
+        --pad-controls ${pad_controls} \
+        --min-element-ovr ${min_element_ovr} \
+        --min-frac-all-elements ${min_frac_all_elements} \
+        -t $CNV \
+        --hpo ${hpo} \
+        -z \
+        -o "$meta.${prefix}.${freq_code}.$CNV.crb_burden.counts.bed.gz" 
+      tabix -f "$meta.${prefix}.${freq_code}.$CNV.crb_burden.counts.bed.gz"
+
+      # Perform burden test
+      /opt/rCNV2/analysis/noncoding/crb_burden_test.R \
+        --pheno-table ${metacohort_sample_table} \
+        --cohort-name $meta \
+        --cnv $CNV \
+        --case-hpo ${hpo} \
+        --bgzip \
+        "$meta.${prefix}.${freq_code}.$CNV.crb_burden.counts.bed.gz" \
+        "$meta.${prefix}.${freq_code}.$CNV.crb_burden.stats.bed.gz"
+      tabix -f "$meta.${prefix}.${freq_code}.$CNV.crb_burden.stats.bed.gz"
+    done
   done < ${metacohort_list}
 done < ${phenotype_list}
 
@@ -284,83 +329,82 @@ paste perm_res/*.crb_burden.meta_analysis.permuted_p_values.*.txt \
 # Run meta-analysis for each phenotype
 while read prefix hpo; do
 
-    # Get metadata for meta-analysis
-    mega_idx=$( head -n1 "${metacohort_sample_table}" \
-                | sed 's/\t/\n/g' \
-                | awk '{ if ($1=="mega") print NR }' )
-    ncase=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
-             | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
-             | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
-    nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
-             | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
-             | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
-    descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
-               | awk -v FS="\t" '{ print $2 }' )
-    title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
-    DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                    crb_burden.${freq_code}.${noncoding_filter}_noncoding.DEL.bonferroni_pval.hpo_cutoffs.tsv )
-    DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                    crb_burden.${freq_code}.${noncoding_filter}_noncoding.DUP.bonferroni_pval.hpo_cutoffs.tsv )
+  # Get metadata for meta-analysis
+  mega_idx=$( head -n1 "${metacohort_sample_table}" \
+              | sed 's/\t/\n/g' \
+              | awk '{ if ($1=="mega") print NR }' )
+  ncase=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+           | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
+           | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+  nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
+           | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
+           | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+  descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+             | awk -v FS="\t" '{ print $2 }' )
+  title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
+  DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
+                  crb_burden.${freq_code}.${noncoding_filter}_noncoding.DEL.bonferroni_pval.hpo_cutoffs.tsv )
+  DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
+                  crb_burden.${freq_code}.${noncoding_filter}_noncoding.DUP.bonferroni_pval.hpo_cutoffs.tsv )
 
-    # Set HPO-specific parameters
-    descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
-               | awk -v FS="\t" '{ print $2 }' )
+  # Set HPO-specific parameters
+  descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+             | awk -v FS="\t" '{ print $2 }' )
 
-    # Run meta-analysis for each CNV type
-    for CNV in DEL DUP; do
-      # Set CNV-specific parameters
-      case "$CNV" in
-        DEL)
-          meta_p_cutoff=$DEL_p_cutoff
-          ;;
-        DUP)
-          meta_p_cutoff=$DUP_p_cutoff
-          ;;
-      esac
+  # Run meta-analysis for each CNV type
+  for CNV in DEL DUP; do
+    # Set CNV-specific parameters
+    case "$CNV" in
+      DEL)
+        meta_p_cutoff=$DEL_p_cutoff
+        ;;
+      DUP)
+        meta_p_cutoff=$DUP_p_cutoff
+        ;;
+    esac
 
-      # Perform meta-analysis of CNV counts
-      while read meta cohorts; do
-        echo -e "$meta\t$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.stats.bed.gz"
-      done < <( fgrep -v mega ${metacohort_list} ) \
-      > ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt
-      /opt/rCNV2/analysis/noncoding/crb_meta_analysis.R \
-        --or-corplot ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.or_corplot_grid.jpg \
-        --model ${meta_model_prefix} \
-        --p-is-phred \
-        --spa \
-        ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt \
-        ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed
-      bgzip -f ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed
-      tabix -f ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed.gz
+    # Perform meta-analysis of CNV counts
+    while read meta cohorts; do
+      echo -e "$meta\t$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.stats.bed.gz"
+    done < <( fgrep -v mega ${metacohort_list} ) \
+    > ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt
+    /opt/rCNV2/analysis/noncoding/crb_meta_analysis.R \
+      --or-corplot ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.or_corplot_grid.jpg \
+      --model ${meta_model_prefix} \
+      --p-is-phred \
+      --spa \
+      ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt \
+      ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed
+    bgzip -f ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed
+    tabix -f ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed.gz
 
-      # Generate Manhattan & QQ plots
-      /opt/rCNV2/utils/plot_manhattan_qq.R \
-        --p-col-name "meta_phred_p" \
-        --p-is-phred \
-        --max-phred-p ${max_manhattan_phred_p} \
-        --cutoff $meta_p_cutoff \
-        --label-prefix "$CNV" \
-        --title "$title" \
-        "${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed.gz" \
-        "${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis"
-    done
-
-    # Generate Miami & QQ plots
+    # Generate Manhattan & QQ plots
     /opt/rCNV2/utils/plot_manhattan_qq.R \
-      --miami \
       --p-col-name "meta_phred_p" \
       --p-is-phred \
       --max-phred-p ${max_manhattan_phred_p} \
-      --cutoff $DUP_p_cutoff \
-      --label-prefix "DUP" \
-      --cutoff-2 $DEL_p_cutoff \
-      --label-prefix-2 "DEL" \
+      --cutoff $meta_p_cutoff \
+      --label-prefix "$CNV" \
       --title "$title" \
-      "${prefix}.${freq_code}.${noncoding_filter}_noncoding.DUP.crb_burden.meta_analysis.stats.bed.gz" \
-      "${prefix}.${freq_code}.${noncoding_filter}_noncoding.DEL.crb_burden.meta_analysis.stats.bed.gz" \
-      "${prefix}.${freq_code}.${noncoding_filter}_noncoding.crb_burden.meta_analysis"
-
+      "${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed.gz" \
+      "${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis"
   done
+
+  # Generate Miami & QQ plots
+  /opt/rCNV2/utils/plot_manhattan_qq.R \
+    --miami \
+    --p-col-name "meta_phred_p" \
+    --p-is-phred \
+    --max-phred-p ${max_manhattan_phred_p} \
+    --cutoff $DUP_p_cutoff \
+    --label-prefix "DUP" \
+    --cutoff-2 $DEL_p_cutoff \
+    --label-prefix-2 "DEL" \
+    --title "$title" \
+    "${prefix}.${freq_code}.${noncoding_filter}_noncoding.DUP.crb_burden.meta_analysis.stats.bed.gz" \
+    "${prefix}.${freq_code}.${noncoding_filter}_noncoding.DEL.crb_burden.meta_analysis.stats.bed.gz" \
+    "${prefix}.${freq_code}.${noncoding_filter}_noncoding.crb_burden.meta_analysis"
+
 done < refs/test_phenotypes.list
 
 # Collapse all meta-analysis p-values into single matrix for visualizing calibration
@@ -415,6 +459,40 @@ paste meta_res/*.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta
 # DEV NOTE: these p-values can be visualized with plot_gene_burden_meta_analysis_p_values.R,
 #           which is currently just a code snippet referencing local filepaths
 
+
+
+
+# Run unfiltered meta-analysis (including coding CNVs) for each phenotype
+while read prefix hpo; do
+
+  # Get metadata for meta-analysis
+  DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
+                  crb_burden.${freq_code}.${noncoding_filter}_noncoding.DEL.bonferroni_pval.hpo_cutoffs.tsv )
+  DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
+                  crb_burden.${freq_code}.${noncoding_filter}_noncoding.DUP.bonferroni_pval.hpo_cutoffs.tsv )
+
+  # Run meta-analysis for each CNV type
+  for CNV in DEL DUP; do
+
+    # Perform meta-analysis of CNV counts
+    while read meta cohorts; do
+      echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.crb_burden.stats.bed.gz"
+    done < <( fgrep -v mega ${metacohort_list} ) \
+    > ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.input.txt
+    
+    /opt/rCNV2/analysis/noncoding/crb_meta_analysis.R \
+      --or-corplot ${prefix}.${freq_code}.$CNV.crb_burden.or_corplot_grid.jpg \
+      --model ${meta_model_prefix} \
+      --p-is-phred \
+      --spa \
+      ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.input.txt \
+      ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed
+    bgzip -f ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed
+    tabix -f ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed.gz
+
+  done
+
+done < refs/test_phenotypes.list
 
 
 

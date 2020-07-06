@@ -58,6 +58,23 @@ workflow crb_burden_analysis {
         prefix=pheno[0],
         cache_string=fisher_cache_string
     }
+    call coding_burden_test as rCNV_coding_burden_test {
+      input:
+        hpo=pheno[1],
+        metacohort_list=metacohort_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code="rCNV",
+        crbs=crbs,
+        crb_elements=crb_elements,
+        pad_controls=pad_controls,
+        min_element_ovr=min_element_ovr,
+        min_frac_all_elements=min_frac_all_elements,
+        p_cutoff=p_cutoff,
+        max_manhattan_phred_p=max_manhattan_phred_p,
+        rCNV_bucket=rCNV_bucket,
+        prefix=pheno[0],
+        cache_string=fisher_cache_string
+    }
 
     # Permute phenotypes to estimate empirical FDR
     call scattered_perm.scattered_crb_burden_perm_test as rCNV_perm_test {
@@ -114,6 +131,20 @@ workflow crb_burden_analysis {
         noncoding_filter=noncoding_filter,
         meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
         max_manhattan_phred_p=max_manhattan_phred_p,
+        meta_model_prefix=meta_model_prefix,
+        rCNV_bucket=rCNV_bucket,
+        prefix=pheno[0],
+        cache_string=meta_cache_string
+    }
+    call coding_meta_analysis as rCNV_coding_meta_analysis {
+      input:
+        stats_beds=rCNV_coding_burden_test.stats_beds,
+        stats_bed_idxs=rCNV_coding_burden_test.stats_bed_idxs,
+        hpo=pheno[1],
+        metacohort_list=metacohort_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code="rCNV",
+        noncoding_filter=noncoding_filter,
         meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0],
@@ -231,7 +262,7 @@ task burden_test {
 
 
     # Copy results to output bucket
-    gsutil -m cp *.crb_burden.stats.bed.gz* \
+    gsutil -m cp *.crb_burden.counts.bed.gz* \
       "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/counts/"
     gsutil -m cp *.crb_burden.stats.bed.gz* \
       "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/stats/"
@@ -255,6 +286,91 @@ task burden_test {
   }
 }
 
+
+# Run unfiltered burden test for a single phenotype for all metacohorts
+task coding_burden_test {
+  String hpo
+  File metacohort_list
+  File metacohort_sample_table
+  String freq_code
+  File crbs
+  File crb_elements
+  Int pad_controls
+  Float min_element_ovr
+  Float min_frac_all_elements
+  Float p_cutoff
+  Int max_manhattan_phred_p
+  String rCNV_bucket
+  String prefix
+  String cache_string
+
+  command <<<
+    set -e
+
+    # Copy CNV data and other references
+    mkdir cleaned_cnv/
+    gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
+    mkdir refs/
+    gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
+
+    # Iterate over metacohorts
+    while read meta cohorts; do
+      echo $meta
+      cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
+
+      # Iterate over CNV types
+      for CNV in DEL DUP; do
+        echo $CNV
+
+        # Count CNVs
+        /opt/rCNV2/analysis/noncoding/count_cnvs_per_crb.py \
+          --cnvs $cnv_bed \
+          --crbs ${crbs} \
+          --elements ${crb_elements} \
+          --pad-controls ${pad_controls} \
+          --min-element-ovr ${min_element_ovr} \
+          --min-frac-all-elements ${min_frac_all_elements} \
+          -t $CNV \
+          --hpo ${hpo} \
+          -z \
+          -o "$meta.${prefix}.${freq_code}.$CNV.crb_burden.counts.bed.gz" 
+        tabix -f "$meta.${prefix}.${freq_code}.$CNV.crb_burden.counts.bed.gz"
+
+        # Perform burden test
+        /opt/rCNV2/analysis/noncoding/crb_burden_test.R \
+          --pheno-table ${metacohort_sample_table} \
+          --cohort-name $meta \
+          --cnv $CNV \
+          --case-hpo ${hpo} \
+          --bgzip \
+          "$meta.${prefix}.${freq_code}.$CNV.crb_burden.counts.bed.gz" \
+          "$meta.${prefix}.${freq_code}.$CNV.crb_burden.stats.bed.gz"
+        tabix -f "$meta.${prefix}.${freq_code}.$CNV.crb_burden.stats.bed.gz"
+      done
+    done < ${metacohort_list}
+
+    # Copy results to output bucket
+    gsutil -m cp *.crb_burden.counts.bed.gz* \
+      "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/counts/"
+    gsutil -m cp *.crb_burden.stats.bed.gz* \
+      "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/stats/"
+
+    echo "${cache_string}" > completion.txt
+  >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:7d70cf3115e4a99652db564b213abbaa5fc5bdb5605f6bc1bfd9ee622deb6328"
+    preemptible: 1
+    memory: "4 GB"
+    bootDiskSizeGb: "20"
+  }
+
+  output {
+    Array[File] stats_beds = glob("*.crb_burden.stats.bed.gz")
+    Array[File] stats_bed_idxs = glob("*.crb_burden.stats.bed.gz.tbi")
+    File completion_token = "completion.txt"
+  }
+}
 
 # Aggregate all permutation results to determine empirical P-value cutoff
 task calc_meta_p_cutoff {
@@ -336,7 +452,7 @@ task calc_meta_p_cutoff {
   }  
 }
 
-# Run meta-analysis (both weighted and raw) across metacohorts for a single phenotype
+# Run meta-analysis across metacohorts for a single phenotype
 task meta_analysis {
   Array[Array[File]] stats_beds
   Array[Array[File]] stats_bed_idxs
@@ -446,6 +562,72 @@ task meta_analysis {
       "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/plots/"
     gsutil -m cp *.crb_burden.*meta_analysis.*.png \
       "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/plots/"
+
+    # Must delocalize completion marker to prevent caching of final step
+    echo "${cache_string}" > completion.txt
+  >>>
+
+  output {
+    File completion_token = "completion.txt"
+  }
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:7d70cf3115e4a99652db564b213abbaa5fc5bdb5605f6bc1bfd9ee622deb6328"
+    preemptible: 1
+    memory: "4 GB"
+    bootDiskSizeGb: "20"
+  }
+}
+
+
+
+# Run unfiltered meta-analysis (including coding CNVs) across metacohorts for a single phenotype
+task coding_meta_analysis {
+  Array[Array[File]] stats_beds
+  Array[Array[File]] stats_bed_idxs
+  String hpo
+  File metacohort_list
+  File metacohort_sample_table
+  String freq_code
+  String noncoding_filter
+  String meta_model_prefix
+  String rCNV_bucket
+  String prefix
+  String cache_string
+
+  command <<<
+    set -e
+
+    # Copy burden counts & gene coordinates
+    find / -name "*${prefix}.${freq_code}.*.crb_burden.stats.bed.gz*" \
+    | xargs -I {} mv {} ./
+    mkdir refs/
+    gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
+
+    # Run meta-analysis for each CNV type
+    for CNV in DEL DUP; do
+
+      # Perform meta-analysis of CNV counts
+      while read meta cohorts; do
+        echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.crb_burden.stats.bed.gz"
+      done < <( fgrep -v mega ${metacohort_list} ) \
+      > ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.input.txt
+      
+      /opt/rCNV2/analysis/noncoding/crb_meta_analysis.R \
+        --or-corplot ${prefix}.${freq_code}.$CNV.crb_burden.or_corplot_grid.jpg \
+        --model ${meta_model_prefix} \
+        --p-is-phred \
+        --spa \
+        ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.input.txt \
+        ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed
+      bgzip -f ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed
+      tabix -f ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed.gz
+
+    done
+
+    # Copy results to output bucket
+    gsutil -m cp *.crb_burden.*meta_analysis.stats.bed.gz* \
+      "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/stats/"
 
     # Must delocalize completion marker to prevent caching of final step
     echo "${cache_string}" > completion.txt

@@ -35,7 +35,7 @@ The code to perform this step is contained in `count_cnvs_per_crb.py`.
 
 We intersected noncoding rCNVs versus the individual elements from each CRB, and only counted rCNV-element pairs where the rCNV completely (100%) covered the element.  
 
-After intersecting rCNVs with individual elements, we only tallied rCNV-CRB pairs where the rCNV hit at least 5% of all elements from that CRB.  
+After intersecting rCNVs with individual elements, we only tallied rCNV-CRB pairs where the rCNV hit at least 50% of all elements from that CRB.  
 
 ### 2. Calculate burden statistics between cases & controls  
 
@@ -57,7 +57,7 @@ Furthermore, for each pair of phenotype group & metacohort, two additional files
 5. `$metacohort.$hpo.rCNV.crb_burden.miami.png`: a Miami plot of association statistics for each CRB, with duplications above and deletions below the x-axis  
 6. `$metacohort.$hpo.rCNV.crb_burden.miami_with_qq.png`: a multi-panel composite plot of association statistics, combining a Miami plot with QQ plots for deletions and duplications separately  
 
-All plots also feature a horizontal dashed line indicating Bonferroni-corrected significance threshold (P ≤ 3.76x10<sup>-6</sup>) for all 13,315 CRBs tested.  
+All plots also feature a horizontal dashed line indicating Bonferroni-corrected significance threshold (P ≤ 3.23x10<sup>-6</sup>) for all 15,497 CRBs tested.  
 
 These files are stored in a protected Google Cloud bucket with one subdirectory per HPO group, here:  
 ```
@@ -115,22 +115,20 @@ We next controlled false discovery rate (FDR) across all gene meta-analyses.
 
 Estimating the number of independent tests performed across all CRBs, phenotypes, and CNV types is difficult due to numerous necessary assumptions, such as the independence of samples between phenotypes, or the local correlation structure of CNV counts between neighboring CRBs, among others.    
 
-Instead, we used a genome-wide significance threshold of P ≤ 3.76x10<sup>-6</sup>, which corresonds to a Bonferroni correction if applied to the number of individual CRBs tested in our analysis (N=13,315).  
+Instead, we used a genome-wide significance threshold of P ≤ 3.23x10<sup>-6</sup>, which corresonds to a Bonferroni correction if applied to the number of individual CRBs tested in our analysis (N=15,497).  
 
 We empirically assessed the calibration of this primary P-value threshold using a permutation-based approach, as follows:  
 
 1. permute phenotype labels for all loose noncoding rCNVs while matching on size (split by quantile) and CNV type (DEL/DUP);  
 2. rerun all association tests (described above), including meta-analysis, for each phenotype & CNV combination;   
 3. compute the fraction of significant CRBs for a broad range of primary P-value thresholds (_e.g._, -log<sub>10</sub>(_P_) ~ [0, 20] ); and
-4. report the least significant primary P-value threshold that results in an empirical FDR ≤ 3.76x10<sup>-6</sup>.  
+4. report the least significant primary P-value threshold that results in an empirical FDR ≤ 3.23x10<sup>-6</sup>.  
 
 Steps 1-3 were repeated 50 times for each CNV type and phenotype, and the median value per phenotype was computed.
 
 #### Output files  
 
 [As described above for Step 2](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/noncoding#output-files), we generated the same combination of plots and statistics files for the meta-analyses results of each phenotype group.  
-
-Unlike the plots from Step 2, the dashed lines from Step 3 correspond to empirically-derived exome-wide significance thresholds [as determined via permutation](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/noncoding#determining-and-calibrating-genome-wide-significance-threshold).  
 
 These files are stored in the same location as the per-metacohort analysis results.  
 
