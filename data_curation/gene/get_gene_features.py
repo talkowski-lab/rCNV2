@@ -310,7 +310,7 @@ def calc_gc(chrom, start, end, ref_fasta, cpg=False):
         return n_gc / len(seq)
 
 
-def get_genomic_features(genes, txbt, exonbt, tx_stats, min_intron_size=4, 
+def get_genomic_features(genes, txbt, exonbt, tx_stats, gnomad_tsv, min_intron_size=4, 
                          chrom_stats=None, ref_fasta=None, athena_tracks=None, 
                          no_scaling=False):
     """
@@ -388,6 +388,26 @@ def get_genomic_features(genes, txbt, exonbt, tx_stats, min_intron_size=4,
                 for gene, val in newanno.items():
                     gfeats_tmp[gene].append(val)
         header_cols = header_cols + add_header_cols
+
+    # Parse gnomAD mutation rate stats
+    if gnomad_tsv is not None:
+        # Load gnomAD data
+        gnomad = pd.read_csv(gnomad_tsv, delimiter='\t', compression='gzip')
+        keep_gnomad_cols = 'gene pLI mu_syn mu_mis mu_lof'
+        gnomad = gnomad.loc[gnomad.gene.isin(genes), keep_gnomad_cols.split()]
+        # Fill in missing genes and values with overall means
+        gnomad_means = gnomad.iloc[:, 1:].apply(np.nanmean).to_dict()
+        gnomad.fillna(gnomad_means, axis=0, inplace=True)
+        for gene in genes:
+            if not any(gnomad.gene == gene):
+                newrow = pd.Series([gene] + list(gnomad_means.values()), 
+                                   index=gnomad.columns)
+                gnomad = gnomad.append(newrow, ignore_index=True)
+        # Add values to gfeats per gene
+        for gene in genes:
+            gvals = gnomad.loc[gnomad.gene == gene, :].values.tolist()[0][1:]
+            gfeats_tmp[gene] += gvals
+        header_cols += ['gnomad_' + x for x in list(gnomad.columns)[1:]]
 
     # Format output string of all genomic features per gene
     header = '\t'.join(header_cols)
@@ -746,6 +766,111 @@ def get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ens
     return header, constraint_features
 
 
+def get_variation_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ensg,
+                           gnomad_tsv, ddd_tsv, asc_tsv, asc_unaffected_tsv, 
+                           gnomad_sv_tsv, redin_tsv):
+    """
+    Collect various human variation features per gene
+    """
+
+    vfeats_tmp = {g : [] for g in genes}
+
+    # Compile feature headers for output file
+    header_cols = []
+
+    # Parse gnomAD SNV/indel variation stats
+    if gnomad_tsv is not None:
+        # Load gnomAD data
+        gnomad = pd.read_csv(gnomad_tsv, delimiter='\t', compression='gzip')
+        keep_gnomad_cols = 'gene obs_syn obs_mis obs_lof'
+        gnomad = gnomad.loc[gnomad.gene.isin(genes), keep_gnomad_cols.split()]
+        # Fill in missing genes and values
+        gnomad.fillna(value=0, axis=0, inplace=True)
+        for gene in genes:
+            if not any(gnomad.gene == gene):
+                newrow = pd.Series([gene] + [0, 0, 0], index=gnomad.columns)
+                gnomad = gnomad.append(newrow, ignore_index=True)
+        # Add values to vfeats per gene
+        for gene in genes:
+            gvals = gnomad.loc[gnomad.gene == gene, :].values.tolist()[0][1:]
+            vfeats_tmp[gene] += [int(v) for v in gvals]
+        header_cols += ['gnomad_' + x for x in list(gnomad.columns)[1:]]
+
+    # Add gnomAD-SV functional SV counts
+    if gnomad_sv_tsv is not None:
+        # Load DDD DNM data
+        gnomad_sv = pd.read_csv(gnomad_sv_tsv, delimiter='\t').rename(columns={'#gene' : 'gene'})
+        gnomad_sv_vals = gnomad_sv.set_index(gnomad_sv.gene).drop(columns='gene').fillna(0).to_dict(orient='index')
+        # Add values to vfeats per gene
+        for gene in genes:
+            if gene in gnomad_sv_vals.keys():
+                vfeats_tmp[gene] += list(gnomad_sv_vals[gene].values())
+            else:
+                vfeats_tmp[gene] += [0, 0, 0, 0, 0]
+        header_cols += ['gnomad_sv_' + x for x in list(gnomad_sv.columns)[1:]]
+
+    # Add DDD DNM counts
+    if ddd_tsv is not None:
+        # Load DDD DNM data
+        ddd = pd.read_csv(ddd_tsv, delimiter='\t').rename(columns={'#gene' : 'gene'})
+        ddd_vals = ddd.set_index(ddd.gene).drop(columns='gene').fillna(0).to_dict(orient='index')
+        # Add values to vfeats per gene
+        for gene in genes:
+            if gene in ddd_vals.keys():
+                vfeats_tmp[gene] += list(ddd_vals[gene].values())
+            else:
+                vfeats_tmp[gene] += [0, 0, 0]
+        header_cols += ['ddd_dn_' + x for x in list(ddd.columns)[1:]]
+
+    # Add ASC DNM counts
+    if asc_tsv is not None:
+        # Load ASC DNM data
+        asc = pd.read_csv(asc_tsv, delimiter='\t').rename(columns={'#gene' : 'gene'})
+        asc_vals = asc.set_index(asc.gene).drop(columns='gene').fillna(0).to_dict(orient='index')
+        # Add values to vfeats per gene
+        for gene in genes:
+            if gene in asc_vals.keys():
+                vfeats_tmp[gene] += list(asc_vals[gene].values())
+            else:
+                vfeats_tmp[gene] += [0, 0, 0]
+        header_cols += ['asc_dn_' + x for x in list(asc.columns)[1:]]
+
+    # Add ASC unaffected sibling DNM counts
+    if asc_unaffected_tsv is not None:
+        # Load ASC DNM data
+        asc_unaffected = pd.read_csv(asc_unaffected_tsv, delimiter='\t').rename(columns={'#gene' : 'gene'})
+        asc_unaffected_vals = asc_unaffected.set_index(asc_unaffected.gene).drop(columns='gene').fillna(0).to_dict(orient='index')
+        # Add values to vfeats per gene
+        for gene in genes:
+            if gene in asc_unaffected_vals.keys():
+                vfeats_tmp[gene] += list(asc_unaffected_vals[gene].values())
+            else:
+                vfeats_tmp[gene] += [0, 0, 0]
+        header_cols += ['asc_unaffected_dn_' + x for x in list(asc_unaffected.columns)[1:]]
+
+    # Add BCA counts from Redin et al.
+    if redin_tsv is not None:
+        # Load DDD DNM data
+        redin = pd.read_csv(redin_tsv, delimiter='\t').rename(columns={'#gene' : 'gene'})
+        redin_vals = redin.set_index(redin.gene).drop(columns='gene').fillna(0).to_dict(orient='index')
+        # Add values to vfeats per gene
+        for gene in genes:
+            if gene in redin_vals.keys():
+                vfeats_tmp[gene] += list(redin_vals[gene].values())
+            else:
+                vfeats_tmp[gene] += [0, 0, 0, 0]
+        header_cols += ['redin_' + x for x in list(redin.columns)[1:]]
+
+    # Format output string of all variation features per gene
+    header = '\t'.join(header_cols)
+    variation_features = {}
+    for gene in genes:
+        vfeats_str = '\t'.join([str(x) for x in vfeats_tmp[gene]])
+        variation_features[gene] = vfeats_str
+
+    return header, variation_features
+
+
 def write_outbed(outbed, header, genes, txbt, tx_stats, genomic_features,
                  expression_features, chromatin_features, constraint_features,
                  variation_features):
@@ -825,7 +950,8 @@ def main():
     parser.add_argument('--roadmap-pca', help='Roadmap gene X tissue X state principal components. ' +
                         'Only used if --get-chromatin is specified.')
     parser.add_argument('--gnomad-constraint', help='gnomAD constraint tsv. Only ' +
-                        'used if --get-constraint is specified.')
+                        'used if --get-genomic, --get-constraint, or --get-variation ' +
+                        'are specified.')
     parser.add_argument('--exac-cnv', help='ExAC CNV constraint tsv. Only used ' +
                         'if --get-constraint is specified.')
     parser.add_argument('--rvis-tsv', help='RVIS tsv. Only used if --get-constraint ' +
@@ -844,8 +970,10 @@ def main():
     parser.add_argument('--asc-unaffected-dnms', help='ASC de novo mutation counts ' +
                         'per gene in unaffected probands. Only used if --get-variation ' +
                         'is specified.')
-    parser.add_argument('--gnomad-sv-vcf', help='gnomAD-SV VCF. Only used if ' +
-                        '--get-variation is specified.')
+    parser.add_argument('--gnomad-svs', help='gnomAD-SV gene variant counts. ' +
+                        'Only used if --get-variation is specified.')
+    parser.add_argument('--redin-bcas', help='tsv of BCA counts from Redin et al. ' +
+                        'Only used if --get-variation is specified.')
     parser.add_argument('--min-intron-size', type=int, default=4, help='Minimum ' +
                         'size of intron to retain (bp). [default: 4]')
     parser.add_argument('--no-scaling', action='store_true', help='Do not perform ' +
@@ -884,6 +1012,7 @@ def main():
             chrom_stats = None
         header_add, genomic_features = get_genomic_features(genes, txbt, exonbt, 
                                                             tx_stats,
+                                                            args.gnomad_constraint,
                                                             args.min_intron_size,
                                                             chrom_stats,
                                                             args.ref_fasta,
@@ -929,7 +1058,7 @@ def main():
             get_variation_features(genes, ensg_ids, tx_stats, txbt, exonbt, 
                                     gene_to_ensg, args.gnomad_constraint, 
                                     args.ddd_dnms, args.asc_dnms, args.asc_unaffected_dnms, 
-                                    args.gnomad_sv_vcf, args.redin_bcas)
+                                    args.gnomad_svs, args.redin_bcas)
         outbed_header = outbed_header + '\t' + header_add
     else:
         variation_features = None

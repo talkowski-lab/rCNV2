@@ -152,6 +152,35 @@ We collected the following chromatin-based gene features:
 
 All chromatin data was based on the [Roadmap Epigenomics dataset](https://www.nature.com/articles/nature14248) using the expanded 18-state ChromHMM model on 98 tissues [as described here](https://egg2.wustl.edu/roadmap/web_portal/chr_state_learning.html).  
 
+#### Gene features: human genetic variation
+
+We collected the following gene features related to reported genetic variation in humans:  
+
+| Feature name | Abbreviation | Description | Source |  
+| :--- | :--- | :--- | :--- |  
+| Loss-of-function short variants in gnomAD | `gnomad_obs_syn` | Number of synonymous short variants observed in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _Nature_, 2020)](https://pubmed.ncbi.nlm.nih.gov/32461654) |  
+| Loss-of-function short variants in gnomAD | `gnomad_obs_mis` | Number of missense short variants observed in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _Nature_, 2020)](https://pubmed.ncbi.nlm.nih.gov/32461654) |  
+| Loss-of-function short variants in gnomAD | `gnomad_obs_lof` | Number of loss-of-function short variants observed in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _Nature_, 2020)](https://pubmed.ncbi.nlm.nih.gov/32461654) |  
+| All loss-of-function structural variants in gnomAD-SV | `gnomad_sv_lof_any` | Total number of loss-of-function structural variants observed in the non-neuro subset of gnomAD-SV | gnomAD-SV v2.1, non-neuro [(Collins _et al._, _Nature_, 2020)](https://www.nature.com/articles/s41586-020-2287-8) |  
+| Loss-of-function deletions in gnomAD-SV | `gnomad_sv_lof_del` | Number of loss-of-function deletions observed in the non-neuro subset of gnomAD-SV | gnomAD-SV v2.1, non-neuro [(Collins _et al._, _Nature_, 2020)](https://www.nature.com/articles/s41586-020-2287-8) |  
+| Non-deletion loss-of-function structural variants in gnomAD-SV | `gnomad_sv_lof_del` | Number of non-deletion loss-of-function structural variants observed in the non-neuro subset of gnomAD-SV | gnomAD-SV v2.1, non-neuro [(Collins _et al._, _Nature_, 2020)](https://www.nature.com/articles/s41586-020-2287-8) |  
+| Whole-gene copy gains in gnomAD-SV | `gnomad_sv_cg` | Total number of whole-gene copy gains observed in the non-neuro subset of gnomAD-SV | gnomAD-SV v2.1, non-neuro [(Collins _et al._, _Nature_, 2020)](https://www.nature.com/articles/s41586-020-2287-8) |  
+| Intragenic exonic duplications in gnomAD-SV | `gnomad_sv_ied` | Total number of intragenic exonic duplications observed in the non-neuro subset of gnomAD-SV | gnomAD-SV v2.1, non-neuro [(Collins _et al._, _Nature_, 2020)](https://www.nature.com/articles/s41586-020-2287-8) |  
+| _De novo_ loss-of-function mutations in DDD | `ddd_dn_lof` | Number of _de novo_ loss-of-function mutations reported in the DDD | Deciphering Developmental Disorders [(Kaplanis _et al._, _bioRxiv_, 2020)](https://www.biorxiv.org/content/10.1101/797787v3) |  
+| _De novo_ missense mutations in DDD | `ddd_dn_mis` | Number of _de novo_ loss-of-function mutations reported in the DDD | Deciphering Developmental Disorders [(Kaplanis _et al._, _bioRxiv_, 2020)](https://www.biorxiv.org/content/10.1101/797787v3) |  
+| _De novo_ synonymous mutations in DDD | `ddd_dn_syn` | Number of _de novo_ loss-of-function mutations reported in the DDD | Deciphering Developmental Disorders [(Kaplanis _et al._, _bioRxiv_, 2020)](https://www.biorxiv.org/content/10.1101/797787v3) |  
+| _De novo_ loss-of-function mutations in ASC probands | `asc_dn_lof` | Number of _de novo_ loss-of-function mutations reported in affected probands in the ASC | ASC [(Satterstrom _et al._, _Cell_, 2020)](https://pubmed.ncbi.nlm.nih.gov/31981491/) |  
+| _De novo_ missense mutations in ASC probands | `asc_dn_mis` | Number of _de novo_ missense mutations reported in affected probands in the ASC | ASC [(Satterstrom _et al._, _Cell_, 2020)](https://pubmed.ncbi.nlm.nih.gov/31981491/) |  
+| _De novo_ synonymous mutations in ASC probands | `asc_dn_syn` | Number of _de novo_ synonymous mutations reported in affected probands in the ASC | ASC [(Satterstrom _et al._, _Cell_, 2020)](https://pubmed.ncbi.nlm.nih.gov/31981491/) |  
+| _De novo_ loss-of-function mutations in ASC siblings | `asc_unaffected_dn_lof` | Number of _de novo_ loss-of-function mutations reported in unaffected siblings in the ASC | ASC [(Satterstrom _et al._, _Cell_, 2020)](https://pubmed.ncbi.nlm.nih.gov/31981491/) |  
+| _De novo_ missense mutations in ASC siblings | `asc_unaffected_dn_mis` | Number of _de novo_ missense mutations reported in unaffected siblings in the ASC | ASC [(Satterstrom _et al._, _Cell_, 2020)](https://pubmed.ncbi.nlm.nih.gov/31981491/) |  
+| _De novo_ synonymous mutations in ASC siblings | `asc_unaffected_dn_syn` | Number of _de novo_ synonymous mutations reported in unaffected siblings in the ASC | ASC [(Satterstrom _et al._, _Cell_, 2020)](https://pubmed.ncbi.nlm.nih.gov/31981491/) |  
+| Translocations in congenital anomalies | `redin_tloc` | Number of _de novo_ or disease-segregating gene-disruptive simple translocations in congenital anomalies | DGAP [(Redin _et al._, _Nat. Genet._, 2017)](https://pubmed.ncbi.nlm.nih.gov/27841880/) |  
+| Inversions in congenital anomalies | `redin_inv` | Number of _de novo_ or disease-segregating gene-disruptive simple inversions in congenital anomalies | DGAP [(Redin _et al._, _Nat. Genet._, 2017)](https://pubmed.ncbi.nlm.nih.gov/27841880/) |  
+| Complex rearrangements in congenital anomalies | `redin_cpx` | Number of _de novo_ or disease-segregating gene-disruptive complex rearrangements in congenital anomalies | DGAP [(Redin _et al._, _Nat. Genet._, 2017)](https://pubmed.ncbi.nlm.nih.gov/27841880/) |  
+| Balanced chromosomal abnormalities in congenital anomalies | `redin_any_bca` | Number of _de novo_ or disease-segregating gene-disruptive balanced chromosomal abnormalities in congenital anomalies | DGAP [(Redin _et al._, _Nat. Genet._, 2017)](https://pubmed.ncbi.nlm.nih.gov/27841880/) |  
+
+
 ## Gene set definitions  
 
 Throughout our analyses, we reference various subsets of genes. These are defined below.  

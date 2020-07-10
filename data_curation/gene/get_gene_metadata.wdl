@@ -53,12 +53,23 @@ workflow get_gene_metadata {
         contig=contig[0],
         rCNV_bucket=rCNV_bucket
     }
-    call join_data {
+    call get_variation_data {
       input:
-        genomic_metadata=get_genomic_data.metadata_table,
-        expression_metadata=get_expression_data.metadata_table,
-        chromatin_metadata=get_chromatin_data.metadata_table,
-        constraint_metadata=get_constraint_data.metadata_table,
+        gtf=gtf,
+        ref_fasta=ref_fasta,
+        ref_fasta_idx=ref_fasta_idx,
+        prefix=gtf_prefix,
+        contig=contig[0],
+        rCNV_bucket=rCNV_bucket
+    }
+    call join_data as join_data_no_variation {
+      input:
+        metadata_tables=[get_genomic_data.metadata_table, get_expression_data.metadata_table, get_chromatin_data.metadata_table, get_constraint_data.metadata_table],
+        prefix="${gtf_prefix}.merged_features.no_variation.${contig[0]}"
+    }
+    call join_data as join_data_with_variation {
+      input:
+        metadata_tables=[get_genomic_data.metadata_table, get_expression_data.metadata_table, get_chromatin_data.metadata_table, get_constraint_data.metadata_table, get_variation_data.metadata_table],
         prefix="${gtf_prefix}.merged_features.${contig[0]}"
     }
   }
@@ -96,9 +107,25 @@ workflow get_gene_metadata {
       eigen_prefix="constraint_eigenfeature",
       rCNV_bucket=rCNV_bucket
   }
+  call cat_metadata as merge_variation_data {
+    input:
+      data_shards=get_variation_data.metadata_table,
+      eigenfeatures_min_var_exp=eigenfeatures_min_var_exp,
+      prefix="${gtf_prefix}.variation_features",
+      eigen_prefix="variation_eigenfeature",
+      rCNV_bucket=rCNV_bucket
+  }
+  call cat_metadata as merge_joined_data_no_variation {
+    input:
+      data_shards=join_data_no_variation.metadata_table,
+      eigenfeatures_min_var_exp=eigenfeatures_min_var_exp,
+      prefix="${gtf_prefix}.all_features.no_variation",
+      eigen_prefix="joined_eigenfeature_no_variation",
+      rCNV_bucket=rCNV_bucket
+  }
   call cat_metadata as merge_joined_data {
     input:
-      data_shards=join_data.metadata_table,
+      data_shards=join_data_with_variation.metadata_table,
       eigenfeatures_min_var_exp=eigenfeatures_min_var_exp,
       prefix="${gtf_prefix}.all_features",
       eigen_prefix="joined_eigenfeature",
@@ -115,6 +142,10 @@ workflow get_gene_metadata {
     File genes_chromatin_eigen_metadata = merge_chromatin_data.merged_data_eigen
     File genes_constraint_metadata = merge_constraint_data.merged_data
     File genes_constraint_eigen_metadata = merge_constraint_data.merged_data_eigen
+    File genes_variation_metadata = merge_variation_data.merged_data
+    File genes_variation_eigen_metadata = merge_variation_data.merged_data_eigen
+    File genes_joined_no_variation_metadata = merge_joined_data_no_variation.merged_data
+    File genes_joined_no_variation_eigen_metadata = merge_joined_data_no_variation.merged_data_eigen
     File genes_joined_metadata = merge_joined_data.merged_data
     File genes_joined_eigen_metadata = merge_joined_data.merged_data_eigen
   }
@@ -134,6 +165,7 @@ task get_genomic_data {
     set -e
 
     # Download necessary data & references
+    wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
     mkdir refs/
     gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/** refs/
     gsutil -m cp ${rCNV_bucket}/refs/** refs/
@@ -159,6 +191,7 @@ task get_genomic_data {
       --centro-telo-bed refs/GRCh37.centromeres_telomeres.bed.gz \
       --ref-fasta ref.fa.gz \
       --athena-tracks gene_features.athena_tracklist.tsv \
+      --gnomad-constraint gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
       --outbed ${prefix}.genomic_features.${contig}.bed.gz \
       --bgzip \
       subset.gtf.gz
@@ -320,22 +353,70 @@ task get_constraint_data {
   }
 }
 
+
+# Collect variation metadata for all genes from a single contig
+task get_variation_data {
+  File gtf
+  File ref_fasta
+  File ref_fasta_idx
+  String prefix
+  String contig
+  String rCNV_bucket
+
+  command <<<
+    set -e
+
+    # Download necessary data & references
+    wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
+    mkdir refs/
+    gsutil -m cp ${rCNV_bucket}/analysis/paper/data/misc/** refs/
+
+    # Subset input files to chromosome of interest
+    tabix -f ${gtf}
+    tabix -h ${gtf} ${contig} | bgzip -c > subset.gtf.gz
+    samtools faidx ${ref_fasta} ${contig} \
+    | bgzip -c \
+    > ref.fa.gz
+    samtools faidx ref.fa.gz
+
+    # Collect genomic metadata
+    /opt/rCNV2/data_curation/gene/get_gene_features.py \
+      --get-variation \
+      --gnomad-constraint gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
+      --ddd-dnms refs/ddd_dnm_counts.tsv.gz \
+      --asc-dnms refs/asc_dnm_counts.tsv.gz \
+      --asc-unaffected-dnms refs/asc_dnm_counts.unaffecteds.tsv.gz \
+      --gnomad-svs refs/gnomad_sv_nonneuro_counts.tsv.gz \
+      --redin-bcas refs/redin_bca_counts.tsv.gz \
+      --outbed ${prefix}.variation_features.${contig}.bed.gz \
+      --bgzip \
+      subset.gtf.gz
+  >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:9da6bae9884d16b82a7bc702c52a6646529d014b529062b4df19d6f3ee1acc7d"
+    preemptible: 1
+    memory: "4 GB"
+    disks: "local-disk 100 SSD"
+    bootDiskSizeGb: "20"
+  }
+
+  output {
+   File metadata_table = "${prefix}.variation_features.${contig}.bed.gz"
+  }
+}
+
+
 # Join metadata for multiple conditions
 task join_data {
-  File genomic_metadata
-  File expression_metadata
-  File chromatin_metadata
-  File constraint_metadata
+  Array[File] metadata_tables
   String prefix
 
   command <<<
     set -e
 
     /opt/rCNV2/data_curation/gene/join_gene_metadata.R \
-      ${genomic_metadata} \
-      ${expression_metadata} \
-      ${chromatin_metadata} \
-      ${constraint_metadata} \
+      ${sep=" " metadata_tables} \
     | bgzip -c \
     > ${prefix}.bed.gz
   >>>

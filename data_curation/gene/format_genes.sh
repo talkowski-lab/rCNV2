@@ -163,6 +163,7 @@ done > gene_features.athena_tracklist.tsv
   --centro-telo-bed refs/GRCh37.centromeres_telomeres.bed.gz \
   --ref-fasta ${ref_fasta} \
   --athena-tracks gene_features.athena_tracklist.tsv \
+  --gnomad-constraint gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
   --outbed gencode.v19.canonical.pext_filtered.genomic_features.bed.gz \
   --bgzip \
   gencode.v19.canonical.pext_filtered.gtf.gz
@@ -217,7 +218,8 @@ wget https://doi.org/10.1371/journal.pgen.1001154.s002
   --ddd-dnms refs/ddd_dnm_counts.tsv.gz \
   --asc-dnms refs/asc_dnm_counts.tsv.gz \
   --asc-unaffected-dnms refs/asc_dnm_counts.unaffecteds.tsv.gz \
-  --gnomad-sv-vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
+  --gnomad-svs refs/gnomad_sv_nonneuro_counts.tsv.gz \
+  --redin-bcas refs/redin_bca_counts.tsv.gz \
   --outbed gencode.v19.canonical.pext_filtered.variation_features.bed.gz \
   --bgzip \
   gencode.v19.canonical.pext_filtered.gtf.gz
