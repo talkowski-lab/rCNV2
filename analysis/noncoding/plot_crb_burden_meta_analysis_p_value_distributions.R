@@ -59,17 +59,17 @@ pairs <- data.frame("p"=as.vector(unlist(x)),
                     "s"=as.vector(unlist(s)))
 pairs$p[which(is.na(pairs$p))] <- 1
 pairs$s[which(is.na(pairs$s))] <- 1
-pairs <- pairs[-which(pairs$p>=0.05 & pairs$s>=0.05), ]
-sig.pairs.idx <- which(-log10(pairs$p)>6 & pairs$s<0.05)
+pairs <- pairs[-which(pairs$p>=0.9 & pairs$s>=0.9), ]
+sig.pairs.idx <- which(pairs$p<0.000003226431 & pairs$s<0.05)
 
 png("~/scratch/rCNV.crb_burden.primary_vs_secondary_pvalues.png", height=300*5, width=300*5, res=300)
 plot(-log10(pairs$p), -log10(pairs$s), cex=0.2,
      panel.first=c(abline(0, 1, lty=2, col="gray50")),
-     xlim=c(0, 20), ylim=c(0, 20),
+     xlim=c(0, 10), ylim=c(0, 10),
      xlab="-log10(P) Primary", ylab="-log10(P) Secondary",
      main="Primary vs. Secondary P-Values\nAll phenotypes & all CNV types")
 points(-log10(pairs$p)[sig.pairs.idx], -log10(pairs$s)[sig.pairs.idx], 
        pch=19, cex=0.2, col="red")
-rect(xleft=0, xright=-log10(0.05), ybottom=0, ytop=-log10(0.05), col="black")
+# rect(xleft=0, xright=-log10(0.05), ybottom=0, ytop=-log10(0.05), col="black")
 dev.off()
 

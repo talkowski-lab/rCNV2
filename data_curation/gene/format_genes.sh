@@ -28,6 +28,7 @@ alias addcom="sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta'"
 mkdir refs/
 gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/** refs/
 gsutil -m cp ${rCNV_bucket}/refs/** refs/
+gsutil -m cp ${rCNV_bucket}/analysis/paper/data/misc/** refs/
 
 
 # Download all gene data from Gencode v19
@@ -142,7 +143,7 @@ gsutil -m cp -r roadmap_stats \
   ${rCNV_bucket}/cleaned_data/genes/annotations/
 # Print HTML-formatted rows for README from ChromHMM data (helper function)
 gsutil -m cp ${rCNV_bucket}/refs/REP_state_manifest.tsv ./
-/opt/rCNV2/data_curation/gene/print_chromhmm_readme_rows.py REP_state_manifest.tsv
+/opt/rCNV2/data_curation/gene/print_chromhmm_readme_rows.py REP_state_manifest.tsv  
 
 
 # Gather per-gene metadata (genomic)
@@ -205,6 +206,19 @@ wget https://doi.org/10.1371/journal.pgen.1001154.s002
   --eds-tsv EDS.Wang_2018.tsv.gz \
   --hi-tsv journal.pgen.1001154.s002 \
   --outbed gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
+  --bgzip \
+  gencode.v19.canonical.pext_filtered.gtf.gz
+
+
+# Gather per-gene metadata (variation)
+/opt/rCNV2/data_curation/gene/get_gene_features.py \
+  --get-variation \
+  --gnomad-constraint gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
+  --ddd-dnms refs/ddd_dnm_counts.tsv.gz \
+  --asc-dnms refs/asc_dnm_counts.tsv.gz \
+  --asc-unaffected-dnms refs/asc_dnm_counts.unaffecteds.tsv.gz \
+  --gnomad-sv-vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
+  --outbed gencode.v19.canonical.pext_filtered.variation_features.bed.gz \
   --bgzip \
   gencode.v19.canonical.pext_filtered.gtf.gz
 

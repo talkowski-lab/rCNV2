@@ -496,14 +496,50 @@ done < refs/test_phenotypes.list
 
 
 
-# # DEV: get significant CRBs
+
+# Extract CRBs meeting all significance criteria
+mkdir meta_res/
+# Download data
+while read prefix hpo; do
+  for CNV in DEL DUP; do
+    echo -e "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/stats/${prefix}.${freq_code}.**$CNV.crb_burden.meta_analysis.stats.bed.gz"
+  done
+done < ${phenotype_list} \
+| gsutil -m cp -I meta_res/
+for CNV in DEL DUP; do
+  # Build input files
+  for x in coding noncoding; do
+    if [ -e ${freq_code}.${x}.sig_crb_input.${CNV}.tsv ]; then
+      rm ${freq_code}.${x}.sig_crb_input.${CNV}.tsv
+    fi
+  done
+  while read prefix hpo; do
+    echo -e "${hpo}\tmeta_res/${prefix}.${freq_code}.${noncoding_filter}_noncoding.${CNV}.crb_burden.meta_analysis.stats.bed.gz" \
+    >> ${freq_code}.noncoding.sig_crb_input.${CNV}.tsv
+    echo -e "${hpo}\tmeta_res/${prefix}.${freq_code}.${CNV}.crb_burden.meta_analysis.stats.bed.gz" \
+    >> ${freq_code}.coding.sig_crb_input.${CNV}.tsv
+  done < ${phenotype_list}
+  # Extract significant CRBs
+  /opt/rCNV2/analysis/noncoding/get_sig_crbs.py \
+    --sumstats ${freq_code}.noncoding.sig_crb_input.${CNV}.tsv \
+    --primary-p ${meta_p_cutoff} \
+    --secondary-p 0.05 \
+    --n-nominal 2 \
+    --secondary-or-nominal \
+    --cnv ${CNV} \
+    --outfile ${freq_code}.sig_CRBs.${CNV}.bed.gz \
+    --bgzip
+    # --coding-sumstats ${freq_code}.coding.sig_crb_input.${CNV}.tsv \
+    # --coding-p ${meta_p_cutoff} \
+done
+# DEV: get significant CRBs
 # for CNV in DEL DUP; do
 #   echo -e "\n\n\n${CNV}"
 #   while read prefix hpo; do
 #     zcat meta_res/${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed.gz \
 #     | fgrep -v "#" \
 #     | awk -v FS="\t" -v OFS="\t" -v prefix=$prefix -v CNV=$CNV \
-#       '{ if ($13>=5.684863 && $13!="NA" && ($5>1 || ($18>=1.30103 && $18!="NA"))) print $1, $2, $3, $4, CNV, prefix, $9 }'
+#       '{ if ($13>=5.491278 && $13!="NA" && ($5>1 || ($18>=1.30103 && $18!="NA"))) print $1, $2, $3, $4, CNV, prefix, $9 }'
 #   done < ${phenotype_list} \
 #   | sort -k4,4V -Vk1,1 -k2,2n -k3,3n -k6,6V -k5,5V 
 # done

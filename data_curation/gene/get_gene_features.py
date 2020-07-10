@@ -747,7 +747,8 @@ def get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ens
 
 
 def write_outbed(outbed, header, genes, txbt, tx_stats, genomic_features,
-                 expression_features, chromatin_features, constraint_features):
+                 expression_features, chromatin_features, constraint_features,
+                 variation_features):
     """
     Format output table of features and write to output BED file
     """
@@ -775,6 +776,9 @@ def write_outbed(outbed, header, genes, txbt, tx_stats, genomic_features,
         if constraint_features is not None:
             outstr = outstr + '\t' + constraint_features[gene]            
 
+        if variation_features is not None:
+            outstr = outstr + '\t' + variation_features[gene]            
+
         outbed.write(outstr + '\n')
 
     # Close connection to flush buffer
@@ -799,6 +803,8 @@ def main():
                         'chromatin features. [default: False]')
     parser.add_argument('--get-constraint', action='store_true', help='Collect ' +
                         'evolutionary constraint features. [default: False]')
+    parser.add_argument('--get-variation', action='store_true', help='Collect ' +
+                        'genetic variation metadata. [default: False]')
     parser.add_argument('--centro-telo-bed', help='BED file indicating ' + 
                         'centromere & telomere positions per chromosome.')
     parser.add_argument('--ref-fasta', help='Reference fasta file. Only necessary ' +
@@ -830,6 +836,16 @@ def main():
                         '--get-constraint is specified.')
     parser.add_argument('--phastcons-bw-url', help='URL to phastCons bigWig.',
                         default='http://hgdownload.soe.ucsc.edu/goldenPath/hg19/phastCons100way/hg19.100way.phastCons.bw')
+    parser.add_argument('--ddd-dnms', help='DDD de novo mutation counts per gene. ' +
+                        'Only used if --get-variation is specified.')
+    parser.add_argument('--asc-dnms', help='ASC de novo mutation counts per gene ' +
+                        'in affected probands. Only used if --get-variation is ' +
+                        'specified.')
+    parser.add_argument('--asc-unaffected-dnms', help='ASC de novo mutation counts ' +
+                        'per gene in unaffected probands. Only used if --get-variation ' +
+                        'is specified.')
+    parser.add_argument('--gnomad-sv-vcf', help='gnomAD-SV VCF. Only used if ' +
+                        '--get-variation is specified.')
     parser.add_argument('--min-intron-size', type=int, default=4, help='Minimum ' +
                         'size of intron to retain (bp). [default: 4]')
     parser.add_argument('--no-scaling', action='store_true', help='Do not perform ' +
@@ -907,9 +923,21 @@ def main():
     else:
         constraint_features = None
 
+    # Get variation metadata, if optioned
+    if args.get_variation:
+        header_add, variation_features = \
+            get_variation_features(genes, ensg_ids, tx_stats, txbt, exonbt, 
+                                    gene_to_ensg, args.gnomad_constraint, 
+                                    args.ddd_dnms, args.asc_dnms, args.asc_unaffected_dnms, 
+                                    args.gnomad_sv_vcf, args.redin_bcas)
+        outbed_header = outbed_header + '\t' + header_add
+    else:
+        variation_features = None
+
     # Format output table of features
     write_outbed(outbed, outbed_header, genes, txbt, tx_stats, genomic_features,
-                 expression_features, chromatin_features, constraint_features)
+                 expression_features, chromatin_features, constraint_features,
+                 variation_features)
     if args.outbed is not None \
     and args.outbed not in 'stdout -'.split() \
     and args.bgzip:

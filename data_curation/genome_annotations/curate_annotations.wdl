@@ -283,6 +283,12 @@ workflow curate_annotations {
       outfile_prefix="${prefix}.crb_elements",
       out_bucket="${rCNV_bucket}/cleaned_data/genome_annotations/"
   }
+  call merge_final_beds as merge_crb_whitelists {
+    input:
+      beds=cluster_elements.crb_whitelist,
+      outfile_prefix="${prefix}.crb_whitelist",
+      out_bucket="${rCNV_bucket}/cleaned_data/genome_annotations/"
+  }
   
   
   # Final outputs
@@ -669,9 +675,10 @@ task merge_final_beds {
     set -e
 
     # Merge all stats
-    zcat ${beds[0]} | sed -n '1p' > header.tsv
-    zcat ${sep=" " beds} | grep -ve '^#' | cat header.tsv - | bgzip -c \
-    > ${outfile_prefix}.bed.gz
+    zcat ${beds[0]} | sed -n '1p' | grep -e '^#' > ${outfile_prefix}.bed || true
+    zcat ${sep=" " beds} | grep -ve '^#' \
+    >> ${outfile_prefix}.bed
+    bgzip -f ${outfile_prefix}.bed
     tabix -f ${outfile_prefix}.bed.gz
 
     # Copy merged BED gs:// bucket

@@ -4,6 +4,8 @@ Below, we describe curation steps for other datasets not already listed in a dif
 
 * Previously reported genomic disorders  
 * Predicted NAHR-mediated CNV loci  
+* _De novo_ point mutations from exome sequencing studies of neurodevelopmental disorders
+* Balanced chromosomal abnormality breakpoints from sequencing studies of congenital anomalies
 
 
 ---  
@@ -57,3 +59,20 @@ After defining candidate pairs of segmental duplications (above), we collapsed o
 2. \>50% reciprocal overlap of intervening sequence  
 
 For each cluster of segmental duplication pairs, we retained the pair with the smallest intervening (_i.e._, spanning) distance, and used the innermost coordinates for analysis purposes.  
+
+
+---  
+
+## _De novo_ mutations in neurodevelopmental disorders  
+
+TBD
+
+---  
+
+## Chromosomal rearrangement breakpoints in congenital anomalies  
+
+We curated breakpoints from balanced chromosomal abnormalities (BCAs) defined at sequence resolution in subjects with congenital anomalies from [Redin _et al._, _Nat. Genet._ (2016)](https://www.nature.com/articles/ng.3720).  
+
+We extracted all breakpoints as reported in the supplement of Redin _et al._, and further restricted the dataset as follows:  
+1. Breakpoint must be resolved at sequence resolution; 
+2. Rearrangement must either be confirmed as _de novo_ in affected subject, or confirmed to segregate with disease in the family (if multiple members were affected).  

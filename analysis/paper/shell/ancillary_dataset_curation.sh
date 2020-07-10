@@ -23,9 +23,11 @@ export prefix="rCNV2_analysis_d1"
 
 # Download necessary reference files and metadata
 gsutil -m cp \
+  ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
   ${rCNV_bucket}/raw_data/other/satterstrom_asc_dnms.raw.tsv.gz \
-  ${rCNV_bucket}/cleaned_data/genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
+  ${rCNV_bucket}/raw_data/other/redin_2017.bca_breakpoints.all.tsv.gz \
+  ${rCNV_bucket}/analysis/analysis_refs/GRCh37.genome \
   ./
 
 
@@ -52,6 +54,17 @@ wget https://www.biorxiv.org/content/biorxiv/early/2020/04/01/797787/DC4/embed/m
   -z
 
 
+# Reformat Redin 2017 translocation & inversion breakpoints
+/opt/rCNV2/data_curation/other/curate_redin_bcas.py \
+  --redin-tsv redin_2017.bca_breakpoints.all.tsv.gz \
+  --gtf gencode.v19.canonical.pext_filtered.gtf.gz \
+  --genes gencode.v19.canonical.pext_filtered.genes.list \
+  --genome GRCh37.genome \
+  -o redin_bca_counts.tsv.gz \
+  --outbed redin_bca_breakpoints.bed.gz \
+  -z
+
+
 # Download & reformat gnomAD mutation rate table
 wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
 /opt/rCNV2/data_curation/other/clean_gnomad_mutation_rates.R \
@@ -61,9 +74,11 @@ wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnoma
 gzip -f gene_mutation_rates.tsv
 
 
-# Copy curated DNMs and mutation rates to gs:// bucket (note: requires permissions)
+# Copy curated DNMs, BCAs, and mutation rates to gs:// bucket (note: requires permissions)
 gsutil -m cp \
   ddd_dnm_counts.tsv.gz \
   asc_dnm_counts*tsv.gz \
+  redin_bca_counts.tsv.gz \
+  redin_bca_breakpoints.bed.gz \
   gene_mutation_rates.tsv.gz \
   ${rCNV_bucket}/analysis/paper/data/misc/

@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens per cis-regulatory block (CRB)
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_crb_burden_perm_test/versions/2/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_crb_burden_perm_test/versions/3/plain-WDL/descriptor" as scattered_perm
 
 
 workflow crb_burden_analysis {
@@ -69,8 +69,6 @@ workflow crb_burden_analysis {
         pad_controls=pad_controls,
         min_element_ovr=min_element_ovr,
         min_frac_all_elements=min_frac_all_elements,
-        p_cutoff=p_cutoff,
-        max_manhattan_phred_p=max_manhattan_phred_p,
         rCNV_bucket=rCNV_bucket,
         prefix=pheno[0],
         cache_string=fisher_cache_string
@@ -273,7 +271,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7d70cf3115e4a99652db564b213abbaa5fc5bdb5605f6bc1bfd9ee622deb6328"
+    docker: "talkowski/rcnv@sha256:a486e234f2ddc9c58e7402a5e5c1600f4b02a9c57ab054402e1035dca1774050"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -298,8 +296,6 @@ task coding_burden_test {
   Int pad_controls
   Float min_element_ovr
   Float min_frac_all_elements
-  Float p_cutoff
-  Int max_manhattan_phred_p
   String rCNV_bucket
   String prefix
   String cache_string
@@ -359,9 +355,10 @@ task coding_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7d70cf3115e4a99652db564b213abbaa5fc5bdb5605f6bc1bfd9ee622deb6328"
+    docker: "talkowski/rcnv@sha256:a486e234f2ddc9c58e7402a5e5c1600f4b02a9c57ab054402e1035dca1774050"
     preemptible: 1
-    memory: "4 GB"
+    memory: "16 GB"
+    disks: "local-disk 200 HDD"
     bootDiskSizeGb: "20"
   }
 
@@ -437,7 +434,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7d70cf3115e4a99652db564b213abbaa5fc5bdb5605f6bc1bfd9ee622deb6328"
+    docker: "talkowski/rcnv@sha256:a486e234f2ddc9c58e7402a5e5c1600f4b02a9c57ab054402e1035dca1774050"
     preemptible: 1
     memory: "32 GB"
     disks: "local-disk 275 HDD"
@@ -572,7 +569,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7d70cf3115e4a99652db564b213abbaa5fc5bdb5605f6bc1bfd9ee622deb6328"
+    docker: "talkowski/rcnv@sha256:a486e234f2ddc9c58e7402a5e5c1600f4b02a9c57ab054402e1035dca1774050"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -612,7 +609,7 @@ task coding_meta_analysis {
         echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.crb_burden.stats.bed.gz"
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.input.txt
-      
+
       /opt/rCNV2/analysis/noncoding/crb_meta_analysis.R \
         --or-corplot ${prefix}.${freq_code}.$CNV.crb_burden.or_corplot_grid.jpg \
         --model ${meta_model_prefix} \
@@ -638,7 +635,7 @@ task coding_meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:7d70cf3115e4a99652db564b213abbaa5fc5bdb5605f6bc1bfd9ee622deb6328"
+    docker: "talkowski/rcnv@sha256:a486e234f2ddc9c58e7402a5e5c1600f4b02a9c57ab054402e1035dca1774050"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
