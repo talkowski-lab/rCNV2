@@ -573,7 +573,10 @@ CNV="DEL"
 phenotype_list="test_phenotypes.list"
 raw_features_genomic="gencode.v19.canonical.pext_filtered.genomic_features.bed.gz"
 raw_features_expression="gencode.v19.canonical.pext_filtered.expression_features.bed.gz"
+raw_features_chromatin="gencode.v19.canonical.pext_filtered.chromatin_features.bed.gz"
 raw_features_constraint="gencode.v19.canonical.pext_filtered.constraint_features.bed.gz"
+raw_features_variation="gencode.v19.canonical.pext_filtered.variation_features.bed.gz"
+raw_features_merged_no_variation="gencode.v19.canonical.pext_filtered.all_features.no_variation.bed.gz"
 raw_features_merged="gencode.v19.canonical.pext_filtered.all_features.bed.gz"
 rCNV_bucket="gs://rcnv_project"
 
@@ -587,16 +590,22 @@ gsutil -m cp \
 for wrapper in 1; do
   echo -e "Prior\tgrey70\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.genomic_features.tsv"
   echo -e "Posterior\t'#264653'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.genomic_features.tsv"
-  echo -e "Genomic features\t'#E76F51'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.tsv"
-  echo -e "Gene expression\t'#E9C46A'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.tsv"
-  echo -e "Gene constraint\t'#F4A261'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.tsv"
-  echo -e "Full model\t'#2A9D8F'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.tsv"
+  echo -e "Genomic features\t'#331C8C'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.tsv"
+  echo -e "Gene expression\t'#87C9F2'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.tsv"
+  echo -e "Chromatin\t'#3DAB9C'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.chromatin_features.tsv"
+  echo -e "Gene constraint\t'#027831'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.tsv"
+  echo -e "Variation\t'#E0CC70'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.variation_features.tsv"
+  echo -e "Full (no var.)\t'#CF6576'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features_no_variation.tsv"
+  echo -e "Full model\t'#AE3F9D'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.tsv"
 done > finemap_roc_input.tsv
 for wrapper in 1; do
-  echo -e "Genomic features\t'#E76F51'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.all_genes_from_blocks.tsv\t${raw_features_genomic}"
-  echo -e "Gene expression\t'#E9C46A'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.all_genes_from_blocks.tsv\t${raw_features_expression}"
-  echo -e "Gene constraint\t'#F4A261'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.all_genes_from_blocks.tsv\t${raw_features_constraint}"
-  echo -e "Full model\t'#2A9D8F'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.all_genes_from_blocks.tsv\t${raw_features_merged}"
+  echo -e "Genomic features\t'#331C8C'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.all_genes_from_blocks.tsv\t${raw_features_genomic}"
+  echo -e "Gene expression\t'#87C9F2'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.all_genes_from_blocks.tsv\t${raw_features_expression}"
+  echo -e "Chromatin\t'#3DAB9C'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.chromatin_features.all_genes_from_blocks.tsv\t${raw_features_chromatin}"
+  echo -e "Gene constraint\t'#027831'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.all_genes_from_blocks.tsv\t${raw_features_constraint}"
+  echo -e "Variation\t'#E0CC70'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.variation_features.all_genes_from_blocks.tsv\t${raw_features_variation}"
+  echo -e "Full (no var.)\t'#CF6576'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features_no_variation.all_genes_from_blocks.tsv\t${raw_features_merged_no_variation}"
+  echo -e "Full model\t'#AE3F9D'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.all_genes_from_blocks.tsv\t${raw_features_merged}"
 done > finemap_feature_cor_input.tsv
 
 # Make all gene truth sets

@@ -526,11 +526,11 @@ for CNV in DEL DUP; do
     --secondary-p 0.05 \
     --n-nominal 2 \
     --secondary-or-nominal \
+    --coding-sumstats ${freq_code}.coding.sig_crb_input.${CNV}.tsv \
+    --coding-p ${meta_p_cutoff} \
     --cnv ${CNV} \
     --outfile ${freq_code}.sig_CRBs.${CNV}.bed.gz \
     --bgzip
-    # --coding-sumstats ${freq_code}.coding.sig_crb_input.${CNV}.tsv \
-    # --coding-p ${meta_p_cutoff} \
 done
 # DEV: get significant CRBs
 # for CNV in DEL DUP; do

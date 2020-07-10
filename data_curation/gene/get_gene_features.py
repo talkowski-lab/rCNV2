@@ -393,7 +393,7 @@ def get_genomic_features(genes, txbt, exonbt, tx_stats, gnomad_tsv, min_intron_s
     if gnomad_tsv is not None:
         # Load gnomAD data
         gnomad = pd.read_csv(gnomad_tsv, delimiter='\t', compression='gzip')
-        keep_gnomad_cols = 'gene pLI mu_syn mu_mis mu_lof'
+        keep_gnomad_cols = 'gene mu_syn mu_mis mu_lof'
         gnomad = gnomad.loc[gnomad.gene.isin(genes), keep_gnomad_cols.split()]
         # Fill in missing genes and values with overall means
         gnomad_means = gnomad.iloc[:, 1:].apply(np.nanmean).to_dict()
@@ -621,7 +621,7 @@ def get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ens
         # Load gnomAD data
         gnomad = pd.read_csv(gnomad_tsv, delimiter='\t', compression='gzip')
         keep_gnomad_cols = 'gene pLI pNull pRec oe_mis oe_lof oe_mis_upper ' + \
-                           'oe_lof_upper mis_z lof_z'
+                           'oe_lof_upper syn_z mis_z lof_z'
         gnomad = gnomad.loc[gnomad.gene.isin(genes), keep_gnomad_cols.split()]
         # Fill in missing genes and values with overall means
         gnomad_means = gnomad.iloc[:, 1:].apply(np.nanmean).to_dict()
@@ -977,7 +977,7 @@ def main():
     parser.add_argument('--min-intron-size', type=int, default=4, help='Minimum ' +
                         'size of intron to retain (bp). [default: 4]')
     parser.add_argument('--no-scaling', action='store_true', help='Do not perform ' +
-                        'scaling & transformations to features.')
+                        'scaling & transformations to genomic features.')
     parser.add_argument('-o', '--outbed', help='Path to output BED file. ' +
                         '[default: stdout]')
     parser.add_argument('-z', '--bgzip', dest='bgzip', action='store_true',

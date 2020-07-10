@@ -155,7 +155,6 @@ samtools faidx Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz
 ref_fasta=Homo_sapiens.GRCh37.dna.primary_assembly.fa.gz
 for wrapper in 1; do 
   echo -e "refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz\tcoverage\trepeat_cov"
-  echo -e "refs/GRCh37.somatic_hypermutable_sites.bed.gz\tcoverage\thypermutable_cov"
   echo -e "https://hgdownload.soe.ucsc.edu/gbdb/hg19/bbi/wgEncodeCrgMapabilityAlign100mer.bw\tmap-mean\talign_100mer"
 done > gene_features.athena_tracklist.tsv
 /opt/rCNV2/data_curation/gene/get_gene_features.py \
@@ -164,6 +163,7 @@ done > gene_features.athena_tracklist.tsv
   --ref-fasta ${ref_fasta} \
   --athena-tracks gene_features.athena_tracklist.tsv \
   --gnomad-constraint gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
+  --no-scaling \
   --outbed gencode.v19.canonical.pext_filtered.genomic_features.bed.gz \
   --bgzip \
   gencode.v19.canonical.pext_filtered.gtf.gz

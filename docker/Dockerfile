@@ -76,7 +76,7 @@ ENV PATH /opt:$PATH
 # Install Athena toolkit
 RUN git clone https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/athena /opt/athena \
     && cd /opt/athena \
-    && git checkout b66722aa3b0329d21a8f0c2446159d999c8ddd03 \
+    && git checkout 883ab666387dea78bfd6c64f1ea9cd20c5f34797 \
     && cd -
 RUN cd /opt/athena \
     && pip install -e .
@@ -84,7 +84,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 2880478304e9568ab180f39eb2338af821f692ac && \
+    git checkout fdd1ec118acf66758eccf49d1e1114492f654ed1 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)

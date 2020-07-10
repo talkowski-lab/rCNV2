@@ -181,7 +181,6 @@ task get_genomic_data {
     # Prep athena input file
     for wrapper in 1; do 
       echo -e "refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz\tcoverage\trepeat_cov"
-      echo -e "refs/GRCh37.somatic_hypermutable_sites.bed.gz\tcoverage\thypermutable_cov"
       echo -e "https://hgdownload.soe.ucsc.edu/gbdb/hg19/bbi/wgEncodeCrgMapabilityAlign100mer.bw\tmap-mean\talign_100mer"
     done > gene_features.athena_tracklist.tsv
 
@@ -192,13 +191,15 @@ task get_genomic_data {
       --ref-fasta ref.fa.gz \
       --athena-tracks gene_features.athena_tracklist.tsv \
       --gnomad-constraint gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
+      --no-scaling \
       --outbed ${prefix}.genomic_features.${contig}.bed.gz \
       --bgzip \
       subset.gtf.gz
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:5239898782e9936bf377373935fce5829907f68276b35e196204ba3f4615496e"
+    # TODO: UPDATE DOCKER
+    # docker: "talkowski/rcnv@sha256:91695cf7e7a3074040a489eecfae6ae006cfccbe19d741da9c0324ba7916758b"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"
@@ -242,7 +243,7 @@ task get_expression_data {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
+    docker: "talkowski/rcnv@sha256:91695cf7e7a3074040a489eecfae6ae006cfccbe19d741da9c0324ba7916758b"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"
@@ -286,7 +287,7 @@ task get_chromatin_data {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
+    docker: "talkowski/rcnv@sha256:91695cf7e7a3074040a489eecfae6ae006cfccbe19d741da9c0324ba7916758b"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"
@@ -341,7 +342,7 @@ task get_constraint_data {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:9da6bae9884d16b82a7bc702c52a6646529d014b529062b4df19d6f3ee1acc7d"
+    docker: "talkowski/rcnv@sha256:91695cf7e7a3074040a489eecfae6ae006cfccbe19d741da9c0324ba7916758b"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"
@@ -394,7 +395,7 @@ task get_variation_data {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:9da6bae9884d16b82a7bc702c52a6646529d014b529062b4df19d6f3ee1acc7d"
+    docker: "talkowski/rcnv@sha256:91695cf7e7a3074040a489eecfae6ae006cfccbe19d741da9c0324ba7916758b"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"
@@ -422,7 +423,7 @@ task join_data {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
+    docker: "talkowski/rcnv@sha256:91695cf7e7a3074040a489eecfae6ae006cfccbe19d741da9c0324ba7916758b"
     preemptible: 1
     disks: "local-disk 50 SSD"
     bootDiskSizeGb: "20"
@@ -445,6 +446,11 @@ task cat_metadata {
   command <<<
     set -e
 
+    # Localize feature transformation metadata
+    gsutil -m cp \
+      ${rCNV_bucket}/analysis/analysis_refs/gene_feature_transformations.tsv \
+      ./
+
     zcat ${data_shards[0]} \
     | head -n1 \
     > header.txt
@@ -460,6 +466,8 @@ task cat_metadata {
       --min-variance ${eigenfeatures_min_var_exp} \
       --fill-missing mean \
       --skip-columns 4 \
+      --max-components 1000 \
+      --transformations-tsv gene_feature_transformations.tsv \
       --prefix ${eigen_prefix} \
       --bgzip \
       ${prefix}.bed.gz \
@@ -471,7 +479,7 @@ task cat_metadata {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:071cc1595d67604f517d31a5743961834d3ba6f9f95151d2a4a1e64708e307a9"
+    docker: "talkowski/rcnv@sha256:91695cf7e7a3074040a489eecfae6ae006cfccbe19d741da9c0324ba7916758b"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 100 SSD"

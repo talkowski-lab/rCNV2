@@ -38,25 +38,27 @@ We collected the following genome-based gene features:
 
 | Feature name | Abbreviation | Description | Source |  
 | :--- | :--- | :--- | :--- |  
-| Gene length | `gene_length` | Length of gene body corresponding to canonical transcript (log<sub>10</sub>-scaled) | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) |  
-| Dist. to nearest gene | `nearest_gene` | Distance to nearest other gene (log<sub>10</sub>-scaled). Defaults to zero for overlapping genes. | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
+| Gene length | `gene_length` | Length of gene body corresponding to canonical transcript | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) |  
+| Dist. to nearest gene | `nearest_gene` | Distance to nearest other gene. Defaults to zero for overlapping genes. | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
 | Genes within 1Mb | `genes_within_1mb` | Count of all other genes within ±1Mb of gene body | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) |  
-| Length of coding sequence | `cds_length` | Length of coding sequence (log<sub>10</sub>-scaled) | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
+| Length of coding sequence | `cds_length` | Length of coding sequence | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
 | Number of exons | `n_exons` | Number of non-overlapping exons | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
-| Min. exon size | `min_exon_size` | Size of smallest exon (log<sub>10</sub>-scaled) | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
-| Median exon size | `med_exon_size` | Median exon size (log<sub>10</sub>-scaled) | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
-| Max. exon size | `max_exon_size` | Size of largest exon (log<sub>10</sub>-scaled) | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
-| Min. intron size | `min_intron_size` | Size of smallest intron (log<sub>10</sub>-scaled). Defauts to zero for single-exon genes. | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
-| Median intron size | `med_intron_size` | Median intron size (log<sub>10</sub>-scaled). Defauts to zero for single-exon genes. | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
-| Max. intron size | `max_intron_size` | Size of largest intron (log<sub>10</sub>-scaled). Defauts to zero for single-exon genes. | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
+| Min. exon size | `min_exon_size` | Size of smallest exon | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
+| Median exon size | `med_exon_size` | Median exon size | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
+| Max. exon size | `max_exon_size` | Size of largest exon | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
+| Min. intron size | `min_intron_size` | Size of smallest intron. Defauts to zero for single-exon genes. | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
+| Median intron size | `med_intron_size` | Median intron size. Defauts to zero for single-exon genes. | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
+| Max. intron size | `max_intron_size` | Size of largest intron. Defauts to zero for single-exon genes. | Gencode v19 [(Harrow _et al._, _Genome Res._, 2012)](https://www.ncbi.nlm.nih.gov/pubmed/22955987) | 
 | Dist. to telomere | `telomere_dist` | Absolute distance to nearest telomere | [UCSC Genome Browser](http://genome.ucsc.edu) |    
 | Dist. to centromere | `centromere_dist` | Absolute distance to nearest centromere | [UCSC Genome Browser](http://genome.ucsc.edu) |  
 | Norm. dist. to telomere | `telomere_dist_norm` | Distance to nearest telomere, normalized to chromosome arm length | [UCSC Genome Browser](http://genome.ucsc.edu) |    
 | Norm. dist. to centromere | `centromere_dist_norm` | Distance to nearest centromere, normalized to chromosome arm length | [UCSC Genome Browser](http://genome.ucsc.edu) |  
 | GC content | `gc_pct` | Fraction of G/C nucleotides within gene body | [UCSC Genome Browser](http://genome.ucsc.edu) |  
 | Repetitive sequence content | `repeat_cov` | Fraction of gene body covered by segmental duplications and/or simple/low-complexity/satellite repeats | [UCSC Genome Browser](http://genome.ucsc.edu) |  
-| Hypermutable region content | `repeat_cov` | Fraction of gene body covered by hypermutable sequences | Various sources as described in [_Collins\*, Brand\*, et al._ (2019)](https://broad.io/gnomad_sv) |  
 | Sequence alignability | `align_100mer` | Mean 100mer alignability score over the gene body | [UCSC Genome Browser](http://genome.ucsc.edu) |  
+| Synonymous mutation rate | `gnomad_mu_syn` | Expected rate of synonymous mutations | gnomAD v2.1 [(Karczewski _et al._, _Nature_, 2020)](https://pubmed.ncbi.nlm.nih.gov/32461654) |  
+| Missense mutation rate | `gnomad_mu_mis` | Expected rate of missense mutations | gnomAD v2.1 [(Karczewski _et al._, _Nature_, 2020)](https://pubmed.ncbi.nlm.nih.gov/32461654) |  
+| Loss-of-function mutation rate | `gnomad_mu_lof` | Expected rate of loss-of-function mutations | gnomAD v2.1 [(Karczewski _et al._, _Nature_, 2020)](https://pubmed.ncbi.nlm.nih.gov/32461654) |  
 
 #### Gene features: expression  
 
@@ -179,6 +181,27 @@ We collected the following gene features related to reported genetic variation i
 | Inversions in congenital anomalies | `redin_inv` | Number of _de novo_ or disease-segregating gene-disruptive simple inversions in congenital anomalies | DGAP [(Redin _et al._, _Nat. Genet._, 2017)](https://pubmed.ncbi.nlm.nih.gov/27841880/) |  
 | Complex rearrangements in congenital anomalies | `redin_cpx` | Number of _de novo_ or disease-segregating gene-disruptive complex rearrangements in congenital anomalies | DGAP [(Redin _et al._, _Nat. Genet._, 2017)](https://pubmed.ncbi.nlm.nih.gov/27841880/) |  
 | Balanced chromosomal abnormalities in congenital anomalies | `redin_any_bca` | Number of _de novo_ or disease-segregating gene-disruptive balanced chromosomal abnormalities in congenital anomalies | DGAP [(Redin _et al._, _Nat. Genet._, 2017)](https://pubmed.ncbi.nlm.nih.gov/27841880/) |  
+
+### Eigenfeature calculation  
+
+Following annotation of all features described above, we collapsed correlated annotations to retain the principal components, or "eigenfeatures," that captured at least 99% of inter-gene variance.  
+
+Prior to principal components analysis, we normalized the data in two steps, as follows:  
+1. All variables were transformed using Box-Cox power transformations (unless otherwise specified in the table below), and
+2. Following transformation, all variables were centered (mean = 0) and scaled (standard deviation = 1).  
+
+Exceptions to Box-Cox power transformations are listed below:  
+
+| Feature | Transformation | Reason |  
+| :--- | :--- | :--- |  
+| All `expression_component` features | None | By definition, features defined as principal components of other data need no additional transformation |  
+| All `chromatin_component` features | None | By definition, features defined as principal components of other data need no additional transformation |  
+| All de novo mutation data from ASC & DDD | None | Mutation counts are too sparse for transformation |  
+| All Z-score features | None | By definition, Z-score features need no additional transformation |  
+| All gnomAD-SV mutation count data | None | Mutation counts are too sparse for transformation |  
+| All BCA counts from Redin _et al._ | None | Mutation counts are too sparse for transformation |  
+| gnomAD constraint probabilities (pLI, pRec., pNull) | None | Beta-distributed probabilities are not well suited for power transformation |  
+| `promoter_phastcons` | None | Data not well suited for power transformation |  
 
 
 ## Gene set definitions  
