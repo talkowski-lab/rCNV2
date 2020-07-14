@@ -304,7 +304,7 @@ def write_annotated_cnvs(cnvbt, cnvs_out, case_cnv_weights, control_cnv_weights,
     """
 
     # Write header to output file
-    hcols = '#chr start end cnvid cnv phenos ngenes genes'
+    hcols = '#chr start end cnvid cnv phenos ngenes total_weight genes'
     cnvs_out.write('\t'.join(hcols.split()) + '\n')
 
     for cnv in cnvbt:
@@ -314,9 +314,10 @@ def write_annotated_cnvs(cnvbt, cnvs_out, case_cnv_weights, control_cnv_weights,
         else:
             cnv_dict = case_cnv_weights
         hits = cnv_dict.get(cnvid, {})
-        ngenes = np.sum(list(hits.values()))
+        ngenes = len(hits.keys())
+        sumweight = np.nansum(list(hits.values()))
         genes = ';'.join(sorted(hits.keys()))
-        outfields = cnv.fields + [str(ngenes), genes]
+        outfields = cnv.fields + [str(ngenes), str(sumweight), genes]
         cnvs_out.write('\t'.join(outfields) + '\n')
 
 
