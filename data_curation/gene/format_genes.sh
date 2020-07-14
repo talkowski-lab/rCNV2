@@ -108,7 +108,7 @@ zcat gencode.v19.canonical.tsv.gz \
 > gencode.v19.canonical.pext_filtered.tsv.gz
 
 
-# Preprocess GTEx expression matrix to compute summaries
+# Preprocess GTEx expression matrix to compute summary data
 wget https://storage.googleapis.com/gtex_analysis_v7/rna_seq_data/GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct.gz
 wget https://storage.googleapis.com/gtex_analysis_v7/annotations/GTEx_v7_Annotations_SampleAttributesDS.txt
 mkdir gtex_stats/
@@ -119,9 +119,26 @@ mkdir gtex_stats/
   gencode.v19.canonical.pext_filtered.tsv.gz \
   GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct.gz \
   GTEx_v7_Annotations_SampleAttributesDS.txt
+/opt/rCNV2/data_curation/gene/get_variable_expressors.py \
+  --min-mean-tpm 5 \
+  --min-sample-tpm 1 \
+  --min-tissues 3 \
+  --variable-tpm-cv 1 \
+  --invariant-tpm-cv 0.3 \
+  --min-variable-prop-low 0.005 \
+  --max-invariant-prop-low 0.001 \
+  --min-variable-prop-high 0.05 \
+  --max-invariant-prop-high 0.01 \
+  --prefix gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors \
+  gencode.v19.canonical.pext_filtered.tsv.gz \
+  GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct.gz \
+  GTEx_v7_Annotations_SampleAttributesDS.txt
 # Copy precomputed GTEx summary data to rCNV bucket (note: requires permissions)
 gsutil -m cp -r gtex_stats \
   ${rCNV_bucket}/cleaned_data/genes/annotations/
+gsutil -m cp \
+  gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors*.genes.list \
+  ${rCNV_bucket}/cleaned_data/genes/gene_lists/
 
 
 # Preprocess Epigenome Roadmap ChromHMM data to compute summaries
@@ -244,17 +261,33 @@ gsutil -m cp genes_lost_during_pext_filtering.genes.list \
 
 
 # Generate BED file of pLoF constrained genes and mutationally tolerant genes from gnomAD
-# wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
+if ! [ -e gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz ]; then
+  wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
+fi
 /opt/rCNV2/data_curation/gene/get_gnomad_genelists.R \
   gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
   gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
   "gnomad.v2.1.1"
 
 
-# Copy gnomAD gene files to rCNV bucket (note: requires permissions)
+# Generate lists of genes based on disruptions in gnomAD-SV
+if ! [ -e gencode.v19.canonical.pext_filtered.variation_features.bed.gz ]; then
+  gsutil -m cp \
+    ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.variation_features.bed.gz \
+    ./
+fi
+/opt/rCNV2/data_curation/gene/get_gnomad-sv_genelists.R \
+  gencode.v19.canonical.pext_filtered.variation_features.bed.gz \
+  gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
+  "gnomad_sv.v2.1.nonneuro"
+
+
+# Copy gnomAD & gnomAD-SV gene files to rCNV bucket (note: requires permissions)
 gsutil -m cp gencode.v19.canonical.pext_filtered.constrained.bed.gz \
   ${rCNV_bucket}/analysis/analysis_refs/
 gsutil -m cp gnomad.v2.1.1.*.genes.list \
+  ${rCNV_bucket}/cleaned_data/genes/gene_lists/
+gsutil -m cp gnomad_sv.v2.1.nonneuro.*.genes.list \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists/
 
 
@@ -329,12 +362,24 @@ done | paste -s \
 >> genelist_table.html.txt
 # Constrained genes
 for wrapper in 1; do
-  echo "Constrained genes"
+  echo "LoF-constrained genes"
   wc -l gnomad.v2.1.1.lof_constrained.genes.list \
   | awk -v OFS="\t" '{ print $1, "`"$2"`" }' \
   | sed 's/\.genes\.list//g' | addcom
-  echo "gnomAD v2.1.1 [Karczewski _et al._, _bioRxiv_, 2019](https://www.biorxiv.org/content/10.1101/531210v3)"
+  echo "gnomAD v2.1.1 [Karczewski _et al._, _Nature_, 2020](https://www.nature.com/articles/s41586-020-2308-7)"
   echo "pLI ≥ 0.9 or in the first LOEUF sextile"
+done | paste -s \
+| sed 's/\t/\ \|\ /g' \
+| sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' \
+>> genelist_table.html.txt
+# Missense constrained genes
+for wrapper in 1; do
+  echo "Missense-constrained genes"
+  wc -l gnomad.v2.1.1.mis_constrained.genes.list \
+  | awk -v OFS="\t" '{ print $1, "`"$2"`" }' \
+  | sed 's/\.genes\.list//g' | addcom
+  echo "gnomAD v2.1.1 [Karczewski _et al._, _Nature_, 2020](https://www.nature.com/articles/s41586-020-2308-7)"
+  echo "Missense Z ≥ 3 or in the first MOEUF sextile"
 done | paste -s \
 | sed 's/\t/\ \|\ /g' \
 | sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' \
@@ -345,7 +390,7 @@ for wrapper in 1; do
   wc -l gnomad.v2.1.1.likely_unconstrained.genes.list \
   | awk -v OFS="\t" '{ print $1, "`"$2"`" }' \
   | sed 's/\.genes\.list//g' | addcom
-  echo "gnomAD v2.1.1 [Karczewski _et al._, _bioRxiv_, 2019](https://www.biorxiv.org/content/10.1101/531210v3)"
+  echo "gnomAD v2.1.1 [Karczewski _et al._, _Nature_, 2020](https://www.nature.com/articles/s41586-020-2308-7)"
   echo "LOEUF ≥ 1, mis. OEUF ≥ 1, synonymous Z-score ~ [-3, 3], pLI ≤ 0.1, LoF O/E in upper 50% of all genes, mis. OE in upper 50% of all genes, observed LoF > 0, observed mis. > 0"
 done | paste -s \
 | sed 's/\t/\ \|\ /g' \
@@ -357,11 +402,39 @@ for wrapper in 1; do
   wc -l gnomad.v2.1.1.mutation_tolerant.genes.list \
   | awk -v OFS="\t" '{ print $1, "`"$2"`" }' \
   | sed 's/\.genes\.list//g' | addcom
-  echo "gnomAD v2.1.1 [Karczewski _et al._, _bioRxiv_, 2019](https://www.biorxiv.org/content/10.1101/531210v3)"
+  echo "gnomAD v2.1.1 [Karczewski _et al._, _Nature_, 2020](https://www.nature.com/articles/s41586-020-2308-7)"
   echo "pLI ≥ 0.01, the last third of LOEUF, missense Z-score ≤ 0, missense OEUF ≥ 1, and synonymous Z-score ~ (-3, 3)"
 done | paste -s \
 | sed 's/\t/\ \|\ /g' \
 | sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' \
+>> genelist_table.html.txt
+# GTEx expression outlier-defined gene sets
+for dir in low high; do
+  for tol in variable invariant; do
+    for wrapper in 1; do
+      echo "$( echo "${dir}" | cut -c1 | tr 'a-z' 'A-Z' )$( echo ${dir} | cut -c2- ) expression-${tol} genes"
+      cat gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.${dir}_expression_${tol}.genes.list | wc -l | addcom
+      echo "\`gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.${dir}_expression_${tol}\`"
+      echo "GTex v7 [(GTEx Consortium, _Nature_, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/29022597)"
+      cbase="≥ 5 mean TPM and 25<sup>th</sup> percentile ≥ 0 in ≥ 3 tissues"
+      if [ $dir == low ]; then
+        if [ $tol == variable ]; then
+          echo -e "${cbase}; mean ≥ 0.5% of samples are low expression outliers; mean TPM CV ≥ 0.5"
+        else
+          echo -e "${cbase}; mean ≤ 0.1% of samples are low expression outliers; mean TPM CV ≤ 0.3; no samples with TPM < 1 in any tissue"
+        fi
+      else
+        if [ $tol == variable ]; then
+          echo -e "${cbase}; mean ≥ 5% of samples are high expression outliers; mean TPM CV ≥ 0.5"
+        else
+          echo -e "${cbase}; mean ≤ 1% of samples are low expression outliers; mean TPM CV ≤ 0.3"
+        fi
+      fi
+    done | paste -s \
+  | sed 's/\t/\ \|\ /g' \
+  | sed -e 's/^/\|\ /g' -e 's/$/\ \|/g'
+  done
+done \
 >> genelist_table.html.txt
 # HPO-associated genes
 while read pheno hpo; do

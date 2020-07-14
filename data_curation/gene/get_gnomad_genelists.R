@@ -25,13 +25,20 @@ args <- commandArgs(trailingOnly=T)
 # Load data
 g <- read.table(as.character(args[1]), sep="\t", comment.char="", header=T)
 g <- g[order(g$gene), ]
+g$oe_mis_upper_bin_6 <- floor((6*rank(g$oe_mis_upper)) / nrow(g))
 elig <- read.table(as.character(args[2]))[, 1]
 out.prefix <- as.character(args[3])
 
-# Gather constrained genes
-constrained <- g$gene[which((g$pLI >= 0.9 | g$oe_lof_upper_bin_6 == 0) & g$gene %in% elig)]
-write.table(constrained,
+# Gather LoF constrained genes
+lof.constrained <- g$gene[which((g$pLI >= 0.9 | g$oe_lof_upper_bin_6 == 0) & g$gene %in% elig)]
+write.table(lof.constrained,
             paste(out.prefix, "lof_constrained.genes.list", sep="."),
+            col.names=F, row.names=F, quote=F)
+
+# Gather missense constrained genes
+mis.constrained <- g$gene[which((g$mis_z >= 3 | g$oe_mis_upper_bin_6 == 0) & g$gene %in% elig)]
+write.table(mis.constrained,
+            paste(out.prefix, "mis_constrained.genes.list", sep="."),
             col.names=F, row.names=F, quote=F)
 
 # Gather likely unconstrained genes

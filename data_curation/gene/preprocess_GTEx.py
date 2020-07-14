@@ -11,9 +11,9 @@ Preprocess GTEx gene X sample matrix and distill various summary matrices
 
 
 import pandas as pd
+import numpy as np
 from os import path
 import gzip
-import numpy as np
 from scipy.stats import median_absolute_deviation as mad
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA

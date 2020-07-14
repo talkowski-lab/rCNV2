@@ -621,7 +621,7 @@ def get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ens
         # Load gnomAD data
         gnomad = pd.read_csv(gnomad_tsv, delimiter='\t', compression='gzip')
         keep_gnomad_cols = 'gene pLI pNull pRec oe_mis oe_lof oe_mis_upper ' + \
-                           'oe_lof_upper syn_z mis_z lof_z'
+                           'oe_lof_upper mis_z lof_z'
         gnomad = gnomad.loc[gnomad.gene.isin(genes), keep_gnomad_cols.split()]
         # Fill in missing genes and values with overall means
         gnomad_means = gnomad.iloc[:, 1:].apply(np.nanmean).to_dict()

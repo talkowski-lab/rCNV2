@@ -37,7 +37,15 @@ workflow gene_burden_analysis {
   File finemap_expression_features
   File finemap_chromatin_features
   File finemap_constraint_features
+  File finemap_variation_features
+  File finemap_merged_no_variation_features
   File finemap_merged_features
+  File raw_finemap_genomic_features
+  File raw_finemap_expression_features
+  File raw_finemap_chromatin_features
+  File raw_finemap_constraint_features
+  File raw_finemap_variation_features
+  File raw_finemap_merged_no_variation_features
   File raw_finemap_merged_features
   String rCNV_bucket
   String fisher_cache_string
@@ -215,6 +223,27 @@ workflow gene_burden_analysis {
         gene_features=finemap_constraint_features,
         rCNV_bucket=rCNV_bucket
     }
+
+    # Variation features
+    call finemap_genes as finemap_variation {
+      input:
+        completion_tokens=rCNV_meta_analysis.completion_token,
+        phenotype_list=phenotype_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code="rCNV",
+        CNV=cnv,
+        meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
+        meta_secondary_p_cutoff=meta_secondary_p_cutoff,
+        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+        finemap_elnet_alpha=finemap_elnet_alpha,
+        finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
+        finemap_distance=finemap_distance,
+        finemap_conf_pip=finemap_conf_pip,
+        finemap_vconf_pip=finemap_vconf_pip,
+        finemap_output_label="variation_features",
+        gene_features=finemap_variation_features,
+        rCNV_bucket=rCNV_bucket
+    }
     
     # Merged features
     call finemap_genes as finemap_merged {
@@ -236,14 +265,35 @@ workflow gene_burden_analysis {
         gene_features=finemap_merged_features,
         rCNV_bucket=rCNV_bucket
     }
+    
+    # Merged features (no variation)
+    call finemap_genes as finemap_merged_no_variation {
+      input:
+        completion_tokens=rCNV_meta_analysis.completion_token,
+        phenotype_list=phenotype_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code="rCNV",
+        CNV=cnv,
+        meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
+        meta_secondary_p_cutoff=meta_secondary_p_cutoff,
+        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+        finemap_elnet_alpha=finemap_elnet_alpha,
+        finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
+        finemap_distance=finemap_distance,
+        finemap_conf_pip=finemap_conf_pip,
+        finemap_vconf_pip=finemap_vconf_pip,
+        finemap_output_label="merged_no_variation_features",
+        gene_features=finemap_merged_no_variation_features,
+        rCNV_bucket=rCNV_bucket
+    }
   }
 
-  # Combine merged features BED files as final output
+  # Combine merged features (without variation) BED files as final output
   call merge_finemap_res {
     input:
-      gene_beds=finemap_merged.sig_genes_bed,
-      assoc_beds=finemap_merged.sig_assocs_bed,
-      credset_beds=finemap_merged.cred_sets_bed,
+      gene_beds=finemap_merged_no_variation.sig_genes_bed,
+      assoc_beds=finemap_merged_no_variation.sig_assocs_bed,
+      credset_beds=finemap_merged_no_variation.cred_sets_bed,
       freq_code="rCNV",
       rCNV_bucket=rCNV_bucket
   }
@@ -252,9 +302,15 @@ workflow gene_burden_analysis {
   scatter( cnv in cnv_types ) {
     call plot_finemap_res {
       input:
-        completion_tokens=[finemap_genomic.completion_token, finemap_expression.completion_token, finemap_chromatin.completion_token, finemap_constraint.completion_token, finemap_merged.completion_token],
+        completion_tokens=[finemap_genomic.completion_token, finemap_expression.completion_token, finemap_chromatin.completion_token, finemap_constraint.completion_token, finemap_variation.completion_token, finemap_merged_no_variation.completion_token, finemap_merged.completion_token],
         freq_code="rCNV",
         CNV=cnv,
+        raw_features_genomic=raw_finemap_genomic_features,
+        raw_features_expression=raw_finemap_expression_features,
+        raw_features_chromatin=raw_finemap_chromatin_features,
+        raw_features_constraint=raw_finemap_constraint_features,
+        raw_features_variation=raw_finemap_variation_features,
+        raw_features_merged_no_variation=raw_finemap_merged_no_variation_features,
         raw_features_merged=raw_finemap_merged_features,
         phenotype_list=phenotype_list,
         rCNV_bucket=rCNV_bucket
@@ -840,7 +896,7 @@ task merge_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
+    docker: "talkowski/rcnv@sha256:91ee6094cfae27626def40ff4557f30701cb4df99e2221991cc87a5361aaf796"
     preemptible: 1
     bootDiskSizeGb: "20"
   }
@@ -857,6 +913,8 @@ task plot_finemap_res {
   File raw_features_expression
   File raw_features_chromatin
   File raw_features_constraint
+  File raw_features_variation
+  File raw_features_merged_no_variation
   File raw_features_merged
   String rCNV_bucket
 
@@ -873,18 +931,22 @@ task plot_finemap_res {
     for wrapper in 1; do
       echo -e "Prior\tgrey70\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.genomic_features.tsv"
       echo -e "Posterior\t'#264653'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.genomic_features.tsv"
-      echo -e "Genomic features\t'#E76F51'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.tsv"
-      echo -e "Gene expression\t'#E9C46A'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.tsv"
-      echo -e "Chromatin\t'#ed80a6'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.chromatin_features.tsv"
-      echo -e "Gene constraint\t'#F4A261'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.tsv"
-      echo -e "Full model\t'#2A9D8F'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.tsv"
+      echo -e "Genomic features\t'#331C8C'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.tsv"
+      echo -e "Gene expression\t'#87C9F2'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.tsv"
+      echo -e "Chromatin\t'#3DAB9C'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.chromatin_features.tsv"
+      echo -e "Gene constraint\t'#027831'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.tsv"
+      echo -e "Variation\t'#E0CC70'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.variation_features.tsv"
+      echo -e "Full (no var.)\t'#CF6576'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_no_variation_features.tsv"
+      echo -e "Full model\t'#AE3F9D'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.tsv"
     done > finemap_roc_input.tsv
     for wrapper in 1; do
-      echo -e "Genomic features\t'#E76F51'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.all_genes_from_blocks.tsv\t${raw_features_genomic}"
-      echo -e "Gene expression\t'#E9C46A'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.all_genes_from_blocks.tsv\t${raw_features_expression}"
-      echo -e "Chromatin\t'#ed80a6'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.chromatin_features.all_genes_from_blocks.tsv\t${raw_features_chromatin}"
-      echo -e "Gene constraint\t'#F4A261'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.all_genes_from_blocks.tsv\t${raw_features_constraint}"
-      echo -e "Full model\t'#2A9D8F'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.all_genes_from_blocks.tsv\t${raw_features_merged}"
+      echo -e "Genomic features\t'#331C8C'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.all_genes_from_blocks.tsv\t${raw_features_genomic}"
+      echo -e "Gene expression\t'#87C9F2'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.all_genes_from_blocks.tsv\t${raw_features_expression}"
+      echo -e "Chromatin\t'#3DAB9C'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.chromatin_features.all_genes_from_blocks.tsv\t${raw_features_chromatin}"
+      echo -e "Gene constraint\t'#027831'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.all_genes_from_blocks.tsv\t${raw_features_constraint}"
+      echo -e "Variation\t'#E0CC70'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.variation_features.all_genes_from_blocks.tsv\t${raw_features_variation}"
+      echo -e "Full (no var.)\t'#CF6576'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv\t${raw_features_merged_no_variation}"
+      echo -e "Full model\t'#AE3F9D'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.all_genes_from_blocks.tsv\t${raw_features_merged}"
     done > finemap_feature_cor_input.tsv
 
     # Make all gene truth sets
@@ -1032,7 +1094,7 @@ task plot_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
+    docker: "talkowski/rcnv@sha256:91ee6094cfae27626def40ff4557f30701cb4df99e2221991cc87a5361aaf796"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
