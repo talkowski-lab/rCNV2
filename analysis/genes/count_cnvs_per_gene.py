@@ -21,7 +21,7 @@ import subprocess
 import gzip
 
 
-def process_cnvs(bedpath, pad_controls, case_hpo, control_hpo, max_size=None):
+def process_cnvs(bedpath, pad_controls, case_hpos, control_hpo, max_size=None):
     """
     Read CNVs & extend control CNV breakpoints by a specified distance
     """
@@ -44,22 +44,22 @@ def process_cnvs(bedpath, pad_controls, case_hpo, control_hpo, max_size=None):
     if max_size is not None:
         cnvbt = cnvbt.filter(lambda x: x.length <= max_size)
 
-    def _filter_phenos(feature, case_hpo, control_hpo):
+    def _filter_phenos(feature, case_hpos, control_hpo):
         """
         Filter CNVs based on phenotype
         """
-        if case_hpo is 'KEEP_ALL_SAMPLES':
+        if 'KEEP_ALL_SAMPLES' in case_hpos:
             # Keep everything if no case hpo is specified
             return True
         else:
-            keep_hpos = [case_hpo, control_hpo]
+            keep_hpos = case_hpos + [control_hpo]
             cnv_hpos = feature[5].split(';')
             if len(set(keep_hpos).intersection(set(cnv_hpos))) > 0:
                 return True
             else:
                 return False
 
-    cnvbt = cnvbt.filter(_filter_phenos, case_hpo, control_hpo).saveas()
+    cnvbt = cnvbt.filter(_filter_phenos, case_hpos, control_hpo).saveas()
     
     return cnvbt
 
@@ -353,7 +353,8 @@ def main():
                         '[default: all]')
     parser.add_argument('--hpo', help='HPO term to consider for case samples. ' +
                         'If no --hpo is supplied, will count all CNVs ' +
-                        'irrespective of phenotype.')
+                        'irrespective of phenotype. Can also provide a semicolon-' +
+                        'delimited list of HPOs to consider at once.')
     parser.add_argument('--control-hpo', default='HEALTHY_CONTROL', help='HPO code ' +
                         'to use for control CNV counts. [default: HEALTHY_CONTROL]',
                         dest='control_hpo')
@@ -388,12 +389,12 @@ def main():
         outbed = open(outbed_path, 'w')
 
     if args.hpo is None:
-        case_hpo = 'KEEP_ALL_SAMPLES'
+        case_hpos = ['KEEP_ALL_SAMPLES']
     else:
-        case_hpo = args.hpo
+        case_hpos = args.hpo.split(';')
 
     # Process input CNV BED file
-    cnvbt = process_cnvs(args.cnvs, args.pad_controls, case_hpo, args.control_hpo,
+    cnvbt = process_cnvs(args.cnvs, args.pad_controls, case_hpos, args.control_hpo,
                          args.max_cnv_size)
 
     if args.type is not None:

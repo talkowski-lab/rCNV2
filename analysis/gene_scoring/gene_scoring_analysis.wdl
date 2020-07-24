@@ -10,7 +10,8 @@
 
 
 workflow gene_burden_analysis {
-  String hpo
+  File training_hpo_list
+  Int effective_case_n
   String prefix
   File metacohort_list
   File metacohort_sample_table
@@ -43,10 +44,28 @@ workflow gene_burden_analysis {
 
   # Scatter over contigs (for speed)
   scatter ( contig in contigs ) {
+    # Gather data required for parameter optimization
+    call get_annotated_cnvs as get_optimization_data {
+      input:
+        hpo="HP:0000118",
+        prefix="HP0000118",
+        contig=contig[0],
+        metacohort_list=metacohort_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code="rCNV",
+        gtf=gtf,
+        gtf_idx=gtf_idx,
+        pad_controls=pad_controls,
+        weight_mode=weight_mode,
+        min_cds_ovr_del=min_cds_ovr_del,
+        min_cds_ovr_dup=min_cds_ovr_dup,
+        rCNV_bucket=rCNV_bucket
+    }
     # Run assocation tests per cohort
     call burden_test as rCNV_burden_test {
       input:
-        hpo=hpo,
+        training_hpo_list=training_hpo_list,
+        effective_case_n=effective_case_n,
         prefix=prefix,
         contig=contig[0],
         metacohort_list=metacohort_list,
@@ -64,13 +83,25 @@ workflow gene_burden_analysis {
     }
   }
 
+  # Merge annotated CNVs for parameter optimization
+  scatter ( cnv in cnv_types ) {
+    call merge_annotated_cnvs {
+      input:
+        annotated_cnv_beds=get_optimization_data.annotated_cnvs_bed,
+        annotated_cnv_bed_idxs=get_optimization_data.annotated_cnvs_idx,
+        metacohort_list=metacohort_list,
+        CNV=cnv,
+        freq_code="rCNV",
+        rCNV_bucket=rCNV_bucket
+    }
+  }
+
   # Merge association statistics and run meta-analysis
   scatter ( CNV in cnv_types ) {
     call merge_and_meta_analysis as rCNV_meta_analysis {
       input:
         stats_beds=rCNV_burden_test.stats_beds,
         stats_beds_idxs=rCNV_burden_test.stats_bed_idxs,
-        hpo=hpo,
         prefix=prefix,
         CNV=CNV,
         metacohort_list=metacohort_list,
@@ -81,70 +112,161 @@ workflow gene_burden_analysis {
     }
   }
 
-  # Make training blacklist, estimate prior effect sizes, and compute BFDPs
-  call blacklist_priors_bfdp {
-    input:
-      del_meta_stats=rCNV_meta_analysis.meta_stats_bed[0],
-      dup_meta_stats=rCNV_meta_analysis.meta_stats_bed[1],
-      freq_code="rCNV",
-      rCNV_bucket=rCNV_bucket,
-      cen_tel_dist=cen_tel_dist,
-      prior_frac=prior_frac
-  }
+  # # Make training blacklist, estimate prior effect sizes, and compute BFDPs
+  # call blacklist_priors_bfdp {
+  #   input:
+  #     del_meta_stats=rCNV_meta_analysis.meta_stats_bed[0],
+  #     dup_meta_stats=rCNV_meta_analysis.meta_stats_bed[1],
+  #     freq_code="rCNV",
+  #     rCNV_bucket=rCNV_bucket,
+  #     cen_tel_dist=cen_tel_dist,
+  #     prior_frac=prior_frac
+  # }
 
-  # Score genes for each model
-  scatter ( model in models ) {
-    call score_genes as score_genes_DEL {
-      input:
-        CNV="DEL",
-        BFDP_stats=blacklist_priors_bfdp.del_bfdp,
-        blacklist=blacklist_priors_bfdp.training_blacklist,
-        underpowered_genes=rCNV_meta_analysis.underpowered_genes[0],
-        gene_features=gene_features,
-        model=model,
-        max_true_bfdp=max_true_bfdp,
-        min_false_bfdp=min_false_bfdp,
-        elnet_alpha=elnet_alpha,
-        elnet_l1_l2_mix=elnet_l1_l2_mix,
-        freq_code="rCNV",
-        rCNV_bucket=rCNV_bucket
-    }
-    call score_genes as score_genes_DUP {
-      input:
-        CNV="DUP",
-        BFDP_stats=blacklist_priors_bfdp.dup_bfdp,
-        blacklist=blacklist_priors_bfdp.training_blacklist,
-        underpowered_genes=rCNV_meta_analysis.underpowered_genes[1],
-        gene_features=gene_features,
-        model=model,
-        max_true_bfdp=max_true_bfdp,
-        min_false_bfdp=min_false_bfdp,
-        elnet_alpha=elnet_alpha,
-        elnet_l1_l2_mix=elnet_l1_l2_mix,
-        freq_code="rCNV",
-        rCNV_bucket=rCNV_bucket
-    }
-  }
+  # # Score genes for each model
+  # scatter ( model in models ) {
+  #   call score_genes as score_genes_DEL {
+  #     input:
+  #       CNV="DEL",
+  #       BFDP_stats=blacklist_priors_bfdp.del_bfdp,
+  #       blacklist=blacklist_priors_bfdp.training_blacklist,
+  #       underpowered_genes=rCNV_meta_analysis.underpowered_genes[0],
+  #       gene_features=gene_features,
+  #       model=model,
+  #       max_true_bfdp=max_true_bfdp,
+  #       min_false_bfdp=min_false_bfdp,
+  #       elnet_alpha=elnet_alpha,
+  #       elnet_l1_l2_mix=elnet_l1_l2_mix,
+  #       freq_code="rCNV",
+  #       rCNV_bucket=rCNV_bucket
+  #   }
+  #   call score_genes as score_genes_DUP {
+  #     input:
+  #       CNV="DUP",
+  #       BFDP_stats=blacklist_priors_bfdp.dup_bfdp,
+  #       blacklist=blacklist_priors_bfdp.training_blacklist,
+  #       underpowered_genes=rCNV_meta_analysis.underpowered_genes[1],
+  #       gene_features=gene_features,
+  #       model=model,
+  #       max_true_bfdp=max_true_bfdp,
+  #       min_false_bfdp=min_false_bfdp,
+  #       elnet_alpha=elnet_alpha,
+  #       elnet_l1_l2_mix=elnet_l1_l2_mix,
+  #       freq_code="rCNV",
+  #       rCNV_bucket=rCNV_bucket
+  #   }
+  # }
 
-  # Determine best model & QC final scores
-  call qc_scores {
-    input:
-      del_scores=score_genes_DEL.scores_tsv,
-      dup_scores=score_genes_DUP.scores_tsv,
-      raw_gene_features=raw_gene_features,
-      freq_code="rCNV",
-      rCNV_bucket=rCNV_bucket
+  # # Determine best model & QC final scores
+  # call qc_scores {
+  #   input:
+  #     del_scores=score_genes_DEL.scores_tsv,
+  #     dup_scores=score_genes_DUP.scores_tsv,
+  #     raw_gene_features=raw_gene_features,
+  #     freq_code="rCNV",
+  #     rCNV_bucket=rCNV_bucket
+  # }
+
+  output {
+    # File gene_scores = qc_scores.final_scores
+  }
+}
+
+
+# Collect data necessary for parameter optimization
+task get_annotated_cnvs {
+  String hpo
+  String prefix
+  String contig
+  File metacohort_list
+  File metacohort_sample_table
+  String freq_code
+  File gtf
+  File gtf_idx
+  Int pad_controls
+  String weight_mode
+  Float min_cds_ovr_del
+  Float min_cds_ovr_dup
+  String rCNV_bucket
+
+  command <<<
+    set -e
+
+    # Copy CNV data and constrained gene coordinates
+    mkdir cleaned_cnv/
+    gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
+    gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
+    mkdir refs/
+    gsutil -m cp ${rCNV_bucket}/refs/GRCh37.*.bed.gz refs/
+    gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
+
+    # Extract contig of interest from GTF
+    tabix ${gtf} ${contig} | bgzip -c > subset.gtf.gz
+
+    # Iterate over metacohorts
+    while read meta cohorts; do
+      echo $meta
+
+      # Extract CNVs of interest from BED
+      tabix -f cleaned_cnv/$meta.${freq_code}.bed.gz
+      tabix -h cleaned_cnv/$meta.${freq_code}.bed.gz ${contig} \
+      | bgzip -c > $meta.${contig}.bed.gz
+      cnv_bed="$meta.${contig}.bed.gz"
+
+      # Iterate over CNV types
+      for CNV in DEL DUP; do
+        echo $CNV
+
+        # Set CNV-specific parameters
+        case "$CNV" in
+          DEL)
+            min_cds_ovr=${min_cds_ovr_del}
+            ;;
+          DUP)
+            min_cds_ovr=${min_cds_ovr_dup}
+            ;;
+        esac
+
+        # Count CNVs
+        /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
+          --max-cnv-size 300000000 \
+          --weight-mode ${weight_mode} \
+          --min-cds-ovr $min_cds_ovr \
+          --max-genes 25000 \
+          -t $CNV \
+          --hpo ${hpo} \
+          --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
+          --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+          --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
+          -z \
+          --verbose \
+          --cnvs-out "$meta.${prefix}.${freq_code}.$CNV.genes_per_cnv.${contig}.bed.gz" \
+          -o "$meta.${prefix}.${freq_code}.$CNV.genes_per_cnv.${contig}.bed.gz" \
+          "$cnv_bed" \
+          subset.gtf.gz
+        tabix -f "$meta.${prefix}.${freq_code}.$CNV.genes_per_cnv.${contig}.bed.gz"
+      done
+    done < ${metacohort_list}
+  >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:bb114d7572228202c9fcb83ba1db575812c818d9f9086bfb12a8fed0ce1ea97d"
+    preemptible: 1
+    memory: "4 GB"
+    bootDiskSizeGb: "20"
   }
 
   output {
-    File gene_scores = qc_scores.final_scores
+    Array[File] annotated_cnvs_bed = glob("*.genes_per_cnv.${contig}.bed.gz")
+    Array[File] annotated_cnvs_idx = glob("*.genes_per_cnv.${contig}.bed.gz.tbi")
   }
 }
 
 
 # Run burden test for a single chromosome for all cohorts
 task burden_test {
-  String hpo
+  File training_hpo_list
+  Int effective_case_n
   String prefix
   String contig
   File metacohort_list
@@ -174,6 +296,9 @@ task burden_test {
     # Extract contig of interest from GTF
     tabix ${gtf} ${contig} | bgzip -c > subset.gtf.gz
 
+    # Create string of HPOs to keep
+    keep_hpos=$( cat ${training_hpo_list} | paste -s -d\; )
+
     # Iterate over metacohorts to compute single-cohort stats
     while read meta cohorts; do
       echo $meta
@@ -202,7 +327,7 @@ task burden_test {
           --min-cds-ovr $min_cds_ovr \
           --max-genes ${max_genes_per_cnv} \
           -t $CNV \
-          --hpo ${hpo} \
+          --hpo "$keep_hpos" \
           --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
           --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
           --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
@@ -210,7 +335,7 @@ task burden_test {
           --verbose \
           -o "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.${contig}.bed.gz" \
           "$cnv_bed" \
-          subset.gtf.gz
+          ${contig}.gtf.gz
         tabix -f "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.${contig}.bed.gz"
 
         # Perform burden test
@@ -218,7 +343,7 @@ task burden_test {
           --pheno-table ${metacohort_sample_table} \
           --cohort-name $meta \
           --cnv $CNV \
-          --case-hpo ${hpo} \
+          --effective-case-n ${effective_case_n} \
           --bgzip \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.${contig}.bed.gz" \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.${contig}.bed.gz"
@@ -241,11 +366,58 @@ task burden_test {
 }
 
 
+# Merge annotated CNVs per metacohort for parameter optimization
+task merge_annotated_cnvs {
+  Array[Array[File]] annotated_cnv_beds
+  Array[Array[File]] annotated_cnv_bed_idxs
+  File metacohort_list
+  String freq_code
+  String CNV
+  String rCNV_bucket
+
+  command <<<
+    set -e
+
+    # Make list of stats files to be considered
+    find / -name "*.${freq_code}.*.genes_per_cnv.*.bed.gz" \
+    > stats.paths.list
+    # Debug: print paths to stdout
+    cat stats.paths.list
+
+    # Merge list of genes hit per cohort, per phenotype
+    mkdir optimization_data/
+    zcat $( sed -n '1p' stats.paths.list ) | sed -n '1p' > header.tsv
+    while read meta cohort; do
+      zcat $( fgrep $meta stats.paths.list ) \
+      | fgrep -w ${CNV} \
+      | grep -ve '^#' \
+      | sort -Vk4,4 \
+      | uniq \
+      | cat header.tsv - \
+      | awk -v FS="\t" -v OFS="\t" '{ print $4, $6, $7, $9 }' \
+      | gzip -c \
+      > optimization_data/${freq_code}.${CNV}.$meta.genes_per_cnv.tsv.gz
+    done < ${metacohort_list}
+
+    # Copy output to Google bucket
+    gsutil -m cp -r \
+      optimization_data \
+      ${rCNV_bucket}/analysis/gene_scoring/
+  >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:bb114d7572228202c9fcb83ba1db575812c818d9f9086bfb12a8fed0ce1ea97d"
+    preemptible: 1
+  }
+
+  output {}
+}
+
+
 # Merge burden tests and perform meta-analysis per cohort per CNV type
 task merge_and_meta_analysis {
   Array[Array[File]] stats_beds
   Array[Array[File]] stats_beds_idxs
-  String hpo
   String prefix
   String CNV
   File metacohort_list

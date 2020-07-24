@@ -24,8 +24,12 @@ get.sample.counts <- function(pheno.table.in, cohort.name,
                "\" cannot be found in header of ",
                pheno.table.in, sep=""))
   }
-  case.n <- ptab[which(ptab[,1] == case.hpo),
-                 which(colnames(ptab) == cohort.name)]
+  if(!is.null(case.hpo)){
+    case.n <- ptab[which(ptab[,1] == case.hpo),
+                   which(colnames(ptab) == cohort.name)]
+  }else{
+    case.n <- NA
+  }
   control.n <- ptab[which(ptab[,1] == control.hpo),
                     which(colnames(ptab) == cohort.name)]
   return(list("case.n"=as.numeric(case.n),
@@ -250,6 +254,9 @@ option_list <- list(
   make_option(c("--control-hpo"), type="character", default='HEALTHY_CONTROL',
               help="HPO term to use for control samples [default %default]",
               metavar="string"),
+  make_option(c("--effective-case-n"), type="integer", default=NULL,
+              help="If specified, will override --case-hpo in determining number of samples [default %default]",
+              metavar="string"),
   make_option(c("--case-column"), type="character", default='case_cnvs',
               help="name of column to use for raw (unweighted) case CNV counts [default %default]",
               metavar="string"),
@@ -282,8 +289,8 @@ if(is.null(opts$`pheno-table`)){
 if(is.null(opts$`cohort-name`)){
   stop("Must specify --cohort-name\n")
 }
-if(is.null(opts$`case-hpo`)){
-  stop("Must specify --case-hpo\n")
+if(is.null(opts$`case-hpo`) & is.null(opts$`effective-case-n`)){
+  stop("Must specify either --case-hpo or --effective-case-n\n")
 }
 
 # Writes args & opts to vars
@@ -294,6 +301,7 @@ cohort.name <- opts$`cohort-name`
 cnv <- opts$cnv
 case.hpo <- opts$`case-hpo`
 control.hpo <- opts$`control-hpo`
+eff.case.n <- opts$`effective-case-n`
 case.col.name <- opts$`case-column`
 control.col.name <- opts$`control-column`
 weighted.suffix <- opts$`weighted-suffix`
@@ -307,6 +315,7 @@ precision <- opts$precision
 # cnv <- "DEL"
 # case.hpo <- "HP:0012759"
 # control.hpo <- "HEALTHY_CONTROL"
+# eff.case.n <- NULL
 # case.col.name <- "case_cnvs"
 # control.col.name <- "control_cnvs"
 # weighted.suffix <- "_weighted"
@@ -315,6 +324,12 @@ precision <- opts$precision
 # Extract sample counts
 sample.counts <- get.sample.counts(pheno.table.in, cohort.name, 
                                    case.hpo, control.hpo)
+if(!is.null(eff.case.n)){
+  sample.counts$case.n <- eff.case.n
+}
+if(is.na(sample.counts$case.n)){
+  exit("Either --case-hpo must be found in --pheno-table, or --effective-case-n must be provided.")
+}
 
 # Process input BED
 bed <- import.bed(bed.in, case.col.name, sample.counts$case.n,

@@ -22,8 +22,9 @@ export rCNV_bucket="gs://rcnv_project"
 
 # Copy all filtered CNV data, gene coordinates, and other references 
 # from the project Google Bucket (note: requires permissions)
-mkdir cleaned_cnv/
+mkdir cleaned_cnv/ phenos/
 gsutil -m cp -r ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
+gsutil -m cp -r ${rCNV_bucket}/cleaned_data/phenotypes/filtered/meta*.cleaned_phenos.txt phenos/
 gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes ./
 mkdir refs/
 gsutil -m cp ${rCNV_bucket}/refs/GRCh37.*.bed.gz refs/
@@ -32,9 +33,9 @@ gsutil -m cp ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz 
 
 
 # Test/dev parameters
-hpo="HP:0000118"
 prefix="HP0000118"
 freq_code="rCNV"
+effective_case_n=214000
 CNV="DEL"
 meta="meta1"
 phenotype_list="refs/test_phenotypes.list"
@@ -44,11 +45,11 @@ gtf="genes/gencode.v19.canonical.gtf.gz"
 gtf_index="genes/gencode.v19.canonical.gtf.gz.tbi"
 contig=18
 pad_controls=0
-max_cnv_size=5000000
+max_cnv_size=300000000
 weight_mode="weak"
-min_cds_ovr_del=1.0
-min_cds_ovr_dup=1.0
-max_genes_per_cnv=10
+min_cds_ovr_del=0.8
+min_cds_ovr_dup=0.8
+max_genes_per_cnv=24
 meta_model_prefix="fe"
 min_cnvs_per_gene_training=5
 cen_tel_dist=1000000
@@ -74,6 +75,11 @@ bedtools intersect -u \
 | cat <( echo -e "#chr\tstart\tend\tgene" ) - \
 | bgzip -c \
 > ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz
+
+# Copy training blacklist to project bucket (note: requires permissions)
+gsutil -m cp \
+  ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+  ${rCNV_bucket}/analysis/gene_scoring/refs/
 
 
 # Create training gene lists
@@ -129,38 +135,85 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/gene_scoring/gene_lists/
 
 
+# Note: data for parameter optimization is computed in parallel in FireCloud with
+# gene_scoring_analysis.wdl, and must be run before the below code:
+gsutil -m cp -r ${rCNV_bucket}/analysis/gene_scoring/optimization_data ./
+
+# Postprocess optimization data
+# Note: the --max-genes-for-summary parameter must be determined first by running the
+# subsequent code block (number of genes per CNV), then running this block a second time
+while read meta cohorts; do
+  echo $meta
+  # Process deletions
+  echo DEL
+  /opt/rCNV2/analysis/gene_scoring/distill_optimization_data.py \
+    --genes-per-cnv optimization_data/${freq_code}.DEL.$meta.genes_per_cnv.tsv.gz \
+    --hpos <( cut -f2 refs/test_phenotypes.list ) \
+    --positive-truth-genes gold_standard.haploinsufficient.genes.list \
+    --negative-truth-genes gold_standard.haplosufficient.genes.list \
+    --exclude-genes <( zcat ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+                       | fgrep -v "#" | cut -f4 ) \
+    --max-genes-for-summary 24 \
+    --summary-counts ${meta}.optimization_data.counts_per_hpo.DEL.tsv \
+    --cnv-stats ${meta}.optimization_data.counts_per_cnv.DEL.tsv \
+    --gzip
+  # Process duplications
+  echo DUP
+  /opt/rCNV2/analysis/gene_scoring/distill_optimization_data.py \
+    --genes-per-cnv optimization_data/${freq_code}.DUP.$meta.genes_per_cnv.tsv.gz \
+    --hpos <( cut -f2 refs/test_phenotypes.list ) \
+    --positive-truth-genes gold_standard.triplosensitive.genes.list \
+    --negative-truth-genes gold_standard.triploinsensitive.genes.list \
+    --exclude-genes <( zcat ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+                       | fgrep -v "#" | cut -f4 ) \
+    --max-genes-for-summary 24 \
+    --summary-counts ${meta}.optimization_data.counts_per_hpo.DUP.tsv \
+    --cnv-stats ${meta}.optimization_data.counts_per_cnv.DUP.tsv \
+    --gzip
+done < <( fgrep -v mega refs/rCNV_metacohort_list.txt )
+
 # Parameter optimization: number of genes per CNV
 for CNV in DEL DUP; do
-  echo $CNV
-  /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
-    --max-cnv-size 3000000000 \
-    --weight-mode "weak" \
-    --min-cds-ovr 1.0 \
-    --max-genes 25000 \
-    -t $CNV \
-    --hpo "${hpo}" \
-    --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
-    --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
-    --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
-    --cnvs-out mega.$CNV.genes_per_cnv.bed.gz \
-    -z \
-    -o mega.$CNV.gene_counts.bed.gz \
-    --verbose \
-    cleaned_cnv/mega.rCNV.bed.gz \
-    genes/gencode.v19.canonical.pext_filtered.gtf.gz
+  while read meta cohorts; do
+    echo -e "${meta}\t${meta}.optimization_data.counts_per_cnv.${CNV}.tsv.gz"
+  done < <( fgrep -v mega refs/rCNV_metacohort_list.txt ) \
+  > optimize_genes_per_cnv.${CNV}.input.tsv
 done
-
+/opt/rCNV2/analysis/gene_scoring/optimize_genes_per_cnv.R \
+  optimize_genes_per_cnv.DEL.input.tsv \
+  optimize_genes_per_cnv.DUP.input.tsv \
+  optimize_genes_per_cnv.results.pdf
 
 # Parameter optimization: phenotype selection
-
-
+for CNV in DEL DUP; do
+  while read meta cohorts; do
+    echo -e "${meta}\t${meta}.optimization_data.counts_per_hpo.${CNV}.tsv.gz"
+  done < <( fgrep -v mega refs/rCNV_metacohort_list.txt ) \
+  > select_hpos.${CNV}.input.tsv
+done
+/opt/rCNV2/analysis/gene_scoring/select_hpos.R \
+  select_hpos.DEL.input.tsv \
+  select_hpos.DUP.input.tsv \
+  gene_scoring.hpos_to_keep.list \
+  select_hpos.results.pdf
+cat phenos/meta*.cleaned_phenos.txt > all_samples.phenos.txt
+/opt/rCNV2/analysis/gene_scoring/determine_effective_case_n.py \
+  all_samples.phenos.txt \
+  gene_scoring.hpos_to_keep.list
+gsutil -m cp \
+  gene_scoring.hpos_to_keep.list \
+  ${rCNV_bucket}/analysis/gene_scoring/refs/
 
 
 # Recompute 
+export training_hpo_list=gene_scoring.hpos_to_keep.list
 for contig in $( seq 1 22 ); do
 
   # Extract contig of interest from GTF
   tabix ${gtf} ${contig} | bgzip -c > ${contig}.gtf.gz
+
+  # Create string of HPOs to keep
+  keep_hpos=$( cat ${training_hpo_list} | paste -s -d\; )
 
   # Iterate over metacohorts to compute single-cohort stats
   while read meta cohorts; do
@@ -190,7 +243,7 @@ for contig in $( seq 1 22 ); do
         --min-cds-ovr $min_cds_ovr \
         --max-genes ${max_genes_per_cnv} \
         -t $CNV \
-        --hpo ${hpo} \
+        --hpo "$keep_hpos" \
         --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
         --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
         --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
@@ -206,7 +259,7 @@ for contig in $( seq 1 22 ); do
         --pheno-table ${metacohort_sample_table} \
         --cohort-name $meta \
         --cnv $CNV \
-        --case-hpo ${hpo} \
+        --effective-case-n ${effective_case_n} \
         --bgzip \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.${contig}.bed.gz" \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.${contig}.bed.gz"
