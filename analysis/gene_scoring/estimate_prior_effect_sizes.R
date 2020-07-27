@@ -40,16 +40,19 @@ read.data <- function(path, blacklist, constrained, gs, neg){
 }
 
 # Plot prior effect size by gene set
-plot.prior.lnors <- function(dat, color){
+plot.prior.lnors <- function(dat, color, title){
   par(mar=c(3, 3.5, 2, 1))
   
   # Plot effect sizes
   plot(x=c(-1, 3), y=range(dat$meta_lnOR, na.rm=T), type="n", 
        ylab="", xlab="", xaxt="n", las=2)
   abline(h=axTicks(2), lty=2, col="gray80")
-  mtext(3, font=2, line=0.25, text="Effect Sizes (lnOR)")
-  axis(1, at=-0.5:2.5, tick=F, labels=c("Gold-Standard\nTolerant Genes", "All\nGenes", 
-                                        "Constrained\nGenes", "Gold-Standard\nIntolerant Genes"))
+  mtext(3, font=2, line=0.25, text=title)
+  xlabs <- c("Gold-Standard\nTolerant Genes", "All\nGenes", 
+             "Constrained\nGenes", "Gold-Standard\nIntolerant Genes")
+  sapply(1:length(xlabs), function(x){
+    axis(1, at=x-1.5, tick=F, labels=xlabs[x])
+  })
   mtext(2, line=2, text="ln(Odds Ratio)")
   vioplot(dat$meta_lnOR[which(!is.na(dat$meta_lnOR) & dat$neg)], at=-0.5, add=T, h=0.25,
           col="gray75", drawRect=F)
@@ -161,8 +164,8 @@ plot.example.priors <- function(del, dup, colors){
 option_list <- list()
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage=paste("%prog del.bed.gz dup.bed.gz blacklist.bed.gz constrained.genes.list",
-                                            "del.gs_true.genes.list del.gs_false.genes.list",
+args <- parse_args(OptionParser(usage=paste("%prog del.bed.gz dup.bed.gz del.exclude.list dup.exclude.list",
+                                            "constrained.genes.list del.gs_true.genes.list del.gs_false.genes.list",
                                             "dup.gs_true.genes.list dup.gs_false.genes.list",
                                             "out.prefix", sep=" "),
                                 option_list=option_list),
@@ -170,8 +173,8 @@ args <- parse_args(OptionParser(usage=paste("%prog del.bed.gz dup.bed.gz blackli
 opts <- args$options
 
 # Checks for appropriate positional arguments
-if(length(args$args) != 9){
-  stop(paste("Seven positional arguments: del.bed.gz, dup.bed.gz, blacklist.bed.gz,",
+if(length(args$args) != 10){
+  stop(paste("Ten positional arguments: del.bed.gz, dup.bed.gz, del.exclude.list, dup.exclude.list,",
              "constrained.genes.list, del.gs_true.genes.list, del.gs_false.genes.list", 
              "dup.gs_true.genes.list dup.gs_false.genes.list out.prefix\n", sep=" "))
 }
@@ -179,19 +182,21 @@ if(length(args$args) != 9){
 # Writes args & opts to vars
 del.in <- args$args[1]
 dup.in <- args$args[2]
-blacklist.in <- args$args[3]
-constrained.in <- args$args[4]
-del.gs_true.in <- args$args[5]
-del.gs_false.in <- args$args[6]
-dup.gs_true.in <- args$args[7]
+del.blacklist.in <- args$args[3]
+dup.blacklist.in <- args$args[4]
+constrained.in <- args$args[5]
+del.gs_true.in <- args$args[6]
+del.gs_false.in <- args$args[7]
 dup.gs_true.in <- args$args[8]
-out.prefix <- args$args[9]
+dup.gs_false.in <- args$args[9]
+out.prefix <- args$args[10]
 
 # # DEV PARAMTERS
 # setwd("~/scratch")
 # del.in <- "~/scratch/rCNV2_analysis_d1.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz"
 # dup.in <- "~/scratch/rCNV2_analysis_d1.rCNV.DUP.gene_burden.meta_analysis.stats.bed.gz"
-# blacklist.in <- "~/scratch/rCNV.gene_scoring.training_gene_blacklist.bed.gz"
+# del.blacklist.in <- "~/scratch/DEL.training_blacklist.genes.list"
+# dup.blacklist.in <- "~/scratch/DUP.training_blacklist.genes.list"
 # constrained.in <- "~/scratch/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list"
 # del.gs_true.in <- "~/scratch/gold_standard.haploinsufficient.genes.list"
 # del.gs_false.in <- "~/scratch/gold_standard.haplosufficient.genes.list"
@@ -200,8 +205,8 @@ out.prefix <- args$args[9]
 # out.prefix <- "rCNV_prior_estimation"
 
 # Read all gene lists
-blacklist.bed <- read.table(blacklist.in, header=T, sep="\t", comment.char="")
-blacklist <- blacklist.bed$gene
+del.blacklist <- read.table(del.blacklist.in, header=F)[, 1]
+dup.blacklist <- read.table(del.blacklist.in, header=F)[, 1]
 constrained <- read.table(constrained.in, header=F)[, 1]
 del.gs <- read.table(del.gs_true.in, header=F)[, 1]
 del.neg <- read.table(del.gs_false.in, header=F)[, 1]
@@ -209,14 +214,14 @@ dup.gs <- read.table(dup.gs_true.in, header=F)[, 1]
 dup.neg <- read.table(dup.gs_false.in, header=F)[, 1]
 
 # Read meta-analysis stats and annotate with gene lists
-del <- read.data(del.in, blacklist, constrained, del.gs, del.neg)
-dup <- read.data(dup.in, blacklist, constrained, dup.gs, dup.neg)
+del <- read.data(del.in, del.blacklist, constrained, del.gs, del.neg)
+dup <- read.data(dup.in, dup.blacklist, constrained, dup.gs, dup.neg)
 
 # Plot effect sizes
 pdf(paste(out.prefix, "observed_effect_sizes.pdf", sep="."), height=4, width=12)
 par(mfrow=c(1, 2))
-plot.prior.lnors(del, colors[1])
-plot.prior.lnors(dup, colors[2])
+plot.prior.lnors(del, colors[1], title="Deletions")
+plot.prior.lnors(dup, colors[2], title="Duplications")
 dev.off()
 
 # Compute table of priors
@@ -229,3 +234,4 @@ write.table(priors, paste(out.prefix, "empirical_prior_estimates.tsv", sep="."),
 pdf(paste(out.prefix, "mock_h0h1_curves.pdf", sep="."), height=4, width=10)
 plot.example.priors(del, dup, colors)
 dev.off()
+

@@ -57,7 +57,8 @@ def get_chrom_arms(features_in, centromeres_in):
     return arm_dict
 
 
-def load_stats(stats_in, arm_dict=None, max_true=0.5, min_false=0.5):
+def load_stats(stats_in, arm_dict=None, max_true=0.5, min_false=0.5, 
+               true_pos=None, true_neg=None):
     """
     Load & format stats per gene
     """
@@ -81,13 +82,18 @@ def load_stats(stats_in, arm_dict=None, max_true=0.5, min_false=0.5):
     if arm_dict is not None:
         ss['chrom'] = ss.index.map(arm_dict)
 
+    # Manually reassign true positive and true negative BFDPs
+    ss.loc[ss.index.isin(true_pos), 'bfdp'] = 0
+    ss.loc[ss.index.isin(true_neg), 'bfdp'] = 1
+
     # Convert bfdp to numeric
     ss['bfdp'] = pd.to_numeric(ss['bfdp'], errors='coerce')
 
     return ss
 
 
-def pair_chroms(sumstats, chroms, xbed=None, n_pairs=11, quiet=False):
+def pair_chroms(sumstats, chroms, xbed=None, true_pos=[], true_neg=[], 
+                n_pairs=11, quiet=False):
     """
     Divide all chromosomes into pairs based on total number of genes
     Or, if --centromeres is provided, groups chromosome arms into 11 groups
@@ -97,6 +103,7 @@ def pair_chroms(sumstats, chroms, xbed=None, n_pairs=11, quiet=False):
     # Load blacklist, if any provided
     if xbed is not None:
         xgenes = pd.read_csv(xbed, sep='\t').iloc[:, 3].values.tolist()
+        xgenes = [g for g in xgenes if g not in true_pos and g not in true_neg]
     else:
         xgenes = []
 
@@ -286,8 +293,9 @@ def fit_model_cv(features, sumstats, all_pairs, xgenes=[], model='logit',
     return best_model, best_rmse
 
 
-def predict_bfdps(features, sumstats, chrompairs, xbed=None, model='logit', 
-                  logit_alpha=0.1, l1_l2_mix=1, random=True, quiet=False):
+def predict_bfdps(features, sumstats, chrompairs, xbed=None, true_pos=[], 
+                  true_neg=[], model='logit', logit_alpha=0.1, l1_l2_mix=1, 
+                  random=True, quiet=False):
     """
     Predicts bfdps for all genes with N-fold CV
     """
@@ -297,6 +305,7 @@ def predict_bfdps(features, sumstats, chrompairs, xbed=None, model='logit',
     # Load gene blacklist, if any provided
     if xbed is not None:
         xgenes = pd.read_csv(xbed, sep='\t').iloc[:, 3].values.tolist()
+        xgenes = [g for g in xgenes if g not in true_pos and g not in true_neg]
     else:
         xgenes = []
 
@@ -351,7 +360,13 @@ def main():
     parser.add_argument('--min-false-bfdp', default=0.5, type=float, help='Minimum ' +
                         'BFDP to consider as dosage sensitive for training.')
     parser.add_argument('-c', '--centromeres', help='Centromeres BED.')
-    parser.add_argument('-x', '--blacklist', help='Training blacklist BED.')
+    parser.add_argument('-x', '--blacklist', help='BED of genes to exclude.')
+    parser.add_argument('-p', '--true-positives', help='List of true positive ' +
+                        'genes. BFDPs will be set to 1 for these, and will ' +
+                        'override --blacklist.')
+    parser.add_argument('-n', '--true-negatives', help='List of true negative ' +
+                        'genes. BFDPs will be set to 1 for these, and will ' +
+                        'override --blacklist.')
     parser.add_argument('-m', '--model', choices=model_options, default='logit',
                         help='Choice of classifier. [default: logit]')
     parser.add_argument('--chromsplit', action='store_true', default=False,
@@ -381,20 +396,31 @@ def main():
     else:
         arm_dict = None
 
+    # Load true positive and negative genes, if optioned
+    if args.true_positives is not None:
+        true_pos = [g.rstrip() for g in open(args.true_positives).readlines()]
+    else:
+        true_pos = []
+    if args.true_negatives is not None:
+        true_neg = [g.rstrip() for g in open(args.true_negatives).readlines()]
+    else:
+        true_neg = []
+
     # Import gene stats
-    sumstats = load_stats(args.stats, arm_dict, args.max_true_bfdp, args.min_false_bfdp)
+    sumstats = load_stats(args.stats, arm_dict, args.max_true_bfdp, 
+                          args.min_false_bfdp, true_pos, true_neg)
     chroms = sorted(np.unique(sumstats.chrom.values))
 
     # Pair all chromosomes (or group chromosome arms, if optioned)
-    chrompairs = pair_chroms(sumstats, chroms, args.blacklist)
+    chrompairs = pair_chroms(sumstats, chroms, args.blacklist, true_pos, true_neg)
 
     # Read gene features
     features = load_features(args.features)
 
     # Predict bfdps for all genes
     pred_bfdps = predict_bfdps(features, sumstats, chrompairs, args.blacklist,
-                               args.model, args.logit_alpha, args.l1_l2_mix,
-                               random=(not args.chromsplit))
+                               true_pos, true_neg, args.model, args.logit_alpha, 
+                               args.l1_l2_mix, random=(not args.chromsplit))
 
     # Write predicted BFDPs to outfile, along with scaled score & quantile
     pred_bfdps.to_csv(outfile, sep='\t', index=True, na_rep='NA')

@@ -91,7 +91,7 @@ def calc_all_bfs(sumstats, theta0, theta1, var0, prior, blacklist=None):
 
     # Load gene blacklist, if optioned
     if blacklist is not None:
-        bl_genes = sorted(list(set(pd.read_csv(blacklist, sep='\t').iloc[:, 3].tolist())))
+        bl_genes = [g.rstrip() for g in open(blacklist).readlines()]
 
     bfs = {}
     bfdps = {}
@@ -133,7 +133,7 @@ def main():
                         '[default: 1.467]', default=1.467, type=float)
     parser.add_argument('-p', '--prior', help='Prior probability of intolerance ' +
                         'per gene. [default: 0.115]', default=0.115, type=float)
-    parser.add_argument('-x', '--blacklist', help='BED of genes to exclude from ' +
+    parser.add_argument('-x', '--blacklist', help='List of genes to exclude from ' +
                         'calculations. [default: exclude no genes]')
     args = parser.parse_args()
 

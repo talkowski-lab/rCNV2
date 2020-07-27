@@ -208,7 +208,7 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/gene_scoring/refs/
 
 
-# Recompute 
+# Recompute association stats per cohort
 export training_hpo_list=gene_scoring.hpos_to_keep.list
 export effective_case_sample_sizes=gene_scoring.effective_case_sample_sizes.tsv
 for contig in $( seq 1 22 ); do
@@ -311,8 +311,10 @@ for CNV in DEL DUP; do
   tabix -p bed -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz
 
   # Extract list of genes with < min_cnvs_per_gene_training (to be used as blacklist later for training)
+  # Note: this cutoff must be pre-determined with eval_or_vs_cnv_counts.R, but is not automated here
   /opt/rCNV2/analysis/gene_scoring/get_underpowered_genes.R \
     --min-cnvs ${min_cnvs_per_gene_training} \
+    --gene-counts-out ${prefix}.${freq_code}.${CNV}.counts_per_gene.tsv \
     ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt \
     ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed
   awk -v OFS="\t" '{ print $1, $2, $3, $4 }' \
@@ -326,17 +328,31 @@ done
 # Localize meta-analysis data (only necessary for local development)
 gsutil -m cp \
   ${rCNV_bucket}/analysis/gene_scoring/data/**.gene_burden.meta_analysis.stats.bed.gz \
+  ${rCNV_bucket}/analysis/gene_scoring/data/*.gene_burden.underpowered_genes.bed.gz \
   ./
+del_meta_stats="rCNV2_analysis_d1.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz"
+dup_meta_stats="rCNV2_analysis_d1.rCNV.DUP.gene_burden.meta_analysis.stats.bed.gz"
 
+
+# Create CNV-type-specific gene blacklists
+for CNV in DEL DUP; do
+  zcat *.$CNV.gene_burden.underpowered_genes.bed.gz \
+    ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+  | fgrep -v "#" | cut -f4 | sort -V | uniq \
+  > ${freq_code}.$CNV.training_blacklist.genes.list
+done
 
 # Compute prior effect sizes
 /opt/rCNV2/analysis/gene_scoring/estimate_prior_effect_sizes.R \
   ${del_meta_stats} \
   ${dup_meta_stats} \
-  ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+  ${freq_code}.DEL.training_blacklist.genes.list \
+  ${freq_code}.DUP.training_blacklist.genes.list \
   gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
   gold_standard.haploinsufficient.genes.list \
   gold_standard.haplosufficient.genes.list \
+  gold_standard.triplosensitive.genes.list \
+  gold_standard.triploinsensitive.genes.list \
   ${freq_code}.prior_estimation
 awk -v FS="\t" '{ if ($1=="theta0" && $2=="DEL") print $3 }' \
   ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
@@ -346,82 +362,113 @@ awk -v FS="\t" '{ if ($1=="theta0" && $2=="DUP") print $3 }' \
 > theta0_dup.tsv
 awk -v FS="\t" '{ if ($1=="theta1" && $2=="DEL") print $3 }' \
   ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-> theta1.tsv
+> theta1_del.tsv
+awk -v FS="\t" '{ if ($1=="theta1" && $2=="DUP") print $3 }' \
+  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+> theta1_dup.tsv
 awk -v FS="\t" '{ if ($1=="var0" && $2=="DEL") print $3 }' \
   ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-> var0.tsv
+> var0_del.tsv
+awk -v FS="\t" '{ if ($1=="var0" && $2=="DUP") print $3 }' \
+  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+> var0_dup.tsv
 awk -v FS="\t" '{ if ($1=="var1" && $2=="DEL") print $3 }' \
   ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-> var1.tsv
+> var1_del.tsv
+awk -v FS="\t" '{ if ($1=="var1" && $2=="DUP") print $3 }' \
+  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+> var1_dup.tsv
 
-# # Compute BFDP per gene
-# for CNV in DEL DUP; do
-#   # Set CNV-specific variables
-#   case $CNV in
-#     "DEL")
-#       theta0=$( cat theta0_del.tsv )
-#       statsbed=${del_meta_stats}
-#       ;;
-#     "DUP")
-#       theta0=$( cat theta0_dup.tsv )
-#       statsbed=${dup_meta_stats}
-#       ;;
-#   esac
+# Compute BFDP per gene
+for CNV in DEL DUP; do
+  # Set CNV-specific variables
+  case $CNV in
+    "DEL")
+      theta0=$( cat theta0_del.tsv )
+      theta1=$( cat theta1_del.tsv )
+      statsbed=${del_meta_stats}
+      ;;
+    "DUP")
+      theta0=$( cat theta0_dup.tsv )
+      theta1=$( cat theta1_dup.tsv )
+      statsbed=${dup_meta_stats}
+      ;;
+  esac
 
-#   # Compute BF & BFDR for all genes
-#   /opt/rCNV2/analysis/gene_scoring/calc_gene_bfs.py \
-#     --theta0 $theta0 \
-#     --theta1 $( cat theta1.tsv ) \
-#     --var0 1 \
-#     --prior ${prior_frac} \
-#     --blacklist ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
-#     --outfile ${freq_code}.$CNV.gene_abfs.tsv \
-#     "$statsbed"
-# done
+  # Compute BF & BFDR for all genes
+  /opt/rCNV2/analysis/gene_scoring/calc_gene_bfs.py \
+    --theta0 $theta0 \
+    --theta1 $theta1 \
+    --var0 1 \
+    --prior ${prior_frac} \
+    --blacklist ${freq_code}.$CNV.training_blacklist.genes.list \
+    --outfile ${freq_code}.$CNV.gene_abfs.tsv \
+    "$statsbed"
+done
 
 
 
 
-# # Score genes for a single model & CNV type
-# # Dev/test parameters
-# freq_code="rCNV"
-# rCNV_bucket="${rCNV_bucket}"
-# CNV="DEL"
-# BFDP_stats="${freq_code}.${CNV}.gene_abfs.tsv"
-# blacklist="${freq_code}.gene_scoring.training_gene_blacklist.bed.gz"
-# underpowered_genes="underpowered_genes.test.bed.gz"
-# gene_features="gencode.v19.canonical.pext_filtered.all_features.eigenfeatures.bed.gz"
-# raw_gene_features="gencode.v19.canonical.pext_filtered.all_features.bed.gz"
-# max_true_bfdp=0.2
-# min_false_bfdp=0.8
-# model="logit"
-# elnet_alpha=0.1
-# elnet_l1_l2_mix=1
+# Score genes for a single model & CNV type
+# Dev/test parameters
+gsutil -m cp \
+  ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.all_features.no_variation.* \
+  ./
+freq_code="rCNV"
+rCNV_bucket="${rCNV_bucket}"
+CNV="DEL"
+BFDP_stats="${freq_code}.${CNV}.gene_abfs.tsv"
+blacklist="${freq_code}.gene_scoring.training_gene_blacklist.bed.gz"
+underpowered_genes="rCNV2_analysis_d1.rCNV.DEL.gene_burden.underpowered_genes.bed.gz"
+gene_features="gencode.v19.canonical.pext_filtered.all_features.no_variation.eigenfeatures.bed.gz"
+raw_gene_features="gencode.v19.canonical.pext_filtered.all_features.no_variation.bed.gz"
+max_true_bfdp=0.5
+min_false_bfdp=0.5
+model="logit"
+elnet_alpha=0.1
+elnet_l1_l2_mix=1
 
-# # Copy centromeres bed
-# gsutil -m cp ${rCNV_bucket}/refs/GRCh37.centromeres_telomeres.bed.gz ./
+# Copy necessary references
+gsutil -m cp \
+  ${rCNV_bucket}/refs/GRCh37.centromeres_telomeres.bed.gz \
+  ${rCNV_bucket}/analysis/gene_scoring/gene_lists/*genes.list \
+  ./
 
-# # Merge blacklist and list of underpowered genes
-# zcat ${blacklist} ${underpowered_genes} \
-# | grep -ve '^#' \
-# | sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
-# | uniq \
-# | cat <( zcat ${blacklist} | grep -e '^#' ) - \
-# | bgzip -c  \
-# > blacklist_plus_underpowered.bed.gz
+# Merge blacklist and list of underpowered genes
+zcat ${blacklist} ${underpowered_genes} \
+| grep -ve '^#' \
+| sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
+| uniq \
+| cat <( zcat ${blacklist} | grep -e '^#' ) - \
+| bgzip -c  \
+> blacklist_plus_underpowered.bed.gz
 
-# # Score genes
-# /opt/rCNV2/analysis/gene_scoring/score_genes.py \
-#   --centromeres GRCh37.centromeres_telomeres.bed.gz \
-#   --blacklist blacklist_plus_underpowered.bed.gz \
-#   --model ${model} \
-#   --max-true-bfdp ${max_true_bfdp} \
-#   --min-false-bfdp ${min_false_bfdp} \
-#   --regularization-alpha ${elnet_alpha} \
-#   --regularization-l1-l2-mix ${elnet_l1_l2_mix} \
-#   --outfile ${freq_code}.${CNV}.gene_scores.${model}.tsv \
-#   ${BFDP_stats} \
-#   ${gene_features}
+# Set CNV type-specific parameters
+case $CNV in
+  "DEL")
+    true_pos="gold_standard.haploinsufficient.genes.list"
+    true_neg="gold_standard.haplosufficient.genes.list"
+    ;;
+  "DUP")
+    true_pos="gold_standard.triplosensitive.genes.list"
+    true_neg="gold_standard.triploinsensitive.genes.list"
+    ;;
+esac
+
+# Score genes
+/opt/rCNV2/analysis/gene_scoring/score_genes.py \
+  --centromeres GRCh37.centromeres_telomeres.bed.gz \
+  --blacklist blacklist_plus_underpowered.bed.gz \
+  --true-positives $true_pos \
+  --true-negatives $true_neg \
+  --model ${model} \
+  --max-true-bfdp ${max_true_bfdp} \
+  --min-false-bfdp ${min_false_bfdp} \
+  --regularization-alpha ${elnet_alpha} \
+  --regularization-l1-l2-mix ${elnet_l1_l2_mix} \
+  --outfile ${freq_code}.${CNV}.gene_scores.${model}.tsv \
+  ${BFDP_stats} \
+  ${gene_features}
 
 
 
