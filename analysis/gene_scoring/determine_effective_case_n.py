@@ -35,7 +35,7 @@ def main():
             if len(set(hpos.split(';')).intersection(set(keepers))) > 0:
                 k += 1
 
-    print('Effective sample size = {:,}'.format(k))
+    print(str(k))
 
 
 if __name__ == '__main__':

@@ -35,7 +35,6 @@ gsutil -m cp ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz 
 # Test/dev parameters
 prefix="HP0000118"
 freq_code="rCNV"
-effective_case_n=214000
 CNV="DEL"
 meta="meta1"
 phenotype_list="refs/test_phenotypes.list"
@@ -196,17 +195,22 @@ done
   select_hpos.DUP.input.tsv \
   gene_scoring.hpos_to_keep.list \
   select_hpos.results.pdf
-cat phenos/meta*.cleaned_phenos.txt > all_samples.phenos.txt
-/opt/rCNV2/analysis/gene_scoring/determine_effective_case_n.py \
-  all_samples.phenos.txt \
-  gene_scoring.hpos_to_keep.list
+while read meta cohorts; do
+  /opt/rCNV2/analysis/gene_scoring/determine_effective_case_n.py \
+    phenos/$meta.cleaned_phenos.txt \
+    gene_scoring.hpos_to_keep.list \
+    | paste <( echo $meta ) -
+done < <( fgrep -v mega refs/rCNV_metacohort_list.txt ) \
+> gene_scoring.effective_case_sample_sizes.tsv
 gsutil -m cp \
   gene_scoring.hpos_to_keep.list \
+  gene_scoring.effective_case_sample_sizes.tsv \
   ${rCNV_bucket}/analysis/gene_scoring/refs/
 
 
 # Recompute 
 export training_hpo_list=gene_scoring.hpos_to_keep.list
+export effective_case_sample_sizes=gene_scoring.effective_case_sample_sizes.tsv
 for contig in $( seq 1 22 ); do
 
   # Extract contig of interest from GTF
@@ -221,6 +225,7 @@ for contig in $( seq 1 22 ); do
 
     # Set metacohort-specific parameters
     cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
+    effective_case_n=$( fgrep -w $meta ${effective_case_sample_sizes} | cut -f2 )
 
     # Iterate over CNV types
     for CNV in DEL DUP; do
@@ -259,7 +264,7 @@ for contig in $( seq 1 22 ); do
         --pheno-table ${metacohort_sample_table} \
         --cohort-name $meta \
         --cnv $CNV \
-        --effective-case-n ${effective_case_n} \
+        --effective-case-n $effective_case_n \
         --bgzip \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.${contig}.bed.gz" \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.${contig}.bed.gz"
@@ -318,30 +323,36 @@ for CNV in DEL DUP; do
 done
 
 
-# # Compute prior effect sizes
-# /opt/rCNV2/analysis/gene_scoring/estimate_prior_effect_sizes.R \
-#   ${del_meta_stats} \
-#   ${dup_meta_stats} \
-#   ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
-#   gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
-#   gold_standard.haploinsufficient.genes.list \
-#   gold_standard.haplosufficient.genes.list \
-#   ${freq_code}.prior_estimation
-# awk -v FS="\t" '{ if ($1=="theta0" && $2=="DEL") print $3 }' \
-#   ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-# > theta0_del.tsv
-# awk -v FS="\t" '{ if ($1=="theta0" && $2=="DUP") print $3 }' \
-#   ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-# > theta0_dup.tsv
-# awk -v FS="\t" '{ if ($1=="theta1" && $2=="DEL") print $3 }' \
-#   ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-# > theta1.tsv
-# awk -v FS="\t" '{ if ($1=="var0" && $2=="DEL") print $3 }' \
-#   ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-# > var0.tsv
-# awk -v FS="\t" '{ if ($1=="var1" && $2=="DEL") print $3 }' \
-#   ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-# > var1.tsv
+# Localize meta-analysis data (only necessary for local development)
+gsutil -m cp \
+  ${rCNV_bucket}/analysis/gene_scoring/data/**.gene_burden.meta_analysis.stats.bed.gz \
+  ./
+
+
+# Compute prior effect sizes
+/opt/rCNV2/analysis/gene_scoring/estimate_prior_effect_sizes.R \
+  ${del_meta_stats} \
+  ${dup_meta_stats} \
+  ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+  gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
+  gold_standard.haploinsufficient.genes.list \
+  gold_standard.haplosufficient.genes.list \
+  ${freq_code}.prior_estimation
+awk -v FS="\t" '{ if ($1=="theta0" && $2=="DEL") print $3 }' \
+  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+> theta0_del.tsv
+awk -v FS="\t" '{ if ($1=="theta0" && $2=="DUP") print $3 }' \
+  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+> theta0_dup.tsv
+awk -v FS="\t" '{ if ($1=="theta1" && $2=="DEL") print $3 }' \
+  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+> theta1.tsv
+awk -v FS="\t" '{ if ($1=="var0" && $2=="DEL") print $3 }' \
+  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+> var0.tsv
+awk -v FS="\t" '{ if ($1=="var1" && $2=="DEL") print $3 }' \
+  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
+> var1.tsv
 
 # # Compute BFDP per gene
 # for CNV in DEL DUP; do

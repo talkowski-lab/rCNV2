@@ -55,7 +55,8 @@ require(optparse, quietly=T)
 # List of command-line options
 option_list <- list(
   make_option(c("--min-cnvs"), default=5,
-              help="Minimum number of total CNVs required per gene")
+              help="Minimum number of total CNVs required per gene"),
+  make_option(c("--gene-counts-out"), help="Output tsv with CNV counts per gene.")
 )
 
 # Get command-line arguments & options
@@ -68,11 +69,14 @@ opts <- args$options
 infile <- args$args[1]
 outfile <- args$args[2]
 min.cnvs <- opts$`min-cnvs`
+counts.out <- opts$`gene-counts-out`
 
 # # Dev parameters
+# setwd("~/scratch/")
 # infile <- "~/scratch/gene_meta_in.test.tsv"
 # outfile <- "~/scratch/underpowered_genes.test.list"
 # min.cnvs <- 5
+# counts.out <- "~/scratch/counts.tsv"
 
 # Read list of cohorts to meta-analyze
 cohort.info <- read.table(infile, header=F, sep="\t")
@@ -88,3 +92,10 @@ stats.merged <- combine.stats(stats.list)
 out.bed <- stats.merged[which(stats.merged$total_alt < min.cnvs), 1:4]
 colnames(out.bed)[1] <- paste("#", colnames(out.bed)[1], sep="")
 write.table(out.bed, outfile, col.names=T, row.names=F, quote=F, sep="\t")
+
+# If optioned, write table of CNV counts per gene to file
+if(!is.null(counts.out)){
+  counts <- data.frame("gene"=stats.merged$gene, "cnvs"=stats.merged$total_alt)
+  colnames(counts)[1] <- paste("#", colnames(counts)[1], sep="")
+  write.table(counts, counts.out, col.names=T, row.names=F, quote=F, sep="\t")
+}

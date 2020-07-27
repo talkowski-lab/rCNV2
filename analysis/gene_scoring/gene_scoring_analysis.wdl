@@ -11,7 +11,7 @@
 
 workflow gene_burden_analysis {
   File training_hpo_list
-  Int effective_case_n
+  File effective_case_sample_sizes
   String prefix
   File metacohort_list
   File metacohort_sample_table
@@ -65,7 +65,7 @@ workflow gene_burden_analysis {
     call burden_test as rCNV_burden_test {
       input:
         training_hpo_list=training_hpo_list,
-        effective_case_n=effective_case_n,
+        effective_case_sample_sizes=effective_case_sample_sizes,
         prefix=prefix,
         contig=contig[0],
         metacohort_list=metacohort_list,
@@ -266,7 +266,7 @@ task get_annotated_cnvs {
 # Run burden test for a single chromosome for all cohorts
 task burden_test {
   File training_hpo_list
-  Int effective_case_n
+  File effective_case_sample_sizes
   String prefix
   String contig
   File metacohort_list
@@ -294,7 +294,7 @@ task burden_test {
     gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
     # Extract contig of interest from GTF
-    tabix ${gtf} ${contig} | bgzip -c > subset.gtf.gz
+    tabix ${gtf} ${contig} | bgzip -c > ${contig}.gtf.gz
 
     # Create string of HPOs to keep
     keep_hpos=$( cat ${training_hpo_list} | paste -s -d\; )
@@ -305,6 +305,7 @@ task burden_test {
 
       # Set metacohort-specific parameters
       cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
+      effective_case_n=$( fgrep -w $meta ${effective_case_sample_sizes} | cut -f2 )
 
       # Iterate over CNV types
       for CNV in DEL DUP; do
@@ -343,7 +344,7 @@ task burden_test {
           --pheno-table ${metacohort_sample_table} \
           --cohort-name $meta \
           --cnv $CNV \
-          --effective-case-n ${effective_case_n} \
+          --effective-case-n $effective_case_n \
           --bgzip \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.${contig}.bed.gz" \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.${contig}.bed.gz"
@@ -353,7 +354,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:db7d61867bb7e0b027f9a61470e40a59a93e8841878e3b8a702e92ae2cde09b6"
+    docker: "talkowski/rcnv@sha256:0456fc2785edad81d2b7d72b763e06c46619e8b2ef2ce83ffbd37c390c3f5464"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -482,7 +483,7 @@ task merge_and_meta_analysis {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:79920b5e5b88923d1813daa8cf04d3e39817a83000b06961c3a7fefb75c4ea37"
+    docker: "talkowski/rcnv@sha256:0456fc2785edad81d2b7d72b763e06c46619e8b2ef2ce83ffbd37c390c3f5464"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "30"
