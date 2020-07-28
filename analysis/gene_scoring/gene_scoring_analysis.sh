@@ -444,7 +444,7 @@ zcat ${blacklist} ${underpowered_genes} \
 > blacklist_plus_underpowered.bed.gz
 
 # Set CNV type-specific parameters
-case $CNV in
+case ${CNV} in
   "DEL")
     true_pos="gold_standard.haploinsufficient.genes.list"
     true_neg="gold_standard.haplosufficient.genes.list"

@@ -26,6 +26,7 @@ workflow gene_burden_analysis {
   String meta_model_prefix
   Int min_cnvs_per_gene_training
   Float prior_frac
+  File training_blacklist
   File gene_features
   File raw_gene_features
   Float max_true_bfdp
@@ -126,8 +127,8 @@ workflow gene_burden_analysis {
     call score_genes as score_genes_DEL {
       input:
         CNV="DEL",
-        BFDP_stats=blacklist_priors_bfdp.del_bfdp,
-        blacklist=blacklist_priors_bfdp.training_blacklist,
+        BFDP_stats=calc_priors_bfdp.del_bfdp,
+        blacklist=training_blacklist,
         underpowered_genes=rCNV_meta_analysis.underpowered_genes[0],
         gene_features=gene_features,
         model=model,
@@ -141,8 +142,8 @@ workflow gene_burden_analysis {
     call score_genes as score_genes_DUP {
       input:
         CNV="DUP",
-        BFDP_stats=blacklist_priors_bfdp.dup_bfdp,
-        blacklist=blacklist_priors_bfdp.training_blacklist,
+        BFDP_stats=calc_priors_bfdp.dup_bfdp,
+        blacklist=training_blacklist,
         underpowered_genes=rCNV_meta_analysis.underpowered_genes[1],
         gene_features=gene_features,
         model=model,
@@ -605,8 +606,7 @@ task calc_priors_bfdp {
   >>>
 
   runtime {
-    # TODO: update docker
-    # docker: "talkowski/rcnv@sha256:79920b5e5b88923d1813daa8cf04d3e39817a83000b06961c3a7fefb75c4ea37"
+    docker: "talkowski/rcnv@sha256:15947c04f5d7063c62712062b354632b47d1ec77f3a3decce74b37317269f480"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -660,7 +660,7 @@ task score_genes {
     > blacklist_plus_underpowered.bed.gz
 
     # Set CNV type-specific parameters
-    case $CNV in
+    case ${CNV} in
       "DEL")
         true_pos="gold_standard.haploinsufficient.genes.list"
         true_neg="gold_standard.haplosufficient.genes.list"
@@ -693,8 +693,7 @@ task score_genes {
   >>>
 
   runtime {
-    # TODO: update docker
-    # docker: "talkowski/rcnv@sha256:a3707d6db2a0411458b0999943dad90a2c5d1adeb6aedd4baaa8f299bc70cfbb"
+    docker: "talkowski/rcnv@sha256:15947c04f5d7063c62712062b354632b47d1ec77f3a3decce74b37317269f480"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -867,7 +866,7 @@ task qc_scores {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:a3707d6db2a0411458b0999943dad90a2c5d1adeb6aedd4baaa8f299bc70cfbb"
+    docker: "talkowski/rcnv@sha256:15947c04f5d7063c62712062b354632b47d1ec77f3a3decce74b37317269f480"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

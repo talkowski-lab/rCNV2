@@ -83,8 +83,9 @@ def load_stats(stats_in, arm_dict=None, max_true=0.5, min_false=0.5,
         ss['chrom'] = ss.index.map(arm_dict)
 
     # Manually reassign true positive and true negative BFDPs
-    ss.loc[ss.index.isin(true_pos), 'bfdp'] = 0
-    ss.loc[ss.index.isin(true_neg), 'bfdp'] = 1
+    # Only for genes missing values (keep empirical BFDPs, if available)
+    ss.loc[(ss.index.isin(true_pos) & ss.bfdp.isnull()), 'bfdp'] = 0
+    ss.loc[(ss.index.isin(true_neg) & ss.bfdp.isnull()), 'bfdp'] = 1
 
     # Convert bfdp to numeric
     ss['bfdp'] = pd.to_numeric(ss['bfdp'], errors='coerce')
@@ -362,11 +363,11 @@ def main():
     parser.add_argument('-c', '--centromeres', help='Centromeres BED.')
     parser.add_argument('-x', '--blacklist', help='BED of genes to exclude.')
     parser.add_argument('-p', '--true-positives', help='List of true positive ' +
-                        'genes. BFDPs will be set to 1 for these, and will ' +
-                        'override --blacklist.')
+                        'genes. BFDPs will be set to 0 for genes missing data, ' +
+                        'and will override --blacklist.')
     parser.add_argument('-n', '--true-negatives', help='List of true negative ' +
-                        'genes. BFDPs will be set to 1 for these, and will ' +
-                        'override --blacklist.')
+                        'genes. BFDPs will be set to 1 for genes missing data, ' +
+                        'and will override --blacklist.')
     parser.add_argument('-m', '--model', choices=model_options, default='logit',
                         help='Choice of classifier. [default: logit]')
     parser.add_argument('--chromsplit', action='store_true', default=False,
