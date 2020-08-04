@@ -282,12 +282,26 @@ fi
   "gnomad_sv.v2.1.nonneuro"
 
 
+# Standardize gene lists curated in Karczewski et al. (2020)
+git clone https://github.com/macarthur-lab/gnomad_lof.git
+wget http://www.informatics.jax.org/downloads/reports/HMD_HumanPhenotype.rpt
+fgrep -wf gencode.v19.canonical.pext_filtered.genes.list \
+  gnomad_lof/R/ko_gene_lists/list_CEGv2.tsv \
+> cell_essential.genes.list
+fgrep -wf gnomad_lof/R/ko_gene_lists/list_mouse_het_lethal_genes.tsv \
+  HMD_HumanPhenotype.rpt \
+| cut -f1 \
+| fgrep -wf gencode.v19.canonical.pext_filtered.genes.list \
+> mouse_het_lethal.genes.list
+
+
 # Copy gnomAD & gnomAD-SV gene files to rCNV bucket (note: requires permissions)
 gsutil -m cp gencode.v19.canonical.pext_filtered.constrained.bed.gz \
   ${rCNV_bucket}/analysis/analysis_refs/
 gsutil -m cp gnomad.v2.1.1.*.genes.list \
-  ${rCNV_bucket}/cleaned_data/genes/gene_lists/
-gsutil -m cp gnomad_sv.v2.1.nonneuro.*.genes.list \
+  gnomad_sv.v2.1.nonneuro.*.genes.list \
+  cell_essential.genes.list \
+  mouse_het_lethal.genes.list \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists/
 
 
@@ -340,6 +354,16 @@ gsutil -m cp DDG2P.*.genes.list \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists/
 gsutil -m cp DDG2P.*.genes_with_hpos.tsv \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists/ddg2p_with_hpos/
+
+
+# Generate COSMIC cancer census gene lists & copy to rCNV bucket (note: requires permissions)
+gsutil -m cp ${rCNV_bucket}/raw_data/other/cancer_gene_census.csv ./
+/opt/rCNV2/data_curation/gene/parse_cosmic_genes.R \
+  cancer_gene_census.csv \
+  gencode.v19.canonical.pext_filtered.genes.list \
+  ./
+gsutil -m cp COSMIC.*.genes.list \
+  ${rCNV_bucket}/cleaned_data/genes/gene_lists/
 
 
 # Generate HTML table of gene lists for README
@@ -404,6 +428,30 @@ for wrapper in 1; do
   | sed 's/\.genes\.list//g' | addcom
   echo "gnomAD v2.1.1 [Karczewski _et al._, _Nature_, 2020](https://www.nature.com/articles/s41586-020-2308-7)"
   echo "pLI ≥ 0.01, the last third of LOEUF, missense Z-score ≤ 0, missense OEUF ≥ 1, and synonymous Z-score ~ (-3, 3)"
+done | paste -s \
+| sed 's/\t/\ \|\ /g' \
+| sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' \
+>> genelist_table.html.txt
+# Cell essential genes
+for wrapper in 1; do
+  echo "Cell essential genes"
+  wc -l cell_essential.genes.list \
+  | awk -v OFS="\t" '{ print $1, "`"$2"`" }' \
+  | sed 's/\.genes\.list//g' | addcom
+  echo "[Hart _et al._, _G3_, 2017](https://www.g3journal.org/content/7/8/2719)"
+  echo "Genes essential in human cell lines as determined by CRISPR/Cas9 screens. Curated in [Karczewski _et al._, _Nature_, 2020](https://www.nature.com/articles/s41586-020-2308-7)"
+done | paste -s \
+| sed 's/\t/\ \|\ /g' \
+| sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' \
+>> genelist_table.html.txt
+# Mouse het LoF lethal genes
+for wrapper in 1; do
+  echo "Mouse heterozygous LoF lethal"
+  wc -l mouse_het_lethal.genes.list \
+  | awk -v OFS="\t" '{ print $1, "`"$2"`" }' \
+  | sed 's/\.genes\.list//g' | addcom
+  echo "[Motenko _et al._, _Mamm. Genome_, 2015](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4534495/)"
+  echo "Genes lethal in mouse models when heterozygously inactivated. Curated in [Karczewski _et al._, _Nature_, 2020](https://www.nature.com/articles/s41586-020-2308-7)"
 done | paste -s \
 | sed 's/\t/\ \|\ /g' \
 | sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' \
@@ -532,6 +580,18 @@ for mech in lof gof other; do
       | sed -e 's/^/\|\ /g' -e 's/$/\ \|/g'
   done
 done \
+>> genelist_table.html.txt
+# COSMIC oncogenes
+for wrapper in 1; do
+  echo "High-confidence oncogenes"
+  wc -l COSMIC.hc_oncogenes.genes.list \
+  | awk -v OFS="\t" '{ print $1, "`"$2"`" }' \
+  | sed 's/\.genes\.list//g' | addcom
+  echo "COSMIC v91 [Sondka _et al._, _Nat. Rev. Cancer_, 2018](https://www.nature.com/articles/s41568-018-0060-1)"
+  echo "Tier 1 dominant oncogenes due to amplification, missense, or 'other' mutations"
+done | paste -s \
+| sed 's/\t/\ \|\ /g' \
+| sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' \
 >> genelist_table.html.txt
 cat genelist_table.html.txt
 

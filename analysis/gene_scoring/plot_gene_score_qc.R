@@ -171,29 +171,31 @@ require(Hmisc, quietly=T)
 option_list <- list()
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage="%prog scores.tsv del_truth.tsv dup_truth.tsv neg_genes.tsv out.prefix",
+args <- parse_args(OptionParser(usage="%prog scores.tsv del_truth.tsv dup_truth.tsv del_false.tsv dup_false.tsv out.prefix",
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Checks for appropriate positional arguments
-if(length(args$args) != 5){
-  stop("Three positional arguments: scores.tsv, del_truth.tsv, dup_truth.tsv, neg_genes.tsv, and out_prefix\n")
+if(length(args$args) != 6){
+  stop("Six positional arguments: scores.tsv, del_truth.tsv, dup_truth.tsv, del_false.tsv, dup_false.tsv, and out_prefix\n")
 }
 
 # Writes args & opts to vars
 stats.in <- args$args[1]
 del_truth.in <- args$args[2]
 dup_truth.in <- args$args[3]
-neg_genes.in <- args$args[4]
-out.prefix <- args$args[5]
+del_false.in <- args$args[4]
+dup_false.in <- args$args[5]
+out.prefix <- args$args[6]
 
 # # DEV PARAMTERS
 # setwd("~/scratch")
 # stats.in <- "rCNV.gene_scores.tsv.gz"
 # del_truth.in <- "DEL.roc_truth_sets.tsv"
 # dup_truth.in <- "DUP.roc_truth_sets.tsv"
-# neg_genes.in <- "gold_standard.haplosufficient.genes.list"
+# del_false.in <- "gold_standard.haplosufficient.genes.list"
+# dup_false.in <- "gold_standard.triplosensitive.genes.list"
 # out.prefix <- "rCNV_gene_scoring_qc"
 
 # Read gene score stats
@@ -202,11 +204,12 @@ stats <- load.stats(stats.in)
 # Read truth sets
 del.truth <- load.truth(del_truth.in)
 dup.truth <- load.truth(dup_truth.in)
-neg.genes <- read.table(neg_genes.in, header=F)[, 1]
+del.false <- read.table(del_false.in, header=F)[, 1]
+dup.false <- read.table(dup_false.in, header=F)[, 1]
 
 # Compute plot stats for DEL & DUP
-del.data <- calc.plot.data(stats, "pHI", del.truth, neg.genes)
-dup.data <- calc.plot.data(stats, "pTS", dup.truth, neg.genes)
+del.data <- calc.plot.data(stats, "pHI", del.truth, del.false)
+dup.data <- calc.plot.data(stats, "pTS", dup.truth, dup.false)
 
 # Generate all DEL/pHI plots
 pdf(paste(out.prefix, "pHI.roc.pdf", sep="."), height=4, width=4)

@@ -170,38 +170,42 @@ require(viridisLite, quietly=T)
 option_list <- list()
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage="%prog del.tsv dup.tsv true.genes false.genes out.prefix",
+args <- parse_args(OptionParser(usage="%prog del.tsv dup.tsv del.true.genes dup.true.genes del.false.genes dup.false.genes out.prefix",
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Checks for appropriate positional arguments
-if(length(args$args) != 5){
-  stop("Five positional arguments: del.tsv, dup.tsv, true.genes, false.genes, and out.prefix\n")
+if(length(args$args) != 7){
+  stop("Seven positional arguments: del.tsv, dup.tsv, del.true.genes, dup.true.genes, del.false.genes, dup.false.genes, and out.prefix\n")
 }
 
 # Writes args & opts to vars
 del.in <- args$args[1]
 dup.in <- args$args[2]
-true_genes.in <- args$args[3]
-false_genes.in <- args$args[4]
-out.prefix <- args$args[5]
+del.true_genes.in <- args$args[3]
+dup.true_genes.in <- args$args[4]
+del.false_genes.in <- args$args[5]
+dup.false_genes.in <- args$args[6]
+out.prefix <- args$args[7]
 
 # # DEV PARAMTERS
 # setwd("~/scratch")
 # del.in <- "rCNV.DEL.model_evaluation.input.tsv"
 # dup.in <- "rCNV.DUP.model_evaluation.input.tsv"
-# true_genes.in <- "gold_standard.haploinsufficient.genes.list"
-# false_genes.in <- "gold_standard.haplosufficient.genes.list"
+# del.true_genes.in <- "gold_standard.haploinsufficient.genes.list"
+# del.false_genes.in <- "gold_standard.haplosufficient.genes.list"
 # out.prefix <- "rCNV_gene_scoring_model_comparison"
 
 # Read gene lists
-true.genes <- read.table(true_genes.in, header=F)[, 1]
-false.genes <- read.table(false_genes.in, header=F)[, 1]
+del.true.genes <- read.table(del.true_genes.in, header=F)[, 1]
+dup.true.genes <- read.table(dup.true_genes.in, header=F)[, 1]
+del.false.genes <- read.table(del.false_genes.in, header=F)[, 1]
+dup.false.genes <- read.table(dup.false_genes.in, header=F)[, 1]
 
 # Load data
-del <- load.all.models(del.in, true.genes, false.genes)
-dup <- load.all.models(dup.in, true.genes, false.genes)
+del <- load.all.models(del.in, del.true.genes, del.false.genes)
+dup <- load.all.models(dup.in, dup.true.genes, dup.false.genes)
 
 # Compute table with stats
 write.table(get.sum.table(del, dup),

@@ -693,7 +693,7 @@ task score_genes {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:15947c04f5d7063c62712062b354632b47d1ec77f3a3decce74b37317269f480"
+    docker: "talkowski/rcnv@sha256:f57a10d1386c4234bd291e8bbdd183264560327ed8f7cfc730c83bd99bc681fc"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -721,7 +721,9 @@ task qc_scores {
 
     # Copy gene lists
     gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes/gene_lists ./
-    gsutil -m cp ${rCNV_bucket}/analysis/gene_scoring/gene_lists/* ./gene_lists/
+    gsutil -m cp \
+      ${rCNV_bucket}/analysis/gene_scoring/gene_lists/gold_standard.*.genes.list \
+      gene_lists/
 
     # Evaluate every model to determine best overall predictor
     compdir=${freq_code}_gene_scoring_model_comparisons
@@ -740,7 +742,9 @@ task qc_scores {
       ${freq_code}.DEL.model_evaluation.input.tsv \
       ${freq_code}.DUP.model_evaluation.input.tsv \
       gene_lists/gold_standard.haploinsufficient.genes.list \
+      gene_lists/gold_standard.triplosensitive.genes.list \
       gene_lists/gold_standard.haplosufficient.genes.list \
+      gene_lists/gold_standard.triploinsensitive.genes.list \
       $compdir/${freq_code}_gene_scoring_model_comparisons
 
     # Merge scores from best model (highest harmonic mean AUC)
@@ -764,78 +768,36 @@ task qc_scores {
     for CNV in DEL DUP; do
       case $CNV in
         "DEL")
-          # Union (ClinGen HI + DDG2P dominant LoF)
-          cat gene_lists/ClinGen.hmc_haploinsufficient.genes.list \
-              gene_lists/DDG2P.hmc_lof.genes.list \
-          | sort -Vk1,1 | uniq \
-          > union_truth_set.lof.tsv
-
-          # Intersection (ClinGen HI + DDG2P dominant LoF)
-          fgrep -wf \
-            gene_lists/ClinGen.hmc_haploinsufficient.genes.list \
-            gene_lists/DDG2P.hmc_lof.genes.list \
-          | sort -Vk1,1 | uniq \
-          > intersection_truth_set.lof.tsv
-
-          # ClinGen HI alone
-          cat gene_lists/ClinGen.all_haploinsufficient.genes.list \
-          | sort -Vk1,1 | uniq \
-          > clingen_truth_set.lof.tsv
-
-          # DDG2P lof + other alone
-          cat gene_lists/DDG2P.all_lof.genes.list \
-              gene_lists/DDG2P.all_other.genes.list \
-          | sort -Vk1,1 | uniq \
-          > ddg2p_truth_set.lof.tsv
-
-          # Combine all truth sets into master union
-          cat union_truth_set.lof.tsv \
-              clingen_truth_set.lof.tsv \
-              ddg2p_truth_set.lof.tsv \
+          cat gene_lists/ClinGen.hc_haploinsufficient.genes.list \
+              gene_lists/DDG2P.hc_lof.genes.list \
+              gene_lists/cell_essential.genes.list \
+              gene_lists/mouse_het_lethal.genes.list \
           | sort -Vk1,1 | uniq \
           > master_union_truth_set.lof.tsv
 
           # Write truth set input tsv
           for wrapper in 1; do
             echo -e "Union truth set\tmaster_union_truth_set.lof.tsv\tgrey25"
-            echo -e "ClinGen & DECIPHER (union)\tunion_truth_set.lof.tsv\t#9F2B1C"
-            echo -e "ClinGen & DECIPHER (int.)\tintersection_truth_set.lof.tsv\t#D43925"
-            echo -e "ClinGen dom. HI\tclingen_truth_set.lof.tsv\t#DD6151"
-            echo -e "DECIPHER dom. LoF/unk.\tddg2p_truth_set.lof.tsv\t#E5887C"
+            echo -e "ClinGen dom. HI\tgene_lists/ClinGen.hc_haploinsufficient.genes.list\t#9F2B1C"
+            echo -e "DECIPHER dom. LoF\tgene_lists/DDG2P.hc_lof.genes.list\t#D43925"
+            echo -e "Cell essential\tgene_lists/cell_essential.genes.list\t#DD6151"
+            echo -e "Mouse het. lethal\tgene_lists/mouse_het_lethal.genes.list\t#E5887C"
           done > DEL.roc_truth_sets.tsv
           ;;
 
         "DUP")
-          # Union (ClinGen HI + DDG2P dominant CG)
-          cat gene_lists/ClinGen.hmc_triplosensitive.genes.list \
-              gene_lists/DDG2P.hmc_gof.genes.list \
-          | sort -Vk1,1 | uniq \
-          > union_truth_set.gof.tsv
-
-          # ClinGen triplo alone
           cat gene_lists/ClinGen.all_triplosensitive.genes.list \
-          | sort -Vk1,1 | uniq \
-          > clingen_truth_set.triplo.tsv
-
-          # DDG2P gof + other alone
-          cat gene_lists/DDG2P.all_gof.genes.list \
-              gene_lists/DDG2P.all_other.genes.list \
-          | sort -Vk1,1 | uniq \
-          > ddg2p_truth_set.gof.tsv
-
-          # Combine all truth sets into master union
-          cat union_truth_set.gof.tsv \
-              clingen_truth_set.triplo.tsv \
-              ddg2p_truth_set.gof.tsv \
+              gene_lists/DDG2P.hc_gof.genes.list \
+              gene_lists/COSMIC.hc_oncogenes.genes.list \
           | sort -Vk1,1 | uniq \
           > master_union_truth_set.gof.tsv
 
           # Write truth set input tsv
           for wrapper in 1; do
             echo -e "Union truth set\tmaster_union_truth_set.gof.tsv\tgrey25"
-            echo -e "ClinGen & DECIPHER GoF (union)\tunion_truth_set.gof.tsv\t#1A5985"
-            echo -e "ClinGen dom. TS\tclingen_truth_set.triplo.tsv\t#2376B2"
-            echo -e "DECIPHER dom. GoF/unk.\tddg2p_truth_set.gof.tsv\t#4F91C1"
+            echo -e "ClinGen dom. TS\tgene_lists/ClinGen.all_triplosensitive.genes.list\t#1A5985"
+            echo -e "DECIPHER dom. GoF\tgene_lists/DDG2P.hc_gof.genes.list\t#2376B2"
+            echo -e "COSMIC dom. oncogenes\tgene_lists/COSMIC.hc_oncogenes.genes.list\t#4F91C1"
           done > DUP.roc_truth_sets.tsv
           ;;
       esac    
@@ -848,6 +810,7 @@ task qc_scores {
       DEL.roc_truth_sets.tsv \
       DUP.roc_truth_sets.tsv \
       gene_lists/gold_standard.haplosufficient.genes.list \
+      gene_lists/gold_standard.triploinsensitive.genes.list \
       ${freq_code}_gene_scoring_QC_plots/${freq_code}_gene_score_qc
 
     # Copy all results to Google bucket
@@ -866,7 +829,8 @@ task qc_scores {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:15947c04f5d7063c62712062b354632b47d1ec77f3a3decce74b37317269f480"
+    # TODO: UPDATE DOCKER
+    # docker: "talkowski/rcnv@sha256:f57a10d1386c4234bd291e8bbdd183264560327ed8f7cfc730c83bd99bc681fc"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

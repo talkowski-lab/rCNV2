@@ -24,10 +24,10 @@ RUN conda install -n rcnv -y -c bioconda click
 RUN conda install -n rcnv -y -c bioconda mysqlclient
 RUN conda install -n rcnv -y -c bioconda pybigwig
 RUN conda install -n rcnv -y -c conda-forge statsmodels lxml matplotlib
+RUN conda install -n rcnv -y -c biobuilds obonet
 ENV CONDA_DEFAULT_ENV rcnv
 RUN echo "source activate rcnv" >> ~/.bashrc
 ENV PATH /opt/conda/envs/rcnv/bin:$PATH
-RUN pip install obonet
 
 # Install locales
 RUN apt-get -qqy update \
@@ -84,7 +84,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 52559f88201698754f48e73bf145ce2262c2ed42 && \
+    git checkout df4ccb6628a35e049e1a9261cf11015e6fe2e7db && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)
