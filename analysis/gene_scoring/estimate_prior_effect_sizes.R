@@ -40,8 +40,9 @@ read.data <- function(path, blacklist, constrained, gs, neg){
 }
 
 # Plot prior effect size by gene set
-plot.prior.lnors <- function(dat, color, title){
+plot.prior.lnors <- function(dat, color, title, pct=1){
   par(mar=c(3, 3.5, 2, 1))
+  cutoffs <- quantile(dat$meta_lnOR, probs=c(1-pct, pct), na.rm=T)
   
   # Plot effect sizes
   plot(x=c(-1, 3), y=range(dat$meta_lnOR, na.rm=T), type="n", 
@@ -54,9 +55,10 @@ plot.prior.lnors <- function(dat, color, title){
     axis(1, at=x-1.5, tick=F, labels=xlabs[x])
   })
   mtext(2, line=2, text="ln(Odds Ratio)")
-  vioplot(dat$meta_lnOR[which(!is.na(dat$meta_lnOR) & dat$neg)], at=-0.5, add=T, h=0.25,
+  vioplot(dat$meta_lnOR[which(!is.na(dat$meta_lnOR) & dat$neg & dat$meta_lnOR<=cutoffs[2])],
+          at=-0.5, add=T, h=0.25,
           col="gray75", drawRect=F)
-  boxplot(dat$meta_lnOR[which(dat$neg)], at=-0.5, add=T, col=NA, outline=F, boxwex=1/3, 
+  boxplot(dat$meta_lnOR[which(dat$neg & dat$meta_lnOR<=cutoffs[2])], at=-0.5, add=T, col=NA, outline=F, boxwex=1/3, 
           staplewex=1/3, lty=1, lwd=2, yaxt="n", col.border="white")
   vioplot(dat$meta_lnOR[which(!is.na(dat$meta_lnOR))], at=0.5, add=T, h=0.25,
           col="gray40", drawRect=F)
@@ -66,9 +68,9 @@ plot.prior.lnors <- function(dat, color, title){
           at=1.5, add=T, h=0.25, col=color, drawRect=F)
   boxplot(dat$meta_lnOR[which(!is.na(dat$meta_lnOR) & dat$constrained)], 
           at=1.5, add=T, col=NA, outline=F, boxwex=1/3, staplewex=1/3, lty=1, lwd=2, yaxt="n")
-  beeswarm(dat$meta_lnOR[which(dat$gs)], add=T, at=2.5, pch=19, col=color,
+  beeswarm(dat$meta_lnOR[which(dat$gs & dat$meta_lnOR>=cutoffs[1])], add=T, at=2.5, pch=19, col=color,
            corral="wrap", corralwidth=0.8, cex=0.5)
-  boxplot(dat$meta_lnOR[which(dat$gs)], at=2.5, add=T, col=NA, outline=F, 
+  boxplot(dat$meta_lnOR[which(dat$gs & dat$meta_lnOR>=cutoffs[1])], at=2.5, add=T, col=NA, outline=F, 
           boxwex=1/3, staplewex=1/3, lty=1, lwd=2, yaxt="n")
   abline(h=median(dat$meta_lnOR, na.rm=T))
   
@@ -100,12 +102,13 @@ plot.prior.lnors <- function(dat, color, title){
 }
 
 # Compute table of empirical priors
-calc.priors <- function(del, dup){
+calc.priors <- function(del, dup, pct=1){
   vals <- unlist(lapply(list(del, dup), function(df){
-    c(median(df$meta_lnOR[which(df$neg)], na.rm=T),
-      median(df$meta_lnOR[which(df$gs)], na.rm=T),
-      median(df$var[which(df$neg)], na.rm=T),
-      median(df$var[which(df$gs)], na.rm=T))
+    cutoffs <- quantile(df$meta_lnOR, probs=c(1-pct, pct), na.rm=T)
+    c(median(df$meta_lnOR[which(df$neg & df$meta_lnOR<=cutoffs[2])], na.rm=T),
+      median(df$meta_lnOR[which(df$gs & df$meta_lnOR>=cutoffs[1])], na.rm=T),
+      median(df$var[which(df$neg & df$meta_lnOR<=cutoffs[2])], na.rm=T),
+      median(df$var[which(df$gs & df$meta_lnOR>=cutoffs[1])], na.rm=T))
   }))
   data.frame("parameter"=rep(c("theta0", "theta1", "var0", "var1"), 2), 
              "cnv"=c(rep("DEL", 4), rep("DUP", 4)), 
@@ -161,7 +164,10 @@ plot.example.priors <- function(del, dup, colors){
 ### RSCRIPT BLOCK ###
 #####################
 # List of command-line options
-option_list <- list()
+option_list <- list(
+  make_option(c("--pct"), default=0.75,
+              help="Percentile cutoff for top & bottom")
+)
 
 # Get command-line arguments & options
 args <- parse_args(OptionParser(usage=paste("%prog del.bed.gz dup.bed.gz del.exclude.list dup.exclude.list",
@@ -190,6 +196,7 @@ del.gs_false.in <- args$args[7]
 dup.gs_true.in <- args$args[8]
 dup.gs_false.in <- args$args[9]
 out.prefix <- args$args[10]
+pct <- opts$pct
 
 # # DEV PARAMTERS
 # setwd("~/scratch")
@@ -203,6 +210,7 @@ out.prefix <- args$args[10]
 # dup.gs_true.in <- "~/scratch/gold_standard.triplosensitive.genes.list"
 # dup.gs_false.in <- "~/scratch/gold_standard.triploinsensitive.genes.list"
 # out.prefix <- "rCNV_prior_estimation"
+# pct <- 0.75
 
 # Read all gene lists
 del.blacklist <- read.table(del.blacklist.in, header=F)[, 1]
@@ -220,12 +228,12 @@ dup <- read.data(dup.in, dup.blacklist, constrained, dup.gs, dup.neg)
 # Plot effect sizes
 pdf(paste(out.prefix, "observed_effect_sizes.pdf", sep="."), height=4, width=12)
 par(mfrow=c(1, 2))
-plot.prior.lnors(del, colors[1], title="Deletions")
-plot.prior.lnors(dup, colors[2], title="Duplications")
+plot.prior.lnors(del, colors[1], title="Deletions", pct=pct)
+plot.prior.lnors(dup, colors[2], title="Duplications", pct=pct)
 dev.off()
 
 # Compute table of priors
-priors <- calc.priors(del, dup)
+priors <- calc.priors(del, dup, pct)
 colnames(priors)[1] <- paste("#", colnames(priors)[1], sep="")
 write.table(priors, paste(out.prefix, "empirical_prior_estimates.tsv", sep="."),
             col.names=T, row.names=F, sep="\t", quote=F)

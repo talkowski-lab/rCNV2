@@ -50,9 +50,9 @@ min_cds_ovr_del=0.8
 min_cds_ovr_dup=0.8
 max_genes_per_cnv=24
 meta_model_prefix="fe"
-min_cnvs_per_gene_training=5
+min_cnvs_per_gene_training=3
 cen_tel_dist=1000000
-prior_frac=0.142
+prior_frac=0.12
 
 
 # Create training blacklist: Remove all genes within ±1Mb of a telomere/centromere, 
@@ -204,6 +204,17 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/gene_scoring/refs/
 
 
+# Parameter optimization: minimum number of CNVs per gene for training
+# NOTE: requires running meta-analysis and get_underpowered_genes tasks first in WDL
+gsutil -m cp ${rCNV_bucket}/analysis/gene_scoring/data/** ./
+for CNV in DEL DUP; do
+  /opt/rCNV2/analysis/gene_scoring/variance_vs_counts.R \
+    rCNV2_analysis_d1.rCNV.$CNV.gene_burden.meta_analysis.stats.bed.gz \
+    rCNV2_analysis_d1.rCNV.$CNV.counts_per_gene.tsv \
+    variance_vs_cnvs.$CNV.pdf
+done
+
+
 # Recompute association stats per cohort
 export training_hpo_list=gene_scoring.hpos_to_keep.list
 export effective_case_sample_sizes=gene_scoring.effective_case_sample_sizes.tsv
@@ -339,7 +350,9 @@ for CNV in DEL DUP; do
 done
 
 # Compute prior effect sizes
+prior_lnor_thresholding_pct=0.75
 /opt/rCNV2/analysis/gene_scoring/estimate_prior_effect_sizes.R \
+  --pct ${prior_lnor_thresholding_pct} \
   ${del_meta_stats} \
   ${dup_meta_stats} \
   ${freq_code}.DEL.training_blacklist.genes.list \

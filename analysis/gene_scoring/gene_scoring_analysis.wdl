@@ -106,6 +106,16 @@ workflow gene_burden_analysis {
         CNV=CNV,
         metacohort_list=metacohort_list,
         meta_model_prefix=meta_model_prefix,
+        freq_code="rCNV",
+        rCNV_bucket=rCNV_bucket
+    }
+    call get_underpowered_genes {
+      input:
+        stats_beds=rCNV_burden_test.stats_beds,
+        stats_beds_idxs=rCNV_burden_test.stats_bed_idxs,
+        prefix=prefix,
+        CNV=CNV,
+        metacohort_list=metacohort_list,
         min_cnvs_per_gene_training=min_cnvs_per_gene_training,
         freq_code="rCNV",
         rCNV_bucket=rCNV_bucket
@@ -119,72 +129,73 @@ workflow gene_burden_analysis {
       dup_meta_stats=rCNV_meta_analysis.meta_stats_bed[1],
       freq_code="rCNV",
       rCNV_bucket=rCNV_bucket,
-      prior_frac=prior_frac
+      prior_frac=prior_frac,
+      prior_lnor_thresholding_pct=0.75
   }
 
-  # Score genes for each model
-  scatter ( model in models ) {
-    call score_genes as score_genes_DEL {
-      input:
-        CNV="DEL",
-        BFDP_stats=calc_priors_bfdp.del_bfdp,
-        blacklist=training_blacklist,
-        underpowered_genes=rCNV_meta_analysis.underpowered_genes[0],
-        gene_features=gene_features,
-        model=model,
-        max_true_bfdp=max_true_bfdp,
-        min_false_bfdp=min_false_bfdp,
-        elnet_alpha=elnet_alpha,
-        elnet_l1_l2_mix=elnet_l1_l2_mix,
-        freq_code="rCNV",
-        rCNV_bucket=rCNV_bucket
-    }
-    call score_genes as score_genes_DUP {
-      input:
-        CNV="DUP",
-        BFDP_stats=calc_priors_bfdp.dup_bfdp,
-        blacklist=training_blacklist,
-        underpowered_genes=rCNV_meta_analysis.underpowered_genes[1],
-        gene_features=gene_features,
-        model=model,
-        max_true_bfdp=max_true_bfdp,
-        min_false_bfdp=min_false_bfdp,
-        elnet_alpha=elnet_alpha,
-        elnet_l1_l2_mix=elnet_l1_l2_mix,
-        freq_code="rCNV",
-        rCNV_bucket=rCNV_bucket
-    }
-  }
+  # # Score genes for each model
+  # scatter ( model in models ) {
+  #   call score_genes as score_genes_DEL {
+  #     input:
+  #       CNV="DEL",
+  #       BFDP_stats=calc_priors_bfdp.del_bfdp,
+  #       blacklist=training_blacklist,
+  #       underpowered_genes=get_underpowered_genes.underpowered_genes[0],
+  #       gene_features=gene_features,
+  #       model=model,
+  #       max_true_bfdp=max_true_bfdp,
+  #       min_false_bfdp=min_false_bfdp,
+  #       elnet_alpha=elnet_alpha,
+  #       elnet_l1_l2_mix=elnet_l1_l2_mix,
+  #       freq_code="rCNV",
+  #       rCNV_bucket=rCNV_bucket
+  #   }
+  #   call score_genes as score_genes_DUP {
+  #     input:
+  #       CNV="DUP",
+  #       BFDP_stats=calc_priors_bfdp.dup_bfdp,
+  #       blacklist=training_blacklist,
+  #       underpowered_genes=get_underpowered_genes.underpowered_genes[1],
+  #       gene_features=gene_features,
+  #       model=model,
+  #       max_true_bfdp=max_true_bfdp,
+  #       min_false_bfdp=min_false_bfdp,
+  #       elnet_alpha=elnet_alpha,
+  #       elnet_l1_l2_mix=elnet_l1_l2_mix,
+  #       freq_code="rCNV",
+  #       rCNV_bucket=rCNV_bucket
+  #   }
+  # }
 
-  # Score with ensemble classifier, and return updated array of all scores + ensemble
-  call score_ensemble as score_ensemble_DEL {
-    input:
-      CNV="DEL",
-      scores=score_genes_DEL.scores_tsv,
-      freq_code="rCNV",
-      rCNV_bucket=rCNV_bucket
-  }
-  call score_ensemble as score_ensemble_DUP {
-    input:
-      CNV="DUP",
-      scores=score_genes_DUP.scores_tsv,
-      freq_code="rCNV",
-      rCNV_bucket=rCNV_bucket
-  }
+  # # Score with ensemble classifier, and return updated array of all scores + ensemble
+  # call score_ensemble as score_ensemble_DEL {
+  #   input:
+  #     CNV="DEL",
+  #     scores=score_genes_DEL.scores_tsv,
+  #     freq_code="rCNV",
+  #     rCNV_bucket=rCNV_bucket
+  # }
+  # call score_ensemble as score_ensemble_DUP {
+  #   input:
+  #     CNV="DUP",
+  #     scores=score_genes_DUP.scores_tsv,
+  #     freq_code="rCNV",
+  #     rCNV_bucket=rCNV_bucket
+  # }
 
-  # Determine best model & QC final scores
-  call qc_scores {
-    input:
-      del_scores=score_ensemble_DEL.all_scores,
-      dup_scores=score_ensemble_DUP.all_scores,
-      models=models,
-      raw_gene_features=raw_gene_features,
-      freq_code="rCNV",
-      rCNV_bucket=rCNV_bucket
-  }
+  # # Determine best model & QC final scores
+  # call qc_scores {
+  #   input:
+  #     del_scores=score_ensemble_DEL.all_scores,
+  #     dup_scores=score_ensemble_DUP.all_scores,
+  #     models=models,
+  #     raw_gene_features=raw_gene_features,
+  #     freq_code="rCNV",
+  #     rCNV_bucket=rCNV_bucket
+  # }
 
   output {
-    File gene_scores = qc_scores.final_scores
+    # File gene_scores = qc_scores.final_scores
   }
 }
 
@@ -266,7 +277,7 @@ task get_annotated_cnvs {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:bb114d7572228202c9fcb83ba1db575812c818d9f9086bfb12a8fed0ce1ea97d"
+    docker: "talkowski/rcnv@sha256:b88c6669695764493aa778498afc2df9407fe35d3e45aa127922c9701fe8f64c"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -370,7 +381,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0456fc2785edad81d2b7d72b763e06c46619e8b2ef2ce83ffbd37c390c3f5464"
+    docker: "talkowski/rcnv@sha256:b88c6669695764493aa778498afc2df9407fe35d3e45aa127922c9701fe8f64c"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -423,7 +434,7 @@ task merge_annotated_cnvs {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:bb114d7572228202c9fcb83ba1db575812c818d9f9086bfb12a8fed0ce1ea97d"
+    docker: "talkowski/rcnv@sha256:b88c6669695764493aa778498afc2df9407fe35d3e45aa127922c9701fe8f64c"
     preemptible: 1
   }
 
@@ -439,7 +450,6 @@ task merge_and_meta_analysis {
   String CNV
   File metacohort_list
   String meta_model_prefix
-  Int min_cnvs_per_gene_training
   String freq_code
   String rCNV_bucket
 
@@ -480,6 +490,65 @@ task merge_and_meta_analysis {
     bgzip -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed
     tabix -p bed -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz
 
+    # Copy meta-analysis results to Google bucket
+    gsutil -m cp \
+      ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz* \
+      ${rCNV_bucket}/analysis/gene_scoring/data/
+  >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:b88c6669695764493aa778498afc2df9407fe35d3e45aa127922c9701fe8f64c"
+    preemptible: 1
+    memory: "8 GB"
+    bootDiskSizeGb: "30"
+    disks: "local-disk 50 HDD"
+  }
+
+  output {
+    File meta_stats_bed = "${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz"
+    File meta_stats_bed_idx = "${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz.tbi"
+  }
+}
+
+
+# Get list of genes with insufficient CNV data to be used for model training
+task get_underpowered_genes {
+  Array[Array[File]] stats_beds
+  Array[Array[File]] stats_beds_idxs
+  String prefix
+  String CNV
+  File metacohort_list
+  Int min_cnvs_per_gene_training
+  String freq_code
+  String rCNV_bucket
+
+  command <<<
+    set -e
+
+    # Make list of stats files to be considered
+    find / -name "*.${prefix}.${freq_code}.${CNV}.gene_burden.stats.*.bed.gz" \
+    > stats.paths.list
+    # Debug: print paths to stdout
+    cat stats.paths.list
+
+    # Merge burden stats per cohort
+    zcat $( sed -n '1p' stats.paths.list ) | sed -n '1p' > header.tsv
+    while read meta cohort; do
+      zcat $( fgrep $meta stats.paths.list ) \
+      | grep -ve '^#' \
+      | sort -Vk1,1 -k2,2n -k3,3n \
+      | cat header.tsv - \
+      | bgzip -c \
+      > "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
+      tabix -f "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
+    done < <( fgrep -v "mega" ${metacohort_list} )
+
+    # Make input for meta-analysis
+    while read meta cohorts; do
+      echo -e "$meta\t$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
+    done < <( fgrep -v "mega" ${metacohort_list} ) \
+    > ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt
+
     # Extract list of genes with < min_cnvs_per_gene_training (to be used as blacklist later for training)
     # Note: this cutoff must be pre-determined with eval_or_vs_cnv_counts.R, but is not automated here
     /opt/rCNV2/analysis/gene_scoring/get_underpowered_genes.R \
@@ -495,14 +564,13 @@ task merge_and_meta_analysis {
 
     # Copy meta-analysis results to Google bucket
     gsutil -m cp \
-      ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz* \
       ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed.gz \
       ${prefix}.${freq_code}.${CNV}.counts_per_gene.tsv \
       ${rCNV_bucket}/analysis/gene_scoring/data/
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:d74a9792813c96018df089d355c29516cd85fb688e025408145bb32db48e4f66"
+    docker: "talkowski/rcnv@sha256:b88c6669695764493aa778498afc2df9407fe35d3e45aa127922c9701fe8f64c"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "30"
@@ -510,8 +578,6 @@ task merge_and_meta_analysis {
   }
 
   output {
-    File meta_stats_bed = "${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz"
-    File meta_stats_bed_idx = "${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz.tbi"
     File underpowered_genes = "${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed.gz"
     File counts_per_gene = "${prefix}.${freq_code}.${CNV}.counts_per_gene.tsv"
   }
@@ -525,6 +591,7 @@ task calc_priors_bfdp {
   String freq_code
   String rCNV_bucket
   Float prior_frac
+  Float prior_lnor_thresholding_pct
 
   command <<<
     set -e
@@ -550,6 +617,7 @@ task calc_priors_bfdp {
 
     # Compute prior effect sizes
     /opt/rCNV2/analysis/gene_scoring/estimate_prior_effect_sizes.R \
+      --pct ${prior_lnor_thresholding_pct} \
       ${del_meta_stats} \
       ${dup_meta_stats} \
       ${freq_code}.DEL.training_blacklist.genes.list \
@@ -623,7 +691,7 @@ task calc_priors_bfdp {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:15947c04f5d7063c62712062b354632b47d1ec77f3a3decce74b37317269f480"
+    docker: "talkowski/rcnv@sha256:b88c6669695764493aa778498afc2df9407fe35d3e45aa127922c9701fe8f64c"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -710,7 +778,7 @@ task score_genes {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:f57a10d1386c4234bd291e8bbdd183264560327ed8f7cfc730c83bd99bc681fc"
+    docker: "talkowski/rcnv@sha256:b88c6669695764493aa778498afc2df9407fe35d3e45aa127922c9701fe8f64c"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -768,15 +836,14 @@ task score_ensemble {
   >>>
 
   runtime {
-    # TODO: UPDATE DOCKER
-    # docker: "talkowski/rcnv@sha256:f0a9adc940da3d344576441ffaf12a4cf296c7bad7770c6d4eb7bc63031b446f"
+    docker: "talkowski/rcnv@sha256:b88c6669695764493aa778498afc2df9407fe35d3e45aa127922c9701fe8f64c"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
   }
 
   output {
-    File all_scores = glob("${freq_code}.${CNV}.gene_scores.*.tsv")
+    Array[File] all_scores = glob("${freq_code}.${CNV}.gene_scores.*.tsv")
   }
 }
 
@@ -906,8 +973,7 @@ task qc_scores {
   >>>
 
   runtime {
-    # TODO: UPDATE DOCKER
-    # docker: "talkowski/rcnv@sha256:f0a9adc940da3d344576441ffaf12a4cf296c7bad7770c6d4eb7bc63031b446f"
+    docker: "talkowski/rcnv@sha256:b88c6669695764493aa778498afc2df9407fe35d3e45aa127922c9701fe8f64c"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
