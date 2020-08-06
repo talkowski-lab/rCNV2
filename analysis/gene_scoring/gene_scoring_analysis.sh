@@ -87,9 +87,8 @@ cat \
   genes/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
   <( cat genes/gene_lists/DDG2P.hc_lof.genes.list genes/gene_lists/ClinGen.hc_haploinsufficient.genes.list | sort | uniq ) \
   genes/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.low_expression_invariant.genes.list \
-  genes/gene_lists/gnomad_sv.v2.1.nonneuro.no_lof_dels.genes.list \
 | sort | uniq -c \
-| awk '{ if ($1>=3) print $2 }' \
+| awk '{ if ($1>=2) print $2 }' \
 | fgrep -wf - genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
 > gold_standard.haploinsufficient.genes.list
 
@@ -99,9 +98,8 @@ cat \
   <( cat genes/gene_lists/HP0000118.HPOdb.genes.list genes/gene_lists/DDG2P*.genes.list genes/gene_lists/ClinGen*.genes.list \
      | fgrep -wvf - genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list | sort | uniq ) \
   genes/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.low_expression_variable.genes.list \
-  genes/gene_lists/gnomad_sv.v2.1.nonneuro.has_lof_dels.genes.list \
 | sort | uniq -c \
-| awk '{ if ($1>=3) print $2 }' \
+| awk '{ if ($1>=2) print $2 }' \
 | fgrep -wf - genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
 > gold_standard.haplosufficient.genes.list
 
@@ -110,9 +108,8 @@ cat \
   genes/gene_lists/gnomad.v2.1.1.mis_constrained.genes.list \
   <( cat genes/gene_lists/DDG2P.hc_gof.genes.list genes/gene_lists/DDG2P.hc_other.genes.list genes/gene_lists/ClinGen.all_triplosensitive.genes.list | sort | uniq ) \
   genes/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.high_expression_invariant.genes.list \
-  genes/gene_lists/gnomad_sv.v2.1.nonneuro.no_cg_dups.genes.list \
 | sort | uniq -c \
-| awk '{ if ($1>=3) print $2 }' \
+| awk '{ if ($1>=2) print $2 }' \
 | fgrep -wf - genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
 > gold_standard.triplosensitive.genes.list
 
@@ -122,9 +119,8 @@ cat \
   <( cat genes/gene_lists/HP0000118.HPOdb.genes.list genes/gene_lists/DDG2P*.genes.list genes/gene_lists/ClinGen*.genes.list \
      | fgrep -wvf - genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list | sort | uniq ) \
   genes/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.high_expression_variable.genes.list \
-  genes/gene_lists/gnomad_sv.v2.1.nonneuro.has_cg_dups.genes.list \
 | sort | uniq -c \
-| awk '{ if ($1>=3) print $2 }' \
+| awk '{ if ($1>=2) print $2 }' \
 | fgrep -wf - genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
 > gold_standard.triploinsensitive.genes.list
 
@@ -471,6 +467,29 @@ esac
   ${gene_features}
 
 
+# Ensemble classifier - requires running all individual models first
+for CNV in DEL DUP; do
+  # Make inputs for ensemble classifier
+  find ./ -name "${freq_code}.${CNV}.gene_scores.*.tsv" \
+  > ensemble_input.tsv
+  case ${CNV} in
+    DEL)
+      pos_genes="gold_standard.haploinsufficient.genes.list"
+      neg_genes="gold_standard.haplosufficient.genes.list"
+      ;;
+    DUP)
+      pos_genes="gold_standard.triplosensitive.genes.list"
+      neg_genes="gold_standard.triploinsensitive.genes.list"
+      ;;
+  esac
+
+  # Run ensemble classifier
+  /opt/rCNV2/analysis/gene_scoring/ensemble_classifier.R \
+    ensemble_input.tsv \
+    $pos_genes \
+    $neg_genes \
+    ${freq_code}.${CNV}.gene_scores.ensemble.tsv
+done
 
 
 # Copy gene lists
@@ -484,7 +503,7 @@ if ! [ -e $compdir ]; then
 fi
 for CNV in DEL DUP; do
   for wrapper in 1; do
-    for model in logit svm randomforest lda naivebayes sgd neuralnet; do
+    for model in logit svm randomforest lda naivebayes sgd neuralnet ensemble; do
       echo $model
       echo ${freq_code}.$CNV.gene_scores.$model.tsv
     done | paste - -

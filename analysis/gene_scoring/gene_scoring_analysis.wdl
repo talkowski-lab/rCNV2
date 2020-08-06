@@ -156,11 +156,28 @@ workflow gene_burden_analysis {
     }
   }
 
+  # Score with ensemble classifier, and return updated array of all scores + ensemble
+  call score_ensemble as score_ensemble_DEL {
+    input:
+      CNV="DEL",
+      scores=score_genes_DEL.scores_tsv,
+      freq_code="rCNV",
+      rCNV_bucket=rCNV_bucket
+  }
+  call score_ensemble as score_ensemble_DUP {
+    input:
+      CNV="DUP",
+      scores=score_genes_DUP.scores_tsv,
+      freq_code="rCNV",
+      rCNV_bucket=rCNV_bucket
+  }
+
   # Determine best model & QC final scores
   call qc_scores {
     input:
-      del_scores=score_genes_DEL.scores_tsv,
-      dup_scores=score_genes_DUP.scores_tsv,
+      del_scores=score_ensemble_DEL.all_scores,
+      dup_scores=score_ensemble_DUP.all_scores,
+      models=models,
       raw_gene_features=raw_gene_features,
       freq_code="rCNV",
       rCNV_bucket=rCNV_bucket
@@ -705,10 +722,70 @@ task score_genes {
 }
 
 
+# Score genes with ensemble classifier of all individual models
+task score_ensemble {
+  String CNV
+  Array[File] scores
+  String freq_code
+  String rCNV_bucket
+
+  command <<<
+    set -e
+
+    # Localize scores to working directory
+    find / -name "${freq_code}.${CNV}.gene_scores.*.tsv" | xargs -I {} mv {} ./
+
+    # Copy gene lists
+    gsutil -m cp \
+      ${rCNV_bucket}/analysis/gene_scoring/gene_lists/gold_standard.*.genes.list \
+      ./
+
+    # Make inputs for ensemble classifier
+    find ./ -name "${freq_code}.${CNV}.gene_scores.*.tsv" \
+    > ensemble_input.tsv
+    case ${CNV} in
+      DEL)
+        pos_genes="gold_standard.haploinsufficient.genes.list"
+        neg_genes="gold_standard.haplosufficient.genes.list"
+        ;;
+      DUP)
+        pos_genes="gold_standard.triplosensitive.genes.list"
+        neg_genes="gold_standard.triploinsensitive.genes.list"
+        ;;
+    esac
+
+    # Run ensemble classifier
+    /opt/rCNV2/analysis/gene_scoring/ensemble_classifier.R \
+      ensemble_input.tsv \
+      $pos_genes \
+      $neg_genes \
+      ${freq_code}.${CNV}.gene_scores.ensemble.tsv
+
+    # Copy scores to Google bucket
+    gsutil -m cp \
+      ${freq_code}.${CNV}.gene_scores.ensemble.tsv \
+      ${rCNV_bucket}/analysis/gene_scoring/all_models/
+  >>>
+
+  runtime {
+    # TODO: UPDATE DOCKER
+    # docker: "talkowski/rcnv@sha256:f0a9adc940da3d344576441ffaf12a4cf296c7bad7770c6d4eb7bc63031b446f"
+    preemptible: 1
+    memory: "4 GB"
+    bootDiskSizeGb: "20"
+  }
+
+  output {
+    File all_scores = glob("${freq_code}.${CNV}.gene_scores.*.tsv")
+  }
+}
+
+
 # Compare scores between models, determine best model, and QC final set of scores
 task qc_scores {
   Array[File] del_scores
   Array[File] dup_scores
+  Array[String] models
   File raw_gene_features
   String freq_code
   String rCNV_bucket
@@ -732,7 +809,7 @@ task qc_scores {
     fi
     for CNV in DEL DUP; do
       for wrapper in 1; do
-        for model in logit svm randomforest lda naivebayes sgd neuralnet; do
+        for model in ${sep=" " models}; do
           echo $model
           echo ${freq_code}.$CNV.gene_scores.$model.tsv
         done | paste - -
@@ -830,7 +907,7 @@ task qc_scores {
 
   runtime {
     # TODO: UPDATE DOCKER
-    # docker: "talkowski/rcnv@sha256:f57a10d1386c4234bd291e8bbdd183264560327ed8f7cfc730c83bd99bc681fc"
+    # docker: "talkowski/rcnv@sha256:f0a9adc940da3d344576441ffaf12a4cf296c7bad7770c6d4eb7bc63031b446f"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
