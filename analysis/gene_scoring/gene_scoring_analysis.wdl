@@ -26,6 +26,7 @@ workflow gene_burden_analysis {
   String meta_model_prefix
   Int min_cnvs_per_gene_training
   Float prior_frac
+  Float prior_lnor_thresholding_pct
   File training_blacklist
   File gene_features
   File raw_gene_features
@@ -127,75 +128,76 @@ workflow gene_burden_analysis {
     input:
       del_meta_stats=rCNV_meta_analysis.meta_stats_bed[0],
       dup_meta_stats=rCNV_meta_analysis.meta_stats_bed[1],
+      underpowered_genes=get_underpowered_genes.underpowered_genes,
       freq_code="rCNV",
       rCNV_bucket=rCNV_bucket,
       prior_frac=prior_frac,
-      prior_lnor_thresholding_pct=0.75
+      prior_lnor_thresholding_pct=prior_lnor_thresholding_pct
   }
 
-  # # Score genes for each model
-  # scatter ( model in models ) {
-  #   call score_genes as score_genes_DEL {
-  #     input:
-  #       CNV="DEL",
-  #       BFDP_stats=calc_priors_bfdp.del_bfdp,
-  #       blacklist=training_blacklist,
-  #       underpowered_genes=get_underpowered_genes.underpowered_genes[0],
-  #       gene_features=gene_features,
-  #       model=model,
-  #       max_true_bfdp=max_true_bfdp,
-  #       min_false_bfdp=min_false_bfdp,
-  #       elnet_alpha=elnet_alpha,
-  #       elnet_l1_l2_mix=elnet_l1_l2_mix,
-  #       freq_code="rCNV",
-  #       rCNV_bucket=rCNV_bucket
-  #   }
-  #   call score_genes as score_genes_DUP {
-  #     input:
-  #       CNV="DUP",
-  #       BFDP_stats=calc_priors_bfdp.dup_bfdp,
-  #       blacklist=training_blacklist,
-  #       underpowered_genes=get_underpowered_genes.underpowered_genes[1],
-  #       gene_features=gene_features,
-  #       model=model,
-  #       max_true_bfdp=max_true_bfdp,
-  #       min_false_bfdp=min_false_bfdp,
-  #       elnet_alpha=elnet_alpha,
-  #       elnet_l1_l2_mix=elnet_l1_l2_mix,
-  #       freq_code="rCNV",
-  #       rCNV_bucket=rCNV_bucket
-  #   }
-  # }
+  # Score genes for each model
+  scatter ( model in models ) {
+    call score_genes as score_genes_DEL {
+      input:
+        CNV="DEL",
+        BFDP_stats=calc_priors_bfdp.del_bfdp,
+        blacklist=training_blacklist,
+        underpowered_genes=get_underpowered_genes.underpowered_genes[0],
+        gene_features=gene_features,
+        model=model,
+        max_true_bfdp=max_true_bfdp,
+        min_false_bfdp=min_false_bfdp,
+        elnet_alpha=elnet_alpha,
+        elnet_l1_l2_mix=elnet_l1_l2_mix,
+        freq_code="rCNV",
+        rCNV_bucket=rCNV_bucket
+    }
+    call score_genes as score_genes_DUP {
+      input:
+        CNV="DUP",
+        BFDP_stats=calc_priors_bfdp.dup_bfdp,
+        blacklist=training_blacklist,
+        underpowered_genes=get_underpowered_genes.underpowered_genes[1],
+        gene_features=gene_features,
+        model=model,
+        max_true_bfdp=max_true_bfdp,
+        min_false_bfdp=min_false_bfdp,
+        elnet_alpha=elnet_alpha,
+        elnet_l1_l2_mix=elnet_l1_l2_mix,
+        freq_code="rCNV",
+        rCNV_bucket=rCNV_bucket
+    }
+  }
 
-  # # Score with ensemble classifier, and return updated array of all scores + ensemble
-  # call score_ensemble as score_ensemble_DEL {
-  #   input:
-  #     CNV="DEL",
-  #     scores=score_genes_DEL.scores_tsv,
-  #     freq_code="rCNV",
-  #     rCNV_bucket=rCNV_bucket
-  # }
-  # call score_ensemble as score_ensemble_DUP {
-  #   input:
-  #     CNV="DUP",
-  #     scores=score_genes_DUP.scores_tsv,
-  #     freq_code="rCNV",
-  #     rCNV_bucket=rCNV_bucket
-  # }
+  # Score with ensemble classifier, and return updated array of all scores + ensemble
+  call score_ensemble as score_ensemble_DEL {
+    input:
+      CNV="DEL",
+      scores=score_genes_DEL.scores_tsv,
+      freq_code="rCNV",
+      rCNV_bucket=rCNV_bucket
+  }
+  call score_ensemble as score_ensemble_DUP {
+    input:
+      CNV="DUP",
+      scores=score_genes_DUP.scores_tsv,
+      freq_code="rCNV",
+      rCNV_bucket=rCNV_bucket
+  }
 
-  # # Determine best model & QC final scores
-  # call qc_scores {
-  #   input:
-  #     del_scores=score_ensemble_DEL.all_scores,
-  #     dup_scores=score_ensemble_DUP.all_scores,
-  #     models=models,
-  #     raw_gene_features=raw_gene_features,
-  #     freq_code="rCNV",
-  #     rCNV_bucket=rCNV_bucket
-  # }
+  # Determine best model & QC final scores
+  call qc_scores {
+    input:
+      del_scores=score_ensemble_DEL.all_scores,
+      dup_scores=score_ensemble_DUP.all_scores,
+      models=models,
+      raw_gene_features=raw_gene_features,
+      freq_code="rCNV",
+      rCNV_bucket=rCNV_bucket
+  }
 
   output {
-    # File gene_scores = qc_scores.final_scores
+    File gene_scores = qc_scores.final_scores
   }
 }
 
@@ -570,7 +572,7 @@ task get_underpowered_genes {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b88c6669695764493aa778498afc2df9407fe35d3e45aa127922c9701fe8f64c"
+    docker: "talkowski/rcnv@sha256:b27de66b70fee3590dbfe965e22456082b9ec735ea404720eeb25958eee9155e"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "30"
@@ -588,6 +590,7 @@ task get_underpowered_genes {
 task calc_priors_bfdp {
   File del_meta_stats
   File dup_meta_stats
+  Array[File] underpowered_genes
   String freq_code
   String rCNV_bucket
   Float prior_frac
@@ -599,13 +602,15 @@ task calc_priors_bfdp {
     # Localize necessary references
     gsutil -m cp \
       ${rCNV_bucket}/analysis/gene_scoring/refs/${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
-      ${rCNV_bucket}/analysis/gene_scoring/data/*.gene_burden.underpowered_genes.bed.gz \
       ${rCNV_bucket}/analysis/gene_scoring/gene_lists/*.genes.list \
       ./
     mkdir gene_lists/
     gsutil -m cp \
       gs://rcnv_project/cleaned_data/genes/gene_lists/*genes.list \
       gene_lists/
+
+    # Locate underpowered genes
+    find / -name "*.gene_burden.underpowered_genes.bed.gz" | xargs -I {} mv {} ./
 
     # Create CNV-type-specific gene blacklists
     for CNV in DEL DUP; do
@@ -691,7 +696,7 @@ task calc_priors_bfdp {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b88c6669695764493aa778498afc2df9407fe35d3e45aa127922c9701fe8f64c"
+    docker: "talkowski/rcnv@sha256:b27de66b70fee3590dbfe965e22456082b9ec735ea404720eeb25958eee9155e"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -778,7 +783,8 @@ task score_genes {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b88c6669695764493aa778498afc2df9407fe35d3e45aa127922c9701fe8f64c"
+    # TODO: update docker
+    # docker: "talkowski/rcnv@sha256:b27de66b70fee3590dbfe965e22456082b9ec735ea404720eeb25958eee9155e"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -836,7 +842,8 @@ task score_ensemble {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b88c6669695764493aa778498afc2df9407fe35d3e45aa127922c9701fe8f64c"
+    # TODO: update docker
+    # docker: "talkowski/rcnv@sha256:b27de66b70fee3590dbfe965e22456082b9ec735ea404720eeb25958eee9155e"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -876,7 +883,7 @@ task qc_scores {
     fi
     for CNV in DEL DUP; do
       for wrapper in 1; do
-        for model in ${sep=" " models}; do
+        for model in ${sep=" " models} ensemble; do
           echo $model
           echo ${freq_code}.$CNV.gene_scores.$model.tsv
         done | paste - -
@@ -973,7 +980,8 @@ task qc_scores {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b88c6669695764493aa778498afc2df9407fe35d3e45aa127922c9701fe8f64c"
+    # TODO: update docker
+    # docker: "talkowski/rcnv@sha256:b27de66b70fee3590dbfe965e22456082b9ec735ea404720eeb25958eee9155e"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

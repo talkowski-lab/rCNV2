@@ -350,7 +350,7 @@ for CNV in DEL DUP; do
 done
 
 # Compute prior effect sizes
-prior_lnor_thresholding_pct=0.75
+prior_lnor_thresholding_pct=1
 /opt/rCNV2/analysis/gene_scoring/estimate_prior_effect_sizes.R \
   --pct ${prior_lnor_thresholding_pct} \
   ${del_meta_stats} \

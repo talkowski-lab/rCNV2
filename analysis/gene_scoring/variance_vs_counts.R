@@ -17,11 +17,11 @@ options(stringsAsFactors=F, scipen=1000)
 #################
 ### FUNCTIONS ###
 #################
-# Compute variance given 95% CI, mean, and sample size (number of CNVs)
+# Compute standard error, standard deviation, and variance given 95% CI, mean, and sample size (number of CNVs)
 calc.variance <- function(mean, ci.upper, cnvs){
   se <- (ci.upper - mean) / 1.96
-  sd <- se / sqrt(22)
-  sd ^ 2
+  sd <- sqrt(cnvs) * se
+  return(c(se, sd, sd ^ 2))
 }
 
 # Load meta-analysis stats, compute variance and merge with counts
@@ -30,19 +30,28 @@ load.data <- function(stats.in, counts.in){
   counts <- read.table(counts.in, header=T, sep="\t", comment.char="")
   colnames(counts)[1] <- "gene"
   stats <- merge(stats, counts, by="gene", all=T, sort=F)
-  stats$var <- sapply(1:nrow(stats), function(i){
+  vars <- as.data.frame(t(sapply(1:nrow(stats), function(i){
     calc.variance(stats$meta_lnOR[i], stats$meta_lnOR_upper[i], stats$cnvs[i])
-  })
-  return(stats)
+  })))
+  colnames(vars) <- c("se", "sd", "var")
+  cbind(stats, vars)
 }
 
-# Bin genes by CNV counts and plot average binwise variance
-plot.var.by.cnvs <- function(stats, max.eval=30){
+# Bin genes by minimum CNV count and plot average binwise variance
+plot.var.by.cnvs <- function(stats, metric="var", max.eval=30){
   x <- as.data.frame(t(sapply(1:max.eval, function(i){
-    c(i, mean(stats$var[which(stats$cnvs==i)], na.rm=T))
+    c(i, mean(stats[which(stats$cnvs>=i), metric], na.rm=T))
   })))
+  ylims <- c(0, max(x[, 2], na.rm=T))
+  if(metric=="var"){
+    ylab <- "Mean variance"
+  }else if(metric=="se"){
+    ylab <- "Mean standard error"
+  }else if(metric=="sd"){
+    ylab <- "Mean standard deviation"
+  }
   par(mar=c(4, 4, 1, 1))
-  plot(x, pch=19, col="grey30", xlab="Number of CNVs per Gene", ylab="Average variance")
+  plot(x, pch=19, col="grey30", xlab="Min. CNVs per Gene", ylab=ylab, ylim=ylims)
   abline(h=1, lty=2)
 }
 
@@ -82,5 +91,5 @@ stats <- load.data(stats.in, counts.in)
 
 # Plot variance vs number of genes
 pdf(outfile, height=3, width=4)
-plot.var.by.cnvs(stats)
+plot.var.by.cnvs(stats, metric="se")
 dev.off()

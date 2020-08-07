@@ -94,6 +94,13 @@ get.ensemble.bfdps <- function(scores, models, weights){
   apply(weighted.bfdps, 1, sum)
 }
 
+# Compute & scale ensemble scores
+get.ensemble.scores <- function(scores){
+  cdfs <- as.vector(pnorm(scale(scores$ensemble.pred_bfdp, center=T, scale=T), lower.tail=F))
+  cdfs <- cdfs - min(cdfs, na.rm=T)
+  cdfs / max(cdfs, na.rm=T)
+}
+
 
 #####################
 ### RSCRIPT BLOCK ###
@@ -143,7 +150,7 @@ weights <- get.weights(scores, models, pos_genes, neg_genes)
 
 # Compute ensemble BFDPs, normalized scores, and percentile
 scores$ensemble.pred_bfdp <- get.ensemble.bfdps(scores, models, weights)
-scores$ensemble.score <- pnorm(scale(scores$ensemble.pred_bfdp, center=T, scale=T), lower.tail=F)
+scores$ensemble.score <- get.ensemble.scores(scores)
 scores$ensemble.quantile <- 100 * order(scores$ensemble.pred_bfdp) / nrow(scores)
 
 # Reformat output file and write out

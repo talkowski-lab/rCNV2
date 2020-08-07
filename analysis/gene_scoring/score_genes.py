@@ -338,8 +338,10 @@ def predict_bfdps(features, sumstats, chrompairs, xbed=None, true_pos=[],
     # Remove genes with no predictions (due to being excluded from feature collection)
     pred_bfdps = pred_bfdps.dropna()
 
-    # Compute final gene score as pnorm from Z-score of pred_bfdps
-    pred_bfdps['score'] = norm.sf(scale(pred_bfdps.pred_bfdp))
+    # Compute final gene score as pnorm from Z-score of pred_bfdps, scaled to range from 0 - 100
+    cdfs = norm.sf(scale(pred_bfdps.pred_bfdp))
+    cdfs = cdfs - cdfs.min()
+    pred_bfdps['score'] = cdfs / cdfs.max()
     pred_bfdps['quantile'] = 100 * pred_bfdps.pred_bfdp.transform('rank') / len(pred_bfdps)
     
     return pred_bfdps
