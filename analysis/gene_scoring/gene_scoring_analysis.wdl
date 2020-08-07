@@ -978,7 +978,7 @@ task qc_scores {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:dcf7d78ce61af74cfc5c8659281f36b8719325d84a4257d9e47142480813c8e3"
+    docker: "talkowski/rcnv@sha256:2fdd11e54719ab4c2ec1324e3785e7806c66b6e1cbf894588c286e72c45df75c"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
