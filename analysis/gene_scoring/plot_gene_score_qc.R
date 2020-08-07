@@ -44,7 +44,7 @@ roc <- function(stats, score, truth.genes, neg.genes, steps=seq(1, 0, -0.001)){
                   "true" = stats$gene %in% truth.genes,
                   "neg" = stats$gene %in% neg.genes)
   roc_res <- as.data.frame(t(sapply(steps, function(k){
-    idxs <- which(x$score > k)
+    idxs <- which(x$score >= k)
     ftrue <- length(which(x$true[idxs])) / length(which(x$true))
     fneg <- length(which(x$neg[idxs])) / length(which(x$neg))
     fother <- length(which(!x$true[idxs])) / length(which(!x$true))
@@ -61,7 +61,7 @@ prc <- function(stats, score, truth.genes, neg.genes, steps=seq(1, 0, -0.001)){
                   "true" = stats$gene %in% truth.genes,
                   "neg" = stats$gene %in% neg.genes)
   prc_res <- as.data.frame(t(sapply(steps, function(k){
-    idxs <- which(x$score > k)
+    idxs <- which(x$score >= k)
     prec <- length(which(x$true[idxs])) / (length(which(x$true[idxs])) + length(which(x$neg[idxs])))
     recall <- length(which(x$true[idxs])) / length(which(x$true))
     fall <- length(idxs) / nrow(x)
