@@ -783,8 +783,7 @@ task score_genes {
   >>>
 
   runtime {
-    # TODO: update docker
-    # docker: "talkowski/rcnv@sha256:b27de66b70fee3590dbfe965e22456082b9ec735ea404720eeb25958eee9155e"
+    docker: "talkowski/rcnv@sha256:4b494ff5dde3eb5a453863f425b4a6d5994bc56b68448332979d26ce92c8ee50"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -842,8 +841,7 @@ task score_ensemble {
   >>>
 
   runtime {
-    # TODO: update docker
-    # docker: "talkowski/rcnv@sha256:b27de66b70fee3590dbfe965e22456082b9ec735ea404720eeb25958eee9155e"
+    docker: "talkowski/rcnv@sha256:4b494ff5dde3eb5a453863f425b4a6d5994bc56b68448332979d26ce92c8ee50"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -980,8 +978,7 @@ task qc_scores {
   >>>
 
   runtime {
-    # TODO: update docker
-    # docker: "talkowski/rcnv@sha256:b27de66b70fee3590dbfe965e22456082b9ec735ea404720eeb25958eee9155e"
+    docker: "talkowski/rcnv@sha256:4b494ff5dde3eb5a453863f425b4a6d5994bc56b68448332979d26ce92c8ee50"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

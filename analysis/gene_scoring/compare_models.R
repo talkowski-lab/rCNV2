@@ -31,7 +31,7 @@ roc <- function(stats, score, true.genes, false.genes, steps=seq(1, 0, -0.001)){
                   "true" = stats$gene %in% true.genes,
                   "false" = stats$gene %in% false.genes)
   roc_res <- as.data.frame(t(sapply(steps, function(k){
-    idxs <- which(x$score > k)
+    idxs <- which(x$score >= k)
     ftrue <- length(which(x$true[idxs])) / length(which(x$true))
     ffalse <- length(which(x$false[idxs])) / length(which(x$false))
     fother <- length(which(!x$true[idxs])) / length(which(!x$true))
@@ -48,7 +48,7 @@ prc <- function(stats, score, true.genes, false.genes, steps=seq(1, 0, -0.001)){
                   "true" = stats$gene %in% true.genes,
                   "false" = stats$gene %in% false.genes)
   prc_res <- as.data.frame(t(sapply(steps, function(k){
-    idxs <- which(x$score > k)
+    idxs <- which(x$score >= k)
     prec <- length(which(x$true[idxs])) / (length(which(x$true[idxs])) + length(which(x$false[idxs])))
     recall <- length(which(x$true[idxs])) / length(which(x$true))
     fall <- length(idxs) / nrow(x)
@@ -146,7 +146,7 @@ plot.prc <- function(data, title="Precision/Recall"){
     points(x$prc$recall, x$prc$precision,
            type="l", col=colors[i], lwd=2)
   })
-  legend("topright", pch=19, pt.cex=1.5, cex=0.75, bty="n",
+  legend("bottomleft", pch=19, pt.cex=1.5, cex=0.75, bty="n",
          col=colors[lorder], 
          legend=paste(names(data), " (AUC=",
                       sapply(data, function(x){format(round(x$prc.auc, 2), nsmall=2)}),
@@ -194,7 +194,9 @@ out.prefix <- args$args[7]
 # del.in <- "rCNV.DEL.model_evaluation.input.tsv"
 # dup.in <- "rCNV.DUP.model_evaluation.input.tsv"
 # del.true_genes.in <- "gold_standard.haploinsufficient.genes.list"
+# dup.true_genes.in <- "gold_standard.triplosensitive.genes.list"
 # del.false_genes.in <- "gold_standard.haplosufficient.genes.list"
+# dup.false_genes.in <- "gold_standard.triploinsensitive.genes.list"
 # out.prefix <- "rCNV_gene_scoring_model_comparison"
 
 # Read gene lists
