@@ -22,13 +22,14 @@ export prefix="rCNV2_analysis_d1"
 
 
 # Download necessary reference files and metadata
-gsutil -m cp \
+gsutil -m cp -r \
   ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
   ${rCNV_bucket}/raw_data/other/satterstrom_asc_dnms.raw.tsv.gz \
   ${rCNV_bucket}/raw_data/other/redin_2017.bca_breakpoints.all.tsv.gz \
   ${rCNV_bucket}/analysis/analysis_refs/GRCh37.genome \
   ${rCNV_bucket}/refs/gnomad_v2.1_sv.nonneuro.sites.vcf* \
+  ${rCNV_bucket}/raw_data/other/asc_spark_denovo_cnvs \
   ./
 
 
@@ -83,6 +84,12 @@ wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnoma
 gzip -f gene_mutation_rates.tsv
 
 
+# Parse ASC/SPARK pedigree for de novo CNV analyses
+/opt/rCNV2/data_curation/other/parse_asc_spark_cnv_pedigree.R \
+  asc_spark_denovo_cnvs/pedigree_cnv_07_27_2020.csv \
+  asc_spark_child_phenotypes.list
+
+
 # Copy curated DNMs, BCAs, and mutation rates to gs:// bucket (note: requires permissions)
 gsutil -m cp \
   ddd_dnm_counts.tsv.gz \
@@ -91,4 +98,6 @@ gsutil -m cp \
   redin_bca_breakpoints.bed.gz \
   gnomad_sv_nonneuro_counts.tsv.gz \
   gene_mutation_rates.tsv.gz \
+  asc_spark_child_phenotypes.list \
   ${rCNV_bucket}/analysis/paper/data/misc/
+

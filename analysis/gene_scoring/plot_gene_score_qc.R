@@ -67,7 +67,7 @@ prc <- function(stats, score, truth.genes, neg.genes, steps=seq(1, 0, -0.001)){
     fall <- length(idxs) / nrow(x)
     return(c(k, fall, prec, recall))
   })))
-  colnames(prc_res) <- c("minPIP", "frac_all", "precision", "recall")
+  colnames(prc_res) <- c("min_score", "frac_all", "precision", "recall")
   return(prc_res)
 }
 

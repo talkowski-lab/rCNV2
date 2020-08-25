@@ -61,65 +61,69 @@ marginal.density <- function(vals, colors, scale=0.25, bw=0.02, rotate=F,
   polygon(x=all.df$x, y=all.df$y, col=NA, border=colors[1], bty="n", xpd=T)
 }
 
-# Scatterplot of genes by scores, colored by group
-scores.scatterplot <- function(scores, ds.groups,
+# Scatterplot of genes by scores with options for coloring and marginal densities
+scores.scatterplot <- function(scores, pt.colors, add.cor=TRUE, 
                                hc.cutoff=0.9, lc.cutoff=0.5,
-                               margin.dens.height=0.175,
+                               margin.dens.height=0.175, pt.cex=0.1, ax.tick=-0.03,
+                               bg.col="white", gridlines.col=bluewhite,
+                               x.ax.title="Haploinsufficiency Score (pHI)",
+                               y.ax.title="Triplosensitivity Score (pTS)",
                                parmar=c(2.7, 2.7, 1, 1)){
-  # Get plot.data
-  pt.colors <- sapply(scores$gene, get.gene.color.byscore, ds.groups)
-  ax.at <- seq(0, 1, 0.2)
-
   # Prep plot area
-  par(mar=parmar, bty="n")
+  ax.at <- seq(0, 1, 0.2)
+  par(mar=parmar, bty="n", family="sans")
   plot(NA, xlim=c(0, 1 + margin.dens.height), ylim=c(0, 1 + margin.dens.height),
        xaxt="n", xlab="", xaxs="i", yaxt="n", ylab="", yaxs="i")
   rect(xleft=par("usr")[1], xright=1,
        ybottom=par("usr")[3], ytop=1,
-       border=NA, bty="n", col=bluewhite)
+       border=NA, bty="n", col=bg.col)
   segments(x0=ax.at, x1=ax.at,
-           y0=par("usr")[3], y1=1, col="white")
+           y0=par("usr")[3], y1=1, col=gridlines.col)
   segments(x0=par("usr")[1], x1=1,
-           y0=ax.at, y1=ax.at, col="white")
+           y0=ax.at, y1=ax.at, col=gridlines.col)
   
   # Add points
-  points(scores$pHI, scores$pTS, cex=0.1, col=pt.colors)
+  points(scores$pHI, scores$pTS, cex=pt.cex, col=pt.colors)
   
   # Add marginal densities
-  marginal.density(scores$pHI, colors=c(cnv.colors[1], control.cnv.colors[1], redwhite),
-                   bw=0.01, scale=margin.dens.height)
-  marginal.density(scores$pTS, colors=c(cnv.colors[2], control.cnv.colors[2], bluewhite), 
-                   bw=0.01, scale=margin.dens.height, rotate=T)
+  if(margin.dens.height > 0){
+    marginal.density(scores$pHI, colors=c(cnv.colors[1], control.cnv.colors[1], redwhite),
+                     bw=0.01, scale=margin.dens.height)
+    marginal.density(scores$pTS, colors=c(cnv.colors[2], control.cnv.colors[2], bluewhite), 
+                     bw=0.01, scale=margin.dens.height, rotate=T)
+  }
   
   # Add delimiting lines
   segments(x0=c(hc.cutoff, lc.cutoff, hc.cutoff, lc.cutoff),
            x1=c(hc.cutoff, lc.cutoff, hc.cutoff, lc.cutoff),
            y0=c(hc.cutoff, lc.cutoff, rep(par("usr")[3], 2)),
            y1=c(1, 1, rep(lc.cutoff, 2)),
-           lwd=1, lend="round", col=blueblack, lty=3)
+           lwd=1, lend="round", col=blueblack, lty=2)
   segments(y0=c(hc.cutoff, lc.cutoff, hc.cutoff, lc.cutoff),
            y1=c(hc.cutoff, lc.cutoff, hc.cutoff, lc.cutoff),
            x0=c(hc.cutoff, lc.cutoff, rep(par("usr")[3], 2)),
            x1=c(1, 1, rep(lc.cutoff, 2)),
-           lwd=1, lend="round", col=blueblack, lty=3)
+           lwd=1, lend="round", col=blueblack, lty=2)
   
   # Add axes
-  axis(1, at=ax.at, col=blueblack, labels=NA, tck=-0.03)
-  axis(2, at=ax.at, col=blueblack, labels=NA, tck=-0.03)
+  axis(1, at=ax.at, col=blueblack, labels=NA, tck=ax.tick)
+  axis(2, at=ax.at, col=blueblack, labels=NA, tck=-ax.tick)
   sapply(ax.at, function(i){
     axis(1, at=i, col=blueblack, tick=F, line=-0.65)
     axis(2, at=i, col=blueblack, tick=F, line=-0.65, las=2)
   })
-  axis(1, at=0.5, tick=F, line=0.6, labels=bquote(italic(P) * "(Haploinsufficient [HI])"))
-  axis(2, at=0.5, tick=F, line=0.6, labels=bquote(italic(P) * "(Triplosensitive [TS])"))
+  axis(1, at=0.5, tick=F, line=0.3, labels=x.ax.title)
+  axis(2, at=0.5, tick=F, line=0.75, labels=y.ax.title)
   
   # Add correlation coefficient
-  r2 <- cor(scores$pHI, scores$pTS)^2
-  r2.fmt <- formatC(round(r2, 2), small.interval=2)
-  text(x=1.05+(margin.dens.height/2), 
-       y=1.065+(margin.dens.height/2), 
-       xpd=T, cex=0.9, srt=45,
-       labels=bquote(italic(R)^2 * "=" * .(r2.fmt)))
+  if(add.cor==TRUE){
+    r2 <- cor(scores$pHI, scores$pTS)^2
+    r2.fmt <- formatC(round(r2, 2), small.interval=2)
+    text(x=1.05+(margin.dens.height/2), 
+         y=1.065+(margin.dens.height/2), 
+         xpd=T, cex=0.9, srt=45,
+         labels=bquote(italic(R)^2 * "=" * .(r2.fmt)))
+  }
   
   # Cleanup
   rect(xleft=par("usr")[1], xright=1,
@@ -136,12 +140,12 @@ plot.scores.scatter.legend <- function(scores, ds.groups){
               ns.color)
   
   # Prep plot area
-  par(mar=c(0.1, 0.1, 1.25, 0.1), bty="n")
+  par(mar=c(0, 0.1, 1.1, 0.1), bty="n")
   plot(NA, xlim=c(0, 1), ylim=c(7, 0),
        xaxt="n", xaxs="i", xlab="", yaxt="n", yaxs="i", ylab="")
   
   # Add points
-  points(x=rep(0.05, 7), y=0.5:6.5, pch=19, col=colors, cex=2.25)
+  points(x=rep(0.05, 7), y=0.5:6.5, pch=18, col=colors, cex=2.25)
   
   # Add N genes
   gene.ax.at <- c(0.125, 0.3)
@@ -158,7 +162,64 @@ plot.scores.scatter.legend <- function(scores, ds.groups){
   text(x=rep(0.3, 7), y=0.5:6.5, pos=4, 
        labels=c(as.vector(sapply(c("DS", "HI", "TS"), 
                                  function(x){paste(x, " (", c("high", "low"), " confidence)", sep="")})),
-                "Not sensitive [NS]"))
+                "NS"))
+}
+
+# Plot histogram for color gradient
+gradient.hist <- function(gradient, palette, x.ax.title="Gradient", y.ax.title="\"# Genes\"", 
+                          outline.lwd=1, parmar=c(1, 1, 0.1, 0.1)){
+  h <- hist(gradient, breaks=seq(0, 100, 1), plot=F)
+  par(bty="n", mar=parmar)
+  plot(NA, xlim=c(0, 100), ylim=c(0, max(h$counts)),
+       xaxt="n", xlab="", yaxt="n", ylab="", yaxs="i")
+  rect(xleft=0:99, xright=1:100, ybottom=0, ytop=h$counts, col=palette, border=palette, lwd=0.3, xpd=T)
+  segments(x0=h$breaks, x1=h$breaks,
+           y0=c(0, h$counts), y1=c(h$counts, 0),
+           col=blueblack, xpd=T, lwd=outline.lwd)
+  segments(x0=h$breaks[-length(h$breaks)], x1=h$breaks[-1],
+           y0=h$counts, y1=h$counts, col=blueblack, xpd=T, lwd=outline.lwd)
+  axis(1, at=c(-100, 200), tck=0, labels=NA, col=blueblack)
+  mtext(1, text=parse(text=x.ax.title), line=0.15)
+  axis(2, at=c(-100, 2*par("usr")[4]), tck=0, labels=NA, col=blueblack)
+  mtext(2, text=parse(text=y.ax.title))
+}
+
+# Plot legend for color gradient
+gradient.legend <- function(palette){
+  par(mar=rep(0.1, 4), bty="n")
+  n.bins <- length(palette)
+  plot(NA, xlim=c(0, n.bins), ylim=c(0, 1),
+       xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
+  rect(xleft=0:(n.bins-1), xright=1:n.bins,
+       ybottom=0, ytop=1, border=palette, lwd=0.5, col=palette)
+  rect(xleft=0, xright=n.bins, ybottom=0, ytop=1, col=NA, border=blueblack, xpd=T)
+  box(bty="o", col=blueblack, xpd=T)
+}
+
+# Wrapper to generate all gradient plots
+plot.gradients <- function(scores, gradient.norm, gradient.pal, hist.x.ax.title, sub.out.prefix){
+  # Scatterplot
+  pt.colors.gradient <- gradient.pal[gradient.norm + 1]
+  pdf(paste(out.prefix, "gene_scores_scatterplot", sub.out.prefix,"pdf", sep="."),
+      height=2, width=2)
+  scores.scatterplot(scores, pt.colors.gradient, add.cor=F,
+                     hc.cutoff=NA, lc.cutoff=NA,
+                     margin.dens.height=0, pt.cex=0.125, 
+                     x.ax.title="pHI", y.ax.title="pTS",
+                     parmar=c(2.7, 2.7, 0.4, 0.4))
+  dev.off()
+  
+  # Histogram
+  pdf(paste(out.prefix, "gene_scores_scatterplot", sub.out.prefix, "hist.pdf", sep="."),
+      height=1.2, width=1.8)
+  gradient.hist(gradient.norm, gradient.pal, x.ax.title=hist.x.ax.title)
+  dev.off()
+  
+  # Legend
+  pdf(paste(out.prefix, "gene_scores_scatterplot", sub.out.prefix, "legend.pdf", sep="."),
+      height=0.2, width=1.5)
+  gradient.legend(gradient.pal)
+  dev.off()
 }
 
 
@@ -181,7 +242,7 @@ opts <- args$options
 
 # Checks for appropriate positional arguments
 if(length(args$args) != 2){
-  stop(paste("Three positional arguments required: scores.tsv and output_prefix\n", sep=" "))
+  stop(paste("Two positional arguments required: scores.tsv and output_prefix\n", sep=" "))
 }
 
 # Writes args & opts to vars
@@ -207,16 +268,34 @@ source(paste(script.dir, "common_functions.R", sep="/"))
 # Load scores & classify genes into subgroups based on scores
 scores <- load.scores(scores.in)
 ds.groups <- classify.genes(scores, hc.cutoff=0.9, lc.cutoff=0.5)
+pt.colors.groupwise <- sapply(scores$gene, get.gene.color.byscore, ds.groups)
 
-# Plot scores
-png(paste(out.prefix, "gene_scores_scatterplot.png", sep="."),
-    height=3.25*300, width=3.25*300, res=300, bg=NA, family="sans")
-scores.scatterplot(scores, ds.groups, margin.dens.height=0.1,
-                   parmar=c(2.7, 2.7, 1.5, 1.5))
+# Plot scores colored by category
+pdf(paste(out.prefix, "gene_scores_scatterplot.pdf", sep="."),
+    height=3.25, width=3.25)
+scores.scatterplot(scores, pt.colors.groupwise, margin.dens.height=0.1,
+                   pt.cex=0.15, ax.tick=-0.02, parmar=c(2.7, 2.7, 1.5, 1.5))
 dev.off()
 
-# Plot legend
+# Plot legend for category-based coloring
 pdf(paste(out.prefix, "gene_scores_scatterplot.legend.pdf", sep="."),
-    height=2.6, width=2.4, family="sans")
+    height=2, width=2.4)
 plot.scores.scatter.legend(scores, ds.groups)
 dev.off()
+
+# Plot scores colored by DS gradient
+ds.gradient <- apply(scores[, -1], 1, function(vals){
+  min(as.numeric(vals))
+})
+ds.gradient.norm <- round(100*ds.gradient)
+plot.gradients(scores, ds.gradient.norm, ds.gradient.pal, 
+               hist.x.ax.title="italic(min) * \"(pHI, pTS)\"",
+               sub.out.prefix="ds_gradient")
+
+# Plot scores colored by HI/TS gradient
+hits.gradient <- scores$pTS - scores$pHI
+hits.gradient.norm <- round(((100*hits.gradient) + 100) / 2)
+plot.gradients(scores, hits.gradient.norm, hits.gradient.pal, 
+               hist.x.ax.title="\"pTS\" - \"pHI\"",
+               sub.out.prefix="hi_ts_gradient")
+

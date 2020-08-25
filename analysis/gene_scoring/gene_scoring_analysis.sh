@@ -597,3 +597,14 @@ mkdir ${freq_code}_gene_scoring_QC_plots/
   gene_lists/gold_standard.triploinsensitive.genes.list \
   ${freq_code}_gene_scoring_QC_plots/${freq_code}_gene_score_qc
 
+# Compute enrichments versus population variation data
+gsutil -m cp \
+  ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.variation_features.bed.gz \
+  ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.genomic_features.eigenfeatures.bed.gz \
+  ./
+/opt/rCNV2/analysis/gene_scoring/scores_vs_gnomad-SV.R \
+  rCNV.gene_scores.tsv.gz \
+  gencode.v19.canonical.pext_filtered.variation_features.bed.gz \
+  gencode.v19.canonical.pext_filtered.genomic_features.eigenfeatures.bed.gz \
+  rCNV_scores_vs_gnomad_sv.pdf
+

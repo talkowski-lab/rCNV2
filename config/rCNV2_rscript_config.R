@@ -67,6 +67,15 @@ somatic.hpos <- c("HP:0000152", "HP:0003011", "HP:0001507",
 
 pheno.abbrevs <- c("Mixed", "Neuro.", "Non-Neuro.")
 
+ml.model.abbrevs <- c("ensemble" = "Ensemble",
+                      "lda" = "LDA",
+                      "logit" = "Logistic Regression",
+                      "naivebayes" = "Naive Bayes",
+                      "neuralnet" = "Neural Net",
+                      "randomforest" = "Random Forest",
+                      "sgd" = "SGD",
+                      "svm" = "SVM")
+
 
 ##########
 # COLORS #
@@ -74,6 +83,7 @@ pheno.abbrevs <- c("Mixed", "Neuro.", "Non-Neuro.")
 graphabs.green <- "#027831"
 gw.sig.color <- "#FFB533"
 ns.color="gray70"
+ns.color.light="#F1F1F1"
 blueblack <- "#003F6A"
 redblack <- "#4F1C14"
 purpleblack <- "#3F2759"
@@ -100,6 +110,10 @@ control.cnv.colors <- c("DEL" = "#E69186",
 cnv.color.palettes <- list("DEL" = colorRampPalette(c("gray95", cnv.colors[1]))(101),
                            "DUP" = colorRampPalette(c("gray95", cnv.colors[2]))(101),
                            "CNV" = colorRampPalette(c("gray95", cnv.colors[3]))(101))
+
+ds.gradient.pal <- colorRampPalette(c(ns.color, ns.color.light, purplewhite, cnv.colors[3]))(101)
+
+hits.gradient.pal <- colorRampPalette(c(cnv.colors[1], ns.color.light, cnv.colors[2]))(101)
 
 require(viridisLite)
 percentile.palette <- viridis(101)
@@ -230,4 +244,32 @@ load.pval.matrix <- function(matrix.in, has.coords=T, ncols.coords=3, p.is.phred
   lambdas <- apply(pvals, 2, function(obs){dchisq(median(obs, na.rm=T), df=1)/dchisq(median(expected), df=1)})
   return(list("coords" = coords, "pvals" = pvals,
               "expected" = expected, "lambdas" = lambdas))
+}
+
+# Load a BED-like tsv of gene features
+load.features <- function(features.in, fill=NA, norm=F){
+  feats <- read.table(features.in, header=T, sep="\t", comment.char="", check.names=F)[, -c(1:3)]
+  feats[, -1] <- apply(feats[, -1], 2, as.numeric)
+  if(!is.na(fill)){
+    feats[, -1] <- apply(feats[, -1], 2, function(vals){
+      na.idxs <- which(is.na(vals) | is.infinite(vals))
+      if(length(na.idxs) > 0){
+        if(fill=="mean"){
+          vfill <- mean(vals[-na.idxs])
+        }else if(fill=="median"){
+          vfill <- median(vals[-na.idxs])
+        }else if(is.numeric(fill)){
+          vfill <- fill
+        }
+        vals[na.idxs] <- vfill
+      }
+      return(vals)
+    })
+  }
+  if(norm==T){
+    feats[, -1] <- apply(feats[, -1], 2, function(vals){
+      scale(vals, scale=T, center=T)
+    })
+  }
+  return(feats)
 }
