@@ -65,6 +65,7 @@ RUN conda install -n rcnv -y r-optparse r-MASS r-KernSmooth
 RUN conda install -n rcnv -y r-caTools r-metafor r-flux
 RUN conda install -n rcnv -y r-Hmisc
 RUN conda install -n rcnv -y r-psych r-funr r-plotrix
+RUN conda install -n rcnv -y r-epitools
 RUN Rscript -e "sapply(c('beeswarm','EQL','vioplot','flux','VennDiagram'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 

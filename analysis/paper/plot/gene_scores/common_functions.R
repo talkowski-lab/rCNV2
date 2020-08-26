@@ -72,6 +72,9 @@ roc <- function(stats, score, true.genes, false.genes, steps=seq(1, 0, -0.001)){
     fall <- length(idxs) / nrow(x)
     return(c(k, fall, fother, ftrue, ffalse))
   })))
+  roc_res <- rbind(c(-Inf, 0, 0, 0, 0),
+                   roc_res,
+                   c(Inf, 1, 1, 1, 1))
   colnames(roc_res) <- c("min_score", "frac_all", "frac_other", "frac_true", "frac_false")
   return(roc_res)
 }
@@ -88,6 +91,8 @@ prc <- function(stats, score, true.genes, false.genes, steps=seq(1, 0, -0.001)){
     fall <- length(idxs) / nrow(x)
     return(c(k, fall, prec, recall))
   })))
+  prc_res <- rbind(c(-Inf, 0, 1, 0),
+                   prc_res)
   colnames(prc_res) <- c("min_score", "frac_all", "precision", "recall")
   return(prc_res)
 }
@@ -104,6 +109,24 @@ evaluate.score <- function(stats, score, true.genes, false.genes){
               "prc.auc"=prc.auc))
 }
 
+# Load & normalize other (non-rCNV) scores
+load.other.scores <- function(meta.in){
+  other.scores <- c("gnomad_pLI", "gnomad_oe_mis_upper", "gnomad_oe_lof_upper",
+                    "exac_cnv_z", "rvis_pct", "eds", "hurles_hi")
+  meta <- read.table(meta.in, header=T, sep="\t", comment.char="")[, c("gene", other.scores)]
+  oeuf.idxs <- grep("_upper", colnames(meta))
+  meta[, oeuf.idxs] <- apply(meta[, oeuf.idxs], 2, function(vals){
+    vals <- vals - min(vals, na.rm=T)
+    vals <- vals / max(vals, na.rm=T)
+    vals <- 1 - vals
+  })
+  meta$exac_cnv_z <- meta$exac_cnv_z - min(meta$exac_cnv_z, na.rm=T)
+  meta$exac_cnv_z <- meta$exac_cnv_z / max(meta$exac_cnv_z, na.rm=T)
+  meta$rvis_pct <- (100 - meta$rvis_pct) / 100
+  meta$eds <- meta$eds - min(meta$eds, na.rm=T)
+  meta$eds <- meta$eds / max(meta$eds, na.rm=T)
+  return(meta)
+}
 
 ##########################
 ### PLOTTING FUNCTIONS ###
@@ -196,14 +219,15 @@ superimposed.barplot <- function(values, colors, xleft, xright, ybottom, ytop,
     lab.colors[which(lab.pos==4)] <- "black"
   }
   lab.x.adj <- sapply(norm.values, function(x){if(x>=0.5){2*buffer}else{-2*buffer}})
-  text(x=bar.xright+lab.x.adj, y=(bar.y.breaks[1:n.bars]+bar.y.breaks[-1])/2, pos=lab.pos, 
+  lab.y.at <- (bar.y.breaks[1:n.bars]+bar.y.breaks[-1])/2
+  text(x=bar.xright+lab.x.adj, y=lab.y.at - (bar.buffer * bar.height), pos=lab.pos, 
        col=lab.colors, labels=round(values, 3), cex=lab.cex)
   segments(x0=inner.xleft, x1=inner.xleft, y0=inner.ybottom, y1=inner.ytop, col=blueblack)
 }
 
 # Plot ROC curves from a list of evaluate.score() outputs
-plot.roc <- function(data, colors=NULL, nested.auc=TRUE, ax.tick=-0.025, 
-                     parmar=c(2.5, 2.5, 0.75, 0.75)){
+plot.roc <- function(data, colors=NULL, nested.auc=TRUE, auc.text.colors=NULL, 
+                     ax.tick=-0.025, parmar=c(2.5, 2.5, 0.75, 0.75)){
   if(is.null(colors)){
     colors <- rev(viridis(length(data)))
   }
@@ -221,7 +245,7 @@ plot.roc <- function(data, colors=NULL, nested.auc=TRUE, ax.tick=-0.025,
     superimposed.barplot(rev(sapply(data, function(l){l$roc.auc})), rev(colors),
                          xleft=0.5, xright=1, ybottom=0, ytop=0.5, 
                          min.value=0, max.value=1, title="AUC",
-                         buffer=0.02)
+                         lab.colors=auc.text.colors, buffer=0.02)
   }
   axis(1, labels=NA, col=blueblack, tck=ax.tick)
   axis(1, tick=F, line=-0.6)
@@ -233,8 +257,8 @@ plot.roc <- function(data, colors=NULL, nested.auc=TRUE, ax.tick=-0.025,
 }
 
 # Plot PRC curves from a list of evaluate.score() outputs
-plot.prc <- function(data, colors=NULL, nested.auc=TRUE, ax.tick=-0.025, 
-                     parmar=c(2.5, 2.5, 0.75, 0.75)){
+plot.prc <- function(data, colors=NULL, nested.auc=TRUE, auc.text.colors=NULL,
+                     ax.tick=-0.025, parmar=c(2.5, 2.5, 0.75, 0.75)){
   if(is.null(colors)){
     colors <- rev(viridis(length(data)))
   }
@@ -251,7 +275,7 @@ plot.prc <- function(data, colors=NULL, nested.auc=TRUE, ax.tick=-0.025,
     superimposed.barplot(rev(sapply(data, function(l){l$prc.auc})), rev(colors),
                          xleft=0, xright=0.5, ybottom=0, ytop=0.5, 
                          min.value=0, max.value=1, title="AUC",
-                         buffer=0.02)
+                         lab.colors=auc.text.colors, buffer=0.02)
   }
   axis(1, labels=NA, col=blueblack, tck=ax.tick)
   axis(1, tick=F, line=-0.6)
@@ -261,4 +285,15 @@ plot.prc <- function(data, colors=NULL, nested.auc=TRUE, ax.tick=-0.025,
   mtext(2, line=1.65, text="Recall")
   box(bty="o", col=blueblack)
 }
+
+# Plot simple color legend
+simple.legend <- function(labels, colors){
+  par(mar=rep(0.25, 4), bty="n")
+  plot(NA, xlim=c(0, 1), ylim=c(0, length(labels)),
+       xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
+  points(x=rep(0.1, length(labels)), y=(1:length(labels))-0.5, pch=22, 
+         col=blueblack, bg=colors, cex=1.8)
+  text(x=rep(0.1, length(labels)), y=(1:length(labels))-0.58, pos=4, labels=labels, xpd=T)
+}
+
 

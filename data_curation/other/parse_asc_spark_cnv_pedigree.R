@@ -14,7 +14,7 @@
 options(stringsAsFactors=F, scipen=1000, family="sans")
 
 
-# Set constants
+# Constants
 child.roles <- c("brother", "Child", "DD-ID_Proband", "Other_Proband",
                  "P", "proband", "Proband", "PROBAND", "Sibling")
 p.map <- c("SVIP" = 0,

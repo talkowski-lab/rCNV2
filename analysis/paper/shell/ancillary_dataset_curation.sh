@@ -30,6 +30,7 @@ gsutil -m cp -r \
   ${rCNV_bucket}/analysis/analysis_refs/GRCh37.genome \
   ${rCNV_bucket}/refs/gnomad_v2.1_sv.nonneuro.sites.vcf* \
   ${rCNV_bucket}/raw_data/other/asc_spark_denovo_cnvs \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
   ./
 
 
@@ -90,7 +91,63 @@ gzip -f gene_mutation_rates.tsv
   asc_spark_child_phenotypes.list
 
 
-# Copy curated DNMs, BCAs, and mutation rates to gs:// bucket (note: requires permissions)
+# Process ASC/SPARK de novo CNVs, including:
+# 1. reverse liftover from hg38 to GRCh37
+# 2. restrict to autosomes
+# 3. exclude known genomic disorders
+# 4. re-annotate vs genes used in rCNV (further requiring copy-gain for dups)
+# 5. restrict to samples in cleaned list of child phenotypes (see above)
+/opt/rCNV2/data_curation/other/curate_asc_spark_denovo_cnvs.py \
+  --bgzip \
+  --outbed asc_spark_denovo_cnvs.cleaned.hg38.bed.gz \
+  asc_spark_denovo_cnvs/dnv_cnv_07_27_2020.txt \
+  asc_spark_child_phenotypes.list
+wget http://hgdownload.cse.ucsc.edu/goldenPath/hg38/liftOver/hg38ToHg19.over.chain.gz
+liftOver -minMatch=0.5 -bedPlus=3 \
+  asc_spark_denovo_cnvs.cleaned.hg38.bed.gz \
+  hg38ToHg19.over.chain.gz \
+  asc_spark_denovo_cnvs.cleaned.hg19.bed \
+  asc_spark_denovo_cnvs.cleaned.hg38.liftFail.txt
+for CNV in DEL DUP; do
+  case $CNV in
+    DEL)
+      cds_ovr=0.05
+      ;;
+    DUP)
+      cds_ovr=1.0
+      ;;
+  esac
+  sed 's/^chr//g' asc_spark_denovo_cnvs.cleaned.hg19.bed \
+  | sort -Vk1,1 -k2,2n -k3,3n \
+  > asc_spark_denovo_cnvs.cleaned.b37.bed
+  /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
+    --min-cds-ovr $cds_ovr \
+    --type $CNV \
+    --control-hpo Control \
+    --outbed /dev/null \
+    --cnvs-out asc_spark_denovo_cnvs.cleaned.b37.${CNV}.annotated.bed.gz \
+    --bgzip \
+    asc_spark_denovo_cnvs.cleaned.b37.bed \
+    gencode.v19.canonical.pext_filtered.gtf.gz
+done
+for CNV in DEL DUP; do
+  bedtools intersect -f 0.5 -r -v -wa \
+    -a asc_spark_denovo_cnvs.cleaned.b37.${CNV}.annotated.bed.gz \
+    -b <( zcat lit_GDs.*.bed.gz | fgrep ${CNV} ) \
+  | bgzip -c \
+  > asc_spark_denovo_cnvs.cleaned.b37.${CNV}.annotated.noGDs.bed.gz
+done
+zcat asc_spark_denovo_cnvs.cleaned.b37.DEL.annotated.noGDs.bed.gz \
+     asc_spark_denovo_cnvs.cleaned.b37.DUP.annotated.noGDs.bed.gz \
+| fgrep -v "#" \
+| awk -v FS="\t" -v OFS="\t" '{ if ($7>0) print $1, $2, $3, $5, $4, $6, $7, $9 }' \
+| sort -Vk1,1 -k2,2 -k3,3n \
+| cat <( echo -e "#chr\tstart\tend\tcnv\tchild_id\tpheno\tn_genes\tgenes" ) - \
+| bgzip -c \
+> asc_spark_denovo_cnvs.cleaned.b37.annotated.bed.gz
+
+
+# Copy curated DNMs, BCAs, mutation rates, and de novo CNVs to gs:// bucket (note: requires permissions)
 gsutil -m cp \
   ddd_dnm_counts.tsv.gz \
   asc_dnm_counts*tsv.gz \
@@ -99,5 +156,6 @@ gsutil -m cp \
   gnomad_sv_nonneuro_counts.tsv.gz \
   gene_mutation_rates.tsv.gz \
   asc_spark_child_phenotypes.list \
+  asc_spark_denovo_cnvs.cleaned.b37.annotated.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/misc/
 

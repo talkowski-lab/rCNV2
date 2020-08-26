@@ -31,6 +31,8 @@ mkdir refs/
 gsutil -m cp \
   ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.all_features.bed.gz \
   ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.all_features.no_variation.bed.gz \
+  ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
+  ${rCNV_bucket}/analysis/paper/data/misc/asc_spark_* \
   refs/
 
 
@@ -54,7 +56,7 @@ for CNV in DEL DUP; do
   esac
   /opt/rCNV2/analysis/paper/plot/gene_scores/plot_ml_performance.R \
     --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
-    scores.input.tsv \
+    evaluation.${CNV}.input.tsv \
     "$true_genes" \
     "$false_genes" \
     ${prefix}.${CNV}
@@ -76,8 +78,19 @@ done
 # Plot distributions of features between subgroups of genes
 
 
+# Compare de novo CNVs in ASD vs gene scores
+/opt/rCNV2/analysis/paper/plot/gene_scores/plot_asd_denovo_cnv_analysis.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  rCNV.gene_scores.tsv.gz \
+  refs/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
+  refs/asc_spark_denovo_cnvs.cleaned.b37.annotated.bed.gz \
+  refs/asc_spark_child_phenotypes.list \
+  ${prefix}
+
+
 # Copy all plots to final gs:// directory
 gsutil -m cp \
-  ${prefix}.model_comparison*pdf \
+  ${prefix}.*.model_eval*pdf \
   ${prefix}.gene_scores_scatterplot*pdf \
+  ${prefix}.asc_spark_denovo_cnvs*pdf \
   ${rCNV_bucket}/analysis/paper/plots/gene_scores/

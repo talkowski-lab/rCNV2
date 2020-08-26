@@ -35,19 +35,6 @@ load.all.scores <- function(scores.in){
 }
 
 
-##########################
-### PLOTTING FUNCTIONS ###
-##########################
-# Plot simple legend
-simple.legend <- function(labels, colors){
-  par(mar=rep(0.25, 4), bty="n")
-  plot(NA, xlim=c(0, 1), ylim=c(0, length(labels)),
-       xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
-  points(x=rep(0.1, length(labels)), y=(1:length(labels))-0.5, pch=22, 
-         col=blueblack, bg=colors, cex=1.8)
-  text(x=rep(0.1, length(labels)), y=(1:length(labels))-0.58, pos=4, labels=labels, xpd=T)
-}
-
 #####################
 ### RSCRIPT BLOCK ###
 #####################
