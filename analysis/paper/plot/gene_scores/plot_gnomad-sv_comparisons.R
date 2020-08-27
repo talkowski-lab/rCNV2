@@ -1,0 +1,227 @@
+#!/usr/bin/env Rscript
+
+######################
+#    rCNV Project    #
+######################
+
+# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Distributed under terms of the MIT License (see LICENSE)
+# Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
+
+# Compare rates of genic SVs in gnomAD-SV vs rCNV gene scores
+
+
+options(stringsAsFactors=F, scipen=1000)
+
+
+######################
+### DATA FUNCTIONS ###
+######################
+# Predict number of SVs expected per gene in gnomAD-SV
+calc.expected <- function(var.meta, genomic.meta, train.genes=NULL){
+  if(is.null(train.genes)){
+    train.genes <- unique(genomic.meta$gene)
+  }
+  csqs <- colnames(var.meta)[grep("gnomad_sv", colnames(var.meta), fixed=T)]
+  exp <- as.data.frame(sapply(csqs, function(csq){
+    all.dat <- merge(var.meta[, c("gene", csq)], genomic.meta, all.x=T, all.y=F, sort=F, by="gene")
+    rownames(all.dat) <- all.dat$gene
+    all.dat$gene <- NULL
+    colnames(all.dat)[1] <- "sv"
+    tdat <- all.dat[which(rownames(all.dat) %in% train.genes), ]
+    fit <- glm.nb(sv ~ ., data=tdat)
+    predict.glm(fit, newdata=all.dat[, -1], type="response")
+  }))
+  colnames(exp) <- paste("exp", csqs, sep=".")
+  exp$gene <- rownames(exp)
+  merge(var.meta, exp, by="gene", all.x=T, all.y=F, sort=F)
+}
+
+# Compute obs/exp SVs in gnomAD-SV across bins of rCNV score
+gnomad.by.score.bin <- function(oe.dat, scores, score="pHI", 
+                                var="gnomad_sv_lof_del", n.bins=10){
+  dat <- merge(scores, oe.dat, all=F, sort=F, by="gene")
+  x <- as.numeric(dat[, score])
+  y.obs <- as.numeric(dat[, var])
+  y.exp <- as.numeric(dat[, paste("exp", var, sep=".")])
+  drop.idx <- which(is.na(x) | is.na(y.obs) | is.na(y.exp))
+  if(length(drop.idx) > 0){
+    x <- x[-drop.idx]
+    y.obs <- y.obs[-drop.idx]
+    y.exp <- y.exp[-drop.idx]
+  }
+  bins <- seq(0, 1, length.out=n.bins+1)
+  mids <- (bins[1:n.bins] + bins[2:(n.bins+1)])/2
+  summed.oe <- function(obs.exp.df, indexes=NULL){
+    if(is.null(indexes)){
+      indexes <- 1:nrow(obs.exp.df)
+    }
+    sum.obs <- sum(obs.exp.df[indexes, 1])
+    sum.exp <- sum(obs.exp.df[indexes, 2])
+    sum.obs / sum.exp
+  }
+  oe.vals <- t(sapply(1:n.bins, function(i){
+    idxs <- which(x>=bins[i] & x<=bins[i+1])
+    obs.exp.df <- data.frame(y.obs[idxs], y.exp[idxs])
+    oe <- summed.oe(obs.exp.df)
+    ci <- boot.ci(boot(data=obs.exp.df, statistic=summed.oe, R=1000), 
+                  conf=0.95, type="norm")$normal[, -1]
+    as.numeric(c(oe, ci))
+  }))
+  colnames(oe.vals) <- c("oe", "oe.lower", "oe.upper")
+  mean.for.boot <- function(vals, indexes){mean(vals[indexes], na.rm=T)}
+  avgs <- t(sapply(1:n.bins, function(i){
+    idxs <- which(x>=bins[i] & x<=bins[i+1])
+    estimate <- mean(y.obs[idxs])
+    ci <- boot.ci(boot(data=y.obs[idxs], statistic=mean.for.boot, R=1000), 
+                  conf=0.95, type="norm")$normal[, -1]
+    as.numeric(c(estimate, ci))
+  }))
+  colnames(avgs) <- c("mean", "mean.lower", "mean.upper")
+  cbind(data.frame("score"=mids), avgs, oe.vals)
+}
+
+
+##########################
+### PLOTTING FUNCTIONS ###
+##########################
+# Plot a single comparison of rCNV score vs. gnomAD-SV counts
+plot.oe <- function(oe.dat, scores, score, var, metric="oe", n.bins=10,
+                    xlab=NULL, parmar=c(2.25, 4, 0.5, 0.5)){
+  # Collect plot data
+  plot.dat <- gnomad.by.score.bin(oe.dat, scores, score, var, n.bins)
+  if(score=="pHI"){
+    color <- cnv.colors[1]
+    descrip <- "LoF Dels."
+  }else if(score=="pTS"){
+    color <- cnv.colors[2]
+    descrip <- "CG Dups."
+  }else{
+    color <- blueblack
+    descrip <- "SVs"
+  }
+  if(metric=="oe"){
+    x <- plot.dat[, c(1, grep("oe", colnames(plot.dat), fixed=T))]
+    ylab <- paste("Obs/Exp ", descrip, "\nin gnomAD-SV", sep="")
+  }else{
+    x <- plot.dat[, c(1, grep("mean", colnames(plot.dat), fixed=T))]
+    ylab <- paste(descrip, "per Gene\nin gnomAD-SV")
+  }
+  ylims <- range(x[, -1], na.rm=T)
+  if(is.null(xlab)){
+    xlab <- paste("Genes Binned by", score)
+  }
+  
+  # Prep plot area
+  par(mar=parmar, bty="n")
+  plot(NA, xlim=c(0, 1), ylim=ylims,
+       xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i")
+  rect(xleft=par("usr")[1], xright=par("usr")[2], 
+       ybottom=par("usr")[3], ytop=par("usr")[4],
+       border=NA, bty="n", col=bluewhite)
+  abline(h=axTicks(2), v=axTicks(1), col="white")
+  if(metric=="oe"){
+    abline(h=1, col=blueblack, lty=2)
+  }
+  
+  # Add points
+  segments(x0=x[, 1], x1=x[, 1], y0=x[, 3], y1=x[, 4],
+           col=color, lend="round", lwd=1.5)
+  points(x=x[, 1], y=x[, 2], pch=19, col=color)
+  
+  # Add axes
+  x.ax.at <- axTicks(1)
+  axis(1, at=c(-100, 100), col=blueblack, tck=0, labels=NA)
+  axis(1, at=x.ax.at, labels=NA, tck=-0.025, col=blueblack)
+  sapply(x.ax.at, function(k){
+    axis(1, at=k, tick=F, line=-0.75)
+  })
+  mtext(1, text=xlab, line=1.1)
+  y.ax.at <- axTicks(2)
+  axis(2, at=c(-100, 100), col=blueblack, tck=0, labels=NA)
+  axis(2, at=y.ax.at, labels=NA, tck=-0.025, col=blueblack)
+  axis(2, at=y.ax.at, tick=F, line=-0.65, las=2)
+  mtext(2, text=ylab, line=2)
+}
+
+
+#####################
+### RSCRIPT BLOCK ###
+#####################
+require(optparse, quietly=T)
+require(funr, quietly=T)
+require(MASS, quietly=T)
+require(boot, quietly=T)
+
+# List of command-line options
+option_list <- list(
+  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
+)
+
+# Get command-line arguments & options
+args <- parse_args(OptionParser(usage=paste("%prog scores.tsv variation.meta.bed genomic.meta.eigen.bed train.genes out.prefix", sep=" "),
+                                option_list=option_list),
+                   positional_arguments=TRUE)
+opts <- args$options
+
+# Checks for appropriate positional arguments
+if(length(args$args) != 5){
+  stop(paste("Five positional arguments required: scores.tsv, variation.meta.bed, genomic.meta.eigen.bed, training.genes, and output_prefix\n", sep=" "))
+}
+
+# Writes args & opts to vars
+scores.in <- args$args[1]
+var.meta.in <- args$args[2]
+genomic.meta.in <- args$args[3]
+mu.training.genes.in <- args$args[4]
+out.prefix <- args$args[5]
+rcnv.config <- opts$`rcnv-config`
+
+# # DEV PARAMETERS
+# setwd("~/scratch/")
+# scores.in <- "~/scratch/rCNV.gene_scores.tsv.gz"
+# var.meta.in <- "gencode.v19.canonical.pext_filtered.variation_features.bed.gz"
+# genomic.meta.in <- "gencode.v19.canonical.pext_filtered.genomic_features.eigenfeatures.bed.gz"
+# mu.training.genes.in <- "gene_lists/gnomad.v2.1.1.likely_unconstrained.genes.list"
+# out.prefix <- "gene_score_gnomad_comparisons"
+# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
+# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/gene_scores/"
+
+# Source rCNV2 config, if optioned
+if(!is.null(rcnv.config)){
+  source(rcnv.config)
+}
+
+# Source common functions
+script.dir <- funr::get_script_path()
+source(paste(script.dir, "common_functions.R", sep="/"))
+
+# Load scores
+scores <- load.scores(scores.in)
+
+# Load gene metadata
+var.meta <- load.gene.metadata(var.meta.in)
+genomic.meta <- load.gene.metadata(genomic.meta.in)
+
+# Train mutation rate model to predict expected number of variants per gene
+train.genes <- as.character(read.table(mu.training.genes.in)[, 1])
+oe.dat <- calc.expected(var.meta, genomic.meta, train.genes)
+
+# Plot rCNV scores vs obs/exp ratios of gnomAD SVs
+pdf(paste(out.prefix, "scores_vs_gnomAD-SV.pHI_oe.pdf", sep="."),
+    height=2, width=2.6)
+plot.oe(oe.dat, scores, "pHI", "gnomad_sv_lof_del", n.bins=10)
+dev.off()
+pdf(paste(out.prefix, "scores_vs_gnomAD-SV.pTS_oe.pdf", sep="."),
+    height=2, width=2.6)
+plot.oe(oe.dat, scores, "pTS", "gnomad_sv_cg", n.bins=10)
+dev.off()
+
+pdf(paste(out.prefix, "scores_vs_gnomAD-SV.pHI_raw.pdf", sep="."),
+    height=2, width=2.6)
+plot.oe(oe.dat, scores, "pHI", "gnomad_sv_lof_del", metric="raw", n.bins=10)
+dev.off()
+pdf(paste(out.prefix, "scores_vs_gnomAD-SV.pTS_raw.pdf", sep="."),
+    height=2, width=2.6)
+plot.oe(oe.dat, scores, "pTS", "gnomad_sv_cg", metric="raw", n.bins=10)
+dev.off()

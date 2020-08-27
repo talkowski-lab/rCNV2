@@ -80,7 +80,7 @@ calc.or <- function(cnvs, phenos){
   n.case.ref <- n.case.all - n.case.cnv
   n.ctrl.ref <- n.ctrl.all - n.ctrl.cnv
   or.table <- matrix(c(n.ctrl.ref, n.case.ref, n.ctrl.cnv, n.case.cnv), nrow=2, byrow=T)
-  as.numeric(oddsratio.wald(or.table)$measure[2, ])
+  as.numeric(oddsratio.wald(or.table, correction=T)$measure[2, ])
 }
 
 # Compute odds ratios for CNVs binned by score (either percentile or absolute bin)
@@ -187,7 +187,7 @@ plot.or.by.scorebin <- function(cnvs, phenos, score, n.bins=3, cnv.pct=TRUE,
   baseline <- log2(calc.or(cnvs, phenos)[1])
   ors <- log2(calc.or.by.scorebin(cnvs, phenos, score, n.bins, cnv.pct))
   or.vals <- as.numeric(unlist(ors))
-  ylims <- range(or.vals[which(!is.infinite(or.vals))])
+  ylims <- range(or.vals[which(!is.infinite(or.vals) & !is.nan(or.vals) & !is.na(or.vals))])
   if(ylims[1] > 0){
     ylims[1] <- 0
   }

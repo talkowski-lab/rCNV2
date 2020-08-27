@@ -32,7 +32,10 @@ gsutil -m cp \
   ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.all_features.bed.gz \
   ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.all_features.no_variation.bed.gz \
   ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
+  ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.variation_features.bed.gz \
+  ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.genomic_features.eigenfeatures.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/misc/asc_spark_* \
+  ${rCNV_bucket}/cleaned_data/genes/gene_lists/gnomad.v2.1.1.likely_unconstrained.genes.list \
   refs/
 
 
@@ -88,9 +91,20 @@ done
   ${prefix}
 
 
+# Compare rates of LoF deletions & CG duplications in gnomAD-SV vs rCNV gene scores
+/opt/rCNV2/analysis/paper/plot/gene_scores/plot_gnomad-sv_comparisons.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  rCNV.gene_scores.tsv.gz \
+  refs/gencode.v19.canonical.pext_filtered.variation_features.bed.gz \
+  refs/gencode.v19.canonical.pext_filtered.genomic_features.eigenfeatures.bed.gz \
+  refs/gnomad.v2.1.1.likely_unconstrained.genes.list \
+  ${prefix}
+
+
 # Copy all plots to final gs:// directory
 gsutil -m cp \
   ${prefix}.*.model_eval*pdf \
   ${prefix}.gene_scores_scatterplot*pdf \
   ${prefix}.asc_spark_denovo_cnvs*pdf \
+  ${prefix}.scores_vs_gnomAD-SV*pdf \
   ${rCNV_bucket}/analysis/paper/plots/gene_scores/

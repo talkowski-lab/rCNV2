@@ -25,6 +25,13 @@ load.scores <- function(scores.in){
   return(scores)
 }
 
+# Load gene metadata from .bed
+load.gene.metadata <- function(cov.in){
+  cov <- read.table(cov.in, header=T, sep="\t", comment.char="")[, -c(1:3)]
+  cov[, -1] <- apply(cov[, -1], 2, as.numeric)
+  return(cov)
+}
+
 # Partition genes into subgroups based on scores
 classify.genes <- function(scores, hc.cutoff=0.9, lc.cutoff=0.5){
   ds.hc <- scores$gene[which(scores$pHI>=hc.cutoff & scores$pTS>=hc.cutoff)]
@@ -128,6 +135,7 @@ load.other.scores <- function(meta.in){
   return(meta)
 }
 
+
 ##########################
 ### PLOTTING FUNCTIONS ###
 ##########################
@@ -189,9 +197,12 @@ superimposed.barplot <- function(values, colors, xleft, xright, ybottom, ytop,
                                  min.value=NULL, max.value=NULL, title=NULL, 
                                  add.labels=TRUE, lab.cex=0.6, lab.colors=NULL, 
                                  buffer=0.025){
+  # Ådd subpanel
   rect(xleft=xleft+buffer, xright=xright-buffer, ybottom=ybottom+buffer, ytop=ytop-buffer, 
        col=bluewhite, border=blueblack)
   text(x=mean(c(xleft, xright)), y=ytop-(2*buffer), labels=title, pos=3)
+  
+  # Set parameters & get plot values
   inner.xleft <- xleft + (2*buffer)
   inner.xright <- xright - (2*buffer)
   inner.ybottom <- ybottom + (2*buffer)
@@ -209,6 +220,14 @@ superimposed.barplot <- function(values, colors, xleft, xright, ybottom, ytop,
   scaled.values <- norm.values * max.bar.length
   bar.xleft <- rep(inner.xleft, times=n.bars)
   bar.xright <- inner.xleft + scaled.values
+  
+  # Add background gridlines
+  gridlines.x.at <- seq(inner.xleft, inner.xright, length.out=6)
+  segments(x0=gridlines.x.at, x1=gridlines.x.at,
+           y0=inner.ybottom, y1=inner.ytop,
+           col="white")
+  
+  # Add bars & labels
   rect(xleft=bar.xleft, xright=bar.xright, ybottom=bar.ybottom, ytop=bar.ytop, border=NA, col=colors)
   if(is.null(lab.colors)){
     lab.colors <- rep("black", n.bars)
@@ -222,68 +241,96 @@ superimposed.barplot <- function(values, colors, xleft, xright, ybottom, ytop,
   lab.y.at <- (bar.y.breaks[1:n.bars]+bar.y.breaks[-1])/2
   text(x=bar.xright+lab.x.adj, y=lab.y.at - (bar.buffer * bar.height), pos=lab.pos, 
        col=lab.colors, labels=round(values, 3), cex=lab.cex)
+  
+  # Add cleanup line
   segments(x0=inner.xleft, x1=inner.xleft, y0=inner.ybottom, y1=inner.ytop, col=blueblack)
 }
 
 # Plot ROC curves from a list of evaluate.score() outputs
 plot.roc <- function(data, colors=NULL, nested.auc=TRUE, auc.text.colors=NULL, 
                      ax.tick=-0.025, parmar=c(2.5, 2.5, 0.75, 0.75)){
+  # Get plot data
   if(is.null(colors)){
     colors <- rev(viridis(length(data)))
   }
+  
+  # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=c(0, 1), ylim=c(0, 1), type="n",
        xaxt="n", yaxt="n", xaxs="i", yaxs="i", xlab="", ylab="")
-  abline(0, 1, col=bluewhite)
+  rect(xleft=par("usr")[1], xright=par("usr")[2], 
+       ybottom=par("usr")[3], ytop=par("usr")[4],
+       border=blueblack, col="white", xpd=T)
+  abline(h=axTicks(2), v=axTicks(1), col=bluewhite)
+  abline(0, 1, col=bluewhite, lwd=2, lty=2)
+  # box(col=blueblack, bty="o")
+  
+  # Add curves
   lorder <- order(-sapply(data, function(x){x$roc.auc}))
   sapply(rev(lorder), function(i){
     x <- data[[i]]
     points(x$roc$frac_false, x$roc$frac_true,
-           type="l", lwd=4, col=colors[i])
+           type="l", lwd=3, col=colors[i], xpd=T)
   })
+  
+  # Add nested AUC subpanel
   if(nested.auc==TRUE){
     superimposed.barplot(rev(sapply(data, function(l){l$roc.auc})), rev(colors),
                          xleft=0.5, xright=1, ybottom=0, ytop=0.5, 
                          min.value=0, max.value=1, title="AUC",
                          lab.colors=auc.text.colors, buffer=0.02)
   }
+  
+  # Add axes
   axis(1, labels=NA, col=blueblack, tck=ax.tick)
   axis(1, tick=F, line=-0.6)
   mtext(1, line=1.25, text="False positive rate")
   axis(2, labels=NA, col=blueblack, tck=ax.tick)
   axis(2, tick=F, line=-0.6, las=2)
   mtext(2, line=1.65, text="True positive rate")
-  box(bty="o", col=blueblack)
 }
 
 # Plot PRC curves from a list of evaluate.score() outputs
 plot.prc <- function(data, colors=NULL, nested.auc=TRUE, auc.text.colors=NULL,
                      ax.tick=-0.025, parmar=c(2.5, 2.5, 0.75, 0.75)){
+  # Get plot data
   if(is.null(colors)){
     colors <- rev(viridis(length(data)))
   }
+  
+  # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=c(0, 1), ylim=c(0, 1), type="n",
        xaxt="n", yaxt="n", xaxs="i", yaxs="i", xlab="", ylab="")
+  rect(xleft=par("usr")[1], xright=par("usr")[2], 
+       ybottom=par("usr")[3], ytop=par("usr")[4],
+       border=blueblack, col="white", xpd=T)
+  abline(h=axTicks(2), v=axTicks(1), col=bluewhite)
+  # box(col=blueblack, bty="o")
+  
+  # Add curves
   lorder <- order(-sapply(data, function(x){x$prc.auc}))
   sapply(rev(lorder), function(i){
     x <- data[[i]]
     points(x$prc$recall, x$prc$precision,
-           type="l", lwd=4, col=colors[i])
+           type="l", lwd=4, col=colors[i], xpd=T)
   })
+  
+  # Add nested AUC subpanel
   if(nested.auc==TRUE){
     superimposed.barplot(rev(sapply(data, function(l){l$prc.auc})), rev(colors),
                          xleft=0, xright=0.5, ybottom=0, ytop=0.5, 
                          min.value=0, max.value=1, title="AUC",
                          lab.colors=auc.text.colors, buffer=0.02)
   }
+  
+  # Add axes & cleanup
   axis(1, labels=NA, col=blueblack, tck=ax.tick)
   axis(1, tick=F, line=-0.6)
   mtext(1, line=1.25, text="Precision")
   axis(2, labels=NA, col=blueblack, tck=ax.tick)
   axis(2, tick=F, line=-0.6, las=2)
   mtext(2, line=1.65, text="Recall")
-  box(bty="o", col=blueblack)
 }
 
 # Plot simple color legend
