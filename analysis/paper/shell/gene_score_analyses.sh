@@ -36,6 +36,8 @@ gsutil -m cp \
   ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.genomic_features.eigenfeatures.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/misc/asc_spark_* \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists/gnomad.v2.1.1.likely_unconstrained.genes.list \
+  ${rCNV_bucket}/analysis/analysis_refs/gene_feature_transformations.tsv \
+  ${rCNV_bucket}/analysis/paper/data/misc/gene_feature_metadata.tsv \
   refs/
 
 
@@ -73,14 +75,6 @@ done
   ${prefix}
 
 
-# Perform feature regressions between subgroups of genes
-
-
-
-
-# Plot distributions of features between subgroups of genes
-
-
 # Compare de novo CNVs in ASD vs gene scores
 /opt/rCNV2/analysis/paper/plot/gene_scores/plot_asd_denovo_cnv_analysis.R \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
@@ -101,10 +95,37 @@ done
   ${prefix}
 
 
+# Perform feature regressions between subgroups of genes
+athena transform \
+  --transformations-tsv refs/gene_feature_transformations.tsv \
+  --ignore-columns 4 \
+  --bgzip \
+  refs/gencode.v19.canonical.pext_filtered.all_features.no_variation.bed.gz \
+  refs/gencode.v19.canonical.pext_filtered.all_features.no_variation.transformed.bed.gz
+/opt/rCNV2/analysis/paper/plot/gene_scores/ds_feature_regressions.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  rCNV.gene_scores.tsv.gz \
+  refs/gencode.v19.canonical.pext_filtered.all_features.no_variation.transformed.bed.gz \
+  refs/gene_feature_metadata.tsv \
+  ${prefix}
+
+
+# Plot distributions of features between subgroups of genes
+mkdir feature_distribs_by_ds_group/
+/opt/rCNV2/analysis/paper/plot/gene_scores/plot_ds_feature_distribs.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  rCNV.gene_scores.tsv.gz \
+  refs/gencode.v19.canonical.pext_filtered.all_features.no_variation.transformed.bed.gz \
+  refs/gene_feature_metadata.tsv \
+  feature_distribs_by_ds_group/${prefix}
+
+
 # Copy all plots to final gs:// directory
-gsutil -m cp \
+gsutil -m cp -r \
   ${prefix}.*.model_eval*pdf \
   ${prefix}.gene_scores_scatterplot*pdf \
   ${prefix}.asc_spark_denovo_cnvs*pdf \
   ${prefix}.scores_vs_gnomAD-SV*pdf \
+  ${prefix}.gradient_regression*pdf \
+  feature_distribs_by_ds_group \
   ${rCNV_bucket}/analysis/paper/plots/gene_scores/

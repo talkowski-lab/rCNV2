@@ -107,7 +107,7 @@ scores.scatterplot <- function(scores, pt.colors, add.cor=TRUE,
   
   # Add axes
   axis(1, at=ax.at, col=blueblack, labels=NA, tck=ax.tick)
-  axis(2, at=ax.at, col=blueblack, labels=NA, tck=-ax.tick)
+  axis(2, at=ax.at, col=blueblack, labels=NA, tck=ax.tick)
   sapply(ax.at, function(i){
     axis(1, at=i, col=blueblack, tick=F, line=-0.65)
     axis(2, at=i, col=blueblack, tick=F, line=-0.65, las=2)
@@ -145,23 +145,23 @@ plot.scores.scatter.legend <- function(scores, ds.groups){
        xaxt="n", xaxs="i", xlab="", yaxt="n", yaxs="i", ylab="")
   
   # Add points
-  points(x=rep(0.05, 7), y=0.5:6.5, pch=18, col=colors, cex=2.25)
+  points(x=rep(0.05, 7), y=0.5:6.5, pch=18, col=colors, cex=2.25, xpd=T)
   
   # Add N genes
-  gene.ax.at <- c(0.125, 0.3)
+  gene.ax.at <- c(0.175, 0.35)
   axis(3, at=gene.ax.at, tck=0, labels=NA, col=blueblack)
   axis(3, at=gene.ax.at[2], tick=F, line=-1, labels="Genes", hadj=1)
   sapply(1:length(ds.groups), function(i){
-    text(x=0.35, y=i-0.5, pos=2, labels=prettyNum(length(ds.groups[[i]]), big.mark=","))
+    text(x=0.4, y=i-0.5, pos=2, labels=prettyNum(length(ds.groups[[i]]), big.mark=","))
   })
   
   # Add labels
-  cat.ax.at <- c(0.35, 0.95)
+  cat.ax.at <- c(0.4, 0.95)
   axis(3, at=cat.ax.at, tck=0, labels=NA, col=blueblack)
   axis(3, at=cat.ax.at[1], tick=F, line=-1, labels="Classification", hadj=0)
-  text(x=rep(0.3, 7), y=0.5:6.5, pos=4, 
+  text(x=rep(0.35, 7), y=0.5:6.5, pos=4, xpd=T, 
        labels=c(as.vector(sapply(c("DS", "HI", "TS"), 
-                                 function(x){paste(x, " (", c("high", "low"), " confidence)", sep="")})),
+                                 function(x){paste(x, " (", c("high", "low"), " conf.)", sep="")})),
                 "NS"))
 }
 
@@ -197,7 +197,8 @@ gradient.legend <- function(palette){
 }
 
 # Wrapper to generate all gradient plots
-plot.gradients <- function(scores, gradient.norm, gradient.pal, hist.x.ax.title, sub.out.prefix){
+plot.gradients <- function(scores, gradient.norm, gradient.pal, null.x=NA, null.y=NA,
+                           hist.x.ax.title, sub.out.prefix){
   # Scatterplot
   pt.colors.gradient <- gradient.pal[gradient.norm + 1]
   pdf(paste(out.prefix, "gene_scores_scatterplot", sub.out.prefix,"pdf", sep="."),
@@ -207,12 +208,29 @@ plot.gradients <- function(scores, gradient.norm, gradient.pal, hist.x.ax.title,
                      margin.dens.height=0, pt.cex=0.125, 
                      x.ax.title="pHI", y.ax.title="pTS",
                      parmar=c(2.7, 2.7, 0.4, 0.4))
+  if(!is.na(null.x) & !is.na(null.y)){
+    null.pt.idxs <- which(scores$pHI<null.x & scores$pTS<null.y)
+    points(x=scores$pHI[null.pt.idxs], y=scores$pTS[null.pt.idxs],
+           cex=0.125, col="gray95")
+    segments(x0=c(0, 0), x1=c(null.x, null.x),
+             y0=c(0, null.y), y1=c(null.y, 0),
+             lend="butt", lwd=2, col="gray90")
+    segments(x0=c(0, null.x), x1=rep(null.x, 2),
+             y0=c(null.y, 0), y1=rep(null.y, 2),
+             lty=2, col=blueblack, lend="round")
+    box(bty="o", col=blueblack, xpd=T)
+  }
   dev.off()
   
   # Histogram
   pdf(paste(out.prefix, "gene_scores_scatterplot", sub.out.prefix, "hist.pdf", sep="."),
       height=1.2, width=1.8)
-  gradient.hist(gradient.norm, gradient.pal, x.ax.title=hist.x.ax.title)
+  if(!is.na(null.x) & !is.na(null.y)){
+    gradient.hist(gradient.norm[-null.pt.idxs], gradient.pal, x.ax.title=hist.x.ax.title)
+  }else{
+    gradient.hist(gradient.norm, gradient.pal, x.ax.title=hist.x.ax.title)
+  }
+  
   dev.off()
   
   # Legend
@@ -279,7 +297,7 @@ dev.off()
 
 # Plot legend for category-based coloring
 pdf(paste(out.prefix, "gene_scores_scatterplot.legend.pdf", sep="."),
-    height=2, width=2.4)
+    height=2, width=2)
 plot.scores.scatter.legend(scores, ds.groups)
 dev.off()
 
@@ -296,6 +314,7 @@ plot.gradients(scores, ds.gradient.norm, ds.gradient.pal,
 hits.gradient <- scores$pTS - scores$pHI
 hits.gradient.norm <- round(((100*hits.gradient) + 100) / 2)
 plot.gradients(scores, hits.gradient.norm, hits.gradient.pal, 
+               null.x=0.5, null.y=0.5,
                hist.x.ax.title="\"pTS\" - \"pHI\"",
                sub.out.prefix="hi_ts_gradient")
 

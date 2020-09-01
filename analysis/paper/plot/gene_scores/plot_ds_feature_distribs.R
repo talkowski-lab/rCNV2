@@ -19,6 +19,7 @@ options(stringsAsFactors=F, scipen=1000)
 #####################
 require(optparse, quietly=T)
 require(funr, quietly=T)
+require(beeswarm, quietly=T)
 require(vioplot, quietly=T)
 
 # List of command-line options
@@ -27,25 +28,27 @@ option_list <- list(
 )
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage=paste("%prog scores.tsv features.bed out_prefix", sep=" "),
+args <- parse_args(OptionParser(usage=paste("%prog scores.tsv features.bed feature.meta.tsv out_prefix", sep=" "),
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Checks for appropriate positional arguments
-if(length(args$args) != 3){
-  stop(paste("Three positional arguments required: scores.tsv, features.bed, and output_prefix\n", sep=" "))
+if(length(args$args) != 4){
+  stop(paste("Four positional arguments required: scores.tsv, features.bed, feature.meta.tsv, and output_prefix\n", sep=" "))
 }
 
 # Writes args & opts to vars
 scores.in <- args$args[1]
 features.in <- args$args[2]
-out.prefix <- args$args[3]
+feature.meta.in <- args$args[3]
+out.prefix <- args$args[4]
 rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
 # scores.in <- "~/scratch/rCNV.gene_scores.tsv.gz"
-# features.in <- "~/scratch/refs/gencode.v19.canonical.pext_filtered.all_features.bed.gz"
+# features.in <- "~/scratch/gencode.v19.canonical.pext_filtered.all_features.no_variation.transformed.bed.gz"
+# feature.meta.in <- "~/scratch/gene_feature_metadata.tsv"
 # out.prefix <- "~/scratch/test_gene_score_feature_regressions"
 # rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
 # script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/gene_scores/"
@@ -63,14 +66,19 @@ source(paste(script.dir, "common_functions.R", sep="/"))
 scores <- load.scores(scores.in)
 ds.groups <- classify.genes(scores, hc.cutoff=0.9, lc.cutoff=0.5)
 
-# Load features (leave unnormalized)
+# Load features (leave unnormalized, but make some adjustments for interpretability)
 feats <- load.features(features.in, norm=T)
+feats <- mod.features(feats)
+feat.meta <- load.gene.feature.metadata(feature.meta.in)
 
 # Iterate over features and plot one comparison for each
 sapply(2:ncol(feats), function(i){
-  pdf(paste(out.prefix, colnames(feats)[i], "feature_distribs.pdf", sep="."),
-      height=2.25, width=3)
-  plot.feature.bydsgroup(feats, ds.groups, feat.idx=i)
+  out.pdf <- paste(out.prefix, gsub("/", "", colnames(feats)[i], fixed=T),
+                   "feature_distribs.pdf", sep=".")
+  pdf(out.pdf, height=2.25, width=3)
+  plot.feature.bydsgroup(feats, ds.groups, feat.idx=i, 
+                         title=feat.meta$name[which(feat.meta$feature==colnames(feats)[i])],
+                         swarm.max=1200)
   dev.off()
 })
 
