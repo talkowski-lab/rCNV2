@@ -37,6 +37,17 @@ calc.expected <- function(var.meta, genomic.meta, train.genes=NULL){
   merge(var.meta, exp, by="gene", all.x=T, all.y=F, sort=F)
 }
 
+# Helper functions for boot (bootstrapping confidence intervals)
+summed.oe <- function(obs.exp.df, indexes=NULL){
+  if(is.null(indexes)){
+    indexes <- 1:nrow(obs.exp.df)
+  }
+  sum.obs <- sum(obs.exp.df[indexes, 1])
+  sum.exp <- sum(obs.exp.df[indexes, 2])
+  sum.obs / sum.exp
+}
+mean.for.boot <- function(vals, indexes){mean(vals[indexes], na.rm=T)}
+
 # Compute obs/exp SVs in gnomAD-SV across bins of rCNV score
 gnomad.by.score.bin <- function(oe.dat, scores, score="pHI", 
                                 var="gnomad_sv_lof_del", n.bins=10){
@@ -52,14 +63,6 @@ gnomad.by.score.bin <- function(oe.dat, scores, score="pHI",
   }
   bins <- seq(0, 1, length.out=n.bins+1)
   mids <- (bins[1:n.bins] + bins[2:(n.bins+1)])/2
-  summed.oe <- function(obs.exp.df, indexes=NULL){
-    if(is.null(indexes)){
-      indexes <- 1:nrow(obs.exp.df)
-    }
-    sum.obs <- sum(obs.exp.df[indexes, 1])
-    sum.exp <- sum(obs.exp.df[indexes, 2])
-    sum.obs / sum.exp
-  }
   oe.vals <- t(sapply(1:n.bins, function(i){
     idxs <- which(x>=bins[i] & x<=bins[i+1])
     obs.exp.df <- data.frame(y.obs[idxs], y.exp[idxs])
@@ -69,7 +72,6 @@ gnomad.by.score.bin <- function(oe.dat, scores, score="pHI",
     as.numeric(c(oe, ci))
   }))
   colnames(oe.vals) <- c("oe", "oe.lower", "oe.upper")
-  mean.for.boot <- function(vals, indexes){mean(vals[indexes], na.rm=T)}
   avgs <- t(sapply(1:n.bins, function(i){
     idxs <- which(x>=bins[i] & x<=bins[i+1])
     estimate <- mean(y.obs[idxs])
@@ -79,6 +81,41 @@ gnomad.by.score.bin <- function(oe.dat, scores, score="pHI",
   }))
   colnames(avgs) <- c("mean", "mean.lower", "mean.upper")
   cbind(data.frame("score"=mids), avgs, oe.vals)
+}
+
+# Compute obs/exp SVs in gnomAD-SV, stratified by low/high pHI & pTS
+gnomad.stratified <- function(oe.dat, scores, high.cutoff=0.8, low.cutoff=0.5, measure="oe"){
+  dat <- merge(scores, oe.dat, all=F, sort=F, by="gene")
+  dat <- dat[which(!is.na(dat$pHI) & !(is.na(dat$pTS))), ]
+  low.low.idx <- which(dat$pHI<=low.cutoff & dat$pTS<=low.cutoff)
+  high.low.idx <- which(dat$pHI>=high.cutoff & dat$pTS<=low.cutoff)
+  low.high.idx <- which(dat$pHI<=low.cutoff & dat$pTS>=high.cutoff)
+  high.high.idx <- which(dat$pHI>=high.cutoff & dat$pTS>=high.cutoff)
+  idxs <- list(low.low.idx, high.low.idx, low.high.idx, high.high.idx)
+  strat.vals <- lapply(c("gnomad_sv_lof_del", "gnomad_sv_cg"), function(var){
+    as.data.frame(do.call("rbind", lapply(idxs, function(idxs.i){
+      y.obs <- as.numeric(dat[idxs.i, var])
+      y.exp <- as.numeric(dat[idxs.i, paste("exp", var, sep=".")])
+      drop.idx <- which(is.na(y.obs) | is.na(y.exp))
+      if(length(drop.idx) > 0){
+        y.obs <- y.obs[-drop.idx]
+        y.exp <- y.exp[-drop.idx]
+      }
+      if(measure=="oe"){
+        obs.exp.df <- data.frame(y.obs, y.exp)
+        estimate <- summed.oe(obs.exp.df)
+        ci <- boot.ci(boot(data=obs.exp.df, statistic=summed.oe, R=1000), 
+                      conf=0.95, type="norm")$normal[, -1]
+      }else{
+        estimate <- mean(y.obs)
+        ci <- boot.ci(boot(data=y.obs, statistic=mean.for.boot, R=1000), 
+                      conf=0.95, type="norm")$normal[, -1]
+      }
+      return(as.numeric(c(estimate, ci)))
+    })))
+  })
+  names(strat.vals) <- c("LoF", "CG")
+  return(strat.vals)
 }
 
 
@@ -217,6 +254,7 @@ pdf(paste(out.prefix, "scores_vs_gnomAD-SV.pTS_oe.pdf", sep="."),
 plot.oe(oe.dat, scores, "pTS", "gnomad_sv_cg", n.bins=10)
 dev.off()
 
+# Plot rCNV scores vs mean SVs per gene from gnomAD-SV
 pdf(paste(out.prefix, "scores_vs_gnomAD-SV.pHI_raw.pdf", sep="."),
     height=2, width=2.6)
 plot.oe(oe.dat, scores, "pHI", "gnomad_sv_lof_del", metric="raw", n.bins=10)
@@ -224,4 +262,11 @@ dev.off()
 pdf(paste(out.prefix, "scores_vs_gnomAD-SV.pTS_raw.pdf", sep="."),
     height=2, width=2.6)
 plot.oe(oe.dat, scores, "pTS", "gnomad_sv_cg", metric="raw", n.bins=10)
+dev.off()
+
+# Plot gnomAD-SV stratified by high/low pHI & pTS
+strat.vals <- gnomad.stratified(oe.dat, scores, high.cutoff=0.9, low.cutoff=0.5, measure="oe")
+pdf(paste(out.prefix, "scores_vs_gnomAD-SV.stratified.pdf", sep="."),
+    height=2.25, width=3)
+plot.stratified.metric(strat.vals, y.title="\"gnomAD-SV Obs/Exp\"")
 dev.off()

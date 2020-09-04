@@ -79,8 +79,8 @@ calc.or <- function(cnvs, phenos){
   n.ctrl.cnv <- length(unique(cnvs$child_id[which(cnvs$pheno == control.pheno)]))
   n.case.ref <- n.case.all - n.case.cnv
   n.ctrl.ref <- n.ctrl.all - n.ctrl.cnv
-  or.table <- matrix(c(n.ctrl.ref, n.case.ref, n.ctrl.cnv, n.case.cnv), nrow=2, byrow=T)
-  as.numeric(oddsratio.wald(or.table, correction=T)$measure[2, ])
+  or.table <- matrix(c(n.ctrl.ref, n.case.ref, n.ctrl.cnv, n.case.cnv), nrow=2, byrow=T) + 0.5
+  as.numeric(oddsratio.wald(or.table, correction=F)$measure[2, ])
 }
 
 # Compute odds ratios for CNVs binned by score (either percentile or absolute bin)
@@ -98,6 +98,28 @@ calc.or.by.scorebin <- function(cnvs, phenos, score, n.bins=3, cnv.pct=TRUE){
   })))
   colnames(ors) <- c("estimate", "lower", "upper")
   return(ors)
+}
+
+# Calculate odds ratios for dnCNVs stratified by high/low pHI & pTS
+calc.or.stratified <- function(cnvs, phenos, high.cutoff=0.8, low.cutoff=0.5, 
+                               log.trans=TRUE, norm.vs.baseline=TRUE){
+  strat.ors <- lapply(c("DEL", "DUP"), function(cnvtype){
+    ors <- t(data.frame("low.low"=calc.or(cnvs[which(cnvs$pHI<=low.cutoff & cnvs$pTS<=low.cutoff & cnvs$cnv==cnvtype), ], phenos),
+    "high.low"=calc.or(cnvs[which(cnvs$pHI>=high.cutoff & cnvs$pTS<=low.cutoff & cnvs$cnv==cnvtype), ], phenos),
+    "low.high"=calc.or(cnvs[which(cnvs$pHI<=low.cutoff & cnvs$pTS>=high.cutoff & cnvs$cnv==cnvtype), ], phenos),
+    "high.high"=calc.or(cnvs[which(cnvs$pHI>=high.cutoff & cnvs$pTS>=high.cutoff & cnvs$cnv==cnvtype), ], phenos)))
+    colnames(ors) <- c("estimate", "lower", "upper")
+    if(norm.vs.baseline==TRUE){
+      baseline <- calc.or(cnvs[which(cnvs$cnv==cnvtype), ], phenos)[1]
+      ors <- ors / baseline
+    }
+    if(log.trans==TRUE){
+      ors <- log2(ors)
+    }
+    return(ors)
+  })
+  names(strat.ors) <- c("DEL", "DUP")
+  return(strat.ors)
 }
 
 # Compute ROC of a single score vs. proband/sibling labels
@@ -317,6 +339,12 @@ plot.or.by.scorebin(cnvs[which(cnvs$cnv=="DUP"), ], phenos, score="pTS", cnv.pct
                     pt.color=cnv.colors[2], baseline.color=control.cnv.colors[2], 
                     null.color=blueblack, parmar=c(3.25, 2.75, 0.5, 0.5))
 mtext(1, line=2.1, text="in Quartiles by pTS")
+
+# Plot odds ratios stratified by high/low pHI & pTS
+strat.ors <- calc.or.stratified(cnvs, phenos, high.cutoff=0.8, low.cutoff=0.5, norm.vs.baseline=F)
+pdf(paste(out.prefix, "asc_spark_denovo_cnvs.odds_ratios.stratified.pdf", sep="."),
+    height=2.25, width=3)
+plot.stratified.metric(strat.ors, y.title="\"log\"[2](\"ASD Odds Ratio\")")
 dev.off()
 
 # Evaluate performance of various scores vs. proband/sibling labels

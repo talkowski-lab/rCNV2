@@ -422,4 +422,77 @@ simple.legend <- function(labels, colors){
   text(x=rep(0.1, length(labels)), y=(1:length(labels))-0.58, pos=4, labels=labels, xpd=T)
 }
 
+# Plot metric stratified by CNV type and low/high pHI & pTS
+plot.stratified.metric <- function(strat.dat, ylims=NULL, y.title=NULL,
+                                   parmar=c(1, 3, 0.5, 0.5)){
+  # Get plot data
+  if(is.null(ylims)){
+    ylims.init <- range(as.numeric(sapply(strat.dat, function(df){df[, 1]})), na.rm=T)
+    ylims.buffer <- (1/3)*diff(ylims.init)
+    ylims <- c(ylims.init[1]-ylims.buffer, ylims.init[2]+ylims.buffer)
+  }
+  y0.val <- min(ylims)
+  strat.dat <- lapply(strat.dat, function(df){
+    df[which(df<ylims[1])] <- ylims[1]
+    return(df)
+  })
+  y.bottom.buffer <- 0.25*diff(ylims)
+  y.rect.tops <- y0.val - (c(0.015, 0.14) * diff(ylims))
+  y.rect.bottoms <- y0.val - (c(0.11, 0.235) * diff(ylims))
+  ylims <- c(ylims[1]-y.bottom.buffer, ylims[2])
+  x.left.border <- (0:3)+0.15
+  x.right.border <- (1:4)-0.15
+  del.x.at <- (1:4)-0.5-0.15
+  dup.x.at <- (1:4)-0.5+0.15
+  
+  # Prep plot area
+  par(bty="n", mar=parmar)
+  plot(NA, xlim=c(0, 4), ylim=ylims,
+       xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
+  rect(xleft=x.left.border, xright=x.right.border, 
+       ybottom=min(ylims), ytop=max(ylims),
+       xpd=T, border=NA, bty="n", col=bluewhite)
+  
+  # Add lower x-axis annotation
+  axis(2, at=((y.rect.tops+y.rect.bottoms)/2)[1], tick=F, las=2, labels="pHI", line=-1.25)
+  axis(2, at=((y.rect.tops+y.rect.bottoms)/2)[2], tick=F, las=2, labels="pTS", line=-1.25)
+  rect(xleft=x.left.border+0.1, xright=x.right.border-0.1,
+       ytop=c(rep(y.rect.tops[1], 4), rep(y.rect.tops[2], 4)), 
+       ybottom=c(rep(y.rect.bottoms[1], 4), rep(y.rect.bottoms[2], 4)),
+       bty="n", border=NA, 
+       col=c(ns.color, cnv.colors[1], ns.color, cnv.colors[1],
+             ns.color, ns.color, cnv.colors[2], cnv.colors[2]))
+  text(x=0.5:3.5, y=((y.rect.tops+y.rect.bottoms)/2)[1], 
+       labels=c("Low", "High", "Low", "High"),
+       col=c("gray30", "white", "gray30", "white"),
+       cex=0.85)
+  text(x=0.5:3.5, y=((y.rect.tops+y.rect.bottoms)/2)[2], 
+       labels=c("Low", "Low", "High", "High"),
+       col=c("gray30", "gray30", "white", "white"),
+       cex=0.85)
+  axis(1, at=par("usr")[1:2], line=0, tck=0, col=bluewhite)
+  sapply(1:4, function(i){
+    axis(1, at=c(x.left.border[i], x.right.border[i]), tck=0, col=blueblack, 
+         line=0, labels=NA)
+  })
+  axis(1, at=0.5:3.5, tick=F, line=-0.9, labels=c("NS", "HI", "TS", "DS"))
+  
+  # Add points & CI bars
+  segments(x0=del.x.at, x1=del.x.at, y0=strat.dat[[1]][, 2], y1=strat.dat[[1]][, 3], 
+           col=cnv.colors[1], lend="round", lwd=2)
+  segments(x0=dup.x.at, x1=dup.x.at, y0=strat.dat[[2]][, 2], y1=strat.dat[[2]][, 3], 
+           col=cnv.colors[2], lend="round", lwd=2)
+  points(x=del.x.at, y=strat.dat[[1]][, 1], pch=19, col=cnv.colors[1])
+  points(x=dup.x.at, y=strat.dat[[2]][, 1], pch=19, col=cnv.colors[2])
+  
+  # Add cleanup bar to X axis
+  abline(h=y0.val, col=blueblack)
+  
+  # Add y axis
+  y.ax.at <- axTicks(2)[which(axTicks(2) >= y0.val)]
+  axis(2, at=c(y0.val, 10e10), tck=0, labels=NA, col=blueblack)
+  axis(2, at=y.ax.at, tck=-0.025, labels=NA, col=blueblack)
+  axis(2, at=y.ax.at, las=2, line=-0.65, tick=F)
+  axis(2, at=mean(c(y0.val, par("usr")[4])), labels=parse(text=y.title), line=0.5, tck=F)
+}
 

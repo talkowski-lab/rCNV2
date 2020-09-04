@@ -38,6 +38,7 @@ gsutil -m cp \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists/gnomad.v2.1.1.likely_unconstrained.genes.list \
   ${rCNV_bucket}/analysis/analysis_refs/gene_feature_transformations.tsv \
   ${rCNV_bucket}/analysis/paper/data/misc/gene_feature_metadata.tsv \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/${prefix}.master_segments.bed.gz \
   refs/
 
 
@@ -120,6 +121,14 @@ mkdir feature_distribs_by_ds_group/
   feature_distribs_by_ds_group/${prefix}
 
 
+# Plot distributions of features between subgroups of genes
+/opt/rCNV2/analysis/paper/plot/gene_scores/driver_gene_prediction.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  rCNV.gene_scores.tsv.gz \
+  refs/${prefix}.master_segments.bed.gz \
+  ${prefix}
+
+
 # Copy all plots to final gs:// directory
 gsutil -m cp -r \
   ${prefix}.*.model_eval*pdf \
@@ -128,4 +137,5 @@ gsutil -m cp -r \
   ${prefix}.scores_vs_gnomAD-SV*pdf \
   ${prefix}.gradient_regression*pdf \
   feature_distribs_by_ds_group \
+  ${prefix}.gd_driver_genes* \
   ${rCNV_bucket}/analysis/paper/plots/gene_scores/
