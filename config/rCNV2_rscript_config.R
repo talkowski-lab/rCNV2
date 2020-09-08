@@ -84,6 +84,7 @@ graphabs.green <- "#027831"
 gw.sig.color <- "#FFB533"
 ns.color="gray70"
 ns.color.light="#F1F1F1"
+highlight.color <- "#FFCB00"
 blueblack <- "#003F6A"
 redblack <- "#4F1C14"
 purpleblack <- "#3F2759"
@@ -272,4 +273,12 @@ load.features <- function(features.in, fill=NA, norm=F){
     })
   }
   return(feats)
+}
+
+# Format a scientific value for printing to plots
+format.scientific <- function(x, nsmall=2, max.decimal=3){
+  parts <- unlist(strsplit(format(x, scientific=T), split="e", fixed=T))
+  base <- format(round(as.numeric(parts[1]), max.decimal), nsmall=nsmall)
+  exp <- as.character(as.numeric(parts[2]))
+  bquote(.(base) ~ "x" ~ 10 ^ .(exp))
 }

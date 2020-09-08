@@ -65,8 +65,8 @@ RUN conda install -n rcnv -y r-optparse r-MASS r-KernSmooth
 RUN conda install -n rcnv -y r-caTools r-metafor r-flux
 RUN conda install -n rcnv -y r-Hmisc
 RUN conda install -n rcnv -y r-psych r-funr r-plotrix
-RUN conda install -n rcnv -y r-epitools
-RUN Rscript -e "sapply(c('beeswarm','EQL','vioplot','flux','VennDiagram'),\
+RUN conda install -n rcnv -y r-epitools r-shape
+RUN Rscript -e "sapply(c('beeswarm','EQL','vioplot','flux','VennDiagram','bedr'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 
 # Download liftOver
@@ -85,7 +85,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 1ab3e61691f861d077d281d2849efc7b28daacb1 && \
+    git checkout 612922ac81ac791e0aee90bbdc0f72cc2ac834a3 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)
