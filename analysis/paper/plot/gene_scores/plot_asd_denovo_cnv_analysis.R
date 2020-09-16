@@ -217,6 +217,11 @@ plot.or.by.scorebin <- function(cnvs, phenos, score, n.bins=3, cnv.pct=TRUE,
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=c(0, n.bins), ylim=ylims, xaxt="n", yaxt="n", xlab="", ylab="")
+  rect(xleft=par("usr")[1], xright=par("usr")[2],
+       ybottom=par("usr")[3], ytop=par("usr")[4],
+       border=NA, bty="n", col=bluewhite)
+  y.ax.at <- axTicks(2)
+  abline(h=y.ax.at, col="white")
   abline(h=c(0, baseline), lty=c(1, 2), col=c(null.color, baseline.color))
   text(x=par("usr")[1]-(0.05*(par("usr")[2]-par("usr")[1])),
        y=baseline+(0.035*(par("usr")[4]-par("usr")[3])), 
@@ -247,7 +252,6 @@ plot.or.by.scorebin <- function(cnvs, phenos, score, n.bins=3, cnv.pct=TRUE,
   }
   
   # Add Y axis
-  y.ax.at <- axTicks(2)
   axis(2, at=c(-100, 100), tck=0, col=blueblack, labels=NA)
   axis(2, at=y.ax.at, col=blueblack, labels=NA, tck=-0.025)
   axis(2, at=y.ax.at, tick=F, labels=2^y.ax.at, las=2, line=-0.6)
@@ -339,6 +343,7 @@ plot.or.by.scorebin(cnvs[which(cnvs$cnv=="DUP"), ], phenos, score="pTS", cnv.pct
                     pt.color=cnv.colors[2], baseline.color=control.cnv.colors[2], 
                     null.color=blueblack, parmar=c(3.25, 2.75, 0.5, 0.5))
 mtext(1, line=2.1, text="in Quartiles by pTS")
+dev.off()
 
 # Plot odds ratios stratified by high/low pHI & pTS
 strat.ors <- calc.or.stratified(cnvs, phenos, high.cutoff=0.8, low.cutoff=0.5, norm.vs.baseline=F)

@@ -23,6 +23,10 @@ export prefix="rCNV2_analysis_d1"
 
 # Download necessary data (note: requires permissions)
 gsutil -m cp -r \
+  ${rCNV_bucket}/analysis/gene_scoring/data/rCNV.*.gene_abfs.tsv \
+  ${rCNV_bucket}/analysis/gene_scoring/data/rCNV2_analysis_d1.rCNV.*.gene_burden.meta_analysis.stats.bed.gz \
+  ${rCNV_bucket}/analysis/gene_scoring/data/rCNV2_analysis_d1.rCNV.*.gene_burden.underpowered_genes.bed.gz \
+  ${rCNV_bucket}/analysis/gene_scoring/refs/rCNV.gene_scoring.training_gene_blacklist.bed.gz \
   ${rCNV_bucket}/results/gene_scoring/rCNV.gene_scores.tsv.gz \
   ${rCNV_bucket}/analysis/gene_scoring/all_models \
   ${rCNV_bucket}/analysis/gene_scoring/gene_lists \
@@ -40,6 +44,37 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/misc/gene_feature_metadata.tsv \
   ${rCNV_bucket}/analysis/paper/data/large_segments/${prefix}.master_segments.bed.gz \
   refs/
+
+
+# Plot distribution of training effect sizes and BFDPs
+for CNV in DEL DUP; do
+  # Combine training blacklist
+  zcat *.$CNV.gene_burden.underpowered_genes.bed.gz \
+    rCNV.gene_scoring.training_gene_blacklist.bed.gz \
+  | fgrep -v "#" | cut -f4 | sort -V | uniq \
+  > rCNV.$CNV.training_blacklist.genes.list
+  # Set CNV-specific parameters
+  case $CNV in
+    DEL)
+      true_genes=gene_lists/gold_standard.haploinsufficient.genes.list
+      false_genes=gene_lists/gold_standard.haplosufficient.genes.list
+      ;;
+    DUP)
+      true_genes=gene_lists/gold_standard.triplosensitive.genes.list
+      false_genes=gene_lists/gold_standard.triploinsensitive.genes.list
+      ;;
+  esac
+  # Plot
+  /opt/rCNV2/analysis/paper/plot/gene_scores/plot_ds_model_training_distribs.R \
+    --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+    rCNV2_analysis_d1.rCNV.$CNV.gene_burden.meta_analysis.stats.bed.gz \
+    rCNV.$CNV.gene_abfs.tsv \
+    $true_genes \
+    $false_genes \
+    rCNV.$CNV.training_blacklist.genes.list \
+    $CNV \
+    ${prefix}.$CNV
+done
 
 
 # Plot performance of various ML models
@@ -67,6 +102,29 @@ for CNV in DEL DUP; do
     "$false_genes" \
     ${prefix}.${CNV}
 done
+
+
+# Compare performance of final scores on HI- or TS-only genes (but not both)
+fgrep -wvf \
+  gene_lists/gold_standard.triplosensitive.genes.list \
+  gene_lists/gold_standard.haploinsufficient.genes.list \
+> hi_only.genes.list
+fgrep -wvf \
+  gene_lists/gold_standard.haploinsufficient.genes.list \
+  gene_lists/gold_standard.triplosensitive.genes.list \
+> ts_only.genes.list
+/opt/rCNV2/analysis/paper/plot/gene_scores/plot_phi_vs_pts_trainingsets.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  rCNV.gene_scores.tsv.gz \
+  hi_only.genes.list \
+  gene_lists/gold_standard.haplosufficient.genes.list \
+  ${prefix}.HI_only
+/opt/rCNV2/analysis/paper/plot/gene_scores/plot_phi_vs_pts_trainingsets.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  rCNV.gene_scores.tsv.gz \
+  ts_only.genes.list \
+  gene_lists/gold_standard.triploinsensitive.genes.list \
+  ${prefix}.TS_only
 
 
 # Plot simple scatterplot distributions of scores
@@ -131,7 +189,9 @@ mkdir feature_distribs_by_ds_group/
 
 # Copy all plots to final gs:// directory
 gsutil -m cp -r \
+  ${prefix}.*.gene_scoring_training_distribs.*pdf \
   ${prefix}.*.model_eval*pdf \
+  ${prefix}.*pHI_vs_pTS.*pdf \
   ${prefix}.gene_scores_scatterplot*pdf \
   ${prefix}.asc_spark_denovo_cnvs*pdf \
   ${prefix}.scores_vs_gnomAD-SV*pdf \

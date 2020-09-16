@@ -336,7 +336,7 @@ plot.p.legend <- function(max.p=6){
 plot.lnor.legend <- function(max.lnor=log(8)){
   # Prep plot area
   par(mar=c(0.1, 2, 1.5, 0.8), bty="n")
-  plot(NA, xlim=c(0, 101), ylim=c(2, 0),
+  plot(NA, xlim=c(0, 101), ylim=c(0, 2),
        xaxt="n", xlab="", xaxs="i", yaxt="n", ylab="", yaxs="i")
   
   # Add gradients

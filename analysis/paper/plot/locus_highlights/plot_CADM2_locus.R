@@ -8,7 +8,7 @@
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Plot noncoding rCNV locus highlights for rCNV2 paper
+# Plot CADM2 rCNV locus highlight for rCNV2 paper
 
 
 options(stringsAsFactors=F, scipen=1000)
@@ -26,27 +26,29 @@ option_list <- list(
 )
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage=paste("%prog cnvlist samples_per_hpo.tsv", 
+args <- parse_args(OptionParser(usage=paste("%prog cnvlist sumstats samples_per_hpo.tsv", 
                                             "genome.tsv out_prefix"),
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Checks for appropriate positional arguments
-if(length(args$args) != 4){
-  stop(paste("Four positional arguments required: cnvlist.tsv,", 
+if(length(args$args) != 5){
+  stop(paste("Five positional arguments required: cnvlist.tsv, sumstats.bed,", 
              "samples_per_hpo.tsv, genome.tsv, and output_prefix\n"))
 }
 
 # Writes args & opts to vars
 cnvlist.in <- args$args[1]
-sample.size.table <- args$args[2]
-genome.in <- args$args[3]
-out.prefix <- args$args[4]
+ss.in <- args$args[2]
+sample.size.table <- args$args[3]
+genome.in <- args$args[4]
+out.prefix <- args$args[5]
 rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
 # cnvlist.in <- "~/scratch/cnvlist.tsv"
+# sumstats.in <- "~/scratch/HP0012638.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz"
 # sample.size.table <- "~/scratch/HPOs_by_metacohort.table.tsv"
 # genome.in <- "~/scratch/GRCh37.genome"
 # out.prefix <- "~/scratch/noncoding_locus_highlights_test"
@@ -70,17 +72,22 @@ region <- paste(chrom, ":", start, "-", end, sep="")
 highlight.start <- 85245894
 highlight.end <- 85314000
 cnv.type <- "DEL"
-case.hpo <- "HP:0012638"
+all.case.hpos <- c("HP:0012638")
+highlight.case.hpo <- "HP:0000752"
 
 # Load sample sizes
-n.samples <- get.sample.sizes(sample.size.table, case.hpo)
+n.samples <- get.sample.sizes(sample.size.table, all.case.hpos)
+n.samples.highlight <- get.sample.sizes(sample.size.table, highlight.case.hpo)
 
 # Load all CNVs
 # Required for bedr::tabix in local Rstudio only:
 # Sys.setenv(PATH = paste(Sys.getenv("PATH"),
 #                         "/Users/collins/anaconda3/envs/py3/bin",
 #                         sep = ":"))
-cadm2.cnvs <- load.cnvs.multi(cnvlist.in, region, cnv.type, case.hpo)
+cnvs <- load.cnvs.multi(cnvlist.in, region, cnv.type, all.case.hpos)
+
+# Load meta-analysis summary stats
+ss <- load.sumstats(sumstats.in, region)
 
 # Notes: panel ordering
 # idiogram (above y=0)
@@ -106,11 +113,15 @@ cnv.panel.height <- 0.85
 cnv.panel.spacing <- 0.25
 cnv.panel.y0s <- upper.panels.height - sapply(1:4, function(i){((i-1)*(cnv.panel.height+cnv.panel.spacing)) + (0.5*cnv.panel.height)})
 total.height <- min(cnv.panel.y0s - (0.5*cnv.panel.height))
+cnv.key.height <- 0.25
+cnv.key.spacing <- 0.15
+cnv.key.y0 <- total.height - cnv.key.spacing - (0.5*cnv.key.height)
+total.height.plus.key <- cnv.key.y0 + (0.5*cnv.key.height)
 
 # Prep locus plot
 pdf(paste(out.prefix, "locus_highlights.CADM2.pdf", sep="."), height=3*2, width=3*2)
 par(mar=c(0.5, 4, 0, 0.5), bty="n")
-plot(NA, xlim=c(start, end), ylim=c(total.height, top.panels.height), 
+plot(NA, xlim=c(start, end), ylim=c(total.height.plus.key, top.panels.height), 
      yaxt="n", xaxt="n", ylab="", xlab="")
 
 # Add background shading
@@ -119,7 +130,7 @@ rect(xleft=par("usr")[1], xright=par("usr")[2],
      ytop=cnv.panel.y0s-(0.5*cnv.panel.height),
      border=NA, bty="n", col=bluewhite)
 rect(xleft=highlight.start, xright=highlight.end, 
-     ybottom=par("usr")[3], ytop=0, 
+     ybottom=total.height, ytop=0, 
      col=adjustcolor(highlight.color, alpha=0.3), border=NA)
 
 # Add stick idiogram
@@ -132,12 +143,20 @@ add.coord.line(start, end, coord.panel.y0, highlight.start, highlight.end,
 
 # Add CNV panels
 sapply(1:4, function(i){
-  add.cnv.panel(cadm2.cnvs[[i]], n.case=n.samples$case[i], n.ctrl=n.samples$ctrl[i], 
-                y0=cnv.panel.y0s[i], cnv.type=cnv.type, panel.height=cnv.panel.height, 
-                y.axis.title="DEL\nFreq.", expand.pheno.label=F,
+  add.cnv.panel(cnvs[[i]], n.case=n.samples$case[i], n.ctrl=n.samples$ctrl[i], 
+                highlight.hpo=highlight.case.hpo, y0=cnv.panel.y0s[i], 
+                cnv.type=cnv.type, panel.height=cnv.panel.height, 
+                y.axis.title="Carrier\nFreq.", expand.pheno.label=F,
                 case.legend.side="left", ctrl.legend.side="left",
                 add.cohort.label=TRUE, cohort.label=paste("Cohort", i))
 })
 
+# Add key for CNV panels
+add.cnv.key(cnv.type, cnv.key.y0, total.n.ctrls=sum(n.samples$ctrl), 
+            all.case.hpos, total.n.cases=sum(n.samples$case),
+            highlight.case.hpo, total.n.cases.highlight=sum(n.samples.highlight$case),
+            panel.height=cnv.key.height)
+
 # Close pdf
 dev.off()
+

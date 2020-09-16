@@ -17,6 +17,38 @@ options(stringsAsFactors=F, scipen=1000)
 ######################
 ### DATA FUNCTIONS ###
 ######################
+# Extract gene components from a GTF
+load.genes <- function(gtf.in, region){
+  # Required for bedr in local Rstudio only:
+  # Sys.setenv(PATH = paste(Sys.getenv("PATH"),
+  #                         "/Users/collins/anaconda3/envs/py3/bin",
+  #                         sep = ":"))
+  
+  # Tabix region of interest
+  if(!file.exists(paste(gtf.in, "tbi", sep="."))){
+    stop(paste("tabix index not found for input file", gtf.in))
+  }
+  require(bedr, quietly=T)
+  gtf <- bedr::tabix(region, gtf.in, check.chr=FALSE)
+  
+  # Reformat entries
+  if(!is.null(gtf)){
+    colnames(gtf) <- c("chr", "source", "feature", "start", "end", "score", 
+                       "strand", "frame", "attribute")
+    gtf$gene <- sapply(gtf$attribute, function(atrs.str){
+      atrs <- unlist(strsplit(atrs.str, split=";"))
+      gsub("\"", "", unlist(strsplit(atrs[grep("gene_name", atrs)], split=" "))[[2]])
+    })
+    gtf <- gtf[, c("chr", "start", "end", "gene", "strand", "feature")]
+    gtf[, c("start", "end")] <- apply(gtf[, c("start", "end")], 2, as.numeric)
+  }else{
+    gtf <- data.frame("chr"=character(), "start"=numeric(), "end"=numeric(),
+                      "gene"=character(), "strand"=character(), "feature"=character())
+  }
+  
+  return(gtf)
+}
+
 # Extract summary statistics from a single BED
 load.sumstats <- function(bedpath, region){
   # Required for bedr in local Rstudio only:
@@ -31,19 +63,24 @@ load.sumstats <- function(bedpath, region){
   require(bedr, quietly=T)
   ss <- bedr::tabix(region, bedpath, check.chr=FALSE)
   
+  # Add midpoint
+  ss$pos <- (ss$start + ss$stop)/2
+  
+  # Return columns of interest
+  ss[, c("chr", "pos", "meta_phred_p", "meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper")]
 }
 
 # Load sample sizes for case/control contrast directly from .tsv
-get.sample.sizes <- function(table.in, case.hpo="HP:0000118", 
+get.sample.sizes <- function(table.in, case.hpos=c("HP:0000118"), 
                              ctrl.hpo="HEALTHY_CONTROL"){
   n <- read.table(table.in, header=T, sep="\t", comment.char="")
-  n.case <- n[which(n[, 1] == case.hpo), grep("meta", colnames(n), fixed=T)]
+  n.case <- apply(n[which(n[, 1] %in% case.hpos), grep("meta", colnames(n), fixed=T)], 2, max, na.rm=T)
   n.ctrl <- n[which(n[, 1] == ctrl.hpo), grep("meta", colnames(n), fixed=T)]
-  return(list("case"=n.case, "ctrl"=n.ctrl))
+  return(list("case"=as.numeric(as.vector(n.case)), "ctrl"=as.numeric(as.vector(n.ctrl))))
 }
 
 # Load CNVs from a single BED, and split by case/control
-load.cnvs <- function(bedpath, region, cnv=NULL, case.hpo="HP:0000118", 
+load.cnvs <- function(bedpath, region, cnv=NULL, case.hpos=c("HP:0000118"), 
                       ctrl.hpo="HEALTHY_CONTROL"){
   # Required for bedr in local Rstudio only:
   # Sys.setenv(PATH = paste(Sys.getenv("PATH"),
@@ -56,15 +93,26 @@ load.cnvs <- function(bedpath, region, cnv=NULL, case.hpo="HP:0000118",
   }
   require(bedr, quietly=T)
   cnvs <- bedr::tabix(region, bedpath, check.chr=FALSE)
-  colnames(cnvs) <- c("chr", "start", "end", "cnv_id", "cnv", "pheno")
-  
-  # Sort & filter CNVs
-  cnvs <- cnvs[with(cnvs, order(start, end)), ]
-  if(!is.null(cnv)){
-    cnvs <- cnvs[which(cnvs$cnv==cnv), ]
+  if(!is.null(cnvs)){
+    # Ensure consistent column names
+    colnames(cnvs) <- c("chr", "start", "end", "cnv_id", "cnv", "pheno")
+    
+    # Sort & filter CNVs
+    cnvs <- cnvs[with(cnvs, order(start, end)), ]
+    if(!is.null(cnv)){
+      cnvs <- cnvs[which(cnvs$cnv==cnv), ]
+    }
+    case.cnv.idxs <- which(sapply(cnvs$pheno, function(pstr){
+      any(case.hpos %in% unlist(strsplit(pstr, split=";", fixed=T)))
+    }))
+    case.cnvs <- cnvs[case.cnv.idxs, ]
+    ctrl.cnvs <- cnvs[grep(ctrl.hpo, cnvs$pheno, fixed=T), ]
+  }else{
+    empty.df <- data.frame("chr"=character(), "start"=numeric(), "end"=numeric(), 
+                           "cnv_id"=character(), "cnv"=character(), "pheno"=character())
+    case.cnvs <- empty.df
+    ctrl.cnvs <- empty.df
   }
-  case.cnvs <- cnvs[grep(case.hpo, cnvs$pheno, fixed=T), 1:4]
-  ctrl.cnvs <- cnvs[grep(ctrl.hpo, cnvs$pheno, fixed=T), 1:4]
   
   return(list("case"=case.cnvs, "ctrl"=ctrl.cnvs))
 }
@@ -81,9 +129,10 @@ load.cnvs.multi <- function(cnvlist, region, cnv=NULL, case.hpo="HP:0000118",
   return(cnvs)
 }
 
-# Transform CNV coordinates to plotting values
+# Transform CNV coordinates to plotting values (with colors)
 pileup.cnvs <- function(cnvs, start=NULL, end=NULL, dx=100, 
-                        cnv.height=1, cnv.buffer=0.15, bevel.switch.pct=0.025){
+                        cnv.height=1, cnv.buffer=0.15, bevel.switch.pct=0.025,
+                        col=blueblack, highlight.hpo=NA, highlight.col=NULL){
   # Set range of values to evaluate
   if(is.null(start)){
     start <- min(cnvs$start)
@@ -110,6 +159,7 @@ pileup.cnvs <- function(cnvs, start=NULL, end=NULL, dx=100,
       cnv.end <- cnvs$end[i]
       cnv.x.idxs <- which(x >= cnv.start & x <= cnv.end)
       counts$count[cnv.x.idxs] <- counts$count[cnv.x.idxs] + cnv.height
+      cnv.hpos <- unlist(strsplit(cnvs$pheno[i], split=";", fixed=T))
       
       # Create plotting vectors for each CNV
       cnv.x <- c(x[cnv.x.idxs], rev(x[cnv.x.idxs]))
@@ -137,8 +187,15 @@ pileup.cnvs <- function(cnvs, start=NULL, end=NULL, dx=100,
       # Always bevel right edge sloping outward
       cnv.y[length(cnv.x.idxs)] <- counts$count[cnv.x.idxs[length(cnv.x.idxs)]] - cnv.height + cnv.y.buf
       
+      # Assign color
+      if(highlight.hpo %in% cnv.hpos){
+        cnv.color <- highlight.col
+      }else{
+        cnv.color <- col
+      }
+      
       # Add CNV plotting values to output list
-      cnv.plot.values[[cnv.id]] <- list("x"=cnv.x, "y"=cnv.y)
+      cnv.plot.values[[cnv.id]] <- list("x"=cnv.x, "y"=cnv.y, "color"=cnv.color)
       
       # Save previous CNV's x indexes and counts for comparisons
       prev.x.idxs <- cnv.x.idxs
@@ -225,13 +282,25 @@ add.coord.line <- function(start, end, y0, highlight.start, highlight.end, highl
   text(x=tick.at, y=tick.labels.y.at, cex=lab.cex, labels=tick.labels, pos=3, xpd=T)
 }
 
+# Add gene bodies to plot
+add.genes <- function(genes, y0, n.rows=1, panel.height=0.2, col=ns.color){
+  genes <- unique(genes$gene)
+  n.genes <- length(genes)
+  
+  # Get y scaling
+  row.height <- panel.height / n.rows
+  row.breaks <- seq(y0 - (0.5*panel.height), y0 + (0.5*panel.height), row.height)
+  
+}
+
 # Add mirrored case & control CNV pileups for a single cohort to an existing coordinate plot
-add.cnv.panel <- function(cnvs, n.case, n.ctrl, y0, cnv.type, 
-                      max.freq=NULL, start=NULL, end=NULL, 
-                      y.axis.title="CNV\nFreq.", expand.pheno.label=TRUE,
-                      case.legend.side="left", ctrl.legend.side="left", 
-                      add.cohort.label=FALSE, cohort.label=NULL,
-                      panel.height=2, dx=100){
+add.cnv.panel <- function(cnvs, n.case, n.ctrl, y0, cnv.type, highlight.hpo=NULL,
+                          max.freq=NULL, start=NULL, end=NULL, 
+                          y.axis.title="CNV\nFreq.", expand.pheno.label=TRUE,
+                          case.legend.side="left", ctrl.legend.side="left", 
+                          cc.legend.colors=rep(blueblack, 2),
+                          add.cohort.label=FALSE, cohort.label=NULL,
+                          panel.height=2, dx=100){
   # Standardize inputs
   n.case <- as.numeric(n.case)
   n.ctrl <- as.numeric(n.ctrl)
@@ -246,11 +315,13 @@ add.cnv.panel <- function(cnvs, n.case, n.ctrl, y0, cnv.type,
   
   # Set CNV-based plotting values
   if(cnv.type=="DEL"){
-    col.case <- cnv.colors[1]
+    col.case.highlight <- cnv.blacks[1]
+    col.case.other <- cnv.colors[1]
     col.ctrl <- control.cnv.colors[1]
     col.midline <- cnv.blacks[1]
   }else if(cnv.type=="DUP"){
-    col.case <- cnv.colors[2]
+    col.case.highlight <- cnv.blacks[2]
+    col.case.other <- cnv.colors[2]
     col.ctrl <- control.cnv.colors[2]
     col.midline <- cnv.blacks[2]
   }
@@ -273,17 +344,19 @@ add.cnv.panel <- function(cnvs, n.case, n.ctrl, y0, cnv.type,
   ctrl.cnv.height <- half.height / ceiling(n.ctrl * max.freq)
   
   # Gather scaled CNV pileups
-  case.pileup <- pileup.cnvs(cnvs$case, start=start, end=end, dx=dx, cnv.height=case.cnv.height)
-  ctrl.pileup <- pileup.cnvs(cnvs$ctrl, start=start, end=end, dx=dx, cnv.height=ctrl.cnv.height)
+  case.pileup <- pileup.cnvs(cnvs$case, start=start, end=end, dx=dx, cnv.height=case.cnv.height,
+                             col=col.case.other, highlight.hpo=highlight.hpo, highlight.col=col.case.highlight)
+  ctrl.pileup <- pileup.cnvs(cnvs$ctrl, start=start, end=end, dx=dx, cnv.height=ctrl.cnv.height,
+                             col=col.ctrl)
   
   # Add horizontal gridlines
   y.ax.tick.spacing <- seq(-half.height, half.height, length.out=7)
   abline(h=c(y0, y0 + y.ax.tick.spacing, y0 - y.ax.tick.spacing), col="white")
   
   # Plot midline, pileups, and outlines
-  lapply(case.pileup$cnvs, function(l){polygon(l$x, y0 + l$y, border=NA, col=col.case)})
-  points(case.pileup$counts[, 1], case.pileup$counts[, 2] + y0, type="l", col=col.case)
-  lapply(ctrl.pileup$cnvs, function(l){polygon(l$x, y0 - l$y, border=NA, col=col.ctrl)})
+  lapply(case.pileup$cnvs, function(l){polygon(l$x, y0 + l$y, border=NA, col=l$color)})
+  points(case.pileup$counts[, 1], case.pileup$counts[, 2] + y0, type="l", col=col.case.other)
+  lapply(ctrl.pileup$cnvs, function(l){polygon(l$x, y0 - l$y, border=NA, col=l$color)})
   points(ctrl.pileup$counts[, 1], -ctrl.pileup$counts[, 2] + y0, type="l", col=col.ctrl)
   abline(h=y0, col=col.midline)
   
@@ -318,7 +391,7 @@ add.cnv.panel <- function(cnvs, n.case, n.ctrl, y0, cnv.type,
     }
     
     text(x=case.legend.x, y=case.legend.y, labels=case.legend.label, 
-         pos=case.legend.pos, col=col.case, cex=legend.text.cex)
+         pos=case.legend.pos, col=cc.legend.colors[1], cex=legend.text.cex)
   }
   
   # Add control legend
@@ -333,7 +406,7 @@ add.cnv.panel <- function(cnvs, n.case, n.ctrl, y0, cnv.type,
     }
     ctrl.legend.label <- paste("Controls (N=", prettyNum(n.ctrl, big.mark=","), ")", sep="")
     text(x=ctrl.legend.x, y=ctrl.legend.y, labels=ctrl.legend.label, 
-         pos=ctrl.legend.pos, col=col.ctrl, cex=legend.text.cex)
+         pos=ctrl.legend.pos, col=cc.legend.colors[2], cex=legend.text.cex)
   }
   
   # Add cohort label (upper panel, opposite case.legend.side)
@@ -353,5 +426,56 @@ add.cnv.panel <- function(cnvs, n.case, n.ctrl, y0, cnv.type,
   # Add cleanup top & bottom lines
   abline(h=c(ytop, ybottom), col=blueblack)
   segments(x0=par("usr")[2], x1=par("usr")[2], y0=ybottom, y1=ytop, col=blueblack, xpd=T)
+}
+
+# Plot CNV key
+add.cnv.key <- function(cnv.type, y0, total.n.ctrls, all.case.hpos, total.n.cases,
+                        highlight.case.hpo=NA, total.n.cases.highlight=NA,
+                        panel.height=0.2, text.cex=5/6, pt.cex=1.3){
+  # Get plot data
+  x.at <- par("usr")[1] + (c(0.075, 0.65) * diff(par("usr")[1:2]))
+  y.buf <- panel.height/3
+  
+  # Set CNV-based plotting values
+  if(cnv.type=="DEL"){
+    col.case.highlight <- cnv.blacks[1]
+    col.case.other <- cnv.colors[1]
+    col.ctrl <- control.cnv.colors[1]
+    cnv.label <- "Deletions:"
+  }else if(cnv.type=="DUP"){
+    col.case.highlight <- cnv.blacks[2]
+    col.case.other <- cnv.colors[2]
+    col.ctrl <- control.cnv.colors[2]
+    cnv.label <- "Duplications:"
+  }
+  
+  # Allow everything to plot beyond the boundaries
+  par(xpd=T)
+  
+  # Add left-most text
+  axis(2, at=y0, tick=F, line=-2, las=2, labels=cnv.label, cex=text.cex)
+  
+  # Add case labels
+  all.case.label <- paste(hpo.abbrevs[all.case.hpos[1]], " cases (total N=", 
+                          prettyNum(total.n.cases, big.mark=","), ")", sep="")
+  all.case.label <- gsub("cases cases", "cases", all.case.label, fixed=T)
+  if(is.na(highlight.case.hpo)){
+    points(x=x.at[1], y=y0, pch=15, col=col.case.other, cex=pt.cex)
+    text(x.at[1], y=y0, pos=4, xpd=T, cex=text.cex, labels=all.case.label)
+  }else{
+    points(x=x.at[1], y=y0+y.buf, pch=15, col=col.case.other, cex=pt.cex)
+    text(x.at[1], y=y0+y.buf, pos=4, xpd=T, cex=text.cex, labels=all.case.label)
+    points(x=x.at[1], y=y0-y.buf, pch=15, col=col.case.highlight, cex=pt.cex)
+    text(x.at[1], y=y0-y.buf, pos=4, xpd=T, cex=text.cex, 
+         labels=paste(hpo.abbrevs[highlight.case.hpo], " cases (total N=", 
+                      prettyNum(total.n.cases.highlight, big.mark=","), ")", sep=""))
+  }
+  
+  # Add control label
+  ctrl.label <- paste("Controls (total N=", 
+                      prettyNum(total.n.ctrls, big.mark=","), 
+                      ")", sep="")
+  points(x=x.at[2], y=y0, pch=15, col=col.ctrl, cex=pt.cex)
+  text(x.at[2], y=y0, pos=4, xpd=T, cex=text.cex, labels=ctrl.label)
 }
 
