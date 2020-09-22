@@ -77,7 +77,7 @@ plot.lnors <- function(lnors, true.genes, false.genes, CNV,
   axis(2, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
   axis(2, at=y.ax.at, labels=NA, tck=-0.025, col=blueblack)
   axis(2, at=y.ax.at, tick=F, las=2, line=-0.7, col=blueblack)
-  mtext(2, line=1.25, text=bquote(log[2]("Odds Ratio")))
+  mtext(2, line=1.25, text=bquote(italic("ln")("Odds Ratio")))
 }
 
 # Scatterplot of BFDP vs meta-analysis effect size
@@ -208,7 +208,7 @@ lnors <- load.lnors(meta.in, xlist)
 
 # Plot odds ratios
 pdf(paste(out.prefix, "gene_scoring_training_distribs.effect_sizes.pdf", sep="."),
-    height=2, width=1.85)
+    height=2.25, width=1.85)
 plot.lnors(lnors, true.genes, false.genes, CNV, pt.cex=0.15)
 dev.off()
 
@@ -217,6 +217,6 @@ bfdps <- load.bfdps(bfdps.in, xlist)
 
 # Plot odds ratios
 pdf(paste(out.prefix, "gene_scoring_training_distribs.bfdps.pdf", sep="."),
-    height=2, width=2.4)
+    height=2.25, width=2.4)
 plot.bfdp.vs.lnor(bfdps, lnors, true.genes, false.genes, CNV, pt.cex=0.15)
 dev.off()

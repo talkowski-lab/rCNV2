@@ -288,8 +288,12 @@ add.genes <- function(genes, y0, n.rows=1, panel.height=0.2, col=ns.color){
   n.genes <- length(genes)
   
   # Get y scaling
+  panel.bottom <- y0 - (0.5*panel.height)
+  panel.top <- y0 + (0.5*panel.height)
   row.height <- panel.height / n.rows
-  row.breaks <- seq(y0 - (0.5*panel.height), y0 + (0.5*panel.height), row.height)
+  row.mids <- seq(panel.bottom + (0.5*row.height), 
+                  panel.top - (0.5*row.height), 
+                  length.out=n.rows)
   
 }
 

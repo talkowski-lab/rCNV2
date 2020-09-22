@@ -85,28 +85,28 @@ gw.sig.color <- "#FFB533"
 ns.color="gray70"
 ns.color.light="#F1F1F1"
 highlight.color <- "#FFCB00"
-blueblack <- "#003F6A"
-redblack <- "#4F1C14"
-purpleblack <- "#3F2759"
-bluewhite <- "#E8F3FB"
-redwhite <- "#F0D6D3"
-purplewhite <- "#EADFF5"
 
 cnv.colors <- c("DEL" = "#D43925",
                 "DUP" = "#2376B2",
                 "CNV" = "#7E4EB2")
 
+control.cnv.colors <- c("DEL" = "#E69186",
+                        "DUP" = "#79AACC",
+                        "CNV" = "#B488A1")
+
+blueblack <- "#003F6A"
+redblack <- "#4F1C14"
+purpleblack <- "#3F2759"
 cnv.blacks <- c("DEL" = redblack,
                 "DUP" = blueblack,
                 "CNV" = purpleblack)
 
+bluewhite <- "#E8F3FB"
+redwhite <- "#F0D6D3"
+purplewhite <- "#EADFF5"
 cnv.whites <- c("DEL" = redwhite,
                 "DUP" = bluewhite,
                 "CNV" = purplewhite)
-
-control.cnv.colors <- c("DEL" = "#E69186",
-                        "DUP" = "#79AACC",
-                        "CNV" = "#B488A1")
 
 cnv.color.palettes <- list("DEL" = colorRampPalette(c("gray95", cnv.colors[1]))(101),
                            "DUP" = colorRampPalette(c("gray95", cnv.colors[2]))(101),
@@ -115,6 +115,13 @@ cnv.color.palettes <- list("DEL" = colorRampPalette(c("gray95", cnv.colors[1]))(
 ds.gradient.pal <- colorRampPalette(c(ns.color, ns.color.light, purplewhite, cnv.colors[3]))(101)
 
 hits.gradient.pal <- colorRampPalette(c(cnv.colors[1], ns.color.light, cnv.colors[2]))(101)
+
+lof.color = "#9D1309"
+mis.color = "#FF6103"
+syn.color = "#AAAAAA"
+snv.colors <- c("lof" = lof.color,
+                "mis" = mis.color,
+                "syn" = syn.color)
 
 require(viridisLite)
 percentile.palette <- viridis(101)

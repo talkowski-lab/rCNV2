@@ -288,11 +288,19 @@ wget http://www.informatics.jax.org/downloads/reports/HMD_HumanPhenotype.rpt
 fgrep -wf gencode.v19.canonical.pext_filtered.genes.list \
   gnomad_lof/R/ko_gene_lists/list_CEGv2.tsv \
 > cell_essential.genes.list
+fgrep -wf gencode.v19.canonical.pext_filtered.genes.list \
+  gnomad_lof/R/ko_gene_lists/list_NEGv1.tsv \
+> cell_nonessential.genes.list
 fgrep -wf gnomad_lof/R/ko_gene_lists/list_mouse_het_lethal_genes.tsv \
   HMD_HumanPhenotype.rpt \
 | cut -f1 \
 | fgrep -wf gencode.v19.canonical.pext_filtered.genes.list \
 > mouse_het_lethal.genes.list
+fgrep -wf gnomad_lof/R/ko_gene_lists/list_mouse_viable_genes.tsv \
+  HMD_HumanPhenotype.rpt \
+| cut -f1 \
+| fgrep -wf gencode.v19.canonical.pext_filtered.genes.list \
+> mouse_dispensable.genes.list
 
 
 # Copy gnomAD & gnomAD-SV gene files to rCNV bucket (note: requires permissions)
@@ -300,8 +308,17 @@ gsutil -m cp gencode.v19.canonical.pext_filtered.constrained.bed.gz \
   ${rCNV_bucket}/analysis/analysis_refs/
 gsutil -m cp gnomad.v2.1.1.*.genes.list \
   gnomad_sv.v2.1.nonneuro.*.genes.list \
-  cell_essential.genes.list \
-  mouse_het_lethal.genes.list \
+  cell_*.genes.list \
+  mouse_*.genes.list \
+  ${rCNV_bucket}/cleaned_data/genes/gene_lists/
+
+
+# Collate list of olfactory receptor genes and copy to rCNV bucket (note: requires permissions)
+gsutil -m cat ${rCNV_bucket}/raw_data/other/HUGO.olfactory_receptors.genes.list \
+| fgrep -wf gencode.v19.canonical.pext_filtered.genes.list \
+> olfactory_receptors.genes.list
+gsutil -m cp \
+  olfactory_receptors.genes.list \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists/
 
 
@@ -432,18 +449,20 @@ done | paste -s \
 | sed 's/\t/\ \|\ /g' \
 | sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' \
 >> genelist_table.html.txt
-# Cell essential genes
-for wrapper in 1; do
-  echo "Cell essential genes"
-  wc -l cell_essential.genes.list \
-  | awk -v OFS="\t" '{ print $1, "`"$2"`" }' \
-  | sed 's/\.genes\.list//g' | addcom
-  echo "[Hart _et al._, _G3_, 2017](https://www.g3journal.org/content/7/8/2719)"
-  echo "Genes essential in human cell lines as determined by CRISPR/Cas9 screens. Curated in [Karczewski _et al._, _Nature_, 2020](https://www.nature.com/articles/s41586-020-2308-7)"
-done | paste -s \
-| sed 's/\t/\ \|\ /g' \
-| sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' \
->> genelist_table.html.txt
+# Cell essential & nonessential genes
+for categ in essential nonessential; do
+  for wrapper in 1; do
+    echo -e "Cell $categ genes"
+    wc -l cell_${categ}.genes.list \
+    | awk -v OFS="\t" '{ print $1, "`"$2"`" }' \
+    | sed 's/\.genes\.list//g' | addcom
+    echo "[Hart _et al._, _G3_, 2017](https://www.g3journal.org/content/7/8/2719)"
+    echo "Genes $categ in human cell lines as determined by CRISPR/Cas9 screens. Curated in [Karczewski _et al._, _Nature_, 2020](https://www.nature.com/articles/s41586-020-2308-7)"
+  done | paste -s \
+  | sed 's/\t/\ \|\ /g' \
+  | sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' \
+  >> genelist_table.html.txt
+done
 # Mouse het LoF lethal genes
 for wrapper in 1; do
   echo "Mouse heterozygous LoF lethal"
@@ -451,7 +470,31 @@ for wrapper in 1; do
   | awk -v OFS="\t" '{ print $1, "`"$2"`" }' \
   | sed 's/\.genes\.list//g' | addcom
   echo "[Motenko _et al._, _Mamm. Genome_, 2015](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4534495/)"
-  echo "Genes lethal in mouse models when heterozygously inactivated. Curated in [Karczewski _et al._, _Nature_, 2020](https://www.nature.com/articles/s41586-020-2308-7)"
+  echo "Genes lethal in mouse models when heterozygously inactivated in mice. Curated in [Karczewski _et al._, _Nature_, 2020](https://www.nature.com/articles/s41586-020-2308-7)"
+done | paste -s \
+| sed 's/\t/\ \|\ /g' \
+| sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' \
+>> genelist_table.html.txt
+# Mouse dispensable genes
+for wrapper in 1; do
+  echo "Mouse dispensable"
+  wc -l mouse_dispensable.genes.list \
+  | awk -v OFS="\t" '{ print $1, "`"$2"`" }' \
+  | sed 's/\.genes\.list//g' | addcom
+  echo "[Motenko _et al._, _Mamm. Genome_, 2015](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4534495/)"
+  echo "Genes with no phenotype reported when heterozygously inactivated in mice. Curated in [Karczewski _et al._, _Nature_, 2020](https://www.nature.com/articles/s41586-020-2308-7)"
+done | paste -s \
+| sed 's/\t/\ \|\ /g' \
+| sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' \
+>> genelist_table.html.txt
+# Olfactory receptor genes
+for wrapper in 1; do
+  echo "Olfactory receptors"
+  wc -l olfactory_receptors.genes.list \
+  | awk -v OFS="\t" '{ print $1, "`"$2"`" }' \
+  | sed 's/\.genes\.list//g' | addcom
+  echo "[Braschi _et al._, _Nucleic Acids Res_, 2019](https://pubmed.ncbi.nlm.nih.gov/30304474/)"
+  echo "Genes from any HUGO-recognized family of olfactory receptor genes."
 done | paste -s \
 | sed 's/\t/\ \|\ /g' \
 | sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' \

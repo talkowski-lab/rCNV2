@@ -32,18 +32,83 @@ gsutil -m cp -r \
   ${rCNV_bucket}/analysis/gene_scoring/gene_lists \
   ./
 mkdir refs/
-gsutil -m cp \
+gsutil -m cp -r \
   ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.all_features.bed.gz \
   ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.all_features.no_variation.bed.gz \
   ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
   ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.variation_features.bed.gz \
   ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.genomic_features.eigenfeatures.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/misc/asc_spark_* \
-  ${rCNV_bucket}/cleaned_data/genes/gene_lists/gnomad.v2.1.1.likely_unconstrained.genes.list \
+  ${rCNV_bucket}/cleaned_data/genes/gene_lists \
   ${rCNV_bucket}/analysis/analysis_refs/gene_feature_transformations.tsv \
   ${rCNV_bucket}/analysis/paper/data/misc/gene_feature_metadata.tsv \
   ${rCNV_bucket}/analysis/paper/data/large_segments/${prefix}.master_segments.bed.gz \
   refs/
+
+
+# Plot UpSet comparisons of gold-standard haploinsufficient genes
+echo -e "LoF constrained\trefs/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list" > hi.gs.upset.input.tsv
+cat \
+  refs/gene_lists/DDG2P.hc_lof.genes.list \
+  refs/gene_lists/ClinGen.hc_haploinsufficient.genes.list \
+| sort | uniq > hc_lof_disease.genes.list
+echo -e "Dominant LoF disease\thc_lof_disease.genes.list" >> hi.gs.upset.input.tsv
+echo -e "Low-expressor intolerant\trefs/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.low_expression_invariant.genes.list" >> hi.gs.upset.input.tsv
+/opt/rCNV2/analysis/paper/plot/misc/plot_upset.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --cnv-coloring "DEL" \
+  hi.gs.upset.input.tsv \
+  ${prefix}.gold_standard_genes.haploinsufficient.upset.pdf
+
+
+# Plot UpSet comparisons of gold-standard haplosufficient genes
+echo -e "Mutationally tolerant\trefs/gene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list" > hs.gs.upset.input.tsv
+cat \
+  refs/gene_lists/HP0000118.HPOdb.genes.list \
+  refs/gene_lists/DDG2P*.genes.list \
+  refs/gene_lists/ClinGen*.genes.list \
+| fgrep -wvf - refs/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
+| sort | uniq > no_disease_assoc.genes.list
+echo -e "No disease assoc.\tno_disease_assoc.genes.list" >> hs.gs.upset.input.tsv
+echo -e "Low-expressor intolerant\trefs/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.low_expression_variable.genes.list" >> hs.gs.upset.input.tsv
+/opt/rCNV2/analysis/paper/plot/misc/plot_upset.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --cnv-coloring "DEL" \
+  hs.gs.upset.input.tsv \
+  ${prefix}.gold_standard_genes.haplosufficient.upset.pdf
+
+
+# Plot UpSet comparisons of gold-standard triplosensitive genes
+echo -e "Missense constrained\trefs/gene_lists/gnomad.v2.1.1.mis_constrained.genes.list" > ts.gs.upset.input.tsv
+cat \
+  refs/gene_lists/DDG2P.hc_gof.genes.list \
+  refs/gene_lists/DDG2P.hc_other.genes.list \
+  refs/gene_lists/ClinGen.all_triplosensitive.genes.list \
+| sort | uniq > hc_notlof_disease.genes.list
+echo -e "Dominant GoF disease\thc_lof_disease.genes.list" >> ts.gs.upset.input.tsv
+echo -e "High-expressor intolerant\trefs/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.high_expression_invariant.genes.list" >> ts.gs.upset.input.tsv
+/opt/rCNV2/analysis/paper/plot/misc/plot_upset.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --cnv-coloring "DUP" \
+  ts.gs.upset.input.tsv \
+  ${prefix}.gold_standard_genes.triplosensitive.upset.pdf
+
+
+# Plot UpSet comparisons of gold-standard triploinsensitive genes
+echo -e "Mutationally tolerant\trefs/gene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list" > ti.gs.upset.input.tsv
+cat \
+  refs/gene_lists/HP0000118.HPOdb.genes.list \
+  refs/gene_lists/DDG2P*.genes.list \
+  refs/gene_lists/ClinGen*.genes.list \
+| fgrep -wvf - refs/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
+| sort | uniq > no_disease_assoc.genes.list
+echo -e "No disease assoc.\tno_disease_assoc.genes.list" >> ti.gs.upset.input.tsv
+echo -e "High-expressor intolerant\trefs/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.high_expression_variable.genes.list" >> ti.gs.upset.input.tsv
+/opt/rCNV2/analysis/paper/plot/misc/plot_upset.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --cnv-coloring "DUP" \
+  ti.gs.upset.input.tsv \
+  ${prefix}.gold_standard_genes.triploinsensitive.upset.pdf
 
 
 # Plot distribution of training effect sizes and BFDPs
@@ -134,6 +199,15 @@ fgrep -wvf \
   ${prefix}
 
 
+# Compare distribution of pHI for selected gene sets
+echo -e "ClinGen dom. HI\trefs/gene_lists/ClinGen.hc_haploinsufficient.genes.list" > phi_vs_gene_sets.input.tsv
+echo -e "DECIPHER dom. HI\trefs/gene_lists/DDG2P.hc_lof.genes.list" >> phi_vs_gene_sets.input.tsv
+echo -e "Mouse het. lethal\trefs/gene_lists/mouse_het_lethal.genes.list" >> phi_vs_gene_sets.input.tsv
+echo -e "Cell essential\trefs/gene_lists/cell_essential.genes.list" >> phi_vs_gene_sets.input.tsv
+
+
+
+
 # Compare de novo CNVs in ASD vs gene scores
 /opt/rCNV2/analysis/paper/plot/gene_scores/plot_asd_denovo_cnv_analysis.R \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
@@ -150,7 +224,16 @@ fgrep -wvf \
   rCNV.gene_scores.tsv.gz \
   refs/gencode.v19.canonical.pext_filtered.variation_features.bed.gz \
   refs/gencode.v19.canonical.pext_filtered.genomic_features.eigenfeatures.bed.gz \
-  refs/gnomad.v2.1.1.likely_unconstrained.genes.list \
+  refs/gene_lists/gnomad.v2.1.1.likely_unconstrained.genes.list \
+  ${prefix}
+
+
+# Compute enrichment of de novo SNVs from ASC & DDD vs rCNV gene scores
+/opt/rCNV2/analysis/paper/plot/gene_scores/plot_dnm_enrichments.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  rCNV.gene_scores.tsv.gz \
+  refs/gencode.v19.canonical.pext_filtered.all_features.bed.gz \
+  refs/gene_lists/gnomad.v2.1.1.likely_unconstrained.genes.list \
   ${prefix}
 
 
@@ -189,12 +272,14 @@ mkdir feature_distribs_by_ds_group/
 
 # Copy all plots to final gs:// directory
 gsutil -m cp -r \
+  ${prefix}.gold_standard_genes.*.upset.pdf \
   ${prefix}.*.gene_scoring_training_distribs.*pdf \
   ${prefix}.*.model_eval*pdf \
   ${prefix}.*pHI_vs_pTS.*pdf \
   ${prefix}.gene_scores_scatterplot*pdf \
   ${prefix}.asc_spark_denovo_cnvs*pdf \
   ${prefix}.scores_vs_gnomAD-SV*pdf \
+  ${prefix}*dnm_enrichments.*pdf \
   ${prefix}.gradient_regression*pdf \
   feature_distribs_by_ds_group \
   ${prefix}.gd_driver_genes* \
