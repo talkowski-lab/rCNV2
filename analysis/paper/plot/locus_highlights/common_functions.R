@@ -70,6 +70,12 @@ load.sumstats <- function(bedpath, region){
   ss[, c("chr", "pos", "meta_phred_p", "meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper")]
 }
 
+# Extract PIPs from BED for specified genes for a single HPO
+load.pips <- function(pips.in, genes, hpo){
+  pips <- read.table(pips.in, header=T, sep="\t", comment.char="")
+  pips[which(pips[, 1] == hpo & pips$gene %in% genes), c("gene", "PIP")]
+}
+
 # Load sample sizes for case/control contrast directly from .tsv
 get.sample.sizes <- function(table.in, case.hpos=c("HP:0000118"), 
                              ctrl.hpo="HEALTHY_CONTROL"){
@@ -238,8 +244,8 @@ add.idio.stick <- function(genome.in, chrom, start, end, y.at, tick.height=0.1,
 }
 
 # Add rounded coordinate line
-add.coord.line <- function(start, end, y0, highlight.start, highlight.end, highlight.col="red",
-                           tick.height=0.1, max.tick=6, lab.cex=4.5/6){
+add.coord.line <- function(start, end, y0, highlight.start, highlight.end, highlight.col="red", 
+                           tick.height=0.1, max.tick=6, vlines=FALSE, vlines.bottom=NULL, lab.cex=4.5/6){
   require(shape, quietly=TRUE)
   
   # Get plot coordinates
@@ -266,6 +272,14 @@ add.coord.line <- function(start, end, y0, highlight.start, highlight.end, highl
   tick.labels <- paste(format(round(tick.at / denom, nsmall), nsmall=nsmall), suffix)
   tick.labels.y.at <- rep(y0, n.ticks)
   
+  # Draw vertical lines for ticks, if optioned
+  if(vlines==TRUE){
+    if(is.null(vlines.bottom)){
+      vlines.bottom <- par("usr")[3]
+    }
+    segments(x0=tick.at, x1=tick.at, y0=y0, y1=vlines.bottom, col=bluewhite)
+  }
+  
   # Draw coordinate line & highlight box
   abline(h=y0, col=blueblack, lwd=2)
   rect(xleft=highlight.start, xright=highlight.end, 
@@ -283,26 +297,254 @@ add.coord.line <- function(start, end, y0, highlight.start, highlight.end, highl
 }
 
 # Add gene bodies to plot
-add.genes <- function(genes, y0, n.rows=1, panel.height=0.2, col=ns.color){
-  genes <- unique(genes$gene)
-  n.genes <- length(genes)
+add.genes <- function(genes, y0, n.rows=1, panel.height=0.2, col=ns.color,
+                      y.axis.title=NULL, y.axis.title.col=NULL, label.genes=c()){
+  gene.names <- unique(genes$gene)
+  n.genes <- length(gene.names)
   
   # Get y scaling
   panel.bottom <- y0 - (0.5*panel.height)
   panel.top <- y0 + (0.5*panel.height)
   row.height <- panel.height / n.rows
+  exon.height <- (2/3) * row.height
+  utr.height <- (1/3) * row.height
   row.mids <- seq(panel.bottom + (0.5*row.height), 
                   panel.top - (0.5*row.height), 
                   length.out=n.rows)
   
+  # Iterate over genes and plot each one at a time
+  sapply(1:n.genes, function(i){
+    gene <- gene.names[i]
+    row.idx <- (i %% n.rows) + 1
+    tx.coords <- genes[which(genes$gene==gene & genes$feature=="transcript"), 2:3]
+    tx.coords$end[which(tx.coords$end > par("usr")[2])] <- par("usr")[2]
+    tx.coords$start[which(tx.coords$start < par("usr")[1])] <- par("usr")[1]
+    ex.coords <- genes[which(genes$gene==gene & genes$feature=="exon"), 2:3]
+    utr.coords <- genes[which(genes$gene==gene & genes$feature=="UTR"), 2:3]
+    if(nrow(tx.coords) > 0){
+      segments(x0=tx.coords[, 1], x1=tx.coords[, 2], 
+               y0=row.mids[row.idx], y1=row.mids[row.idx],
+               lend="round", col=col)
+    }
+    if(nrow(ex.coords) > 0){
+      rect(xleft=ex.coords[, 1], xright=ex.coords[, 2],
+           ybottom=row.mids[row.idx]-(0.5*exon.height),
+           ytop=row.mids[row.idx]+(0.5*exon.height),
+           border=col, lwd=0.3, col=col)
+    }
+    if(nrow(utr.coords) > 0){
+      rect(xleft=utr.coords[, 1], xright=utr.coords[, 2],
+           ybottom=row.mids[row.idx]-(0.5*utr.height),
+           ytop=row.mids[row.idx]+(0.5*utr.height),
+           border=col, lwd=0.3, col=col)
+    }
+    if(gene %in% label.genes){
+      if(row.mids[row.idx] >= y0){
+        glabel.pos <- 3
+        glabel.y <- row.mids[row.idx]-(0.25*row.height)
+      }else{
+        glabel.pos <- 1
+        glabel.y <- row.mids[row.idx]+(0.25*row.height)
+      }
+      text(x=mean(as.numeric(tx.coords[1, 1:2])), y=glabel.y,
+           cex=5/6, font=3, labels=gene, pos=glabel.pos)
+    }
+  })
+  
+  # Add y-axis title (if optioned)
+  if(is.null(y.axis.title.col)){
+    y.axis.title.col <- col
+  }
+  axis(2, at=y0, tick=F, line=-0.9, las=2, labels=y.axis.title, col.axis=y.axis.title.col)
+}
+
+# Add square bracket to plot
+add.bracket <- function(xleft, xright, y0, height, col=blueblack, staple.wex=0.025, 
+                        lwd=1, left.label=NULL){
+  # Get various dimensions for plotting
+  staple.width <- staple.wex*diff(par("usr")[1:2])
+  half.height <- height / 2
+  ytop <- y0 - half.height
+  ybottom <- y0 + half.height
+  
+  # Plot staples
+  segments(x0=rep(c(xleft, xright), 2), x1=rep(c(xleft-staple.width, xright+staple.width), 2), 
+           y0=c(ytop, ytop, ybottom, ybottom), y1=c(ytop, ytop, ybottom, ybottom), 
+           col=col, lwd=lwd, lend="round")
+  
+  # Plot vertical connectors
+  segments(x0=c(xleft-staple.width, xright+staple.width), x1=c(xleft-staple.width, xright+staple.width), 
+           y0=rep(ybottom, 2), y1=rep(ytop, 2),
+           col=col, lwd=lwd, lend="round")
+  
+  # Add labels, if optioned
+  text(x=xleft-staple.width, y=y0, pos=2, col=col, labels=left.label)
+}
+
+# Add panel of phred-scaled P-values 
+add.pvalues <- function(ss, y0, cnv.type, panel.height=0.2, pt.cex=0.6){
+  # Get panel parameters
+  half.height <- 0.5*panel.height
+  ybottom <- y0 - half.height
+  ytop <- y0 + half.height
+  
+  # Set CNV-based plotting values
+  if(cnv.type=="DEL"){
+    pt.col <- cnv.blacks[1]
+  }else if(cnv.type=="DUP"){
+    pt.col <- cnv.blacks[2]
+  }
+  
+  # Scale p-values according to y0 and panel.height
+  pos <- as.numeric(ss$pos)
+  pvals.orig <- as.numeric(ss$meta_phred_p)
+  max.pval.orig <- max(pvals.orig, na.rm=T)
+  pvals.scaled <- (panel.height / (ceiling(max.pval.orig) + 1)) * pvals.orig
+  pvals <- pvals.scaled + y0 - half.height
+  
+  # Add horizontal gridlines
+  y.ax.tick.spacing <- seq(-half.height, half.height, length.out=6)
+  abline(h=c(y0 + y.ax.tick.spacing), col="white")
+  
+  # Add points
+  points(x=pos, y=pvals, pch=19, col=pt.col, cex=pt.cex)
+  
+  # Add Y-axis
+  y.ax.label.cex <- 5/6
+  axis(2, at=c(ybottom, ytop), tick=0, labels=NA, col=blueblack)
+  axis(2, at=y0 + y.ax.tick.spacing, tck=-0.0075, col=blueblack, labels=NA)
+  axis(2, at=y0+c(-half.height, half.height), tick=F, las=2, line=-0.65,
+       labels=c(0, ceiling(max.pval.orig)+1), cex.axis=y.ax.label.cex)
+  axis(2, at=y0, line=-0.2, tick=F, labels=bquote(-log[10](italic("P")[.(cnv.type)])), las=2)
+  
+  # Add cleanup top & bottom lines
+  abline(h=c(ytop, ybottom), col=blueblack)
+  segments(x0=par("usr")[2], x1=par("usr")[2], y0=ybottom, y1=ytop, col=blueblack, xpd=T)
+}
+
+# Add panel of natural log-scaled odds ratios 
+add.ors <- function(ss, y0, cnv.type, panel.height=0.2, pt.cex=0.7){
+  # Get panel parameters
+  half.height <- 0.5*panel.height
+  ybottom <- y0 - half.height
+  ytop <- y0 + half.height
+  
+  # Set CNV-based plotting values
+  if(cnv.type=="DEL"){
+    line.col <- cnv.colors[1]
+    ci.col <- control.cnv.colors[1]
+  }else if(cnv.type=="DUP"){
+    line.col <- cnv.colors[2]
+    ci.col <- control.cnv.colors[2]
+  }
+  
+  # Scale odds ratios according to y0 and panel.height
+  pos <- as.numeric(ss$pos)
+  ors.orig <- apply(ss[, grep("meta_lnOR", colnames(ss), fixed=T)], 2, as.numeric)
+  ors.scalar <- max(ors.orig[, 1], na.rm=T)
+  ors.scaled <- (panel.height / (ceiling(ors.scalar) + 1)) * ors.orig
+  ors.scaled[which(ors.scaled > panel.height)] <- panel.height
+  ors.scaled[which(ors.scaled < 0)] <- 0
+  ors <- ors.scaled + y0 - half.height
+  
+  # Only keep points with non-NA ORs
+  keep.idx <- which(apply(ors, 1, function(vals){all(!is.na(vals))}))
+  pos <- pos[keep.idx]
+  ors <- ors[keep.idx, ]
+  
+  # Add horizontal gridlines
+  y.ax.tick.spacing <- seq(-half.height, half.height, length.out=6)
+  abline(h=c(y0 + y.ax.tick.spacing), col="white")
+  
+  # Add points & shading
+  polygon(x=c(pos, rev(pos)), y=c(ors[, 2], rev(ors[, 3])),
+          col=adjustcolor(ci.col, alpha=0.5), border=NA, bty="n")
+  points(x=pos, y=ors[, 1], lwd=3, col=line.col, type="l")
+  
+  # Add Y-axis
+  y.ax.label.cex <- 5/6
+  axis(2, at=c(ybottom, ytop), tick=0, labels=NA, col=blueblack)
+  axis(2, at=y0 + y.ax.tick.spacing, tck=-0.0075, col=blueblack, labels=NA)
+  axis(2, at=y0+c(-half.height, half.height), tick=F, las=2, line=-0.65,
+       labels=c(0, ceiling(ors.scalar) + 1), cex.axis=y.ax.label.cex)
+  axis(2, at=y0, line=-0.2, tick=F, labels=bquote("ln" * ("OR"[.(cnv.type)])), las=2)
+  
+  # Add cleanup top & bottom lines
+  abline(h=c(ytop, ybottom), col=blueblack)
+  segments(x0=par("usr")[2], x1=par("usr")[2], y0=ybottom, y1=ytop, col=blueblack, xpd=T)
+}
+
+# Add plot of PIPs for all genes
+add.pips <- function(pips, genes, y0, panel.height=0.2, label.genes=NULL,
+                     col=blueblack, highlight.col="red", highlight.genes=NULL){
+  # Get panel parameters
+  half.height <- 0.5*panel.height
+  ybottom <- y0 - half.height
+  ytop <- y0 + half.height
+  
+  # Merge gene coordinates & PIPs
+  gcoords <- genes[which(genes$gene %in% pips$gene & genes$feature=="transcript"), 
+                   c("start", "end", "gene")]
+  pdat <- merge(gcoords, pips, all=F, sort=F, by="gene")
+  
+  # Scale PIPs according to y0 and panel.height
+  max.pip <- ceiling(11*max(pdat$PIP, na.rm=T)) / 10
+  pdat$y <- (pdat$PIP * panel.height / min(c(1, max.pip))) + y0 - half.height
+  
+  # Add horizontal gridlines
+  y.ax.tick.spacing <- seq(-half.height, half.height, length.out=6)
+  abline(h=c(y0 + y.ax.tick.spacing), col="white")
+  
+  # Add Y-axis
+  y.ax.label.cex <- 5/6
+  axis(2, at=c(ybottom, ytop), tick=0, labels=NA, col=blueblack)
+  axis(2, at=y0 + y.ax.tick.spacing, tck=-0.0075, col=blueblack, labels=NA)
+  axis(2, at=y0+c(-half.height, half.height), tick=F, las=2, line=-0.65,
+       labels=c(0, max.pip), cex.axis=y.ax.label.cex)
+  axis(2, at=y0, line=-0.2, tick=F, labels="PIP", las=2)
+  
+  # Add cleanup top & bottom lines
+  abline(h=c(ytop, ybottom), col=blueblack)
+  segments(x0=par("usr")[2], x1=par("usr")[2], y0=ybottom, y1=ytop, col=blueblack, xpd=T)
+  
+  # Add segments for each gene
+  if(!is.null(highlight.genes)){
+    highlight.idxs <- which(pdat$gene %in% highlight.genes)
+    other.idxs <- which(!(pdat$gene %in% highlight.genes))
+    segments(x0=pdat$start[highlight.idxs], x1=pdat$end[highlight.idxs], 
+             y0=pdat$y[highlight.idxs], y1=pdat$y[highlight.idxs], 
+             lwd=4, lend="butt", col=highlight.col)
+  }else{
+    other.idxs <- 1:nrow(pdat)
+  }
+  segments(x0=pdat$start[other.idxs], x1=pdat$end[other.idxs], 
+           y0=pdat$y[other.idxs], y1=pdat$y[other.idxs], 
+           lwd=4, lend="butt", col=col)
+  
+  # Label any genes, if optioned
+  if(!is.na(label.genes)){
+    sapply(label.genes, function(gene){
+      best.pip <- pdat$PIP[which(pdat$gene==gene)]
+      best.y <- pdat$y[which(pdat$gene==gene)]
+      if(best.pip > 0.6 * max.pip){
+        best.pos <- 1
+        best.y <- best.y + 0.1*panel.height
+      }else{
+        best.pos <- 3
+        best.y <- best.y - 0.1*panel.height
+      }
+      text(x=mean(as.numeric(pdat[which(pdat$gene==gene), c("start", "end")])), 
+           y=best.y, labels=gene, font=3, cex=5/6, pos=best.pos)
+    })
+  }
 }
 
 # Add mirrored case & control CNV pileups for a single cohort to an existing coordinate plot
 add.cnv.panel <- function(cnvs, n.case, n.ctrl, y0, cnv.type, highlight.hpo=NULL,
                           max.freq=NULL, start=NULL, end=NULL, 
                           y.axis.title="CNV\nFreq.", expand.pheno.label=TRUE,
-                          case.legend.side="left", ctrl.legend.side="left", 
-                          cc.legend.colors=rep(blueblack, 2),
+                          case.legend.side="left", case.legend.topbottom="top", 
+                          ctrl.legend.side="left", cc.legend.colors=rep(blueblack, 2),
                           add.cohort.label=FALSE, cohort.label=NULL,
                           panel.height=2, dx=100){
   # Standardize inputs
@@ -415,7 +657,12 @@ add.cnv.panel <- function(cnvs, n.case, n.ctrl, y0, cnv.type, highlight.hpo=NULL
   
   # Add cohort label (upper panel, opposite case.legend.side)
   if(add.cohort.label==TRUE){
-    cohort.label.y <- y0 + (legend.y.cex * half.height)
+    if(case.legend.topbottom=="top"){
+      cohort.label.y.adj <- 1
+    }else{
+      cohort.label.y.adj <- -1
+    }
+    cohort.label.y <- y0 + (cohort.label.y.adj * legend.y.cex * half.height)
     if(case.legend.side=="left"){
       cohort.label.x <- end
       cohort.label.pos <- 2

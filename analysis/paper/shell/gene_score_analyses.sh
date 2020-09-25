@@ -200,12 +200,34 @@ fgrep -wvf \
 
 
 # Compare distribution of pHI for selected gene sets
-echo -e "ClinGen dom. HI\trefs/gene_lists/ClinGen.hc_haploinsufficient.genes.list" > phi_vs_gene_sets.input.tsv
-echo -e "DECIPHER dom. HI\trefs/gene_lists/DDG2P.hc_lof.genes.list" >> phi_vs_gene_sets.input.tsv
-echo -e "Mouse het. lethal\trefs/gene_lists/mouse_het_lethal.genes.list" >> phi_vs_gene_sets.input.tsv
-echo -e "Cell essential\trefs/gene_lists/cell_essential.genes.list" >> phi_vs_gene_sets.input.tsv
+echo -e "ClinGen dom. HI\trefs/gene_lists/ClinGen.hc_haploinsufficient.genes.list\tTRUE" > phi_vs_gene_sets.input.tsv
+echo -e "DECIPHER dom. HI\trefs/gene_lists/DDG2P.hc_lof.genes.list\tTRUE" >> phi_vs_gene_sets.input.tsv
+echo -e "Mouse het. lethal\trefs/gene_lists/mouse_het_lethal.genes.list\tFALSE" >> phi_vs_gene_sets.input.tsv
+echo -e "Cell essential\trefs/gene_lists/cell_essential.genes.list\tFALSE" >> phi_vs_gene_sets.input.tsv
+# echo -e "Mouse dispensable\trefs/gene_lists/mouse_dispensable.genes.list\tFALSE" >> phi_vs_gene_sets.input.tsv
+echo -e "Cell non-essential\trefs/gene_lists/cell_nonessential.genes.list\tFALSE" >> phi_vs_gene_sets.input.tsv
+echo -e "Olfactory receptors\trefs/gene_lists/olfactory_receptors.genes.list\tFALSE" >> phi_vs_gene_sets.input.tsv
+/opt/rCNV2/analysis/paper/plot/gene_scores/plot_gene_set_enrichments.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --height 1.7 \
+  rCNV.gene_scores.tsv.gz \
+  phi_vs_gene_sets.input.tsv \
+  pHI \
+  ${prefix}
 
 
+# Compare distribution of pTS for selected gene sets
+echo -e "ClinGen dom. TS\trefs/gene_lists/ClinGen.all_triplosensitive.genes.list\tTRUE" > pts_vs_gene_sets.input.tsv
+echo -e "DECIPHER dom. GoF\trefs/gene_lists/DDG2P.all_gof.genes.list\tTRUE" >> pts_vs_gene_sets.input.tsv
+echo -e "Proto-oncogenes\trefs/gene_lists/COSMIC.hc_oncogenes.genes.list\tFALSE" >> pts_vs_gene_sets.input.tsv
+echo -e "Olfactory receptors\trefs/gene_lists/olfactory_receptors.genes.list\tFALSE" >> pts_vs_gene_sets.input.tsv
+/opt/rCNV2/analysis/paper/plot/gene_scores/plot_gene_set_enrichments.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --height 1.35 \
+  rCNV.gene_scores.tsv.gz \
+  pts_vs_gene_sets.input.tsv \
+  pTS \
+  ${prefix}
 
 
 # Compare de novo CNVs in ASD vs gene scores
@@ -277,6 +299,7 @@ gsutil -m cp -r \
   ${prefix}.*.model_eval*pdf \
   ${prefix}.*pHI_vs_pTS.*pdf \
   ${prefix}.gene_scores_scatterplot*pdf \
+  ${prefix}.*.geneset_enrichments.*pdf \
   ${prefix}.asc_spark_denovo_cnvs*pdf \
   ${prefix}.scores_vs_gnomAD-SV*pdf \
   ${prefix}*dnm_enrichments.*pdf \

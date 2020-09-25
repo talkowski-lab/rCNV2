@@ -29,6 +29,10 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/gene_burden/**.rCNV.**.gene_burden.meta_analysis.stats.bed.gz \
   ${rCNV_bucket}/analysis/crb_burden/**.rCNV.**.crb_burden.meta_analysis.stats.bed.gz \
   meta_stats/
+find meta_stats/ -name "*bed.gz" | xargs -I {} tabix -p bed -f {}
+gsutil -m cp -r \
+  ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv \
+  ./
 
 
 # Download reference files (note: requires permissions)
@@ -49,13 +53,63 @@ done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt | cut -f1 ) \
 > cnvs.input.tsv
 
 
-#####################
-#  CADM2 Deletions  #
-#####################
-/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_CADM2_locus.R \
+######################
+#  SHANK3 Deletions  #
+######################
+/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_SHANK3_locus.R \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
+  --pips rCNV.DEL.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv \
   cnvs.input.tsv \
+  meta_stats/HP0012759.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
   refs/HPOs_by_metacohort.table.tsv \
   refs/GRCh37.genome \
   ${prefix}
+
+
+########################
+#  GMEB2 Duplications  #
+########################
+/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_GMEB2_locus.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
+  --pips rCNV.DUP.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv \
+  cnvs.input.tsv \
+  meta_stats/HP0012639.rCNV.DUP.sliding_window.meta_analysis.stats.bed.gz \
+  refs/HPOs_by_metacohort.table.tsv \
+  refs/GRCh37.genome \
+  ${prefix}
+
+
+##########################
+#  ANKRD11 Duplications  #
+##########################
+/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_ANKRD11_locus.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
+  --pips rCNV.DUP.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv \
+  cnvs.input.tsv \
+  meta_stats/HP0001507.rCNV.DUP.sliding_window.meta_analysis.stats.bed.gz \
+  refs/HPOs_by_metacohort.table.tsv \
+  refs/GRCh37.genome \
+  ${prefix}
+
+
+#######################
+#  SMARCA2 Deletions  #
+#######################
+/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_SMARCA2_locus.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
+  cnvs.input.tsv \
+  meta_stats/HP0012759.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
+  refs/HPOs_by_metacohort.table.tsv \
+  refs/GRCh37.genome \
+  ${prefix}
+
+
+# Copy all plots to final gs:// directory
+gsutil -m cp -r \
+  ${prefix}.locus_highlight.*.pdf \
+  ${rCNV_bucket}/analysis/paper/plots/locus_highlights/
 
