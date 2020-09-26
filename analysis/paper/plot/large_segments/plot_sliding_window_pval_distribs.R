@@ -123,7 +123,7 @@ plot.lambdas <- function(del, dup, hpos,
   axis(3, at=c(-10e10, 10e10), tck=0, labels=NA)
   axis(3, tck=-0.025, labels=NA)
   axis(3, tick=F, line=-0.65)
-  mtext(3, line=1.2, text=bquote("Genomic Inflation Parameter," ~ lambda))
+  mtext(3, line=1.2, text=bquote("Genomic Inflation Statistic," ~ lambda["GC"]))
 }
 
 # Scatterplot of lambdas vs sample size
@@ -184,7 +184,7 @@ lambda.scatter <- function(del, dup, hpo.n,
   axis(2, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
   axis(2, at=y.ax.at, tck=-0.025, labels=NA, col=blueblack)
   axis(2, at=y.ax.at, tick=F, line=-0.65, las=2)
-  mtext(2, line=1.75, text=bquote("Genomic Inflation," ~ lambda))
+  mtext(2, line=1.75, text=bquote("Genomic Inflation," ~ lambda["GC"]))
   
   # Add P-values
   x.length <- par("usr")[2] - par("usr")[1]
@@ -352,7 +352,7 @@ dev.off()
 # Horizontal dotplot of primary lambdas
 pdf(paste(out.prefix, "primary_lambdas_byHPO.pdf", sep="."),
     height=6, width=5)
-plot.lambdas(del.1, dup.1, hpos, parmar=c(0.25, 14, 2.25, 0.75))
+plot.lambdas(del.1, dup.1, hpos, parmar=c(0.25, 14, 2.25, 1))
 dev.off()
 
 # Scatterplot of lambdas vs sample size

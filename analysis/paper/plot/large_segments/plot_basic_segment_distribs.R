@@ -159,7 +159,7 @@ pdf(paste(out.prefix, "all_segs.best_p_vs_or.pdf", sep="."),
 segs.scatter(segs.all, x=log2(exp(segs.all$meta_best_lnor)), y=segs.all$meta_best_p, 
              subset_to_regions=segs.all$region_id[which(!is.infinite(segs.all$meta_best_p))],
              horiz.lines.at=c(gw.sig, -log10(0.05)), horiz.lines.lty=c(2, 1),
-             xtitle=bquote(log[2]("Odds Ratio")), ytitle=bquote("Best -log"[10] * (italic(P))),
+             xtitle=bquote(ln("Odds Ratio")), ytitle=bquote("Best -log"[10] * (italic(P))),
              x.title.line=1.6, y.title.line=1.5,
              add.lm=F, pt.cex=0.75, parmar=c(2.75, 2.75, 0.2, 0.2))
 x.bump <- 0.04 * (par("usr")[2] - par("usr")[1])

@@ -474,6 +474,14 @@ add.ors <- function(ss, y0, cnv.type, panel.height=0.2, pt.cex=0.7){
   segments(x0=par("usr")[2], x1=par("usr")[2], y0=ybottom, y1=ytop, col=blueblack, xpd=T)
 }
 
+# Add hatched NA rectangle
+add.na.rect <- function(xleft, xright, y0, panel.height=0.2, text=NULL){
+  half.height <- 0.5*panel.height
+  rect(xleft=xleft, xright=xright, ybottom=y0 - half.height, ytop=y0 + half.height,
+       border=blueblack, col=control.cnv.colors[2], density=15)
+  text(x=mean(c(xleft, xright)), y=y0, labels=text, cex=5/6, font=3)
+}
+
 # Add plot of PIPs for all genes
 add.pips <- function(pips, genes, y0, panel.height=0.2, label.genes=NULL,
                      col=blueblack, highlight.col="red", highlight.genes=NULL){

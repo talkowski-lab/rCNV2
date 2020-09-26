@@ -75,7 +75,7 @@ chrom <- 6
 highlight.start <- 163680000
 highlight.end <- 164040000
 highlight.width <- highlight.end - highlight.start
-viewpoint.buffer <- (3/4) * highlight.width
+viewpoint.buffer <- (4/3) * highlight.width
 start <- floor(max(c(0, highlight.start - viewpoint.buffer)))
 end <- ceiling(highlight.end + viewpoint.buffer)
 region <- paste(chrom, ":", start, "-", end, sep="")
@@ -95,6 +95,9 @@ genes <- load.genes(gtf.in, region)
 # Load meta-analysis summary stats
 ss <- load.sumstats(sumstats.in, region)
 
+# Load PIPs for genes in region for highlight HPO
+pips <- load.pips(pips.in, unique(genes$gene), highlight.case.hpo)
+
 # Load sample sizes
 n.samples <- get.sample.sizes(sample.size.table, all.case.hpos)
 n.samples.highlight <- get.sample.sizes(sample.size.table, highlight.case.hpo)
@@ -109,13 +112,16 @@ cnvs <- load.cnvs.multi(cnvlist.in, region, cnv.type, all.case.hpos)
 # p-values
 # odds ratios
 # all genes
+# PIPs
+# credible set genes
+# other genes
 # cnv pileups
 # Set plot values
 coord.panel.height <- 0.2
 coord.panel.space <- 0.2
 coord.panel.y0 <- 0
 idio.panel.height <- 0.1
-idio.panel.space <- 0.3
+idio.panel.space <- 0.2
 idio.panel.y0 <- (0.5 * coord.panel.height) + idio.panel.space + (0.5*idio.panel.height)
 # Top panels = those at or above y=0 (idiogram & coordinate line)
 top.panels.height <- sum(c(idio.panel.height, idio.panel.space, 0.5*coord.panel.height))
@@ -126,12 +132,21 @@ pval.panel.y0 <- -((0.5*coord.panel.height) + coord.panel.space + (0.5*coord.pan
 or.panel.space <- 0.15
 or.panel.height <- 0.4
 or.panel.y0 <- pval.panel.y0 - (0.5*pval.panel.height) - or.panel.space - (0.5*or.panel.height)
-gene.panel.space <- 0.15
+gene.panel.space <- 0.1
 allgene.panel.height <- 0.1
 allgene.panel.y0 <- or.panel.y0 - (0.5*or.panel.height) - gene.panel.space - (0.5*allgene.panel.height)
+pip.panel.space <- 0.1
+pip.panel.height <- 0.4
+pip.panel.y0 <- allgene.panel.y0 - (0.5*allgene.panel.height) - pip.panel.space - (0.5*pip.panel.height)
+credset.panel.space <- gene.panel.space + 0.1
+credset.panel.height <- 0.1
+credset.panel.y0 <- pip.panel.y0 - (0.5*pip.panel.height) - credset.panel.space - (0.5*credset.panel.height)
+othergene.panel.height <- 0.1
+othergene.panel.y0 <- credset.panel.y0 - (0.5*credset.panel.height) - gene.panel.space - (0.5*othergene.panel.height)
 upper.panels.height <- -sum(c((0.5 * coord.panel.height), coord.panel.space,
                               pval.panel.space, pval.panel.height, or.panel.space, or.panel.height,
-                              allgene.panel.height, gene.panel.space))
+                              allgene.panel.height, gene.panel.space, pip.panel.space, pip.panel.height,
+                              credset.panel.height, credset.panel.space, othergene.panel.height, gene.panel.space))
 # Lower panels = CNV pileup
 cnv.panel.height <- 0.65
 cnv.panel.spacing <- 0.15
@@ -143,8 +158,8 @@ cnv.key.y0 <- total.height - cnv.key.spacing - (0.5*cnv.key.height)
 total.height.plus.key <- cnv.key.y0 + (0.5*cnv.key.height)
 
 # Prep locus plot
-pdf(paste(out.prefix, "locus_highlight.QKI.pdf", sep="."), height=3*2, width=3.25*2)
-par(mar=c(0.5, 6, 0, 0.5), bty="n")
+pdf(paste(out.prefix, "locus_highlight.QKI.pdf", sep="."), height=3.75*2, width=3.25*2)
+par(mar=c(0.2, 6, 0, 0.5), bty="n")
 plot(NA, xlim=c(start, end), ylim=c(total.height.plus.key, top.panels.height), 
      yaxt="n", xaxt="n", ylab="", xlab="")
 
@@ -162,10 +177,12 @@ rect(xleft=highlight.start, xright=highlight.end,
      col=adjustcolor(highlight.color, alpha=0.3), border=NA)
 blueshade.ybottoms <- c(cnv.panel.y0s+(0.5*cnv.panel.height),
                         pval.panel.y0+(0.5*pval.panel.height),
-                        or.panel.y0+(0.5*or.panel.height))
+                        or.panel.y0+(0.5*or.panel.height),
+                        pip.panel.y0+(0.5*pip.panel.height))
 blueshade.ytops <- c(cnv.panel.y0s-(0.5*cnv.panel.height),
                      pval.panel.y0-(0.5*pval.panel.height),
-                     or.panel.y0-(0.5*or.panel.height))
+                     or.panel.y0-(0.5*or.panel.height),
+                     pip.panel.y0-(0.5*pip.panel.height))
 rect(xleft=par("usr")[1], xright=par("usr")[2], 
      ybottom=blueshade.ybottoms,
      ytop=blueshade.ytops,
@@ -176,12 +193,25 @@ add.pvalues(ss, y0=pval.panel.y0, panel.height=pval.panel.height, cnv.type=cnv.t
 add.ors(ss, y0=or.panel.y0, panel.height=or.panel.height, cnv.type=cnv.type)
 
 # Add all genes
-add.genes(genes[which(genes$gene != "QKI"), ], n.rows=1, 
+add.genes(genes, n.rows=1, 
           y0=allgene.panel.y0, panel.height=allgene.panel.height, col=blueblack,
-          y.axis.title="Genes", y.axis.title.col="black")
-add.genes(genes[which(genes$gene == "QKI"), ], n.rows=1, 
-          y0=allgene.panel.y0, panel.height=allgene.panel.height, col=graphabs.green,
-          y.axis.title="", y.axis.title.col="black", label.genes="QKI")
+          y.axis.title="All Genes", y.axis.title.col="black")
+
+# Add PIPs
+add.pips(pips, genes, y0=pip.panel.y0, panel.height=pip.panel.height, label.genes=c("QKI"),
+         col=ns.color, highlight.col=graphabs.green, highlight.genes=credset.genes)
+
+# Add finemapped genes
+add.bracket(xleft=min(as.numeric(genes[which(genes$gene %in% credset.genes), "start"])),
+            xright=max(as.numeric(genes[which(genes$gene %in% credset.genes), "end"])),
+            y0=credset.panel.y0, height=2*credset.panel.height, col=graphabs.green,
+            lwd=2, staple.wex=0.015)
+add.genes(genes[which(genes$gene %in% credset.genes), ], n.rows=1, 
+          y0=credset.panel.y0, panel.height=credset.panel.height, col=graphabs.green,
+          y.axis.title="Credible Set", label.genes=c("QKI"))
+add.genes(genes[which(!(genes$gene %in% credset.genes)), ], n.rows=1, 
+          y0=othergene.panel.y0, panel.height=othergene.panel.height, col=ns.color,
+          y.axis.title="Other Genes")
 
 # Add CNV panels
 if(cnv.type=="DEL"){
