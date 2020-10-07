@@ -106,20 +106,6 @@ done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt | cut -f1 ) \
   ${prefix}
 
 
-######################
-#  SHANK3 Deletions  #
-######################
-/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_SHANK3_locus.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
-  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
-  --pips rCNV.DEL.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv \
-  cnvs.input.tsv \
-  meta_stats/HP0012759.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
-  refs/HPOs_by_metacohort.table.tsv \
-  refs/GRCh37.genome \
-  ${prefix}
-
-
 ########################
 #  GMEB2 Duplications  #
 ########################
@@ -143,6 +129,20 @@ done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt | cut -f1 ) \
   --pips rCNV.DUP.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv \
   cnvs.input.tsv \
   meta_stats/HP0001507.rCNV.DUP.sliding_window.meta_analysis.stats.bed.gz \
+  refs/HPOs_by_metacohort.table.tsv \
+  refs/GRCh37.genome \
+  ${prefix}
+
+
+######################
+#  SHANK3 Deletions  #
+######################
+/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_SHANK3_locus.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
+  --pips rCNV.DEL.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv \
+  cnvs.input.tsv \
+  meta_stats/HP0012759.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
   refs/HPOs_by_metacohort.table.tsv \
   refs/GRCh37.genome \
   ${prefix}
@@ -179,6 +179,56 @@ done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt | cut -f1 ) \
 #  SLC2A3 Deletions  #
 ######################
 /opt/rCNV2/analysis/paper/plot/locus_highlights/plot_SLC2A3_locus.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
+  --pips rCNV.DEL.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv \
+  cnvs.input.tsv \
+  meta_stats/HP0001250.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
+  refs/HPOs_by_metacohort.table.tsv \
+  refs/GRCh37.genome \
+  ${prefix}
+
+
+#####################
+#  CADM2 Deletions  #
+#####################
+# Download & process fetal cortex RNAseq data from ENCODE
+wget https://www.encodeproject.org/files/ENCFF862KEW/@@download/ENCFF862KEW.bigWig
+bigWigToBedGraph \
+  -chrom=chr3 -start=83892686 -end=87239026 \
+  ENCFF862KEW.bigWig \
+  ENCFF862KEW.CADM2.bg
+wget https://www.encodeproject.org/files/ENCFF572HVL/@@download/ENCFF572HVL.bigWig
+bigWigToBedGraph \
+  -chrom=chr3 -start=83892686 -end=87239026 \
+  ENCFF572HVL.bigWig \
+  ENCFF572HVL.CADM2.bg
+athena make-bins \
+  --exclude-chroms <( cut -f1 refs/GRCh37.genome | fgrep -wv 3 | paste -s -d, ) \
+  --bgzip \
+  refs/GRCh37.genome \
+  1000 \
+  chr3.1kb_bins.bed.gz
+bedtools intersect -header -wa \
+  -a chr3.1kb_bins.bed.gz \
+  -b <( echo -e "3\t83892686\t87239026" ) \
+| awk '{ print "chr"$0 }' \
+| bgzip -c \
+> CADM2.1kb_bins.bed.gz
+bedtools map -c 4 -o mean \
+  -a CADM2.1kb_bins.bed.gz \
+  -b ENCFF862KEW.CADM2.bg \
+| bedtools map -c 4 -o mean \
+  -a - \
+  -b ENCFF572HVL.CADM2.bg \
+| awk -v OFS="\t" '{ if ($4==".") $4=0; print }' \
+| awk -v OFS="\t" '{ if ($5==".") $5=0; print }' \
+| awk -v OFS="\t" '{ print $1, $2, $3, ($4+$5)/2 }' \
+| sort -Vk1,1 -k2,2n -k3,3n \
+| cat <( echo -e "#chr\tstart\tend\tsignal" ) - \
+| bgzip -c \
+> CADM2.fetal_cortex_RNAseq.1kb_bins.bed.gz
+/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_CADM2_locus.R \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
   --pips rCNV.DEL.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv \

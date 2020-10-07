@@ -8,7 +8,7 @@
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Plot SMARCA2 deletion rCNV locus highlight for rCNV2 paper
+# Plot CADM2 intronic deletion rCNV locus highlight for rCNV2 paper
 
 
 options(stringsAsFactors=F, scipen=1000)
@@ -52,7 +52,7 @@ pips.in <- opts$pips
 
 # # DEV PARAMETERS
 # cnvlist.in <- "~/scratch/cnvlist.tsv"
-# sumstats.in <- "~/scratch/HP0012759.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz"
+# sumstats.in <- "~/scratch/HP0000752.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz"
 # sample.size.table <- "~/scratch/HPOs_by_metacohort.table.tsv"
 # genome.in <- "~/scratch/GRCh37.genome"
 # out.prefix <- "~/scratch/noncoding_locus_highlights_test"
@@ -71,18 +71,20 @@ script.dir <- funr::get_script_path()
 source(paste(script.dir, "common_functions.R", sep="/"))
 
 # Set locus parameters
-chrom <- 9
-highlight.start <- 1310000
-highlight.end <- 2460000
+chrom <- 3
+highlight.start <- 85160000
+highlight.end <- 85560000
 highlight.width <- highlight.end - highlight.start
-viewpoint.buffer <- 0.75 * highlight.width
+crb.starts <- c(85245894, 85300195)
+crb.ends <- c(85278400, 85314000)
+viewpoint.buffer <- (4/3) * highlight.width
 start <- floor(max(c(0, highlight.start - viewpoint.buffer)))
 end <- ceiling(highlight.end + viewpoint.buffer)
 region <- paste(chrom, ":", start, "-", end, sep="")
 cnv.type <- "DEL"
 all.case.hpos <- c("HP:0000707")
-highlight.case.hpo <- "HP:0012759"
-credset.genes <- c("SMARCA2")
+highlight.case.hpo <- "HP:0000752"
+credset.genes <- c("CADM2")
 
 # # Required for bedr::tabix in local Rstudio only:
 # Sys.setenv(PATH = paste(Sys.getenv("PATH"),
@@ -94,6 +96,10 @@ genes <- load.genes(gtf.in, region)
 
 # Load meta-analysis summary stats
 ss <- load.sumstats(sumstats.in, region)
+ss$meta_phred_p[which(is.na(as.numeric(ss$meta_phred_p)))] <- 0
+ss$meta_lnOR[which(is.na(as.numeric(ss$meta_lnOR)))] <- 0
+ss$meta_lnOR_lower[which(is.na(as.numeric(ss$meta_lnOR_lower)))] <- -100
+ss$meta_lnOR_upper[which(is.na(as.numeric(ss$meta_lnOR_upper)))] <- 100
 
 # Load sample sizes
 n.samples <- get.sample.sizes(sample.size.table, all.case.hpos)
@@ -115,7 +121,7 @@ coord.panel.height <- 0.2
 coord.panel.space <- 0.2
 coord.panel.y0 <- 0
 idio.panel.height <- 0.1
-idio.panel.space <- 0.2
+idio.panel.space <- 0.3
 idio.panel.y0 <- (0.5 * coord.panel.height) + idio.panel.space + (0.5*idio.panel.height)
 # Top panels = those at or above y=0 (idiogram & coordinate line)
 top.panels.height <- sum(c(idio.panel.height, idio.panel.space, 0.5*coord.panel.height))
@@ -143,8 +149,8 @@ cnv.key.y0 <- total.height - cnv.key.spacing - (0.5*cnv.key.height)
 total.height.plus.key <- cnv.key.y0 + (0.5*cnv.key.height)
 
 # Prep locus plot
-pdf(paste(out.prefix, "locus_highlight.SMARCA2.pdf", sep="."), height=3.25*2, width=3.25*2)
-par(mar=c(0.2, 6, 0, 0.5), bty="n")
+pdf(paste(out.prefix, "locus_highlight.CADM2.pdf", sep="."), height=3*2, width=3.25*2)
+par(mar=c(0.5, 6, 0, 0.5), bty="n")
 plot(NA, xlim=c(start, end), ylim=c(total.height.plus.key, top.panels.height), 
      yaxt="n", xaxt="n", ylab="", xlab="")
 
@@ -153,15 +159,19 @@ add.idio.stick(genome.in, chrom, highlight.start, highlight.end, idio.panel.y0,
                tick.height=-0.03)
 
 # Add background shading
-causal.start <- min(genes$start[which(genes$gene=="SMARCA2")], na.rm=T)
-causal.end <- max(genes$end[which(genes$gene=="SMARCA2")], na.rm=T)
-rect(xleft=highlight.start, xright=causal.start, 
+rect(xleft=highlight.start, xright=crb.starts[1], 
      ybottom=total.height, ytop=0, 
      col=adjustcolor(highlight.color, alpha=0.3), border=NA)
-rect(xleft=causal.start, xright=causal.end, 
+rect(xleft=crb.starts[1], xright=crb.ends[1], 
      ybottom=total.height, ytop=0, 
      col=adjustcolor(highlight.color, alpha=0.6), border=NA)
-rect(xleft=causal.end, xright=highlight.end, 
+rect(xleft=crb.ends[1], xright=crb.starts[2], 
+     ybottom=total.height, ytop=0, 
+     col=adjustcolor(highlight.color, alpha=0.3), border=NA)
+rect(xleft=crb.starts[2], xright=crb.ends[2], 
+     ybottom=total.height, ytop=0, 
+     col=adjustcolor(highlight.color, alpha=0.6), border=NA)
+rect(xleft=crb.ends[2], xright=highlight.end, 
      ybottom=total.height, ytop=0, 
      col=adjustcolor(highlight.color, alpha=0.3), border=NA)
 blueshade.ybottoms <- c(cnv.panel.y0s+(0.5*cnv.panel.height),
@@ -184,12 +194,9 @@ add.pvalues(ss, y0=pval.panel.y0, panel.height=pval.panel.height, cnv.type=cnv.t
 add.ors(ss, y0=or.panel.y0, panel.height=or.panel.height, cnv.type=cnv.type)
 
 # Add all genes
-add.genes(genes[which(genes$gene != "SMARCA2"), ], n.rows=1, 
-          y0=allgene.panel.y0, panel.height=allgene.panel.height, col=blueblack,
-          y.axis.title="Genes", y.axis.title.col="black")
-add.genes(genes[which(genes$gene == "SMARCA2"), ], n.rows=1, 
+add.genes(genes[which(genes$gene == "CADM2"), ], n.rows=1, 
           y0=allgene.panel.y0, panel.height=allgene.panel.height, col=graphabs.green,
-          y.axis.title="", y.axis.title.col="black", label.genes="SMARCA2")
+          y.axis.title="", y.axis.title.col="black", label.genes="CADM2")
 
 # Add CNV panels
 if(cnv.type=="DEL"){
@@ -198,8 +205,8 @@ if(cnv.type=="DEL"){
   cnv.title <- "Duplication Evidence per Cohort"
 }
 text(x=mean(c(start, end)), y=upper.panels.height+(0.85*cnv.panel.spacing), labels=cnv.title, pos=3, cex=5.5/6)
-legend.sides <- rep("right", 4)
-topbottoms <- c("bottom", "bottom", "bottom", "top")
+legend.sides <- c("left", rep("right", 3))
+topbottoms <- c("bottom", "bottom", "top", "top")
 sapply(1:4, function(i){
   add.cnv.panel(cnvs[[i]], n.case=n.samples$case[i], n.ctrl=n.samples$ctrl[i], 
                 highlight.hpo=highlight.case.hpo, y0=cnv.panel.y0s[i], 

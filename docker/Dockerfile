@@ -69,9 +69,11 @@ RUN conda install -n rcnv -y r-epitools r-shape
 RUN Rscript -e "sapply(c('beeswarm','EQL','vioplot','flux','VennDiagram','bedr'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 
-# Download liftOver
+# Install UCSC tools (liftOver & bigWigToBedGraph
 RUN wget -P /opt/ http://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/liftOver \
     && chmod a+x /opt/liftOver
+RUN wget -P /opt/ http://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/bigWigToBedGraph \
+    && chmod a+x /opt/bigWigToBedGraph
 ENV PATH /opt:$PATH
 
 # Install Athena toolkit

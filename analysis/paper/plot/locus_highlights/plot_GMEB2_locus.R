@@ -167,12 +167,16 @@ plot(NA, xlim=c(start, end), ylim=c(total.height.plus.key, top.panels.height),
 add.idio.stick(genome.in, chrom, highlight.start, highlight.end, idio.panel.y0,
                tick.height=-0.03)
 
-# Add coordinate line
-add.coord.line(start, end, coord.panel.y0, highlight.start, highlight.end, 
-               highlight.col=highlight.color, tick.height=0.04, vlines=TRUE, vlines.bottom=total.height)
-
 # Add background shading
-rect(xleft=highlight.start, xright=highlight.end, 
+causal.start <- min(genes$start[which(genes$gene=="GMEB2")], na.rm=T)
+causal.end <- max(genes$end[which(genes$gene=="GMEB2")], na.rm=T)
+rect(xleft=highlight.start, xright=causal.start, 
+     ybottom=total.height, ytop=0, 
+     col=adjustcolor(highlight.color, alpha=0.3), border=NA)
+rect(xleft=causal.start, xright=causal.end, 
+     ybottom=total.height, ytop=0, 
+     col=adjustcolor(highlight.color, alpha=0.6), border=NA)
+rect(xleft=causal.end, xright=highlight.end, 
      ybottom=total.height, ytop=0, 
      col=adjustcolor(highlight.color, alpha=0.3), border=NA)
 blueshade.ybottoms <- c(cnv.panel.y0s+(0.5*cnv.panel.height),
@@ -187,6 +191,10 @@ rect(xleft=par("usr")[1], xright=par("usr")[2],
      ybottom=blueshade.ybottoms,
      ytop=blueshade.ytops,
      border=NA, bty="n", col=bluewhite)
+
+# Add coordinate line
+add.coord.line(start, end, coord.panel.y0, highlight.start, highlight.end, 
+               highlight.col=highlight.color, tick.height=0.04, vlines=TRUE, vlines.bottom=total.height)
 
 # Add association summary stats
 add.pvalues(ss, y0=pval.panel.y0, panel.height=pval.panel.height, cnv.type=cnv.type)
