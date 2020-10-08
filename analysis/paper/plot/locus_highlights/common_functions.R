@@ -37,13 +37,20 @@ load.genes <- function(gtf.in, region){
                        "strand", "frame", "attribute")
     gtf$gene <- sapply(gtf$attribute, function(atrs.str){
       atrs <- unlist(strsplit(atrs.str, split=";"))
-      gsub("\"", "", unlist(strsplit(atrs[grep("gene_name", atrs)], split=" "))[[2]])
+      parts <- unlist(strsplit(atrs[grep("gene_name", atrs)], split=" "))
+      gsub("\"", "", parts[length(parts)])
     })
-    gtf <- gtf[, c("chr", "start", "end", "gene", "strand", "feature")]
+    gtf$transcript <- sapply(gtf$attribute, function(atrs.str){
+      atrs <- unlist(strsplit(atrs.str, split=";"))
+      parts <- unlist(strsplit(atrs[grep("transcript_id", atrs)], split=" "))
+      gsub("\"", "", parts[length(parts)])
+    })
+    gtf <- gtf[, c("chr", "start", "end", "gene", "strand", "feature", "transcript")]
     gtf[, c("start", "end")] <- apply(gtf[, c("start", "end")], 2, as.numeric)
   }else{
     gtf <- data.frame("chr"=character(), "start"=numeric(), "end"=numeric(),
-                      "gene"=character(), "strand"=character(), "feature"=character())
+                      "gene"=character(), "strand"=character(), "feature"=character(),
+                      "transcript"=character())
   }
   
   return(gtf)
@@ -83,6 +90,18 @@ get.sample.sizes <- function(table.in, case.hpos=c("HP:0000118"),
   n.case <- apply(n[which(n[, 1] %in% case.hpos), grep("meta", colnames(n), fixed=T)], 2, max, na.rm=T)
   n.ctrl <- n[which(n[, 1] == ctrl.hpo), grep("meta", colnames(n), fixed=T)]
   return(list("case"=as.numeric(as.vector(n.case)), "ctrl"=as.numeric(as.vector(n.ctrl))))
+}
+
+# Load a quantitative feature from a BED file
+load.feature.bed <- function(bedpath, keep.chrom=NULL, keep.col=4){
+  bed <- read.table(bedpath, sep="\t")
+  if(!is.null(keep.chrom)){
+    bed <- bed[which(bed[, 1] == keep.chrom), ]
+  }
+  bed <- bed[, c(1:3, keep.col)]
+  colnames(bed) <- c("chr", "start", "end", "value")
+  bed$value <- as.numeric(bed$value)
+  return(bed)
 }
 
 # Load CNVs from a single BED, and split by case/control
@@ -297,8 +316,13 @@ add.coord.line <- function(start, end, y0, highlight.start, highlight.end, highl
 }
 
 # Add gene bodies to plot
-add.genes <- function(genes, y0, n.rows=1, panel.height=0.2, col=ns.color,
+add.genes <- function(genes, y0, transcripts=FALSE, mark.tss=FALSE, 
+                      n.rows=1, panel.height=0.2, col=ns.color,
                       y.axis.title=NULL, y.axis.title.col=NULL, label.genes=c()){
+  require(shape, quietly=T)
+  if(transcripts==TRUE){
+    genes$gene <- genes$transcript
+  }
   gene.names <- unique(genes$gene)
   n.genes <- length(gene.names)
   
@@ -308,6 +332,10 @@ add.genes <- function(genes, y0, n.rows=1, panel.height=0.2, col=ns.color,
   row.height <- panel.height / n.rows
   exon.height <- (2/3) * row.height
   utr.height <- (1/3) * row.height
+  if(mark.tss==TRUE){
+    exon.height <- 0.75 * exon.height
+    utr.height <- 0.75 * utr.height
+  }
   row.mids <- seq(panel.bottom + (0.5*row.height), 
                   panel.top - (0.5*row.height), 
                   length.out=n.rows)
@@ -319,9 +347,29 @@ add.genes <- function(genes, y0, n.rows=1, panel.height=0.2, col=ns.color,
     tx.coords <- genes[which(genes$gene==gene & genes$feature=="transcript"), 2:3]
     tx.coords$end[which(tx.coords$end > par("usr")[2])] <- par("usr")[2]
     tx.coords$start[which(tx.coords$start < par("usr")[1])] <- par("usr")[1]
+    tx.strand <- genes$strand[which(genes$gene==gene & genes$feature=="transcript")]
     ex.coords <- genes[which(genes$gene==gene & genes$feature=="exon"), 2:3]
     utr.coords <- genes[which(genes$gene==gene & genes$feature=="UTR"), 2:3]
     if(nrow(tx.coords) > 0){
+      if(mark.tss==TRUE){
+        tss.arrow.buffer <- 0.015 * (end-start)
+        tss.arrow.height <- 0.5 * 0.75 * row.height
+        tss.arrow.y1 <- row.mids[row.idx] + tss.arrow.height
+        if(tx.strand=="+"){
+          tss.arrow.start <- as.numeric(tx.coords[1])
+          tss.arrow.end <- tss.arrow.start + tss.arrow.buffer
+        }else{
+          tss.arrow.start <- as.numeric(tx.coords[2])
+          tss.arrow.end <- tss.arrow.start - tss.arrow.buffer
+        }
+        segments(x0=tss.arrow.start, x1=tss.arrow.start,
+                 y0=row.mids[row.idx], y1=tss.arrow.y1,
+                 col=blueblack)
+        Arrows(x0=tss.arrow.start, x1=tss.arrow.end,
+               y0=tss.arrow.y1, y1=tss.arrow.y1,
+               arr.type="triangle", arr.length=0.12, arr.width=0.08,
+               col=blueblack)
+      }
       segments(x0=tx.coords[, 1], x1=tx.coords[, 2], 
                y0=row.mids[row.idx], y1=row.mids[row.idx],
                lend="round", col=col)
@@ -330,13 +378,13 @@ add.genes <- function(genes, y0, n.rows=1, panel.height=0.2, col=ns.color,
       rect(xleft=ex.coords[, 1], xright=ex.coords[, 2],
            ybottom=row.mids[row.idx]-(0.5*exon.height),
            ytop=row.mids[row.idx]+(0.5*exon.height),
-           border=col, lwd=0.3, col=col)
+           border=col, lwd=1, col=col)
     }
     if(nrow(utr.coords) > 0){
       rect(xleft=utr.coords[, 1], xright=utr.coords[, 2],
            ybottom=row.mids[row.idx]-(0.5*utr.height),
            ytop=row.mids[row.idx]+(0.5*utr.height),
-           border=col, lwd=0.3, col=col)
+           border=col, lwd=1, col=col)
     }
     if(gene %in% label.genes){
       if(row.mids[row.idx] >= y0){
@@ -545,6 +593,55 @@ add.pips <- function(pips, genes, y0, panel.height=0.2, label.genes=NULL,
            y=best.y, labels=gene, font=3, cex=5/6, pos=best.pos)
     })
   }
+}
+
+# Add panel of simple rectangles
+add.rects <- function(xlefts, xrights, y0, col=blueblack, border=blueblack,
+                      panel.height=0.2, rect.height.cex=1, y.axis.title=NULL){
+  # Get panel parameters
+  half.height <- 0.5*panel.height
+  ybottom <- rect.height.cex * (y0 - half.height)
+  ytop <- rect.height.cex * (y0 + half.height)
+  
+  # Add rectangles
+  rect(xleft=xlefts, xright=xrights, ybottom=ybottom, ytop=ytop, col=col, border=border)
+  
+  # Add Y-axis title
+  axis(2, at=y0, tick=F, line=-0.9, las=2, labels=y.axis.title)
+}
+
+# Add panel of BED-style feature as coordinate-based barplot
+add.feature.barplot <- function(bed, y0, col=blueblack, panel.height=0.2, ytitle=NULL){
+  # Get panel parameters
+  half.height <- 0.5*panel.height
+  ybottom <- y0 - half.height
+  ytop <- y0 + half.height
+  
+  # Scale feature values according to y0 and panel.height
+  vals.orig <- as.numeric(bed$value)
+  max.vals.orig <- max(vals.orig, na.rm=T)
+  vals.scaled <- (panel.height / (1.05*max.vals.orig)) * vals.orig
+  vals <- vals.scaled + y0 - half.height
+  
+  # Add horizontal gridlines
+  y.ax.tick.spacing <- seq(-half.height, half.height, length.out=6)
+  abline(h=c(y0 + y.ax.tick.spacing), col="white")
+  
+  # Add rectangles
+  rect(xleft=bed$start, xright=bed$end, ybottom=ybottom, ytop=vals,
+       col=col, border=col)
+  
+  # Add Y-axis
+  y.ax.label.cex <- 5/6
+  axis(2, at=c(ybottom, ytop), tick=0, labels=NA, col=blueblack)
+  axis(2, at=y0 + y.ax.tick.spacing, tck=-0.0075, col=blueblack, labels=NA)
+  axis(2, at=y0+c(-half.height, half.height), tick=F, las=2, line=-0.65,
+       labels=c(0, ceiling(max.vals.orig)+1), cex.axis=y.ax.label.cex)
+  axis(2, at=y0, line=-0.2, tick=F, labels=ytitle, las=2)
+  
+  # Add cleanup top & bottom lines
+  abline(h=c(ytop, ybottom), col=blueblack)
+  segments(x0=par("usr")[2], x1=par("usr")[2], y0=ybottom, y1=ytop, col=blueblack, xpd=T)
 }
 
 # Add mirrored case & control CNV pileups for a single cohort to an existing coordinate plot
