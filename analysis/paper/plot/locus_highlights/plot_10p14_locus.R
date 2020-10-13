@@ -8,7 +8,7 @@
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Plot CADM2 intronic deletion rCNV locus highlight for rCNV2 paper
+# Plot 10p14 intergenic duplication rCNV locus highlight for rCNV2 paper
 
 
 options(stringsAsFactors=F, scipen=1000)
@@ -25,9 +25,12 @@ require(shape, quietly=T)
 option_list <- list(
   make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced."),
   make_option(c("--gtf"), help="GTF for plotting gene bodies. Must be tabix indexed."),
+  make_option(c("--ncrna-gtf"), help="GTF for plotting gene bodies. Must be tabix indexed."),
   make_option(c("--pips"), help="BED file of PIPs for all genes."),
   make_option(c("--rnaseq"), help="RNAseq BED file."),
-  make_option(c("--chromhmm-tracks"), help=".tsv of ChromHMM BED files to plot."),
+  make_option(c("--chipseq"), help="ChIP-seq BED file."),
+  make_option(c("--esc-chromhmm-tracks"), help=".tsv of ESC ChromHMM BED files to plot."),
+  make_option(c("--adult-chromhmm-tracks"), help=".tsv of adult cortex ChromHMM BED files to plot."),
   make_option(c("--chromhmm-manifest"), help=".tsv of ChromHMM state manifest.")
 )
 
@@ -52,21 +55,26 @@ genome.in <- args$args[4]
 out.prefix <- args$args[5]
 rcnv.config <- opts$`rcnv-config`
 gtf.in <- opts$gtf
+ncrna.gtf.in <- opts$`ncrna-gtf`
 pips.in <- opts$pips
 rnaseq.in <- opts$rnaseq
-chromhmm.tracks.in <- opts$`chromhmm-tracks`
+chipseq.in <- opts$chipseq
+esc.chromhmm.tracks.in <- opts$`esc-chromhmm-tracks`
+adult.chromhmm.tracks.in <- opts$`adult-chromhmm-tracks`
 chromhmm.manifest.in <- opts$`chromhmm-manifest`
 
 # # DEV PARAMETERS
 # cnvlist.in <- "~/scratch/cnvlist.tsv"
-# sumstats.in <- "~/scratch/HP0000752.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz"
+# sumstats.in <- "~/scratch/HP0012759.rCNV.DUP.sliding_window.meta_analysis.stats.bed.gz"
 # sample.size.table <- "~/scratch/HPOs_by_metacohort.table.tsv"
 # genome.in <- "~/scratch/GRCh37.genome"
 # out.prefix <- "~/scratch/noncoding_locus_highlights_test"
 # rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-# gtf.in <- "~/scratch/gencode.v19.annotation.CADM2.gtf.gz"
-# rnaseq.in <- "~/scratch/CADM2.fetal_cortex_RNAseq.3kb_bins.bed.gz"
-# chromhmm.tracks.in <- "~/scratch/CADM2.chromhmm_paths.tsv"
+# gtf.in <- "~/scratch/gencode.v19.canonical.pext_filtered.gtf.gz"
+# ncrna.gtf.in <- "~/scratch/gencode.v19.annotation.chr10_ncRNAs.gtf.gz"
+# chipseq.in <- "~/scratch/10p14.ESC_H3k27ac.1kb_bins.bed.gz"
+# esc.chromhmm.tracks.in <- "~/scratch/10p14.chromhmm_paths.tsv"
+# adult.chromhmm.tracks.in <- "~/scratch/CADM2.chromhmm_paths.tsv"
 # chromhmm.manifest.in <- "~/scratch/REP_state_manifest.tsv"
 # script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/locus_highlights/"
 
@@ -80,23 +88,20 @@ script.dir <- funr::get_script_path()
 source(paste(script.dir, "common_functions.R", sep="/"))
 
 # Set locus parameters
-chrom <- 3
-highlight.start <- 85160000
-highlight.end <- 85560000
+chrom <- 10
+highlight.start <- 6620000
+highlight.end <- 6920000
 highlight.width <- highlight.end - highlight.start
-crb.starts <- c(85245894, 85300195)
-crb.ends <- c(85278400, 85314000)
-rss.starts <- c(85288006, 85560906)
-rss.ends <- c(85288206, 85561148)
-viewpoint.buffer.left <- 0.75 * highlight.width
-viewpoint.buffer.right <- 1.5 * highlight.width
+crb.starts <- c(6756200, 6816600)
+crb.ends <- c(6793711, 6838000)
+viewpoint.buffer.left <- (1/3) * highlight.width
+viewpoint.buffer.right <- (6/5) * highlight.width
 start <- floor(max(c(0, highlight.start - viewpoint.buffer.left)))
 end <- ceiling(highlight.end + viewpoint.buffer.right)
 region <- paste(chrom, ":", start, "-", end, sep="")
-cnv.type <- "DEL"
+cnv.type <- "DUP"
 all.case.hpos <- c("HP:0000707")
-highlight.case.hpo <- "HP:0000752"
-credset.genes <- c("CADM2")
+highlight.case.hpo <- "HP:0012759"
 
 # # Required for bedr::tabix in local Rstudio only:
 # Sys.setenv(PATH = paste(Sys.getenv("PATH"),
@@ -105,27 +110,21 @@ credset.genes <- c("CADM2")
 
 # Load genes
 genes <- load.genes(gtf.in, region)
-elig.tx <- unique(genes$transcript[which(genes$end - genes$start > 10000 & genes$gene=="CADM2" & genes$feature=="transcript")])
-genes <- genes[which(genes$transcript %in% elig.tx), ]
+ncrnas <- load.genes(ncrna.gtf.in, region)
 
 # Load meta-analysis summary stats
 ss <- load.sumstats(sumstats.in, region)
-ss$meta_phred_p[which(is.na(as.numeric(ss$meta_phred_p)))] <- 0
-ss$meta_lnOR[which(is.na(as.numeric(ss$meta_lnOR)))] <- 0
-ss$meta_lnOR_lower[which(is.na(as.numeric(ss$meta_lnOR_lower)))] <- -100
-ss$meta_lnOR_upper[which(is.na(as.numeric(ss$meta_lnOR_upper)))] <- 100
 
 # Load sample sizes
 n.samples <- get.sample.sizes(sample.size.table, all.case.hpos)
 n.samples.highlight <- get.sample.sizes(sample.size.table, highlight.case.hpo)
 
-# Load RNAseq BED
-rnaseq <- load.feature.bed(rnaseq.in, region, keep.col=6)
-max.rnaseq.value <- quantile(rnaseq$value, 0.99)
-rnaseq$value[which(rnaseq$value >= max.rnaseq.value)] <- max.rnaseq.value
+# Load H3K27ac ChIP-seq
+h3k27ac <- load.feature.bed(chipseq.in, region, keep.col=6)
 
 # Load ChromHMM BEDs & annotate with state colors
-chmm.tracks <- load.chromhmm.tracks(chromhmm.tracks.in, chromhmm.manifest.in, region)
+esc.chmm.tracks <- load.chromhmm.tracks(esc.chromhmm.tracks.in, chromhmm.manifest.in, region)
+adult.chmm.tracks <- load.chromhmm.tracks(adult.chromhmm.tracks.in, chromhmm.manifest.in, region)
 
 # Load all CNVs
 cnvs <- load.cnvs.multi(cnvlist.in, region, cnv.type, all.case.hpos)
@@ -134,10 +133,11 @@ cnvs <- load.cnvs.multi(cnvlist.in, region, cnv.type, all.case.hpos)
 # idiogram (above y=0)
 # coordinate line (at y=0)
 # CRBs
-# all transcripts
-# RNAseq
-# RS sites
-# ChromHMM
+# protein-coding genes
+# ncRNAs
+# ESC H3K27ac chip-seq
+# ESC ChromHMM
+# Adult cortex ChromHMM
 # cnv pileups
 # Set plot values
 coord.panel.height <- 0.2
@@ -152,24 +152,28 @@ top.panels.height <- sum(c(idio.panel.height, idio.panel.space, 0.5*coord.panel.
 crb.panel.space <- 0.05
 crb.panel.height <- 0.1
 crb.panel.y0 <- -((0.5*coord.panel.height) + coord.panel.space + (0.5*crb.panel.height))
-gene.panel.space <- 0.05
-gene.panel.height <- 0.4
-gene.panel.y0 <- crb.panel.y0 - (0.5*crb.panel.height) - gene.panel.space - (0.5*gene.panel.height)
-rna.panel.space <- 0.075
-rna.panel.height <- 0.35
-rna.panel.y0 <- gene.panel.y0 - (0.5*gene.panel.height) - rna.panel.space - (0.5*rna.panel.height)
-rss.panel.space <- 0.05
-rss.panel.height <- 0.1
-rss.panel.y0 <- rna.panel.y0 - (0.5*rna.panel.height) - rss.panel.space - (0.5*rss.panel.height)
-chmm.panel.space <- 0.075
-chmm.panel.height <- 0.3
-chmm.panel.y0 <- rss.panel.y0 - (0.5*rss.panel.height) - chmm.panel.space - (0.5*chmm.panel.height)
+pcgene.panel.space <- 0.15
+pcgene.panel.height <- 0.1
+pcgene.panel.y0 <- crb.panel.y0 - (0.5*crb.panel.height) - pcgene.panel.space - (0.5*pcgene.panel.height)
+nc.panel.space <- 0.075
+nc.panel.height <- 0.1
+nc.panel.y0 <- pcgene.panel.y0 - (0.5*pcgene.panel.height) - nc.panel.space - (0.5*nc.panel.height)
+h3k27ac.panel.space <- 0.1
+h3k27ac.panel.height <- 0.3
+h3k27ac.panel.y0 <- nc.panel.y0 - (0.5*nc.panel.height) - h3k27ac.panel.space - (0.5*h3k27ac.panel.height)
+esc.chmm.panel.space <- 0.075
+esc.chmm.panel.height <- 0.3
+esc.chmm.panel.y0 <- h3k27ac.panel.y0 - (0.5*h3k27ac.panel.height) - esc.chmm.panel.space - (0.5*esc.chmm.panel.height)
+adult.chmm.panel.space <- 0.1
+adult.chmm.panel.height <- 0.3
+adult.chmm.panel.y0 <- esc.chmm.panel.y0 - (0.5*esc.chmm.panel.height) - adult.chmm.panel.space - (0.5*adult.chmm.panel.height)
 upper.panels.height <- -sum(c((0.5 * coord.panel.height), coord.panel.space,
                               crb.panel.height, crb.panel.space,
-                              gene.panel.height, gene.panel.space, 
-                              rna.panel.height, rna.panel.space,
-                              rss.panel.height, rss.panel.space,
-                              chmm.panel.height, chmm.panel.space))
+                              pcgene.panel.height, pcgene.panel.space, 
+                              nc.panel.height, nc.panel.space, 
+                              h3k27ac.panel.height, h3k27ac.panel.space,
+                              esc.chmm.panel.height, esc.chmm.panel.space,
+                              adult.chmm.panel.height, adult.chmm.panel.space))
 # Lower panels = CNV pileup
 cnv.panel.height <- 0.65
 cnv.panel.spacing <- 0.15
@@ -181,7 +185,7 @@ cnv.key.y0 <- total.height - cnv.key.spacing - (0.5*cnv.key.height)
 total.height.plus.key <- cnv.key.y0 + (0.5*cnv.key.height)
 
 # Prep locus plot
-pdf(paste(out.prefix, "locus_highlight.CADM2.pdf", sep="."), height=3.5*2, width=3.25*2)
+pdf(paste(out.prefix, "locus_highlight.10p14.pdf", sep="."), height=3.5*2, width=3.25*2)
 par(mar=c(0.7, 6.5, 0, 0.5), bty="n")
 plot(NA, xlim=c(start, end), ylim=c(total.height.plus.key, top.panels.height), 
      yaxt="n", xaxt="n", ylab="", xlab="")
@@ -203,9 +207,9 @@ rect(xleft=crb.ends[2], xright=highlight.end,
 # rect(xleft=rss.starts, xright=rss.ends, 
 #      ybottom=total.height, ytop=0, 
 #      col=control.cnv.colors[3], border=control.cnv.colors[3])
-blueshade.ybottoms <- c(rna.panel.y0+(0.5*rna.panel.height),
+blueshade.ybottoms <- c(h3k27ac.panel.y0+(0.5*h3k27ac.panel.height),
                         cnv.panel.y0s+(0.5*cnv.panel.height))
-blueshade.ytops <- c(rna.panel.y0-(0.5*rna.panel.height),
+blueshade.ytops <- c(h3k27ac.panel.y0-(0.5*h3k27ac.panel.height),
                      cnv.panel.y0s-(0.5*cnv.panel.height))
 rect(xleft=par("usr")[1], xright=par("usr")[2], 
      ybottom=blueshade.ybottoms,
@@ -224,29 +228,26 @@ text(x=min(crb.starts), y=crb.panel.y0-(0.1*crb.panel.height), pos=2, cex=5.5/6,
      labels="Significant CRBs", col=blueblack)
 
 # Add all genes
-add.genes(genes[which(genes$gene == "CADM2"), ], n.rows=3, transcripts=TRUE,
-          y0=gene.panel.y0, panel.height=gene.panel.height, col=graphabs.green,
-          y.axis.title="", y.axis.title.col="black", label.genes=c(), mark.tss=TRUE)
-axis(2, at=gene.panel.y0+(0.05*gene.panel.height), tick=F, line=-0.9, las=2, labels=bquote(italic("CADM2")), padj=0)
-axis(2, at=gene.panel.y0-(0.05*gene.panel.height), tick=F, line=-0.9, las=2, labels="Transcripts", padj=1)
+add.genes(genes, n.rows=1, transcripts=FALSE,
+          y0=pcgene.panel.y0, panel.height=pcgene.panel.height, col=graphabs.green,
+          y.axis.title="Coding Genes", label.genes=c("PRKCQ", "SFMBT2"))
 
-# Add RNAseq
-add.feature.barplot(rnaseq, y0=rna.panel.y0, col=graphabs.green, panel.height=rna.panel.height,
-                    ytitle="Fetal Cortex\nRNA-seq")
-Arrows(x0=(rss.starts[1]+rss.ends[1])/2, x1=(rss.starts[1]+rss.ends[1])/2,
-       y0=rna.panel.y0+(0.4*rna.panel.height), y1=rna.panel.y0+(0.05*rna.panel.height),
-       arr.type="triangle", col=blueblack, lwd=2, arr.adj=1, arr.length=0.175, arr.width=0.15)
+# Add ncRNAs
+add.genes(ncrnas, n.rows=1, transcripts=FALSE,
+          y0=nc.panel.y0, panel.height=nc.panel.height, col=cnv.colors[3],
+          y.axis.title="Noncoding RNAs")
 
-# Add RSSs
-add.rects(rss.starts, rss.ends, y0=rss.panel.y0, panel.height=rss.panel.height,
-          col=graphabs.green, y.axis.title="")
-text(x=min(rss.starts), y=rss.panel.y0-(0.1*rss.panel.height), pos=2, cex=5.5/6, 
-     labels="Recursive Splice Sites", col=graphabs.green)
+# Add cortex H3k27ac ChIP-seq
+add.feature.barplot(h3k27ac, y0=h3k27ac.panel.y0, col=h3k27ac.color,
+                    panel.height=h3k27ac.panel.height, ytitle="ESC H3K27ac")
 
-# Add ChromHMM tracks
-add.chromhmm(chmm.tracks, y0=chmm.panel.y0, panel.height=chmm.panel.height,
+# Add ESC ChromHMM tracks
+add.chromhmm(esc.chmm.tracks, y0=esc.chmm.panel.y0, panel.height=esc.chmm.panel.height,
+             y.axis.title="ESC\nChromatin State")
+
+# Add adult cortex ChromHMM tracks
+add.chromhmm(adult.chmm.tracks, y0=adult.chmm.panel.y0, panel.height=adult.chmm.panel.height,
              y.axis.title="Adult Cortex\nChromatin State")
-
 
 # Add CNV panels
 if(cnv.type=="DEL"){
@@ -254,7 +255,7 @@ if(cnv.type=="DEL"){
 }else if(cnv.type=="DUP"){
   cnv.title <- "Duplication Evidence per Cohort"
 }
-text(x=mean(c(start, end)), y=upper.panels.height-(1.5*cnv.panel.spacing), labels=cnv.title, pos=3, cex=5.5/6)
+text(x=mean(c(start, end)), y=upper.panels.height-(1.4*cnv.panel.spacing), labels=cnv.title, pos=3, cex=5.5/6)
 legend.sides <- rep("right", 4)
 topbottoms <- rep("top", 4)
 sapply(1:4, function(i){

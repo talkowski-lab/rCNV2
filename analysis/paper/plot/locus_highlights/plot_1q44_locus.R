@@ -24,7 +24,9 @@ require(funr, quietly=T)
 option_list <- list(
   make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced."),
   make_option(c("--gtf"), help="GTF for plotting gene bodies. Must be tabix indexed."),
-  make_option(c("--pips"), help="BED file of PIPs for all genes.")
+  make_option(c("--pips"), help="BED file of PIPs for all genes."),
+  make_option(c("--gw-sig"), type="numeric", default=3.715428E-6,
+              help="P-value cutoff to mark as genome-wide significant.")
 )
 
 # Get command-line arguments & options
@@ -49,6 +51,8 @@ out.prefix <- args$args[5]
 rcnv.config <- opts$`rcnv-config`
 gtf.in <- opts$gtf
 pips.in <- opts$pips
+gw.sig <- opts$`gw-sig`
+
 
 # # DEV PARAMETERS
 # cnvlist.in <- "~/scratch/cnvlist.tsv"
@@ -59,6 +63,7 @@ pips.in <- opts$pips
 # rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
 # gtf.in <- "~/scratch/gencode.v19.canonical.pext_filtered.gtf.gz"
 # script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/locus_highlights/"
+# gw.sig <- 3.715428E-6
 
 # Source rCNV2 config, if optioned
 if(!is.null(rcnv.config)){
@@ -170,7 +175,7 @@ rect(xleft=par("usr")[1], xright=par("usr")[2],
      border=NA, bty="n", col=bluewhite)
 
 # Add association summary stats
-add.pvalues(ss, y0=pval.panel.y0, panel.height=pval.panel.height, cnv.type=cnv.type)
+add.pvalues(ss, y0=pval.panel.y0, panel.height=pval.panel.height, cnv.type=cnv.type, gw.sig=gw.sig)
 add.ors(ss, y0=or.panel.y0, panel.height=or.panel.height, cnv.type=cnv.type)
 
 # Add all genes

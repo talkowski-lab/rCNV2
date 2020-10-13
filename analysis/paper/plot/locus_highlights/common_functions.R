@@ -93,15 +93,50 @@ get.sample.sizes <- function(table.in, case.hpos=c("HP:0000118"),
 }
 
 # Load a quantitative feature from a BED file
-load.feature.bed <- function(bedpath, keep.chrom=NULL, keep.col=4){
-  bed <- read.table(bedpath, sep="\t")
-  if(!is.null(keep.chrom)){
-    bed <- bed[which(bed[, 1] == keep.chrom), ]
+load.feature.bed <- function(bedpath, region, keep.col=4){
+  # Required for bedr in local Rstudio only:
+  # Sys.setenv(PATH = paste(Sys.getenv("PATH"),
+  #                         "/Users/collins/anaconda3/envs/py3/bin",
+  #                         sep = ":"))
+  
+  # Tabix region of interest
+  if(!file.exists(paste(bedpath, "tbi", sep="."))){
+    stop(paste("tabix index not found for input file", bedpath))
   }
-  bed <- bed[, c(1:3, keep.col)]
-  colnames(bed) <- c("chr", "start", "end", "value")
-  bed$value <- as.numeric(bed$value)
+  require(bedr, quietly=T)
+  bed <- bedr::tabix(region, bedpath, check.chr=FALSE)
+  if(!is.null(bed)){
+    bed <- bed[, c(1:3, keep.col)]
+    colnames(bed) <- c("chr", "start", "end", "value")
+    bed$value <- as.numeric(bed$value)
+  }else{
+    bed <- data.frame("chr"=character(), "start"=numeric(),
+                      "end"=numeric(), value=numeric())
+  }
+  
   return(bed)
+}
+
+# Load ChromHMM state color code as HEX from manifest .tsv
+load.chromhmm.colors <- function(chromhmm.manifest.in){
+  mfst <- read.table(chromhmm.manifest.in, sep="\t", comment.char="", header=T)
+  colors <- sapply(mfst$COLOR.CODE, function(str){
+    cvals <- as.numeric(unlist(strsplit(str, split=",")))
+    rgb(cvals[1], cvals[2], cvals[3], maxColorValue=255)
+  })
+  names(colors) <- mfst[, 1]
+  return(colors)
+}
+
+# Load a set of ChromHMM tracks from an input .tsv and apply color scheme
+load.chromhmm.tracks <- function(chromhmm.tracks.in, chromhmm.manifest.in, region){
+  tlist <- read.table(chromhmm.tracks.in)[, 1]
+  chmm.colors <- load.chromhmm.colors(chromhmm.manifest.in)
+  lapply(tlist, function(tpath){
+    track <- load.feature.bed(tpath, region)
+    track$color <- chmm.colors[track$value]
+    return(track)
+  })
 }
 
 # Load CNVs from a single BED, and split by case/control
@@ -394,7 +429,10 @@ add.genes <- function(genes, y0, transcripts=FALSE, mark.tss=FALSE,
         glabel.pos <- 1
         glabel.y <- row.mids[row.idx]+(0.25*row.height)
       }
-      text(x=mean(as.numeric(tx.coords[1, 1:2])), y=glabel.y,
+      glab.coords <- as.numeric(tx.coords[1, 1:2])
+      glab.coords[1] <- max(c(par("usr")[1], glab.coords[1]))
+      glab.coords[2] <- min(c(par("usr")[2], glab.coords[2]))
+      text(x=mean(glab.coords), y=glabel.y, xpd=T,
            cex=5/6, font=3, labels=gene, pos=glabel.pos)
     }
   })
@@ -430,7 +468,9 @@ add.bracket <- function(xleft, xright, y0, height, col=blueblack, staple.wex=0.0
 }
 
 # Add panel of phred-scaled P-values 
-add.pvalues <- function(ss, y0, cnv.type, panel.height=0.2, pt.cex=0.6){
+add.pvalues <- function(ss, y0, cnv.type, panel.height=0.2, pt.cex=0.6, gw.sig=NULL, 
+                        min.y=9, gw.sig.label="Genome-wide significance",
+                        gw.sig.label.side="above"){
   # Get panel parameters
   half.height <- 0.5*panel.height
   ybottom <- y0 - half.height
@@ -446,13 +486,27 @@ add.pvalues <- function(ss, y0, cnv.type, panel.height=0.2, pt.cex=0.6){
   # Scale p-values according to y0 and panel.height
   pos <- as.numeric(ss$pos)
   pvals.orig <- as.numeric(ss$meta_phred_p)
-  max.pval.orig <- max(pvals.orig, na.rm=T)
-  pvals.scaled <- (panel.height / (ceiling(max.pval.orig) + 1)) * pvals.orig
+  max.pval.orig <- max(c(9, (ceiling(max(pvals.orig, na.rm=T)) + 1)))
+  pval.scale.factor <- (panel.height / max.pval.orig)
+  pvals.scaled <- pval.scale.factor * pvals.orig
   pvals <- pvals.scaled + y0 - half.height
   
   # Add horizontal gridlines
   y.ax.tick.spacing <- seq(-half.height, half.height, length.out=6)
   abline(h=c(y0 + y.ax.tick.spacing), col="white")
+  
+  # Add marker for genome-wide significance, if optioned
+  if(!is.null(gw.sig)){
+    gw.sig.y <- (-log10(gw.sig) * pval.scale.factor) + y0 - half.height
+    abline(h=gw.sig.y, col=graphabs.green, lty=5)
+    if(gw.sig.label.side=="above"){
+      gw.sig.label.y <- gw.sig.y+((2/3)*diff(y.ax.tick.spacing[1:2]))
+    }else{
+      gw.sig.label.y <- gw.sig.y-((2/3)*diff(y.ax.tick.spacing[1:2]))
+    }
+    text(x=par("usr")[1], y=gw.sig.label.y, cex=5/6, font=3, col=graphabs.green,
+         labels=gw.sig.label, pos=4)
+  }
   
   # Add points
   points(x=pos, y=pvals, pch=19, col=pt.col, cex=pt.cex)
@@ -462,7 +516,7 @@ add.pvalues <- function(ss, y0, cnv.type, panel.height=0.2, pt.cex=0.6){
   axis(2, at=c(ybottom, ytop), tick=0, labels=NA, col=blueblack)
   axis(2, at=y0 + y.ax.tick.spacing, tck=-0.0075, col=blueblack, labels=NA)
   axis(2, at=y0+c(-half.height, half.height), tick=F, las=2, line=-0.65,
-       labels=c(0, ceiling(max.pval.orig)+1), cex.axis=y.ax.label.cex)
+       labels=c(0, max.pval.orig), cex.axis=y.ax.label.cex)
   axis(2, at=y0, line=-0.2, tick=F, labels=bquote(-log[10](italic("P")[.(cnv.type)])), las=2)
   
   # Add cleanup top & bottom lines
@@ -610,6 +664,38 @@ add.rects <- function(xlefts, xrights, y0, col=blueblack, border=blueblack,
   axis(2, at=y0, tick=F, line=-0.9, las=2, labels=y.axis.title)
 }
 
+# Add panel of ChromHMM tracks
+add.chromhmm <- function(chmm.tracks, y0, panel.height=0.2, y.axis.title=NULL){
+  # Get panel parameters
+  half.height <- 0.5*panel.height
+  ybottom <- y0 - half.height
+  ytop <- y0 + half.height
+  n.tracks <- length(chmm.tracks)
+  track.breaks <- rev(seq(ybottom, ytop, length.out=n.tracks+1))
+  track.ybottoms <- track.breaks[1:n.tracks]
+  track.ytops <- track.breaks[(1:n.tracks)+1]
+  
+  # Prep background
+  rect(xleft=par("usr")[1], xright=par("usr")[2], ybottom=ybottom, ytop=ytop,
+       col="white", border=NA, bty="n")
+  
+  # Add rectangles
+  sapply(1:n.tracks, function(i){
+    track <- chmm.tracks[[i]]
+    rect(xleft=track$start, xright=track$end,
+         ybottom=track.ybottoms[i], ytop=track.ytops[[i]],
+         border=track$color, col=track$color)
+  })
+  
+  # Add Y-axis title
+  axis(2, at=y0, tick=F, line=-0.8, las=2, labels=y.axis.title)
+  
+  # Add cleanup gridlines & border
+  segments(x0=par("usr")[1], x1=par("usr")[2], y0=track.breaks, y1=track.breaks, col=bluewhite)
+  rect(xleft=par("usr")[1], xright=par("usr")[2], 
+       ybottom=ybottom, ytop=ytop, col=NA, border=blueblack, xpd=T)
+}
+
 # Add panel of BED-style feature as coordinate-based barplot
 add.feature.barplot <- function(bed, y0, col=blueblack, panel.height=0.2, ytitle=NULL){
   # Get panel parameters
@@ -620,13 +706,13 @@ add.feature.barplot <- function(bed, y0, col=blueblack, panel.height=0.2, ytitle
   # Scale feature values according to y0 and panel.height
   vals.orig <- as.numeric(bed$value)
   max.vals.orig <- max(vals.orig, na.rm=T)
-  vals.scaled <- (panel.height / (1.05*max.vals.orig)) * vals.orig
+  vals.scaled <- (panel.height / max.vals.orig) * vals.orig
   vals <- vals.scaled + y0 - half.height
   
   # Add horizontal gridlines
   y.ax.tick.spacing <- seq(-half.height, half.height, length.out=6)
   abline(h=c(y0 + y.ax.tick.spacing), col="white")
-  
+
   # Add rectangles
   rect(xleft=bed$start, xright=bed$end, ybottom=ybottom, ytop=vals,
        col=col, border=col)
@@ -638,7 +724,7 @@ add.feature.barplot <- function(bed, y0, col=blueblack, panel.height=0.2, ytitle
   axis(2, at=y0+c(-half.height, half.height), tick=F, las=2, line=-0.65,
        labels=c(0, ceiling(max.vals.orig)+1), cex.axis=y.ax.label.cex)
   axis(2, at=y0, line=-0.2, tick=F, labels=ytitle, las=2)
-  
+
   # Add cleanup top & bottom lines
   abline(h=c(ytop, ybottom), col=blueblack)
   segments(x0=par("usr")[2], x1=par("usr")[2], y0=ybottom, y1=ytop, col=blueblack, xpd=T)

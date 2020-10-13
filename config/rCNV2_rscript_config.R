@@ -135,6 +135,8 @@ pheno.colors <- c("all" = "#808080",
                   "neuro" = "#F58F38",
                   "somatic" = "#854614")
 
+h3k27ac.color <- "#FFC34D"
+
 
 ##########
 # SCALES #
