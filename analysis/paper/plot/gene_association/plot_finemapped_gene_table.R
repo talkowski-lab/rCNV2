@@ -67,9 +67,9 @@ annotate.gene <- function(gene, hpos, omim.genes, lof.genes, mis.genes){
   # OMIM comparisons
   omim.matches <- sapply(omim.genes, function(glist){gene %in% glist})
   if(any(omim.matches[hpos])){
-    omim.label <- "O+"
+    omim.label <- "D+"
   }else if(any(omim.matches)){
-    omim.label <- "O"
+    omim.label <- "D"
   }else{
     omim.label <- NA
   }
