@@ -52,6 +52,39 @@ load.associations <- function(assocs.in){
   return(assocs)
 }
 
+# Categorize genes based on their rank in credible set & PIP
+categorize.genes <- function(credsets){
+  g.cats <- lapply(c("DEL", "DUP"), function(cnv){
+    cnv.idxs <- which(credsets$cnv==cnv)
+    g.top <- unique(sort(credsets$top_gene[cnv.idxs]))
+    g.nottop <- setdiff(unique(sort(unlist(credsets$all_genes[cnv.idxs]))),
+                        g.top)
+    g.vconf <- unique(sort(unlist(credsets$vconf_genes[cnv.idxs])))
+    g.conf <- setdiff(unique(sort(unlist(credsets$conf_genes[cnv.idxs]))),
+                      g.vconf)
+    g.notconf <- setdiff(setdiff(unique(sort(unlist(credsets$all_genes[cnv.idxs]))),
+                                 g.vconf), g.conf)
+    g.top.vconf <- intersect(g.top, g.vconf)
+    g.nottop.vconf <- intersect(g.nottop, g.vconf)
+    g.top.conf <- intersect(g.top, g.conf)
+    g.nottop.conf <- intersect(g.nottop, g.conf)
+    g.top.notconf <- intersect(g.top, g.notconf)
+    g.nottop.notconf <- intersect(g.nottop, g.notconf)
+    list("top.vconf"=g.top.vconf, "nottop.vconf"=g.nottop.vconf,
+         "top.conf"=g.top.conf, "nottop.conf"=g.nottop.conf,
+         "top.notconf"=g.top.notconf, "nottop.notconf"=g.nottop.notconf)
+  })
+  names(g.cats) <- c("DEL", "DUP")
+  return(g.cats)
+}
+
+# Get all genes for a single quadrant of 2x2 grid
+get.quadrant.genes <- function(gene.groups, top, conf){
+  group.name <- paste(top, conf, sep=".")
+  sort(unique(c(gene.groups$DEL[[group.name]],
+                gene.groups$DUP[[group.name]])))
+}
+
 
 ##########################
 ### PLOTTING FUNCTIONS ###

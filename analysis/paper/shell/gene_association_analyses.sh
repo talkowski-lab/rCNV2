@@ -97,6 +97,20 @@ done < refs/test_phenotypes.list \
   ${prefix}
 
 
+# Plot gene set enrichments for fine-mapped genes vs. various gene metadata
+echo -e "lof_constrained\trefs/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list" > enrichment.genelists.tsv
+cat refs/gene_lists/DDG2P.*.genes.list | sort | uniq > ddg2p.all_dom.genes.list
+echo -e "ddg2p\tddg2p.all_dom.genes.list" >> enrichment.genelists.tsv
+echo -e "omim\trefs/gene_lists/HP0000118.HPOdb.genes.list" >> enrichment.genelists.tsv
+/opt/rCNV2/analysis/paper/plot/gene_association/plot_finemapped_enrichments.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  rCNV.final_genes.credible_sets.bed.gz \
+  rCNV.final_genes.associations.bed.gz \
+  refs/gencode.v19.canonical.pext_filtered.all_features.bed.gz \
+  enrichment.genelists.tsv \
+  ${prefix}
+
+
 # Calculate fraction of credible sets overlapping significant large segment
 for CNV in DEL DUP; do
   zcat rCNV.final_segments.loci.bed.gz \
@@ -107,9 +121,18 @@ for CNV in DEL DUP; do
 done | wc -l
 
 
+# Count number of significant large segments with at least one confident fine-mapped gene
+for CNV in DEL DUP; do
+  zcat rCNV.final_segments.loci.bed.gz \
+  | fgrep -w $CNV | cut -f22 \
+  | fgrep -wf <( zcat rCNV.final_genes.genes.bed.gz | fgrep -w $CNV | cut -f4 )
+done | wc -l
+
+
 # Copy all plots to final gs:// directory
 gsutil -m cp -r \
   ${prefix}.finemapped_distribs*pdf \
   ${prefix}.*finemapped_genes_grid*pdf \
+  ${prefix}.*.enrichments.pdf \
   ${rCNV_bucket}/analysis/paper/plots/gene_association/
 

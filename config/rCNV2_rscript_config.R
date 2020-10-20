@@ -76,14 +76,25 @@ ml.model.abbrevs <- c("ensemble" = "Ensemble",
                       "sgd" = "SGD",
                       "svm" = "SVM")
 
+nc.anno.family.names <- c("chromhmm" = "Inferred Chromatin States",
+                          "dhs" = "Open Chromatin Regions",
+                          "histone" = "Histone Modification Peaks",
+                          "tfbs" = "Transcription Factor Sites",
+                          "transcription" = "Transcribed Elements",
+                          "tads" = "Chromatin Domain Boundaries",
+                          "enhancers" = "Enhancers",
+                          "super.enhancers" = "Super Enhancers",
+                          "other" = "Other")
+
 
 ##########
 # COLORS #
 ##########
 graphabs.green <- "#027831"
 gw.sig.color <- "#FFB533"
-ns.color="gray70"
-ns.color.light="#F1F1F1"
+ns.color.dark <- "gray50"
+ns.color <- "gray70"
+ns.color.light <- "#F1F1F1"
 highlight.color <- "#FFCB00"
 
 cnv.colors <- c("DEL" = "#D43925",
@@ -136,6 +147,16 @@ pheno.colors <- c("all" = "#808080",
                   "somatic" = "#854614")
 
 h3k27ac.color <- "#FFC34D"
+
+nc.anno.family.colors <- c("chromhmm" = "#490C65",
+                           "dhs" = "#D3441C",
+                           "histone" = "#BA7FD0",
+                           "tfbs" = "#46A040",
+                           "transcription" = "#00441B",
+                           "tads" = "#01AF99",
+                           "enhancers" = "#FFA300",
+                           "super.enhancers" = "#F6313E",
+                           "other" = ns.color)
 
 
 ##########
@@ -290,4 +311,18 @@ format.scientific <- function(x, nsmall=2, max.decimal=3){
   base <- format(round(as.numeric(parts[1]), max.decimal), nsmall=nsmall)
   exp <- as.character(as.numeric(parts[2]))
   bquote(.(base) ~ "x" ~ 10 ^ .(exp))
+}
+
+# Generate colors for XY scatterplot based on density
+color.points.by.density <- function(x, y){
+  # Based on heatscatter.R from Colby Chiang
+  # (https://github.com/cc2qe/voir/blob/master/bin/heatscatter.R)
+  plot.df <- data.frame("x"=x, "y"=y)
+  plot.df <- plot.df[which(!is.infinite(plot.df$x) & !is.infinite(plot.df$y)
+                           & !is.na(plot.df$x) & !is.na(plot.df$y)), ]
+  dens <- densCols(plot.df$x, plot.df$y, colramp=colorRampPalette(c("black", "white")))
+  plot.df$dens <- col2rgb(dens)[1, ] + 1L
+  palette <- viridis(256)
+  plot.df$col <- palette[plot.df$dens]
+  plot.df[order(plot.df$dens), ]
 }

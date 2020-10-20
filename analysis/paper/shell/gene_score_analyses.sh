@@ -70,7 +70,7 @@ cat \
 | fgrep -wvf - refs/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
 | sort | uniq > no_disease_assoc.genes.list
 echo -e "No disease assoc.\tno_disease_assoc.genes.list" >> hs.gs.upset.input.tsv
-echo -e "Low-expressor intolerant\trefs/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.low_expression_variable.genes.list" >> hs.gs.upset.input.tsv
+echo -e "Low-expressor tolerant\trefs/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.low_expression_variable.genes.list" >> hs.gs.upset.input.tsv
 /opt/rCNV2/analysis/paper/plot/misc/plot_upset.R \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   --cnv-coloring "DEL" \
@@ -103,7 +103,7 @@ cat \
 | fgrep -wvf - refs/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
 | sort | uniq > no_disease_assoc.genes.list
 echo -e "No disease assoc.\tno_disease_assoc.genes.list" >> ti.gs.upset.input.tsv
-echo -e "High-expressor intolerant\trefs/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.high_expression_variable.genes.list" >> ti.gs.upset.input.tsv
+echo -e "High-expressor tolerant\trefs/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.high_expression_variable.genes.list" >> ti.gs.upset.input.tsv
 /opt/rCNV2/analysis/paper/plot/misc/plot_upset.R \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   --cnv-coloring "DUP" \

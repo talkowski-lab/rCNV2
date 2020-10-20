@@ -29,39 +29,6 @@ load.omim.lists <- function(omimlists.in){
   return(glists)
 }
 
-# Categorize genes based on their rank in credible set & PIP
-categorize.genes <- function(credsets){
-  g.cats <- lapply(c("DEL", "DUP"), function(cnv){
-    cnv.idxs <- which(credsets$cnv==cnv)
-    g.top <- unique(sort(credsets$top_gene[cnv.idxs]))
-    g.nottop <- setdiff(unique(sort(unlist(credsets$all_genes[cnv.idxs]))),
-                        g.top)
-    g.vconf <- unique(sort(unlist(credsets$vconf_genes[cnv.idxs])))
-    g.conf <- setdiff(unique(sort(unlist(credsets$conf_genes[cnv.idxs]))),
-                      g.vconf)
-    g.notconf <- setdiff(setdiff(unique(sort(unlist(credsets$all_genes[cnv.idxs]))),
-                         g.vconf), g.conf)
-    g.top.vconf <- intersect(g.top, g.vconf)
-    g.nottop.vconf <- intersect(g.nottop, g.vconf)
-    g.top.conf <- intersect(g.top, g.conf)
-    g.nottop.conf <- intersect(g.nottop, g.conf)
-    g.top.notconf <- intersect(g.top, g.notconf)
-    g.nottop.notconf <- intersect(g.nottop, g.notconf)
-    list("top.vconf"=g.top.vconf, "nottop.vconf"=g.nottop.vconf,
-         "top.conf"=g.top.conf, "nottop.conf"=g.nottop.conf,
-         "top.notconf"=g.top.notconf, "nottop.notconf"=g.nottop.notconf)
-  })
-  names(g.cats) <- c("DEL", "DUP")
-  return(g.cats)
-}
-
-# Get all genes for a single quadrant of 2x2 grid
-get.quadrant.genes <- function(gene.groups, top, conf){
-  group.name <- paste(top, conf, sep=".")
-  sort(unique(c(gene.groups$DEL[[group.name]],
-                gene.groups$DUP[[group.name]])))
-}
-
 # Annotate a single gene based on OMIM, HPO, and constraint
 annotate.gene <- function(gene, hpos, omim.genes, lof.genes, mis.genes){
   # OMIM comparisons
@@ -142,7 +109,7 @@ get.gene.color.byquadrant <- function(gene, gene.groups, top, conf){
 print.quadrant <- function(genes, gene.groups, credsets, assocs, 
                            omim.genes, lof.genes, mis.genes, 
                            x.start, y.start, top, conf, 
-                           text.cex=5/6, break.width=5){
+                           text.cex=5/6, break.width=5, y.min=NULL){
   y.add <- 0
   x.add <- 0
   k <- 0
@@ -165,9 +132,12 @@ print.quadrant <- function(genes, gene.groups, credsets, assocs,
     }else{
       gene.counts <- table(sapply(genes, get.gene.color.byquadrant, gene.groups=gene.groups, top=top, conf=conf))
       sum.labels <- paste(gene.counts[cnv.colors], "genes")
-      text(x=x.start + 0:2, y=y.start + 0.5, 
+      text(x=x.start + (1:break.width) - 1, y=y.start + 0.5, 
            labels=sum.labels, pos=4, cex=text.cex, col=cnv.colors)
     }
+  }else{
+    text(x=x.start + (break.width/2), y=(y.start + y.min)/2, 
+         labels="(No genes)", cex=text.cex, col=ns.color)
   }
 }
 
@@ -195,13 +165,15 @@ plot.gene.grid <- function(gene.groups, credsets, assocs,
        xaxt="n", xlab="", xaxs="i", yaxt="n", ylab="", yaxs="i")
   
   # Add grid
+  rect(xleft=0, xright=quadrant.width, ytop=0, ybottom=n.rows.top+n.rows.bottom, xpd=T, 
+       col=bluewhite, border=NA, bty="n", lwd=1.5)
   rect(xleft=0, xright=n.cols, ytop=0, ybottom=n.rows.total, xpd=T, 
-       col=bluewhite, border=blueblack, lwd=1.5)
+       col=NA, border=blueblack, lwd=1.5)
   segments(x0=0, x1=n.cols, 
            y0=c(n.rows.top, n.rows.top+n.rows.bottom), 
            y1=c(n.rows.top, n.rows.top+n.rows.bottom), 
            col=blueblack)
-  segments(x0=quadrant.width, x1=quadrant.width, y0=0, y1=n.rows.total)
+  segments(x0=quadrant.width, x1=quadrant.width, y0=0, y1=n.rows.total, col=blueblack)
   
   # Add axes
   axis(3, at=quadrant.width/2, tick=F, line=-0.85, labels="Top gene in at least one credible set")
@@ -215,23 +187,28 @@ plot.gene.grid <- function(gene.groups, credsets, assocs,
   axis(2, at=n.rows.top+(n.rows.bottom/2)+0.2, tick=F, line=-0.8, las=2, padj=1, 
        labels=expression(("PIP" >= 0.15)), cex.axis=(5.5/6))
   axis(2, at=n.rows.top+n.rows.bottom+0.5-0.2, tick=F, line=-0.8, las=2, padj=0, 
-       labels="Other")
+       labels="Unlikely")
   axis(2, at=n.rows.top+n.rows.bottom+0.5+0.2, tick=F, line=-0.8, las=2, padj=1, 
        labels=expression(("PIP" < 0.15)), cex.axis=(5.5/6))
   
   # Add genes to each quadrant
   print.quadrant(genes.topleft, gene.groups, credsets, assocs, omim.genes, lof.genes, mis.genes,
-                 x.start=0, y.start=0, "top", "vconf", break.width=quadrant.width)
+                 x.start=0.08, y.start=0, "top", "vconf", break.width=quadrant.width, y.min=n.rows.top)
   print.quadrant(genes.topright, gene.groups, credsets, assocs, omim.genes, lof.genes, mis.genes,
-                 x.start=quadrant.width, y.start=0, "nottop", "vconf", break.width=quadrant.width)
+                 x.start=quadrant.width+0.08, y.start=0, "nottop", "vconf", break.width=quadrant.width, 
+                 y.min=n.rows.top)
   print.quadrant(genes.bottomleft, gene.groups, credsets, assocs, omim.genes, lof.genes, mis.genes,
-                 x.start=0, y.start=n.rows.top, "top", "conf", break.width=quadrant.width)
+                 x.start=0.08, y.start=n.rows.top, "top", "conf", break.width=quadrant.width, 
+                 y.min=n.rows.top+n.rows.bottom)
   print.quadrant(genes.bottomright, gene.groups, credsets, assocs, omim.genes, lof.genes, mis.genes,
-                 x.start=quadrant.width, y.start=n.rows.top, "nottop", "conf", break.width=quadrant.width)
+                 x.start=quadrant.width+0.08, y.start=n.rows.top, "nottop", "conf", break.width=quadrant.width, 
+                 y.min=n.rows.top+n.rows.bottom)
   print.quadrant(genes.otherleft, gene.groups, credsets, assocs, omim.genes, lof.genes, mis.genes,
-                 x.start=0, y.start=n.rows.top+n.rows.bottom, "top", "notconf", break.width=quadrant.width)
+                 x.start=0.08, y.start=n.rows.top+n.rows.bottom, "top", "notconf", break.width=quadrant.width,
+                 y.min=n.rows.total)
   print.quadrant(genes.otherright, gene.groups, credsets, assocs, omim.genes, lof.genes, mis.genes,
-                 x.start=quadrant.width, y.start=n.rows.top+n.rows.bottom, "nottop", "notconf", break.width=quadrant.width)
+                 x.start=quadrant.width+0.08, y.start=n.rows.top+n.rows.bottom, "nottop", "notconf", 
+                 break.width=quadrant.width, y.min=n.rows.total)
 }
 
 
@@ -301,7 +278,7 @@ omim.genes <- load.omim.lists(omimlists.in)
 gene.groups <- categorize.genes(credsets)
 
 # Plot gene grid
-pdf(paste(out.prefix, "finemapped_genes_grid.pdf", sep="."), height=2*2.1, width=2*3.5)
+pdf(paste(out.prefix, "finemapped_genes_grid.pdf", sep="."), height=2*2.1, width=2*3.55)
 plot.gene.grid(gene.groups, credsets, assocs, omim.genes, lof.genes, mis.genes,
                quadrant.width=3, parmar=c(0.5, 4.5, 1.2, 0.2))
 dev.off()

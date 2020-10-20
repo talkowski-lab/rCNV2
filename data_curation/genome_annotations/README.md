@@ -10,7 +10,7 @@ In practice, this analysis was parallelized on [FireCloud/Terra](https://terra.b
 
 We aimed to comprehensively assess all major repositories of genome annotations.
 
-In total, we evaluated _TBD_ genome annotation tracks across all sources.  
+In total, we evaluated 11,612 genome annotation tracks across all sources.  
 
 The following table outlines all sources included in this analysis:
 
