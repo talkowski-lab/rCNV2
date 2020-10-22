@@ -186,13 +186,15 @@ mkdir basic_distribs
 # Note: in practice, this is parallelized in the cloud using segment_permutation.wdl
 # The code to execute these permutation tests is contained elsewhere
 # Copy results of segment permutation tests (note: requires permissions)
-n_seg_perms=10000
+n_seg_perms=100000
 gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/permutations/${prefix}*${n_seg_perms}_permuted_segments.bed.gz \
   ./
 
 
 # Plot segment permutation results
+# Note: depending on the number of permutations, the Docker image RAM may need 
+# to be increased (e.g., 2GB for 100k permutations is insufficient, but 8GB is enough)
 if [ -e perm_test_plots ]; then
   rm -rf perm_test_plots
 fi
@@ -211,13 +213,15 @@ mkdir perm_test_plots
 # Note: in practice, this is parallelized in the cloud using segment_permutation_bygene.wdl
 # The code to execute these permutation tests is contained elsewhere
 # Copy results of segment permutation tests (note: requires permissions)
-n_seg_perms=10000
+n_seg_perms=100000
 gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/permutations/${prefix}*${n_seg_perms}_permuted_segments_bygene.tsv.gz \
   ./
 
 
 # Plot segment permutation results while matching on number of genes per segment
+# Note: depending on the number of permutations, the Docker image RAM may need 
+# to be increased (e.g., 2GB for 100k permutations is insufficient)
 if ! [ -e perm_test_plots ]; then
   mkdir perm_test_plots
 fi

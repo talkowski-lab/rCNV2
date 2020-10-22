@@ -139,7 +139,7 @@ plot.all.perm.res(segs, perms, lit.perms,
                   pdf.dims.single=c(2.2, 2.4),
                   parmar.single=c(2.25, 2, 0, 2),
                   pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.25, 6.25, 0, 2.7))
+                  parmar.multi=c(2.25, 6.25, 0, 3.5))
 
 # Mean number of constrained genes per segment
 print("Mean constrained genes per segment:")
