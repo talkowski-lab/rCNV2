@@ -98,7 +98,7 @@ def main():
     parser.add_argument('--positive-truth-genes', required=True, 
                         help='list of positive truth genes.')
     parser.add_argument('--negative-truth-genes', required=True, 
-                        help='list of positive truth genes.')
+                        help='list of negative truth genes.')
     parser.add_argument('--exclude-genes',  help='list of genes to ignore.')
     parser.add_argument('--control-hpo', default='HEALTHY_CONTROL', help='HPO code ' +
                         'to use for control CNV counts. [default: HEALTHY_CONTROL]')

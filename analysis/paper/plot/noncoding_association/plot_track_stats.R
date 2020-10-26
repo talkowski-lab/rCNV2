@@ -79,12 +79,14 @@ track.scatter <- function(stats, pt.cex=0.2, parmar=c(2.25, 2.5, 0.25, 1)){
 
   # Add axes
   axis(1, at=c(-10e10, 10e10), col=blueblack, tck=0, labels=NA)
+  axis(1, at=log10(logscale.minor[which(logscale.minor >= 1)]), tck=-0.015, col=blueblack, labels=NA, lwd=0.7)
   axis(1, at=ax.at, tck=-0.025, col=blueblack, labels=NA)
   sapply(1:length(logscale.major.bp), function(i){
     axis(1, at=log10(logscale.major.bp[i]), tick=F, line=-0.8, cex.axis=5.5/6, 
          labels=logscale.major.bp.labels[i])
   })
   mtext(1, line=1.2, text="Mean Element Size")
+  axis(2, at=log10(logscale.minor[which(logscale.minor >= 1)]), tck=-0.015, col=blueblack, labels=NA, lwd=0.7)
   axis(2, at=c(-10e10, 10e10), col=blueblack, tck=0, labels=NA)
   axis(2, at=ax.at, tck=-0.025, col=blueblack, labels=NA)
   sapply(ax.at, function(i){
@@ -143,7 +145,7 @@ stats <- stats[which(stats$cnv=="DEL"), ]
 
 # Barplot of number of tracks per annotation family
 pdf(paste(out.prefix, "track_stats.barplot.pdf", sep="."),
-    height=2.75, width=4.1)
+    height=2.5, width=4.1)
 family.barplot(stats)
 dev.off()
 

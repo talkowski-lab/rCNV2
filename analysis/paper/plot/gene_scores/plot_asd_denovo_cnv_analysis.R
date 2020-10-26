@@ -255,7 +255,7 @@ plot.or.by.scorebin <- function(cnvs, phenos, score, n.bins=3, cnv.pct=TRUE,
   axis(2, at=c(-100, 100), tck=0, col=blueblack, labels=NA)
   axis(2, at=y.ax.at, col=blueblack, labels=NA, tck=-0.025)
   axis(2, at=y.ax.at, tick=F, labels=2^y.ax.at, las=2, line=-0.6)
-  mtext(2, text=bquote("log"[2] * "(Odds Ratio for Autism)"), line=1.5)
+  mtext(2, text="Odds Ratio for Autism", line=1.5)
 }
 
 

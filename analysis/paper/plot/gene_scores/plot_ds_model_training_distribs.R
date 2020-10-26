@@ -40,8 +40,9 @@ plot.lnors <- function(lnors, true.genes, false.genes, CNV,
   plot.dat <- list(lnors$meta_lnOR[which(lnors$gene %in% false.genes)],
                    lnors$meta_lnOR[which(!(lnors$gene %in% c(false.genes, true.genes)))],
                    lnors$meta_lnOR[which(lnors$gene %in% true.genes)])
+  plot.dat <- lapply(plot.dat, function(lnors){log2(exp(lnors))})
   ylim <- quantile(lnors$meta_lnOR, probs=c(0.005, 0.995), na.rm=T)
-  
+
   # Set CNV type-specific parameters
   if(CNV == "DEL"){
     colors <- c(ns.color, control.cnv.colors[1], cnv.colors[1])
@@ -58,7 +59,7 @@ plot.lnors <- function(lnors, true.genes, false.genes, CNV,
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
        border=NA, bty="n", col=bluewhite)
-  y.ax.at <- axTicks(2)
+  y.ax.at <- -3:10
   abline(h=y.ax.at, col="white")
   
   # Add swarms
@@ -77,7 +78,7 @@ plot.lnors <- function(lnors, true.genes, false.genes, CNV,
   axis(2, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
   axis(2, at=y.ax.at, labels=NA, tck=-0.025, col=blueblack)
   axis(2, at=y.ax.at, tick=F, las=2, line=-0.7, col=blueblack)
-  mtext(2, line=1.25, text=bquote(italic("ln")("Odds Ratio")))
+  mtext(2, line=1.25, text=bquote(log[2]("Odds Ratio")))
 }
 
 # Scatterplot of BFDP vs meta-analysis effect size
@@ -89,8 +90,12 @@ plot.bfdp.vs.lnor <- function(bfdps, lnors, true.genes, false.genes, CNV,
   plot.dat <- list(g.dat[which(g.dat$gene %in% false.genes), -1],
                    g.dat[which(!(g.dat$gene %in% c(false.genes, true.genes))), -1],
                    g.dat[which(g.dat$gene %in% true.genes), -1])
+  plot.dat <- lapply(plot.dat, function(df){
+    df$meta_lnOR <- log2(exp(df$meta_lnOR))
+    return(df)
+  })
   # xlim <- quantile(lnors$meta_lnOR, probs=c(0.001, 0.999), na.rm=T)
-  xlim <- range(lnors$meta_lnOR, na.rm=T)
+  xlim <- range(log2(exp(lnors$meta_lnOR)), na.rm=T)
   
   # Set CNV type-specific parameters
   if(CNV == "DEL"){

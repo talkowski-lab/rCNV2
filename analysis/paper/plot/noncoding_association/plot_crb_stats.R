@@ -40,6 +40,7 @@ crb.scatter <- function(crbs, pt.cex=0.2, parmar=c(2.25, 3.25, 0.25, 0.25)){
   
   # Add axes
   axis(1, at=c(-10e10, 10e10), col=blueblack, tck=0, labels=NA)
+  axis(1, at=log10(logscale.minor[which(logscale.minor >= 1)]), tck=-0.015, col=blueblack, labels=NA, lwd=0.7)
   axis(1, at=ax.at, tck=-0.025, col=blueblack, labels=NA)
   sapply(1:length(logscale.major.bp), function(i){
     axis(1, at=log10(logscale.major.bp[i]), tick=F, line=-0.8, cex.axis=5.5/6, 
@@ -47,6 +48,7 @@ crb.scatter <- function(crbs, pt.cex=0.2, parmar=c(2.25, 3.25, 0.25, 0.25)){
   })
   mtext(1, line=1.2, text="CRB Size")
   axis(2, at=c(-10e10, 10e10), col=blueblack, tck=0, labels=NA)
+  axis(2, at=log10(logscale.minor[which(logscale.minor >= 1)]), tck=-0.015, col=blueblack, labels=NA, lwd=0.7)
   axis(2, at=log10(logscale.demi), tck=-0.025, col=blueblack, labels=NA)
   sapply(logscale.demi, function(y){
     axis(2, at=log10(y), tick=F, line=-0.65, las=2, cex.axis=5.5/6,
