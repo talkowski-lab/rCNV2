@@ -32,32 +32,38 @@ We created these gene sets as follows:
 
 #### Gold-standard dosage-sensitive genes  
 
-We defined a set of 95 gold-standard haploinsufficient genes, which were **both**:  
-1. mutationally constrained, **and**
-2. known causes of dominant disease via a loss-of-function/haploinsufficient mechanism.  
+We defined 294 gold-standard haploinsufficient genes as those which met at least two of the three following criteria:  
+1. LoF-constrained (N=3,036 genes); that is, either (i) pLI ≥ 0.9 and/or (ii) in the top LOEUF sextile in gnomAD v2.1; 
+2. Known dominant disease gene via LoF mechanism (N=313); that is, either (i) ClinGen high-confidence dominant haploinsufficient genes (N=208) or (ii) DDG2P high-confidence dominant LoF genes (N=300);
+3. Genes intolerant of low-expressing samples in GTEx (N=617); specifically, genes that satisfied all of the following: (i) tight expression distributions (mean expression coefficient of variation ≤ 0.3 across tissues), (ii) expressed (mean ≥ 5 TPM & first quartile ≥ 0) in at least 3 tissues, (iii) low rate of low expression outliers (mean < 0.1% samples per tissue are low expression outliers), and (iv) no samples with TPM < 1 in any tissue where gene is expressed.  
 
-We defined `mutationally constrained` genes as those meeting **either** of the following two criteria in [gnomAD v2.1 (Karczewski _et al._, _bioRxiv_, 2019)](https://doi.org/10.1101/531210):  
-1. probability of loss-of-function intolerance (pLI) ≥ 0.9 ; **or**  
-2. in the first sextile of loss-of-function observed/expected upper fraction (LOEUF) scores.  
+We also defined 151 gold-standard triplosensitive genes as those which met at least two of the three following criteria:  
+1. Missense-constrained genes (N=3,019 genes); that is, either (i) missense Z ≥ 3 and/or (ii) in the top MOEUF sextile in gnomAD v2.1;
+2. Known dominant disease gene via triplosensitive, gain-of-function, or other (non-LoF) mechanisms (N=167); that is, either (i) ClinGen dominant triplosensitive genes at any confidence (N=15) and/or (ii) DDG2P high-confidence dominant gain-of-function or “other” mechanism genes (N=158); 
+3. Genes intolerant of overexpression in GTEx (N=279); specifically, genes that satisfied all of the following: (i) tight expression distributions (mean expression coefficient of variation ≤ 0.3 across tissues), (ii) expressed (mean ≥ 5 TPM & first quartile ≥ 0) in at least 3 tissues, and (iii) low rate of high expression outliers (mean < 1% samples per tissue are high expression outliers).  
 
-And we defined `known causes of dominant disease via a loss-of-function/haploinsufficient mechanism` genes as those meeting **both** of the following criteria: 
-1. dominant haploinsufficient disease genes scored at high confidence by [ClinGen (Strande _et al._, _Am. J. Hum. Genet._, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/28552198); **and**  
-2. dominant developmental disorder genes with a loss-of-function mechanism scored as "confirmed" in [DECIPHER/DDG2P (Wright _et al._, _Lancet_, 2015)](https://www.ncbi.nlm.nih.gov/pubmed/25529582).  
 
 #### Gold-standard dosage-insensitive genes  
 
-We also defined a set of 1,728 gold-standard haplo*sufficient* genes, which were **both**:
-1. mutationally tolerant, **and**
-2. had no known disease associations. 
+We defined a set of 3,602 gold-standard haplosufficient genes as those which met at least two of the three following criteria:
+1. Mutation-tolerant (N=2,007 genes);
+2. No known disease associations (N=14,659 genes);
+3. Genes tolerant of low-expressing samples in GTEx (N=2,682); specifically, genes that satisfied all of the following: (i) variable expression levels (mean expression coefficient of variation ≥ 0.5 across tissues), (ii) expressed (mean ≥ 5 TPM & first quartile ≥ 0) in at least 3 tissues, and (iii) high rate of expression outliers (mean ≥ 0.5% samples per tissue are low expression outliers)  
 
-We defined `mutationally tolerant` genes as those meeting **both** of the following criteria in [gnomAD v2.1 (Karczewski _et al._, _bioRxiv_, 2019)](https://doi.org/10.1101/531210):  
+We also defined a set of 3,806 bronze-standard triploinsensitive genes as those which met at least three of the four following criteria:
+1. Mutation-tolerant (N=2,007 genes);
+2. No known disease associations (N=14,659 genes);
+3. Genes tolerant of overexpression in GTEx (N=1,924); specifically, genes that satisfied all of the following: (i) variable expression levels (mean expression coefficient of variation ≥ 0.5 across tissues), (ii) expressed (mean ≥ 5 TPM & first quartile ≥ 0) in at least 3 tissues, and (iii) high rate of expression outliers (mean ≥ 5% samples per tissue are low expression outliers)
+
+For the above definitions:  
+`Mutationally tolerant` genes refer to those meeting **both** of the following criteria in [gnomAD v2.1 (Karczewski _et al._, _bioRxiv_, 2019)](https://doi.org/10.1101/531210):  
 1. pLI ≤ 0.01; **and**  
 2. in the last third of LOEUF scores; **and** 
 3. missense Z-score ≤ 0; **and**  
 4. missense observed/expected upper fraction ≥ 1; **and**  
 5. synonymous Z-score ~ (-3, 3)
 
-We defined `no known disease association` genes as those present in none of the following lists:  
+`No known disease association` refers to genes not present in any of the following lists:  
 1. Online Mendelian Inheritance in Man (OMIM) database; or
 2. DECIPHER/DDG2P [DECIPHER/DDG2P (Wright _et al._, _Lancet_, 2015)](https://www.ncbi.nlm.nih.gov/pubmed/25529582); or
 3. ClinGen dosage sensitivity map [ClinGen (Strande _et al._, _Am. J. Hum. Genet._, 2017)](https://www.ncbi.nlm.nih.gov/pubmed/28552198).  

@@ -79,7 +79,7 @@ if(!is.null(rcnv.config)){
 
 # Source common functions
 script.dir <- funr::get_script_path()
-source(paste(script.dir, "common_functions.R", sep="/"))
+source(paste(gsub("scripts/", "plot/", script.dir, fixed=T), "common_functions.R", sep="/"))
 
 # Load track stats
 stats <- load.track.stats(stats.in)

@@ -81,6 +81,12 @@ done
   ${prefix}
 
 
+# Make supplementary table of noncoding track stats
+/opt/rCNV2/analysis/paper/scripts/noncoding_association/format_track_stats_table.R \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  rCNV.burden_stats.tsv.gz \
+  ${prefix}
+
 
 # Plot annotation track distributions & stats
 /opt/rCNV2/analysis/paper/plot/noncoding_association/plot_track_stats.R \
@@ -114,6 +120,7 @@ done
 # Copy all plots to final gs:// directory
 gsutil -m cp -r \
   ${prefix}.cnv_lnORs_by_genic_context.pdf \
+  ${prefix}.annotation_burden_stats.tsv.gz \
   ${prefix}.track_stats.*.pdf \
   ${prefix}.*volcano*pdf \
   ${prefix}.chromhmm_enrichment.*.pdf \

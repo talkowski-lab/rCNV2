@@ -126,15 +126,18 @@ We empirically assessed the calibration of this primary P-value threshold using 
 
 Steps 1-3 were repeated 50 times for each CNV type and phenotype, and the median value per phenotype was computed.
 
+In practice, we considered a CRB to be genome-wide significant if:
+1. its primary P-value exceeded the genome-wide significance threshold, 
+2. its primary P-value also exceeded the genome-wide significance threshold when the full meta-analysis was rerun with all CNVs (including coding CNVs), and
+3. it satisifed at least one of the following two criteria: (i) secondary P-value (as [described above](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/genes/#3-combine-association-statistics-across-metacohorts)) was also nominally significant (P < 0.05) and/or (ii) at least two metacohorts were nominally significant (P < 0.05) per Fisher's exact test.  
+
+Absent a true replication sample, these _post hoc_ filters were applied to protect against Winner's Curse.  
+
 #### Output files  
 
 [As described above for Step 2](https://github.com/talkowski-lab/rCNV2/tree/master/analysis/noncoding#output-files), we generated the same combination of plots and statistics files for the meta-analyses results of each phenotype group.  
 
 These files are stored in the same location as the per-metacohort analysis results.  
-
-#### 4. Refine correlated associations  
-
-#### 5. Reporting of final association statistics  
 
 ---  
 
