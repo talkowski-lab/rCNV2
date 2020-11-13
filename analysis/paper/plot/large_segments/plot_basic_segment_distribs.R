@@ -155,18 +155,21 @@ dev.off()
 
 # Scatterplot of peak P-value and corresponding lnOR for all sites
 pdf(paste(out.prefix, "all_segs.best_p_vs_or.pdf", sep="."),
-    height=2.3, width=2.4)
+    height=2.8, width=2.8)
 segs.scatter(segs.all, x=log2(exp(segs.all$meta_best_lnor)), y=segs.all$meta_best_p, 
              subset_to_regions=segs.all$region_id[which(!is.infinite(segs.all$meta_best_p))],
-             horiz.lines.at=c(gw.sig, -log10(0.05)), horiz.lines.lty=c(2, 1),
-             xtitle=bquote(ln("Odds Ratio")), ytitle=bquote("Best -log"[10] * (italic(P))),
+             horiz.lines.at=c(gw.sig, -log10(0.05)), horiz.lines.lty=c(5, 2),
+             horiz.lines.color=c(graphabs.green, blueblack),
+             xtitle=bquote(log[2]("Odds Ratio")), 
+             ytitle=bquote("Best -log"[10] * (italic(P)) * ", any phenotype"),
              x.title.line=1.6, y.title.line=1.5,
-             add.lm=F, pt.cex=0.75, parmar=c(2.75, 2.75, 0.2, 0.2))
+             add.lm=F, pt.cex=0.85, parmar=c(2.75, 2.75, 0.2, 0.2))
 x.bump <- 0.04 * (par("usr")[2] - par("usr")[1])
 y.bump <- 0.04 * (par("usr")[4] - par("usr")[3])
-text(x=par("usr")[2] + x.bump, y=-log10(0.05) + y.bump, labels=format.pval(0.05), cex=0.75, pos=2, col=blueblack)
-text(x=par("usr")[2] + x.bump, y=gw.sig + 1.5*y.bump, labels=format.pval(10^-gw.sig, nsmall=1), cex=0.75, pos=2, col=blueblack)
-text(x=par("usr")[2] + x.bump, y=8.3, labels="Genome-wide\nsignificance", cex=0.75, pos=2, font=3, col=blueblack)
+text(x=par("usr")[2] + x.bump, y=-log10(0.05) + y.bump, labels=format.pval(0.05), cex=0.85, pos=2, col=blueblack)
+text(x=par("usr")[2] + x.bump, y=gw.sig + 1.5*y.bump, labels=format.pval(10^-gw.sig, nsmall=1), cex=0.85, pos=2, col=graphabs.green)
+text(x=par("usr")[2] + x.bump, y=8.3, labels="Genome-wide\nsignificance", cex=0.85, pos=2, font=3, col=graphabs.green)
 # text(x=par("usr")[2] + x.bump, y=2.4, labels="Nominal\nsignificance", cex=0.65, pos=2, font=3, col=blueblack)
 # text(x=par("usr")[2] + x.bump, y=-log10(0.05) + y.bump, labels=format.pval(0.05), cex=0.75, pos=2)
 dev.off()
+

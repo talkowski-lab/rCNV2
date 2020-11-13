@@ -223,7 +223,7 @@ calc.segs.dat <- function(segs, feature, measure, subset_to_regions=NULL){
 # Generic segment scatterplot function
 segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
                          xlims=NULL, ylims=NULL, add.lm=T, pt.cex=1,
-                         horiz.lines.at=NULL, horiz.lines.lty=1,
+                         horiz.lines.at=NULL, horiz.lines.lty=1, horiz.lines.color=NULL,
                          abline.a=NULL, abline.b=NULL, abline.lty=1,
                          xtitle=NULL, x.title.line=1.75, x.at=NULL, x.labs=NULL, x.labs.at=NULL, parse.x.labs=FALSE,
                          ytitle=NULL, y.title.line=1.75, y.at=NULL, y.labs=NULL, y.labs.at=NULL, parse.y.labs=FALSE,
@@ -260,8 +260,12 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
   }
   abline(v=x.at, h=y.at, col="white")
   if(!is.null(horiz.lines.at)){
+    n.horiz.lines <- length(horiz.lines.at)
+    if(is.null(horiz.lines.color) | length(horiz.lines.color) != n.horiz.lines){
+      horiz.lines.color <- rep(blueblack, n.horiz.lines)
+    }
     sapply(1:length(horiz.lines.at), function(i){
-      abline(h=horiz.lines.at[i], lty=horiz.lines.lty[i], col=blueblack)
+      abline(h=horiz.lines.at[i], lty=horiz.lines.lty[i], col=horiz.lines.color[i])
     })
   }
   if(!is.null(abline.a)){

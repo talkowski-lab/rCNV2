@@ -443,14 +443,31 @@ done < <( zcat rCNV.final_segments.loci.bed.gz | grep -ve '^#' \
 | bedtools merge -i - -d 200000 -c 4 -o distinct \
 | cut -f4 \
 | uniq \
-> locus_clusters.txt
+> locus_clusters.gw_sig.txt
+while read intervals rid; do
+  echo "$intervals" | sed -e 's/\;/\n/g' -e 's/\:\|\-/\t/g' \
+  | awk -v OFS="\t" -v rid=$rid '{ print $0, rid }' \
+  | bedtools merge -i - -c 4 -o distinct -d 10000000
+done < <( zcat all_gds.bed.gz | grep -ve '^#' \
+          | awk -v FS="\t" -v OFS="\t" '{ print $8, $4 }' ) \
+| sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
+| bedtools merge -i - -d 200000 -c 4 -o distinct \
+| cut -f4 \
+| uniq \
+> locus_clusters.all_gds.txt
+# Merge all sumstats for gw-sig and lit GDs
+cat <( zcat ${prefix}.final_segments.loci.all_sumstats.tsv.gz ) \
+    <( zcat ${prefix}.lit_gds.all_sumstats.tsv.gz | grep -ve '^#' ) \
+| gzip -c \
+> ${prefix}.all_segs.all_sumstats.tsv.gz
 # Generate master locus grid plot
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_association_grid.R \
-  --clusters locus_clusters.txt \
+  --gw-clusters locus_clusters.gw_sig.txt \
+  --lit-clusters locus_clusters.all_gds.txt \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
-  ${prefix}.final_segments.loci.all_sumstats.tsv.gz \
+  ${prefix}.all_segs.all_sumstats.tsv.gz \
   refs/${prefix}.reordered_hpos.txt \
   association_grid/${prefix}
 

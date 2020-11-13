@@ -81,15 +81,17 @@ calc.dnm.excess.cdf.matrix <- function(segs, dnms, csq, n.max.genes=10){
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Plot matrix of excess de novo cdfs for all loci
-dnm.excess.cdf.barplots <- function(segs, dnms, csq, n.max.genes=5, norm=F,
+dnm.excess.cdf.barplots <- function(segs, dnms, csq, n.max.genes=5, norm=F, min.excess=1,
                                     xtitle.suffix="Segments", ytitle=NULL, 
                                     legend=F, cnv.marker.wex=0.035,
                                     parmar=c(1.1, 2.6, 0.4, 0.1)){
   # Get plot data
   res <- calc.dnm.excess.cdf.matrix(segs, dnms, csq, n.max.genes)
   if(norm==T){
+    res <- res[which(apply(res, 1, sum) > min.excess), ]
     res <- t(apply(res, 1, function(vals){vals/max(vals, na.rm=T)}))
-    res <- res[order(-res[, 1]), ]
+    res.cumsum <- t(apply(res, 1, cumsum))
+    res <- res[order(-res[, 1], -res[, 2], -res[, 3], -res[, 4], -res[, 5]), ]
   }
   res <- res[which(!is.na(res[, 1])), ]
   colors <- rev(viridis(n.max.genes + 1))
@@ -263,14 +265,14 @@ sapply(c("asc", "ddd"), function(cohort){
 pdf(paste(out.prefix, "segs_by_mechanism.ddd_lof_oligogenicity_index.pdf", sep="."),
     height=2.25, width=2.6)
 segs.swarm(neuro.segs, x.bool=neuro.segs$nahr, y=neuro.segs$ddd.lof.oligo, 
-           x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.pvalue=T,
+           x.labs=c("Non-NAHR", "NAHR"), violin=T, add.pvalue=T,
            add.y.axis=T, ytitle="Oligogenicity Index", pt.cex=0.75, 
            parmar=c(1.2, 3, 2.5, 0))
 dev.off()
 pdf(paste(out.prefix, "segs_by_mechanism.ddd_mis_oligogenicity_index.pdf", sep="."),
     height=2.25, width=2.6)
 segs.swarm(neuro.segs, x.bool=neuro.segs$nahr, y=neuro.segs$ddd.mis.oligo, 
-           x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.pvalue=T,
+           x.labs=c("Non-NAHR", "NAHR"), violin=T, add.pvalue=T,
            add.y.axis=T, ytitle="Oligogenicity Index", pt.cex=0.75, 
            parmar=c(1.2, 3, 2.5, 0))
 dev.off()
@@ -279,33 +281,38 @@ dev.off()
 pdf(paste(out.prefix, "segs_by_mechanism.asc_lof_oligogenicity_index.pdf", sep="."),
     height=2.25, width=2.6)
 segs.swarm(neuro.segs, x.bool=neuro.segs$nahr, y=neuro.segs$asc.lof.oligo, 
-           x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.pvalue=T,
+           x.labs=c("Non-NAHR", "NAHR"), violin=T, add.pvalue=T,
            add.y.axis=T, ytitle="Oligogenicity Index", pt.cex=0.75, 
            parmar=c(1.2, 3, 2.5, 0))
 dev.off()
 pdf(paste(out.prefix, "segs_by_mechanism.asc_mis_oligogenicity_index.pdf", sep="."),
     height=2.25, width=2.6)
 segs.swarm(neuro.segs, x.bool=neuro.segs$nahr, y=neuro.segs$asc.mis.oligo, 
-           x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.pvalue=T,
+           x.labs=c("Non-NAHR", "NAHR"), violin=T, add.pvalue=T,
            add.y.axis=T, ytitle="Oligogenicity Index", pt.cex=0.75, 
            parmar=c(1.2, 3, 2.5, 0))
 dev.off()
 
 # Distribution of excess DNMs across neuro segments
 sapply(c("ddd", "asc"), function(cohort){
+  if(cohort=="ddd"){
+    min.excess <- 3
+  }else{
+    min.excess <- 1
+  }
   sapply(csqs, function(csq){
     if(csq=="lof"){
       ytitle.1 <- bquote("Excess" ~ italic("dn") * "PTVs")
       ytitle.2 <- bquote("Prop. of Excess" ~ italic("dn") * "PTVs")
-      xtitle.suffix.2 <- '"Segs. with Excess" ~ italic("dn") * "PTVs"'
+      xtitle.suffix.2 <- paste('"Segs. with " >= "', min.excess, ' Excess" ~ italic("dn") * "PTV"', sep="")
     }else if(csq=="mis"){
       ytitle.1 <- bquote("Excess" ~ italic("dn") * "Mis.")
       ytitle.2 <- bquote("Prop. of Excess" ~ italic("dn") * "Mis.")
-      xtitle.suffix.2 <- '"Segs. with Excess" ~ italic("dn") * "Mis."'
+      xtitle.suffix.2 <- paste('"Segs. with " >= "', min.excess, ' Excess" ~ italic("dn") * "Mis."', sep="")
     }else{
       ytitle.1 <- bquote("Excess" ~ italic("dn") * "Syn.")
       ytitle.2 <- bquote("Prop. of Excess" ~ italic("dn") * "Syn.")
-      xtitle.suffix.2 <- '"Segs. with Excess" ~ italic("dn") * "Syn."'
+      xtitle.suffix.2 <- paste('"Segs. with " >= "', min.excess, ' Excess" ~ italic("dn") * "Syn."', sep="")
     }
     pdf(paste(out.prefix, "neuro_segs", cohort, csq, "excess_dnm_distrib_bygene.pdf", sep="."),
         height=2, width=3)
@@ -315,8 +322,8 @@ sapply(c("ddd", "asc"), function(cohort){
     dev.off()
     pdf(paste(out.prefix, "neuro_segs", cohort, csq, "excess_dnm_distrib_bygene.norm.pdf", sep="."),
         height=2, width=3)
-    dnm.excess.cdf.barplots(neuro.segs, dnms[[cohort]], csq=csq, norm=T, legend=F,
-                            xtitle.suffix=xtitle.suffix.2,
+    dnm.excess.cdf.barplots(neuro.segs, dnms[[cohort]], csq=csq, norm=T, legend=F, 
+                            min.excess=min.excess, xtitle.suffix=xtitle.suffix.2,
                             ytitle=ytitle.2)
     dev.off()
   })

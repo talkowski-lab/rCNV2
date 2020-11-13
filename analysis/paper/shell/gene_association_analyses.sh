@@ -111,7 +111,7 @@ echo -e "omim\trefs/gene_lists/HP0000118.HPOdb.genes.list" >> enrichment.genelis
   ${prefix}
 
 
-# Calculate fraction of credible sets overlapping significant large segment
+# Calculate fraction of credible sets not overlapping significant large segment
 for CNV in DEL DUP; do
   zcat rCNV.final_segments.loci.bed.gz \
   | fgrep -w $CNV | cut -f22 | sed 's/\;/\n/g' \

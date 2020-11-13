@@ -31,7 +31,11 @@ load.clusters <- function(clusters.in, loci){
   }else{
     clusters <- lapply(loci$region_id, function(x){x})
   }
-  names(clusters) <- unlist(lapply(clusters, function(x){sort(sapply(strsplit(x, split="_"), function(l){l[4]}))[1]}))
+  # Restrict clusters to regions found in loci
+  clusters <- lapply(clusters, function(rids){rids[which(rids %in% loci$region_id)]})
+  clusters <- clusters[which(lapply(clusters, length) > 0)]
+  # Rename clusters
+  names(clusters) <- unlist(lapply(clusters, function(x){sort(sapply(strsplit(x, split="_"), function(l){l[length(l)]}))[1]}))
   return(clusters)
 }
 
@@ -72,11 +76,16 @@ format.genes <- function(gw, cluster, column.name="genes", max.genes=6, max.char
 prep.plot <- function(sumstats, clusters, hpos, 
                       ncols.prestats, prestat.widths, prestat.colnames,
                       ncols.poststats, poststat.widths, poststat.colnames,
-                      shading.color=NA, shading.buffer=0.15, 
+                      shading.color=NA, shading.buffer=0.15, nominal=FALSE,
                       parmar=c(0.5, 0.5, 8, 0.5)){
   # Get plot values
   ncols.hpo <- length(hpos)
   nrows <- length(clusters)
+  if(nominal==TRUE){
+    left.bracket.title <- "Nominally significant large segments from literature"
+  }else{
+    left.bracket.title <- "Genome-wide significant large segments"
+  }
   
   # Prep plotting area
   par(bty="n", mar=parmar)
@@ -111,7 +120,7 @@ prep.plot <- function(sumstats, clusters, hpos,
   axis(3, at=c(prestat.hr.at[1], prestat.hr.at[ncols.prestats+1]),
        tck=0.01, labels=NA, col=blueblack, line=2.35, lend="round")
   axis(3, at=mean(c(prestat.hr.at[1], prestat.hr.at[ncols.prestats+1])),
-       tick=F, labels="Genome-wide significant large segments", line=1.45)
+       tick=F, labels=left.bracket.title, line=1.45)
   
   # sapply(1:ncols.hpo, function(i){
   #   axis(3, at=c(i-1+shading.buffer, i-shading.buffer),
@@ -199,20 +208,25 @@ plot.all.loci <- function(gw, clusters, sumstats, hpos,
                           stat.size="pvalue", max.stat.size=8, 
                           stat.color="lnor", max.stat.color=4,
                           outline.color="gray60", background.color=bluewhite,
-                          cex.table.text=0.9, buffer=0.1, 
+                          cex.table.text=0.9, buffer=0.1, nominal=FALSE, 
                           parmar=c(0.25, 0.25, 8, 0.25)){
   # Prep plot area
   prestat.widths <- rev(c(7, 3, 4, 3, 3))
   poststat.widths <- rep(10, 3)
+  if(nominal==TRUE){
+    prestat.colnames <- c("Cytoband", "Nominal\nrCNVs", "Size", "NAHR", "Known\nGDs")
+    poststat.colnames <- c("All Genes", "Genes Constrained\nAgainst Truncating SNVs", "All OMIM\nDisease Genes")
+  }else{
+    prestat.colnames <- c("Cytoband", "Signif.\nrCNVs", "Size", "NAHR", "Known\nGDs")
+    poststat.colnames <- c("All Genes", "Genes Constrained\nAgainst Truncating SNVs", "Phenotype-Matched\nDisease Genes")
+  }
   prep.plot(sumstats, clusters, hpos,
             ncols.prestats=5, prestat.widths=prestat.widths, 
-            prestat.colnames=c("Cytoband", "Signif.\nrCNVs", "Size", "NAHR", "Known\nGDs"),
+            prestat.colnames=prestat.colnames,
             ncols.poststats=3, poststat.widths=poststat.widths,
-            poststat.colnames=c("All Genes", 
-                                "Genes Constrained\nAgainst Truncating SNVs", 
-                                "Phenotype-Matched\nDisease Genes"),
+            poststat.colnames=poststat.colnames,
             shading.color=background.color, shading.buffer=buffer,
-            parmar=parmar)
+            nominal=nominal, parmar=parmar)
   
   # Get plot data
   nhpos <- length(hpos)
@@ -227,7 +241,7 @@ plot.all.loci <- function(gw, clusters, sumstats, hpos,
   
   # Add significant CNV association
   sapply(1:nrows, function(i){
-    cnv <- gw$cnv[which(gw$region_id %in% clusters[[i]])]
+    cnv <- unique(gw$cnv[which(gw$region_id %in% clusters[[i]])])
     if(length(cnv) == 2){
       text(x=mean(x.at.left[2:3]), y=y.at[i], cex=cex.table.text,
            labels="Recip.", col=cnv.colors[3])
@@ -284,7 +298,11 @@ plot.all.loci <- function(gw, clusters, sumstats, hpos,
   })
   
   # Add genes, constrained genes, and HPO-matched genes
-  glists <- c("genes", "gnomAD_constrained_genes", "HPOmatched_genes")
+  if(nominal==TRUE){
+    glists <- c("genes", "gnomAD_constrained_genes", "OMIM_genes")
+  }else{
+    glists <- c("genes", "gnomAD_constrained_genes", "HPOmatched_genes")
+  }
   sapply(1:length(glists), function(gi){
     genes <- sapply(clusters, format.genes, gw=gw, 
                     column.name=glists[gi], 
@@ -308,26 +326,32 @@ plot.all.loci <- function(gw, clusters, sumstats, hpos,
 }
 
 # Plot P-value legend for locus grid
-plot.p.legend <- function(max.p=6){
+plot.p.legend <- function(max.p=6, max.is.gw=TRUE){
+  pvals <- unique(round(seq(0, max.p, length.out=4)))[-1]
   # Prep plot area
   par(mar=c(rep(0.1, 3), 4), bty="n")
   plot(NA, xlim=c(0, 1), ylim=c(0, 3), asp=1,
        xaxt="n", xlab="", xaxs="i", yaxt="n", ylab="", yaxs="i")
-  sapply(1:3, function(i){
-    if(i<3){
+  sapply(1:length(pvals), function(i){
+    if(i<length(pvals)){
       sapply(c("top", "bottom"), function(side){
-        plot.semicircle(x=0.5, y=i-0.5, r=0.5*((2*i)/max.p), side=side, 
+        plot.semicircle(x=0.5, y=i-0.5, r=0.5*((pvals[i])/max.p), side=side, 
                         color=control.cnv.colors[2], border=control.cnv.colors[2], xpd=T)
       })
       axis(4, at=i-0.5, las=2, line=-0.8, tick=F,
-           labels=bquote(italic(P) == 10^-.(2*i)))
+           labels=bquote(italic(P) == 10^-.(pvals[i])))
     }else{
+      if(max.is.gw==TRUE){
+        border <- blueblack
+      }else{
+        border <- control.cnv.colors[2]
+      }
       sapply(c("top", "bottom"), function(side){
-        plot.semicircle(x=0.5, y=i-0.5, r=0.5*((2*i)/max.p), side=side, 
-                        color=control.cnv.colors[2], border=blueblack, lwd=2, xpd=T)
+        plot.semicircle(x=0.5, y=i-0.5, r=0.5*((pvals[i])/max.p), side=side, 
+                        color=control.cnv.colors[2], border=border, lwd=2, xpd=T)
       })
       axis(4, at=i-0.5, las=2, line=-0.8, tick=F,
-           labels=bquote(italic(P) <= 10^-.(2*i)))
+           labels=bquote(italic(P) <= 10^-.(pvals[i])))
     }
   })
 }
@@ -366,7 +390,8 @@ require(funr, quietly=T)
 
 # List of command-line options
 option_list <- list(
-  make_option(c("--clusters"), help="Comma-delimited list of regions to collapse."),
+  make_option(c("--gw-clusters"), help="Comma-delimited list of gw-sig regions to collapse."),
+  make_option(c("--lit-clusters"), help="Comma-delimited list of literature regions to collapse."),
   make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
 )
 
@@ -387,15 +412,17 @@ segs.in <- args$args[2]
 sumstats.in <- args$args[3]
 hpos.in <- args$args[4]
 out.prefix <- args$args[5]
-clusters.in <- opts$`clusters`
+gw.clusters.in <- opts$`gw-clusters`
+lit.clusters.in <- opts$`lit-clusters`
 rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
 # loci.in <- "~/scratch/rCNV.final_segments.loci.bed.gz"
 # segs.in <- "~/scratch/rCNV2_analysis_d1.master_segments.bed.gz"
-# sumstats.in <- "~/scratch/rCNV.final_segments.loci.all_sumstats.tsv.gz"
+# sumstats.in <- "~/scratch/rCNV2_analysis_d1.all_segs.all_sumstats.tsv.gz"
 # hpos.in <- "~/scratch/rCNV2_analysis_d1.reordered_hpos.txt"
-# clusters.in <- "~/scratch/locus_clusters.txt"
+# gw.clusters.in <- "~/scratch/locus_clusters.gw_sig.txt"
+# lit.clusters.in <- "~/scratch/locus_clusters.all_gds.txt"
 # rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
 # out.prefix <- "~/scratch/test"
 # script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
@@ -416,10 +443,14 @@ segs <- load.segment.table(segs.in)
 # Merge loci & segment data for genome-wide significant sites only
 gw <- merge.loci.segs(loci, segs)
 
+# Subset segment data for nominal (but not genome-wide significant) sites
+nom <- segs[which(segs$nom_sig & !segs$gw_sig), ]
+
 # Load other data
 sumstats <- load.sumstats(sumstats.in)
 hpos <- as.character(read.table(hpos.in, header=F, sep="\t")[, 1])
-clusters <- load.clusters(clusters.in, loci)
+gw.clusters <- load.clusters(gw.clusters.in, loci)
+lit.clusters <- load.clusters(lit.clusters.in, nom)
 
 # Modify HPOs to have breaks after phenotype clusters
 hpos <- c(NA, hpos[1], NA,
@@ -427,20 +458,35 @@ hpos <- c(NA, hpos[1], NA,
           hpos[min(which(hpos %in% somatic.hpos)):max(which(hpos %in% somatic.hpos))], NA,
           hpos[length(hpos)], NA)
 
-# Plot locus grid
-pdf(paste(out.prefix, "large_segments.association_grid.pdf", sep="."), 
+# Plot locus grid for genome-wide significant segments
+pdf(paste(out.prefix, "large_segments.association_grid.gw_sig.pdf", sep="."), 
     height=10.25, width=16)
-plot.all.loci(gw, clusters, sumstats, hpos, 
+plot.all.loci(gw, gw.clusters, sumstats, hpos, 
               stat.size="pvalue", max.stat.size=6, 
               stat.color="lnor", max.stat.color=log(8),
               outline.color=control.cnv.colors[2], background.color=bluewhite, 
               buffer=0.15, cex.table.text=0.85)
 dev.off()
 
+# Plot locus grid for nominal (not genome-wide significant) segments
+pdf(paste(out.prefix, "large_segments.association_grid.nominal.pdf", sep="."), 
+    height=11, width=16)
+plot.all.loci(nom, lit.clusters, sumstats, hpos, 
+              stat.size="pvalue", max.stat.size=5, 
+              stat.color="lnor", max.stat.color=log(8),
+              outline.color=control.cnv.colors[2], background.color=bluewhite, 
+              buffer=0.15, cex.table.text=0.85,
+              nominal=TRUE)
+dev.off()
+
 # Plot legends
-pdf(paste(out.prefix, "pvalue_legend.pdf", sep="."),
+pdf(paste(out.prefix, "pvalue_legend.gw_sig.pdf", sep="."),
     height=1, width=1.04)
-plot.p.legend()
+plot.p.legend(max.p=6)
+dev.off()
+pdf(paste(out.prefix, "pvalue_legend.nominal.pdf", sep="."),
+    height=1, width=1.04)
+plot.p.legend(max.p=5, max.is.gw=FALSE)
 dev.off()
 pdf(paste(out.prefix, "lnor_legend.pdf", sep="."),
     height=0.7, width=1.4)

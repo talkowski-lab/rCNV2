@@ -75,7 +75,7 @@ neuro.region_ids <- get.neuro.region_ids(loci, segs)
 pdf(paste(out.prefix, "segs_by_mechanism.size.pdf", sep="."),
     height=2.25, width=2.7)
 segs.swarm(segs, x.bool=segs$nahr, y=log10(segs$size), 
-           x.labs=c("Nonrecurrent", "NAHR"), violin=T, alternative="two.sided",
+           x.labs=c("Non-NAHR", "NAHR"), violin=T, alternative="two.sided",
            add.pvalue=T, add.y.axis=F, pt.cex=0.75, parmar=c(1.2, 4, 2.5, 0))
 axis(2, at=log10(logscale.minor), tck=-0.015, col=blueblack, labels=NA, lwd=0.7)
 axis(2, at=log10(logscale.demi), tck=-0.03, col=blueblack, labels=NA)
@@ -87,7 +87,7 @@ dev.off()
 pdf(paste(out.prefix, "segs_by_mechanism.n_genes.pdf", sep="."),
     height=2.25, width=2.6)
 segs.swarm(segs, x.bool=segs$nahr, y=segs$n_genes, 
-           x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.pvalue=T,
+           x.labs=c("Non-NAHR", "NAHR"), violin=T, add.pvalue=T,
            add.y.axis=T, ytitle="Genes in Segment", pt.cex=0.75, 
            parmar=c(1.2, 3, 2.5, 0))
 dev.off()
@@ -96,7 +96,7 @@ dev.off()
 pdf(paste(out.prefix, "segs_by_mechanism.basic_gene_density.pdf", sep="."),
     height=2.25, width=2.6)
 segs.swarm(segs, x.bool=segs$nahr, y=100000*(segs$n_genes/segs$size), 
-           x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.pvalue=T,
+           x.labs=c("Non-NAHR", "NAHR"), violin=T, add.pvalue=T,
            add.y.axis=T, ytitle="Genes per 100kb", pt.cex=0.75, 
            parmar=c(1.2, 3, 2.5, 0))
 dev.off()
@@ -105,7 +105,7 @@ dev.off()
 pdf(paste(out.prefix, "segs_by_mechanism.constrained_gene_density.pdf", sep="."),
     height=2.25, width=2.6)
 segs.swarm(segs, x.bool=segs$nahr, y=1000000*(segs$n_gnomAD_constrained_genes/segs$size), 
-           x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.pvalue=T,
+           x.labs=c("Non-NAHR", "NAHR"), violin=T, add.pvalue=T,
            add.y.axis=T, ytitle="Constr. Genes per 1Mb", pt.cex=0.75, 
            parmar=c(1.2, 3, 2.5, 0))
 dev.off()
@@ -114,7 +114,7 @@ dev.off()
 pdf(paste(out.prefix, "segs_by_mechanism.omim_gene_density.pdf", sep="."),
     height=2.25, width=2.6)
 segs.swarm(segs, x.bool=segs$nahr, y=1000000*(segs$n_OMIM_genes/segs$size), 
-           x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.pvalue=T,
+           x.labs=c("Non-NAHR", "NAHR"), violin=T, add.pvalue=T,
            add.y.axis=T, ytitle="OMIM Genes per 1Mb", pt.cex=0.75, 
            parmar=c(1.2, 3, 2.5, 0))
 dev.off()
@@ -126,7 +126,7 @@ segs.swarm(segs[which(segs$n_genes>0), ],
            x.bool=segs$nahr[which(segs$n_genes>0)], 
            y=segs$DDD_dnm_lof_norm_excess_per_gene,
            subset_to_regions=neuro.region_ids,
-           x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.y.axis=T, add.pvalue=T,
+           x.labs=c("Non-NAHR", "NAHR"), violin=T, add.y.axis=T, add.pvalue=T,
            ytitle=bquote("Excess" ~ italic("dn") * "PTV" ~ "/ Gene"), 
            pt.cex=0.75, parmar=c(1.2, 3, 2.5, 0))
 dev.off()
@@ -138,7 +138,7 @@ segs.swarm(segs[which(segs$n_genes>0), ],
            x.bool=segs$nahr[which(segs$n_genes>0)], 
            y=segs$DDD_dnm_mis_norm_excess_per_gene,
            subset_to_regions=neuro.region_ids,
-           x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.y.axis=T, add.pvalue=T,
+           x.labs=c("Non-NAHR", "NAHR"), violin=T, add.y.axis=T, add.pvalue=T,
            ytitle=bquote("Excess" ~ italic("dn") * "Mis" ~ "/ Gene"), 
            pt.cex=0.75, parmar=c(1.2, 3, 2.5, 0))
 dev.off()
@@ -150,7 +150,7 @@ segs.swarm(segs[which(segs$n_genes>0), ],
            x.bool=segs$nahr[which(segs$n_genes>0)], 
            y=segs$ASC_dnm_lof_norm_excess_per_gene,
            subset_to_regions=neuro.region_ids,
-           x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.y.axis=T, add.pvalue=T,
+           x.labs=c("Non-NAHR", "NAHR"), violin=T, add.y.axis=T, add.pvalue=T,
            ytitle=bquote("Excess" ~ italic("dn") * "PTV" ~ "/ Gene"), 
            pt.cex=0.75, parmar=c(1.2, 3, 2.5, 0))
 dev.off()
@@ -162,7 +162,7 @@ segs.swarm(segs[which(segs$n_genes>0), ],
            x.bool=segs$nahr[which(segs$n_genes>0)], 
            y=segs$ASC_dnm_mis_norm_excess_per_gene,
            subset_to_regions=neuro.region_ids,
-           x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.y.axis=T, add.pvalue=T,
+           x.labs=c("Non-NAHR", "NAHR"), violin=T, add.y.axis=T, add.pvalue=T,
            ytitle=bquote("Excess" ~ italic("dn") * "Mis" ~ "/ Gene"), 
            pt.cex=0.75, parmar=c(1.2, 3, 2.5, 0))
 dev.off()
@@ -173,7 +173,7 @@ pdf(paste(out.prefix, "segs_by_mechanism.avg_gene_expression.pdf", sep="."),
 segs.swarm(segs, 
            x.bool=segs$nahr, 
            y=segs$gene_expression_harmonic_mean, 
-           x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.y.axis=T, add.pvalue=T,
+           x.labs=c("Non-NAHR", "NAHR"), violin=T, add.y.axis=T, add.pvalue=T,
            ytitle=bquote("Avg. Gene Expression"), 
            pt.cex=0.75, parmar=c(1.2, 3, 2.5, 0))
 dev.off()
