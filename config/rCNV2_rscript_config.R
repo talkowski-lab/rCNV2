@@ -146,6 +146,11 @@ pheno.colors <- c("all" = "#808080",
                   "neuro" = "#F58F38",
                   "somatic" = "#854614")
 
+gene.feat.category.colors <- c("genomic" = "#027831",
+                               "expression" = "#FFA300",
+                               "chromatin" = "#6D3D84",
+                               "constraint" = "#F6313E")
+
 h3k27ac.color <- "#FFC34D"
 
 nc.anno.family.colors <- c("chromhmm" = "#490C65",

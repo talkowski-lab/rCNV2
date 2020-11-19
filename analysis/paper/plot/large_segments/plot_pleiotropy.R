@@ -108,19 +108,23 @@ gw.swarm(gw,
          ytitle="Genes Overlapped",
          parmar=parmar)
 dev.off()
+# Note: this plot is formatted differently because of placement in main figure
 pdf(paste(out.prefix, "pleiotropy_vs_gene_density.pdf", sep="."),
-    height=2.25, width=2)
+    height=2.3, width=1.8)
 gw.swarm(gw,
          x.bool=gw$n_hpos > 1,
          y=100000 * gw$n_genes / gw$size,
          cnv.split=F,
          violin=T,
+         pt.cex=0.85,
          add.pvalue=T,
          alternative="less",
-         xtitle="Associated Phenos.",
+         xtitle="",
          x.labs=c("One", "Multiple"), 
          ytitle="Genes per 100kb",
-         parmar=parmar)
+         y.at=seq(0, 8, 2),
+         y.title.line=1.25,
+         parmar=c(2.3, 2.3, 1.5, 0.5))
 dev.off()
 
 # Plot pleiotropy vs. constrained genes & gene density
@@ -138,19 +142,22 @@ gw.swarm(gw,
          ytitle="Constrained Genes",
          parmar=parmar)
 dev.off()
+# Note: this plot is formatted differently because of placement in main figure
 pdf(paste(out.prefix, "pleiotropy_vs_constrained_gene_density.pdf", sep="."),
-    height=2.25, width=2)
+    height=2.3, width=1.8)
 gw.swarm(gw,
          x.bool=gw$n_hpos > 1,
          y=1000000 * gw$n_gnomAD_constrained_genes / gw$size,
          cnv.split=F,
          violin=T,
+         pt.cex=0.85,
          add.pvalue=T,
          alternative="less",
-         xtitle="Associated Phenos.",
+         xtitle="",
          x.labs=c("One", "Multiple"), 
-         ytitle="Constr. Genes per 1Mb",
-         parmar=parmar)
+         ytitle="Genes per 1Mb",
+         y.title.line=1.35,
+         parmar=c(2.3, 2.3, 1.5, 0.5))
 dev.off()
 
 # Plot pleiotropy vs. OMIM genes & gene density

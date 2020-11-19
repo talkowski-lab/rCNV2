@@ -155,13 +155,13 @@ dev.off()
 
 # Scatterplot of peak P-value and corresponding lnOR for all sites
 pdf(paste(out.prefix, "all_segs.best_p_vs_or.pdf", sep="."),
-    height=2.8, width=2.8)
+    height=2.8, width=3)
 segs.scatter(segs.all, x=log2(exp(segs.all$meta_best_lnor)), y=segs.all$meta_best_p, 
              subset_to_regions=segs.all$region_id[which(!is.infinite(segs.all$meta_best_p))],
              horiz.lines.at=c(gw.sig, -log10(0.05)), horiz.lines.lty=c(5, 2),
              horiz.lines.color=c(graphabs.green, blueblack),
-             xtitle=bquote(log[2]("Odds Ratio")), 
-             ytitle=bquote("Best -log"[10] * (italic(P)) * ", any phenotype"),
+             xtitle=bquote("Max" ~ log[2]("Odds Ratio") * ", any pheno."), 
+             ytitle=bquote("Max -log"[10] * (italic(P)) * ", any phenotype"),
              x.title.line=1.6, y.title.line=1.5,
              add.lm=F, pt.cex=0.85, parmar=c(2.75, 2.75, 0.2, 0.2))
 x.bump <- 0.04 * (par("usr")[2] - par("usr")[1])

@@ -67,7 +67,7 @@ constrained.obs_exp.test <- function(segs){
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Plot values vs # of genes
-scatter.vsGenes <- function(segs, feature, pt.cex=0.75, fit=NULL,
+scatter.vsGenes <- function(segs, feature, pt.cex=0.75, fit=NULL, rollmean.span=1,
                             xlims=NULL, ylims=NULL, y.title=NULL, 
                             y.title.line=2, y.pct=FALSE,
                             horiz.line=NULL, legend.pos=NULL,
@@ -115,7 +115,7 @@ scatter.vsGenes <- function(segs, feature, pt.cex=0.75, fit=NULL,
         fit.df <- data.frame("x"=ngenes[which(segs$cnv==cnv)],
                              "y"=vals[which(segs$cnv==cnv)])
         fit.df <- fit.df[order(fit.df$x), ]
-        fit <- loess(y ~ x, data=fit.df, span=1)
+        fit <- loess(y ~ x, data=fit.df, span=rollmean.span)
         points(x=fit.df$x, y=predict(fit), type="l", lwd=2, col=cnv.colors[which(names(cnv.colors)==cnv)])
       })
     }
@@ -210,11 +210,11 @@ neuro.segs <- segs[which(segs$region_id %in% neuro.plus.lit.ids), ]
 
 # Plot proportion of constrained genes vs. # of genes
 pdf(paste(out.prefix, "prop_constrained_vs_ngenes.pdf", sep="."),
-    height=2.2, width=2.8)
+    height=2.4, width=2.8)
 scatter.vsGenes(segs, feature="gnomAD_constrained_prop", y.title="Constrained Genes",
                 y.pct=T, pt.cex=0.85,
                 horiz.line=prop_constrained.genome_avg,
-                y.title.line=2.25, parmar=c(2.5, 3.25, 0.5, 3.5))
+                y.title.line=2.3, parmar=c(2.45, 3.25, 0.5, 3.5))
 axis(4, at=prop_constrained.genome_avg, tck=-0.03, col=blueblack, labels=NA)
 axis(4, at=prop_constrained.genome_avg, tick=F, line=-0.9, las=2,
      labels=c("Genome\naverage"), col.axis=blueblack, font=3, cex=0.8)
@@ -239,15 +239,12 @@ scatter.vsGenes(neuro.segs, feature="ASC_dnm_mis_norm_excess_per_gene",
 dev.off()
 
 # Plot average enrichment of DDD DNMs vs. # of genes
-# Note: LoF panel is intentionally larger than other three for placement in main figure
 pdf(paste(out.prefix, "DDD_dnPTVs_vs_ngenes.pdf", sep="."),
-    height=2.2, width=2.8)
+    height=2.2, width=2.3)
 scatter.vsGenes(neuro.segs, feature="DDD_dnm_lof_norm_excess_per_gene", 
                 y.title=bquote("Excess" ~ italic("dn") * "PTVs / Gene"),
                 y.pct=F, pt.cex=0.85, horiz.line=0,
-                y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 3.5))
-axis(4, at=0, tck=-0.03, col=blueblack, labels=NA)
-axis(4, at=0, tick=F, line=-0.9, las=2, labels=c("No\nExcess"), col.axis=blueblack, font=3, cex=0.8)
+                y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
 dev.off()
 pdf(paste(out.prefix, "DDD_dnMis_vs_ngenes.pdf", sep="."),
     height=2.2, width=2.3)

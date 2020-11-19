@@ -82,16 +82,40 @@ calc.dnm.excess.cdf.matrix <- function(segs, dnms, csq, n.max.genes=10){
 ##########################
 # Plot matrix of excess de novo cdfs for all loci
 dnm.excess.cdf.barplots <- function(segs, dnms, csq, n.max.genes=5, norm=F, min.excess=1,
+                                    sort.firstwo.only=FALSE, 
                                     xtitle.suffix="Segments", ytitle=NULL, 
                                     legend=F, cnv.marker.wex=0.035,
                                     parmar=c(1.1, 2.6, 0.4, 0.1)){
+  # Helper function for ordering segments by decile
+  order.by.decile <- function(res){
+    deciles <- seq(1, 0, -0.1)
+    ranks <- sapply(deciles, function(d){
+      apply(res, 1, function(vals){min(which(vals>=d))})
+    })
+    order(ranks[, 1], ranks[, 2], ranks[, 3], ranks[, 4], ranks[, 5], ranks[, 6], 
+          ranks[, 7], ranks[, 8], ranks[, 9], ranks[, 10], ranks[, 11])
+  }
+  # # Helper function for ordering segments by quartile
+  # order.by.quartile <- function(res){
+  #   quartiles <- seq(1, 0, -0.2)
+  #   ranks <- sapply(quartiles[-1], function(d){
+  #     apply(res, 1, function(vals){min(which(vals>=d))})
+  #   })
+  #   order(ranks[, 1], ranks[, 2], ranks[, 3], ranks[, 4])
+  # }
+  
   # Get plot data
   res <- calc.dnm.excess.cdf.matrix(segs, dnms, csq, n.max.genes)
   if(norm==T){
     res <- res[which(apply(res, 1, sum) > min.excess), ]
     res <- t(apply(res, 1, function(vals){vals/max(vals, na.rm=T)}))
-    res.cumsum <- t(apply(res, 1, cumsum))
-    res <- res[order(-res[, 1], -res[, 2], -res[, 3], -res[, 4], -res[, 5]), ]
+    if(sort.firstwo.only==FALSE){
+      res <- res[order(res[, 5], res[, 4], res[, 3], res[, 2], res[, 1], decreasing=T), ]
+      res <- res[order.by.decile(res), ]
+    }else{
+      res <- res[order(res[, 2], res[, 1], decreasing=T), ]
+      res <- res[order.by.decile(res[, c(1, 2, ncol(res))]), ]
+    }
   }
   res <- res[which(!is.na(res[, 1])), ]
   colors <- rev(viridis(n.max.genes + 1))
@@ -109,8 +133,8 @@ dnm.excess.cdf.barplots <- function(segs, dnms, csq, n.max.genes=5, norm=F, min.
   # Add rectangles
   sapply(1:nrow(res), function(i){
     rect(xleft=i-1, xright=i,
-         ybottom=c(0, res[i, -ncol(res)]), ytop=res[i, ],
-         col=colors, border=colors, lwd=0.1, xpd=T)
+         ybottom=rev(c(0, res[i, -ncol(res)])), ytop=rev(res[i, ]),
+         col=rev(colors), border=rev(colors), xpd=T, lwd=0.25, lend="butt")
     rect(xleft=i-1, xright=i, ybottom=-cnv.marker.wex*ymax, ytop=0,
          col=cnv.colors[segs$cnv[which(segs$region_id==rownames(res)[i])]], 
          border=cnv.colors[segs$cnv[which(segs$region_id==rownames(res)[i])]],  
@@ -328,3 +352,24 @@ sapply(c("ddd", "asc"), function(cohort){
     dev.off()
   })
 })
+
+# Plot larger version of DNM excess distributions from DDD PTVs for main figure
+cohort <- "ddd"
+csq <- "lof"
+min.excess <- 3
+pdf(paste(out.prefix, "neuro_segs", cohort, csq, "excess_dnm_distrib_bygene.reshaped.pdf", sep="."),
+    height=2.2, width=3)
+dnm.excess.cdf.barplots(neuro.segs, dnms[[cohort]], csq=csq, norm=F, legend=T,
+                        xtitle.suffix='"Neuro. rCNV Segments"',
+                        ytitle=bquote("Excess" ~ italic("dn") * "PTVs"))
+dev.off()
+ytitle.2 <- bquote("Fraction of Excess")
+xtitle.suffix.2 <- paste('"Segs. w/" >= "', min.excess, ' Excess" ~ italic("dn") * "PTV"', sep="")
+pdf(paste(out.prefix, "neuro_segs", cohort, csq, "excess_dnm_distrib_bygene.norm.reshaped.pdf", sep="."),
+    height=1.8, width=2.8)
+dnm.excess.cdf.barplots(neuro.segs, dnms[[cohort]], csq=csq, norm=T, legend=F, 
+                        sort.firstwo.only=T, min.excess=min.excess, 
+                        cnv.marker.wex=0.035*(2.2/1.8),
+                        xtitle.suffix=xtitle.suffix.2, ytitle=ytitle.2)
+dev.off()
+

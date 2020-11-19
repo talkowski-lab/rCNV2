@@ -43,27 +43,29 @@ gsutil -m cp -r \
 
 
 # Plot correlation heatmap of gene features
-# DEV NOTE: this script is incomplete and does not yet generate a final plot
-# TODO: complete this script
+if ! [ -e feature_heatmap ]; then
+  mkdir feature_heatmap
+fi
 /opt/rCNV2/analysis/paper/plot/gene_association/plot_gene_feature_cor_matrix.R \
-	ref/gencode.v19.canonical.pext_filtered.all_features.no_variation.bed.gz \
+  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+	refs/gencode.v19.canonical.pext_filtered.all_features.no_variation.bed.gz \
   refs/gencode.v19.canonical.pext_filtered.all_features.no_variation.eigenfeatures.bed.gz \
   refs/gene_feature_metadata.tsv \
-  ./gene_features_corplot
+  feature_heatmap/${prefix}
 
 
-# Collect list of genes theoretically eligible to be in each credible set
-while read chrom start end csID; do
-  echo -e "$chrom\t$(( $start - $finemap_dist ))\t$(( $end + $finemap_dist ))" \
-  | awk -v OFS="\t" '{ if ($2<0) $2=0; print $1, $2, $3 }' \
-  | bedtools intersect -u -wa \
-    -a refs/gencode.v19.canonical.pext_filtered.all_features.bed.gz \
-    -b - \
-  | cut -f4 | sort | uniq | paste -s -d\; \
-  | awk -v OFS="\t" -v csID=$csID '{ print csID, $1 }'
-done < <( zcat rCNV.final_genes.credible_sets.bed.gz | fgrep -v "#" | cut -f1-4 ) \
-| cat <( echo -e "#credible_set_id\teligible_genes" ) - \
-> credible_set.eligible_genes.tsv
+# # Collect list of genes theoretically eligible to be in each credible set
+# while read chrom start end csID; do
+#   echo -e "$chrom\t$(( $start - $finemap_dist ))\t$(( $end + $finemap_dist ))" \
+#   | awk -v OFS="\t" '{ if ($2<0) $2=0; print $1, $2, $3 }' \
+#   | bedtools intersect -u -wa \
+#     -a refs/gencode.v19.canonical.pext_filtered.all_features.bed.gz \
+#     -b - \
+#   | cut -f4 | sort | uniq | paste -s -d\; \
+#   | awk -v OFS="\t" -v csID=$csID '{ print csID, $1 }'
+# done < <( zcat rCNV.final_genes.credible_sets.bed.gz | fgrep -v "#" | cut -f1-4 ) \
+# | cat <( echo -e "#credible_set_id\teligible_genes" ) - \
+# > credible_set.eligible_genes.tsv
 
 
 # Plot fine-mapping descriptive panels (number of genes per block, distribution of PIP, etc)
@@ -74,12 +76,15 @@ done \
 | cat <( head -n1 rCNV.DEL.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv \
          | awk -v OFS="\t" '{ print $0, "cnv" }' ) - \
 > all_genes_from_fine_mapping.tsv
+if ! [ -e finemapping_distribs ]; then
+  mkdir finemapping_distribs
+fi
 /opt/rCNV2/analysis/paper/plot/gene_association/plot_finemapping_distribs.R \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.final_genes.credible_sets.bed.gz \
   rCNV.final_genes.associations.bed.gz \
   all_genes_from_fine_mapping.tsv \
-  ${prefix}
+  finemapping_distribs/${prefix}
 
 
 # Plot master annotated 2x2 table of fine-mapped genes
@@ -102,13 +107,16 @@ echo -e "lof_constrained\trefs/gene_lists/gnomad.v2.1.1.lof_constrained.genes.li
 cat refs/gene_lists/DDG2P.*.genes.list | sort | uniq > ddg2p.all_dom.genes.list
 echo -e "ddg2p\tddg2p.all_dom.genes.list" >> enrichment.genelists.tsv
 echo -e "omim\trefs/gene_lists/HP0000118.HPOdb.genes.list" >> enrichment.genelists.tsv
+if ! [ -e finemapping_distribs ]; then
+  mkdir finemapping_distribs
+fi
 /opt/rCNV2/analysis/paper/plot/gene_association/plot_finemapped_enrichments.R \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.final_genes.credible_sets.bed.gz \
   rCNV.final_genes.associations.bed.gz \
   refs/gencode.v19.canonical.pext_filtered.all_features.bed.gz \
   enrichment.genelists.tsv \
-  ${prefix}
+  finemapping_distribs/${prefix}
 
 
 # Calculate fraction of credible sets not overlapping significant large segment
@@ -131,8 +139,8 @@ done | wc -l
 
 # Copy all plots to final gs:// directory
 gsutil -m cp -r \
-  ${prefix}.finemapped_distribs*pdf \
+  feature_heatmap \
+  finemapping_distribs \
   ${prefix}.*finemapped_genes_grid*pdf \
-  ${prefix}.*.enrichments.pdf \
   ${rCNV_bucket}/analysis/paper/plots/gene_association/
 

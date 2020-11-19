@@ -225,8 +225,8 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
                          xlims=NULL, ylims=NULL, add.lm=T, pt.cex=1,
                          horiz.lines.at=NULL, horiz.lines.lty=1, horiz.lines.color=NULL,
                          abline.a=NULL, abline.b=NULL, abline.lty=1,
-                         xtitle=NULL, x.title.line=1.75, x.at=NULL, x.labs=NULL, x.labs.at=NULL, parse.x.labs=FALSE,
-                         ytitle=NULL, y.title.line=1.75, y.at=NULL, y.labs=NULL, y.labs.at=NULL, parse.y.labs=FALSE,
+                         xtitle=NULL, x.title.line=1.75, x.at=NULL, x.labs=NULL, x.labs.at=NULL, parse.x.labs=FALSE, x.title.cex=1,
+                         ytitle=NULL, y.title.line=1.75, y.at=NULL, y.labs=NULL, y.labs.at=NULL, parse.y.labs=FALSE, y.title.cex=1,
                          parmar=c(3, 3, 0.8, 0.8)){
   # Get plot values
   if(!is.null(subset_to_regions)){
@@ -332,8 +332,8 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
   })
   
   # Add axis titles
-  mtext(1, text=xtitle, line=x.title.line)
-  mtext(2, text=ytitle, line=y.title.line)
+  mtext(1, text=xtitle, line=x.title.line, cex=x.title.cex)
+  mtext(2, text=ytitle, line=y.title.line, cex=y.title.cex)
   
   # Add cleanup box
   # box(col=blueblack, bty="o")
@@ -345,7 +345,8 @@ gw.scatter <- segs.scatter
 segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL, subset_to_regions=NULL,
                        add.pvalue=FALSE, stat.test="wilcoxon", alternative="two.sided",
                        xtitle=NULL, x.labs=c("FALSE", "TRUE"),
-                       add.y.axis=TRUE, ytitle=NULL, y.at=NULL, y.labs=NULL, y.labs.at=NULL, 
+                       add.y.axis=TRUE, ytitle=NULL, y.title.line=1.75,
+                       y.at=NULL, y.labs=NULL, y.labs.at=NULL, 
                        parse.y.labs=FALSE, violin=FALSE, pt.cex=1,
                        parmar=c(2.3, 3, 0.5, 0.5)){
   
@@ -468,7 +469,7 @@ segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL, subset_to_re
         axis(2, at=y.labs.at[i], labels=y.labs[i], tick=F, line=-0.6, las=2)
       }
     })
-    mtext(2, text=ytitle, line=1.75)
+    mtext(2, text=ytitle, line=y.title.line)
   }
   
   # Add P-values, if optioned

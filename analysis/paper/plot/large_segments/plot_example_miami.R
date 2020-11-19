@@ -136,11 +136,11 @@ mini.miami <- function(del, dup, max.p=10,
        xaxt="n", xlab="", yaxt="n", ylab="")
   abline(h=c(dup.cutoff + middle.axis.width/2, -del.cutoff - middle.axis.width/2),
          lty=2, col=sig.color)
-  gw.sig.label.buffer <- 0.025*(diff(par("usr")[3:4]))
+  gw.sig.label.buffer <- 0.03*(diff(par("usr")[3:4]))
   text(x=par("usr")[1], 
        y=c(dup.cutoff + gw.sig.label.buffer + middle.axis.width/2, 
-           -del.cutoff - gw.sig.label.buffer - middle.axis.width/2),
-       labels="Genome-wide significance", col=sig.color, pos=4, font=3, cex=0.8)
+           -del.cutoff - (4/3)*gw.sig.label.buffer - middle.axis.width/2),
+       labels="Genome-wide significance", col=sig.color, pos=4, font=3, cex=0.85)
   
   # Add points
   points(x=del.df$pos, y=del.df$p, 
@@ -160,9 +160,9 @@ mini.miami <- function(del, dup, max.p=10,
   axis(2, at=-y.at-middle.axis.width/2, labels=NA, tck=-0.02, col=blueblack)
   axis(2, at=-y.at-middle.axis.width/2, tick=F, line=-0.5, labels=abs(y.at), las=2, cex.axis=0.9)
   axis(2, at=middle.axis.width/2 + (par("usr")[4]-par("usr")[3])/4,
-       tick=F, line=0, labels=bquote(-log[10](italic(P)["DUP"])))
+       tick=F, line=0.1, labels=bquote(-log[10](italic(P)["DUP"])))
   axis(2, at=-middle.axis.width/2 - (par("usr")[4]-par("usr")[3])/4,
-       tick=F, line=0, labels=bquote(-log[10](italic(P)["DEL"])))
+       tick=F, line=0.1, labels=bquote(-log[10](italic(P)["DEL"])))
   segments(x0=rep(par("usr")[1], 2), 
            x1=rep(par("usr")[2], 2),
            y0=c(0.5, -0.5) * middle.axis.width, 
@@ -226,7 +226,7 @@ dup <- load.sumstats(dup.in, p.col.name="meta_phred_p")
 
 # Plot miami
 dim.scalar <- 2.1
-png(out.png, height=dim.scalar*1.4*300, width=dim.scalar*2*300, res=300, family="sans", bg=NA)
+png(out.png, height=dim.scalar*1.4*300, width=dim.scalar*1.95*300, res=300, family="sans", bg=NA)
 mini.miami(del, dup, del.cutoff=del.cutoff, dup.cutoff=dup.cutoff, 
            middle.axis.width=1.25, sig.col=graphabs.green, max.p=8)
 dev.off()
