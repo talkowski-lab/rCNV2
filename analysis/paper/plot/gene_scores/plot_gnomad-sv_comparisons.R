@@ -181,6 +181,75 @@ plot.oe <- function(oe.dat, scores, score, var, metric="oe", n.bins=10,
   mtext(2, text=ylab, line=2)
 }
 
+# Plot rates of SVs in bins by CNV score (either percentile or absolute bin)
+plot.oe.by.scorebin <- function(oe.dat, scores, score, var, metric="oe", n.bins=10,
+                                x.label=NULL, parse.x.label=T, x.label.line=2,
+                                x.ax.labels=NULL, parse.x.ax.labels=T, ylims=NULL,
+                                cex.x.ax.labels=1, pt.color=blueblack, 
+                                baseline.color=blueblack, null.color=bluewhite, 
+                                parmar=c(3.5, 3.5, 0.5, 0.5)){
+  # Collect plot data
+  all.plot.dat <- gnomad.by.score.bin(oe.dat, scores, score, var, n.bins)
+  if(metric == "oe"){
+    baseline <- 1
+    plot.dat <- all.plot.dat[, c("score", "oe", "oe.lower", "oe.upper")]
+  }else{
+    baseline <- NA
+    plot.dat <- all.plot.dat[, c("score", "mean", "mean.lower", "mean.upper")]
+  }
+  colnames(plot.dat) <- c("score", "estimate", "lower", "upper")
+  if(is.null(ylims)){
+    ylims <- range(plot.dat[, -1], na.rm=T)
+  }
+  
+  # Prep plot area
+  par(mar=parmar, bty="n")
+  plot(NA, xlim=c(0, n.bins), ylim=ylims, xaxt="n", yaxt="n", xlab="", ylab="")
+  rect(xleft=par("usr")[1], xright=par("usr")[2],
+       ybottom=par("usr")[3], ytop=par("usr")[4],
+       border=NA, bty="n", col=bluewhite)
+  y.ax.at <- sort(unique(round(axTicks(2), 1)))
+  abline(h=y.ax.at, col="white")
+  abline(h=c(0, baseline), lty=c(1, 2), col=c(null.color, baseline.color))
+  text(x=par("usr")[1]-(0.05*(par("usr")[2]-par("usr")[1])),
+       y=baseline+(0.035*(par("usr")[4]-par("usr")[3])), 
+       labels="Expected", cex=0.85, font=3, col=baseline.color, pos=4)
+  
+  # Add points
+  pt.x.at <- (1:n.bins)-0.5
+  segments(x0=pt.x.at, x1=pt.x.at, y0=plot.dat$lower, y1=plot.dat$upper, lend="round", 
+           lwd=2.5, col=pt.color)
+  points(x=pt.x.at, y=plot.dat$estimate, pch=19, col=pt.color, cex=1.5)
+  
+  # Add X axis
+  if(!is.null(x.ax.labels)){
+    sapply(1:length(pt.x.at), function(i){
+      if(parse.x.ax.labels==T){
+        axis(1, at=pt.x.at[i], tick=F, line=-1, labels=parse(text=x.ax.labels[i]), 
+             cex.axis=cex.x.ax.labels)
+      }else{
+        axis(1, at=pt.x.at[i], tick=F, line=-1, labels=x.ax.labels[i], 
+             cex.axis=cex.x.ax.labels)
+      }
+    })
+  }
+  if(parse.x.label==T){
+    mtext(1, text=parse(text=x.label), line=x.label.line)
+  }else{
+    mtext(1, text=x.label, line=x.label.line)
+  }
+  
+  # Add Y axis
+  axis(2, at=c(-100, 100), tck=0, col=blueblack, labels=NA)
+  axis(2, at=y.ax.at, col=blueblack, labels=NA, tck=-0.025)
+  axis(2, at=y.ax.at, tick=F, labels=y.ax.at, las=2, line=-0.6)
+  if(metric == "oe"){
+    mtext(2, text="Obs/Exp CNVs per Gene", line=1.75)
+  }else{
+    mtext(2, text="Mean CNVs per Gene", line=1.75)
+  }
+}
+
 
 #####################
 ### RSCRIPT BLOCK ###
@@ -269,4 +338,30 @@ strat.vals <- gnomad.stratified(oe.dat, scores, high.cutoff=0.9, low.cutoff=0.5,
 pdf(paste(out.prefix, "scores_vs_gnomAD-SV.stratified.pdf", sep="."),
     height=2.25, width=3)
 plot.stratified.metric(strat.vals, y.title="\"gnomAD-SV Obs/Exp\"")
+dev.off()
+
+# Plot large quintile-binned panel of pHI for main figure
+pdf(paste(out.prefix, "scores_vs_gnomAD-SV.pHI_raw.quintiled_large.pdf", sep="."),
+    height=2.75, width=2.1)
+plot.oe.by.scorebin(oe.dat, scores, "pHI", "gnomad_sv_lof_del", metric="mean", n.bins=5,
+                    x.label="All Autosomal Genes", 
+                    parse.x.label=F, x.label.line=1.1,
+                    x.ax.labels=paste("\"Q\"[", 1:5, "]", sep=""),
+                    parse.x.ax.labels=T, cex.x.ax.labels=0.9, 
+                    pt.color=cnv.colors[1], baseline.color=NA, 
+                    null.color=blueblack, parmar=c(3.25, 2.75, 0.5, 0.5))
+mtext(1, line=2.1, text="in Quintiles by pHI")
+dev.off()
+
+# Plot large quintile-binned panel of pHI for main figure
+pdf(paste(out.prefix, "scores_vs_gnomAD-SV.pTS_raw.quintiled_large.pdf", sep="."),
+    height=2.75, width=2.1)
+plot.oe.by.scorebin(oe.dat, scores, "pTS", "gnomad_sv_cg", metric="mean", n.bins=5,
+                    x.label="All Autosomal Genes", 
+                    parse.x.label=F, x.label.line=1.1,
+                    x.ax.labels=paste("\"Q\"[", 1:5, "]", sep=""),
+                    parse.x.ax.labels=T, cex.x.ax.labels=0.9, 
+                    pt.color=cnv.colors[2], baseline.color=NA,
+                    null.color=blueblack, parmar=c(3.25, 2.75, 0.5, 0.5))
+mtext(1, line=2.1, text="in Quintiles by pTS")
 dev.off()

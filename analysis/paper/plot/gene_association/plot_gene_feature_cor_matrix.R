@@ -17,13 +17,6 @@ options(stringsAsFactors=F, scipen=1000, family="sans")
 ######################
 ### DATA FUNCTIONS ###
 ######################
-# Load table of feature metadata (including plain English labels)
-load.feature.metadata <- function(feature.metadata.in){
-  meta <- read.table(feature.metadata.in, header=T, sep="\t", comment.char="")
-  colnames(meta)[1] <- gsub("^X.", "", colnames(meta)[1])
-  return(meta)
-}
-
 # Compute correlation matrix between two sets of features
 make.cor.mat <- function(f1, f2, method="spearman"){
   f1.members <- colnames(f1)[-1]
@@ -33,6 +26,7 @@ make.cor.mat <- function(f1, f2, method="spearman"){
   cor.mat[which(rownames(cor.mat) %in% f1.members),
           which(colnames(cor.mat) %in% f2.members)]
 }
+
 
 ##########################
 ### PLOTTING FUNCTIONS ###
@@ -216,7 +210,7 @@ source(paste(script.dir, "common_functions.R", sep="/"))
 # Load features
 features <- load.features(features.in, fill="mean", norm=F)
 n.features <- ncol(features) - 1
-feat.meta <- load.feature.metadata(feature.metadata.in)
+feat.meta <- load.gene.feature.metadata(feature.metadata.in)
 
 # Remove features based on PCs or std dev
 features <- features[, -grep("_component_", colnames(features), fixed=T)]

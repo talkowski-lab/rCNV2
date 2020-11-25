@@ -34,6 +34,10 @@ lof.constrained <- g$gene[which((g$pLI >= 0.9 | g$oe_lof_upper_bin_6 == 0) & g$g
 write.table(lof.constrained,
             paste(out.prefix, "lof_constrained.genes.list", sep="."),
             col.names=F, row.names=F, quote=F)
+strict.lof.constrained <- g$gene[which(g$pLI >= 0.9 & g$oe_lof_upper_bin_6 == 0 & g$gene %in% elig)]
+write.table(strict.lof.constrained,
+            paste(out.prefix, "lof_constrained_strict.genes.list", sep="."),
+            col.names=F, row.names=F, quote=F)
 
 # Gather missense constrained genes
 mis.constrained <- g$gene[which((g$mis_z >= 3 | g$oe_mis_upper_bin_6 == 0) & g$gene %in% elig)]

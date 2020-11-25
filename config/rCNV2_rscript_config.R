@@ -310,6 +310,13 @@ load.features <- function(features.in, fill=NA, norm=F){
   return(feats)
 }
 
+# Load table of gene feature metadata (including plain English labels)
+load.gene.feature.metadata <- function(feature.metadata.in){
+  meta <- read.table(feature.metadata.in, header=T, sep="\t", comment.char="")
+  colnames(meta)[1] <- gsub("^X.", "", colnames(meta)[1])
+  return(meta)
+}
+
 # Format a scientific value for printing to plots
 format.scientific <- function(x, nsmall=2, max.decimal=3){
   parts <- unlist(strsplit(format(x, scientific=T), split="e", fixed=T))
@@ -319,7 +326,7 @@ format.scientific <- function(x, nsmall=2, max.decimal=3){
 }
 
 # Generate colors for XY scatterplot based on density
-color.points.by.density <- function(x, y){
+color.points.by.density <- function(x, y, palette=NULL){
   # Based on heatscatter.R from Colby Chiang
   # (https://github.com/cc2qe/voir/blob/master/bin/heatscatter.R)
   plot.df <- data.frame("x"=x, "y"=y)
@@ -327,7 +334,9 @@ color.points.by.density <- function(x, y){
                            & !is.na(plot.df$x) & !is.na(plot.df$y)), ]
   dens <- densCols(plot.df$x, plot.df$y, colramp=colorRampPalette(c("black", "white")))
   plot.df$dens <- col2rgb(dens)[1, ] + 1L
-  palette <- viridis(256)
+  if(is.null(palette)){
+    palette <- viridis(256)
+  }
   plot.df$col <- palette[plot.df$dens]
   plot.df[order(plot.df$dens), ]
 }

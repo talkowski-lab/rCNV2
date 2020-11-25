@@ -151,13 +151,21 @@ plot.gradient.legend <- function(score, max.pct=0.5){
     score.pal <- colorRampPalette(c("white", cnv.colors[1]))(101)
   }else if(score == "pTS"){
     score.pal <- colorRampPalette(c("white", cnv.colors[2]))(101)
+  }else if(score == "both"){
+    score.pal <- list(colorRampPalette(c("white", cnv.colors[1]))(101),
+                       colorRampPalette(c("white", cnv.colors[2]))(101))
   }
   
   # Plot legend
   par(bty="n", mar=c(0.05, 1.2, 1, 2.1))
   plot(NA, xlim=c(0, 100), ylim=c(0, 1),
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
-  rect(xleft=0:99, xright=1:100, ybottom=0, ytop=1, col=score.pal, border=score.pal, lwd=0.5)
+  if(score == "both"){
+    rect(xleft=0:99, xright=1:100, ybottom=0.5, ytop=1, col=score.pal[[1]], border=score.pal[[1]], lwd=0.5)
+    rect(xleft=0:99, xright=1:100, ybottom=0, ytop=0.5, col=score.pal[[2]], border=score.pal[[2]], lwd=0.5)
+  }else{
+    rect(xleft=0:99, xright=1:100, ybottom=0, ytop=1, col=score.pal, border=score.pal, lwd=0.5)
+  }
   box(bty="o", col=blueblack, xpd=T)
   
   # Add labels
@@ -240,3 +248,11 @@ pdf(paste(out.prefix, score, "geneset_enrichments.legend.pdf", sep="."),
     height=0.35, width=1.8)
 plot.gradient.legend(score)
 dev.off()
+
+# Plot split legend only for pHI
+if(score=="pHI"){
+  pdf(paste(out.prefix, score, "geneset_enrichments.double_legend.pdf", sep="."),
+      height=0.35, width=1.8)
+  plot.gradient.legend("both")
+  dev.off()
+}

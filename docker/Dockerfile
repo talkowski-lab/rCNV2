@@ -69,6 +69,13 @@ RUN conda install -n rcnv -y r-epitools r-shape r-gtools
 RUN Rscript -e "sapply(c('beeswarm','EQL','vioplot','flux','VennDiagram','bedr'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 
+# Install Microsoft TrueType fonts (including Arial). Necessary for rendering .pngs
+RUN apt-get -qqy update \
+    && apt-get -qqy install software-properties-common \
+    && add-apt-repository contrib
+RUN apt-get -qqy update \
+    && apt-get -qqy install ttf-mscorefonts-installer
+
 # Install UCSC tools (liftOver & bigWigToBedGraph
 RUN wget -P /opt/ http://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/liftOver \
     && chmod a+x /opt/liftOver
@@ -87,7 +94,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout d41c75cbe183dd19eaacd3836021d5ae9c8c4a9e && \
+    git checkout 8be3b01c43dbef2e95c5d2fc28e2267bd06f9ecb && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)

@@ -214,7 +214,6 @@ wget http://genic-intolerance.org/data/RVIS_Unpublished_ExACv2_March2017.txt
 gsutil -m cp ${rCNV_bucket}/cleaned_data/genes/annotations/EDS.Wang_2018.tsv.gz ./
 wget https://storage.googleapis.com/gnomad-public/legacy/exac_browser/forweb_cleaned_exac_r03_march16_z_data_pLI_CNV-final.txt.gz
 wget https://doi.org/10.1371/journal.pgen.1001154.s002
-# Add: promoter conservation, average exon conservation, EDS
 /opt/rCNV2/data_curation/gene/get_gene_features.py \
   --get-constraint \
   --ref-fasta ${ref_fasta} \
@@ -409,6 +408,17 @@ for wrapper in 1; do
   | sed 's/\.genes\.list//g' | addcom
   echo "gnomAD v2.1.1 [Karczewski _et al._, _Nature_, 2020](https://www.nature.com/articles/s41586-020-2308-7)"
   echo "pLI ≥ 0.9 or in the first LOEUF sextile"
+done | paste -s \
+| sed 's/\t/\ \|\ /g' \
+| sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' \
+>> genelist_table.html.txt
+for wrapper in 1; do
+  echo "LoF-constrained (strict) genes"
+  wc -l gnomad.v2.1.1.lof_constrained_strict.genes.list \
+  | awk -v OFS="\t" '{ print $1, "`"$2"`" }' \
+  | sed 's/\.genes\.list//g' | addcom
+  echo "gnomAD v2.1.1 [Karczewski _et al._, _Nature_, 2020](https://www.nature.com/articles/s41586-020-2308-7)"
+  echo "pLI ≥ 0.9 and in the first LOEUF sextile"
 done | paste -s \
 | sed 's/\t/\ \|\ /g' \
 | sed -e 's/^/\|\ /g' -e 's/$/\ \|/g' \

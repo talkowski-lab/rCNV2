@@ -73,6 +73,13 @@ get.gene.color.byscore <- function(gene, ds.groups){
   }
 }
 
+# Get gene color based on gradient of possible x,y values for score pairs
+get.gene.color.byxy <- function(vals){
+  phi <- 100*round(as.numeric(vals)[1])
+  pts <- 100*round(as.numeric(vals)[1])
+  
+}
+
 # Compute ROC of a single score vs. predefined true/false genes
 roc <- function(stats, score, true.genes, false.genes, steps=seq(1, 0, -0.001)){
   x <- data.frame("score" = stats[, which(colnames(stats) == score)],
@@ -214,7 +221,7 @@ plot.feature.bydsgroup <- function(feats, ds.groups, feat.idx=2, title=NULL,
   plot.colors <- c(cnv.colors[c(1, 3, 2)], control.cnv.colors[c(1, 3, 2)], ns.color)
   border.colors <- c(cnv.blacks[c(1, 3, 2)], cnv.colors[c(1, 3, 2)], "gray30")
   black.colors <- c(rep(cnv.blacks[c(1, 3, 2)], 2), "gray30")
-  lab.colors <- c(plot.colors[1:6], "black")
+  lab.colors <- c(plot.colors[1:3], plot.colors[1:3], "black")
   pt.cex <- c(rep(0.12, 3), rep(0.075, 4))
   if(is.null(title)){
     title <- colnames(feats)[feat.idx]
@@ -245,8 +252,10 @@ plot.feature.bydsgroup <- function(feats, ds.groups, feat.idx=2, title=NULL,
   })
   axis(1, at=c(0.1, 2.9), tck=0, col=blueblack, labels=NA, line=1.1)
   axis(1, at=c(4.1, 6.9), tck=0, col=blueblack, labels=NA, line=1.1)
-  axis(1, at=1.5, line=0.1, labels="High Conf.", tick=F)
-  axis(1, at=5.5, line=0.1, labels="Low Conf.", tick=F)
+  axis(1, at=c(8.1, 8.9), tck=0, col=blueblack, labels=NA, line=1.1)
+  axis(1, at=1.5, line=0.1, labels=bquote("Score" >= 0.9), tick=F)
+  axis(1, at=5.5, line=0.1, labels="0.5-0.9", tick=F)
+  axis(1, at=8.5, line=0.1, labels=bquote("" < 0.5), tick=F)
   axis(2, at=c(-10e10, 10e10), tck=0, col=blueblack)
   axis(2, at=y.ax.at, tck=-0.03, labels=NA, col=blueblack)
   axis(2, at=y.ax.at, tick=F, las=2, line=-0.65)

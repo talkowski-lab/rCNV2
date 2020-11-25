@@ -17,9 +17,27 @@ options(stringsAsFactors=F, scipen=1000, family="sans")
 ##########################
 ### PLOTTING FUNCTIONS ###
 ##########################
+# Prepare color grid for gradient-based scatter
+make.color.grid <- function(){
+  yl.pal <- colorRampPalette(c(ns.color.light, control.cnv.colors[2], cnv.colors[2]))(101)
+  yr.pal <- colorRampPalette(c(cnv.colors[1],  cnv.colors[3]))(101)
+  # xb.pal <- colorRampPalette(c(ns.color, control.cnv.colors[1], cnv.colors[1]))(101)
+  # xt.pal <- colorRampPalette(c(cnv.colors[2], cnv.colors[3]))(101)
+  do.call("rbind", lapply(1:101, function(y){
+    colorRampPalette(c(yl.pal[y], yr.pal[y]))(101)
+  }))
+}
+
+# Get gene color based on (pHI, pTS) x,y pairs
+query.color.grid <- function(gene, scores, color.grid){
+  x <- round(100*as.numeric(scores$pHI[which(scores$gene==gene)]))
+  y <- round(100*as.numeric(scores$pTS[which(scores$gene==gene)]))
+  color.grid[y+1, x+1]
+}
+
 # Helper function to add marginal density plot
 marginal.density <- function(vals, colors, scale=0.25, bw=0.02, rotate=F,
-                             hc.cutoff=0.9, lc.cutoff=0.5){
+                             hc.cutoff=0.9, lc.cutoff=0.5, gradient=F, pal=NA){
   # Gather plot values
   d <- density(vals, bw=bw)
   idx <- d$x
@@ -29,42 +47,63 @@ marginal.density <- function(vals, colors, scale=0.25, bw=0.02, rotate=F,
   h <- h + 1
   
   # Split indexes into bins
-  ns.idx <- which(idx<lc.cutoff)
-  lc.idx <- which(idx>=lc.cutoff & idx<hc.cutoff)
-  hc.idx <- which(idx>=hc.cutoff)
+  if(gradient==FALSE){
+    ns.idx <- which(idx<lc.cutoff)
+    lc.idx <- which(idx>=lc.cutoff & idx<hc.cutoff)
+    hc.idx <- which(idx>=hc.cutoff)
+  }
   
   # Compute polygon coordinate vectors based on rotation
   if(rotate==T){
     x <- h; y <- idx
-    ns.df <- data.frame("x"=c(x[ns.idx], rep(1, length(ns.idx))),
-                        "y"=c(y[ns.idx], rev(y[ns.idx])))
-    lc.df <- data.frame("x"=c(x[lc.idx], rep(1, length(lc.idx))),
-                        "y"=c(y[lc.idx], rev(y[lc.idx])))
-    hc.df <- data.frame("x"=c(x[hc.idx], rep(1, length(hc.idx))),
-                        "y"=c(y[hc.idx], rev(y[hc.idx])))
+    if(gradient==FALSE){
+      ns.df <- data.frame("x"=c(x[ns.idx], rep(1, length(ns.idx))),
+                          "y"=c(y[ns.idx], rev(y[ns.idx])))
+      lc.df <- data.frame("x"=c(x[lc.idx], rep(1, length(lc.idx))),
+                          "y"=c(y[lc.idx], rev(y[lc.idx])))
+      hc.df <- data.frame("x"=c(x[hc.idx], rep(1, length(hc.idx))),
+                          "y"=c(y[hc.idx], rev(y[hc.idx])))
+    }
     all.df <- data.frame("x"=c(x, rep(1, length(x))), "y"=c(y, rev(y)))
   }else{
     x <- idx; y <- h
-    ns.df <- data.frame("x"=c(x[ns.idx], rev(x[ns.idx])),
-                        "y"=c(y[ns.idx], rep(1, length(ns.idx))))
-    lc.df <- data.frame("x"=c(x[lc.idx], rev(x[lc.idx])),
-                        "y"=c(y[lc.idx], rep(1, length(lc.idx))))
-    hc.df <- data.frame("x"=c(x[hc.idx], rev(x[hc.idx])),
-                        "y"=c(y[hc.idx], rep(1, length(hc.idx))))
+    if(gradient==FALSE){
+      ns.df <- data.frame("x"=c(x[ns.idx], rev(x[ns.idx])),
+                          "y"=c(y[ns.idx], rep(1, length(ns.idx))))
+      lc.df <- data.frame("x"=c(x[lc.idx], rev(x[lc.idx])),
+                          "y"=c(y[lc.idx], rep(1, length(lc.idx))))
+      hc.df <- data.frame("x"=c(x[hc.idx], rev(x[hc.idx])),
+                          "y"=c(y[hc.idx], rep(1, length(hc.idx))))
+    }
     all.df <- data.frame("x"=c(x, rev(x)), "y"=c(y, rep(1, length(y))))
   }
   
   # Plot polygons in ascending order
-  polygon(x=ns.df$x, y=ns.df$y, border=colors[3], col=colors[3], xpd=T)
-  polygon(x=lc.df$x, y=lc.df$y, border=colors[2], col=colors[2], xpd=T)
-  polygon(x=hc.df$x, y=hc.df$y, border=colors[1], col=colors[1], xpd=T)
+  if(gradient==FALSE){
+    polygon(x=ns.df$x, y=ns.df$y, border=colors[3], col=colors[3], xpd=T)
+    polygon(x=lc.df$x, y=lc.df$y, border=colors[2], col=colors[2], xpd=T)
+    polygon(x=hc.df$x, y=hc.df$y, border=colors[1], col=colors[1], xpd=T)
+  }else{
+    n.poly <- length(x)-1
+    pal <- pal(n.poly)
+    sapply(1:n.poly, function(i){
+      if(rotate==TRUE){
+        polygon(x=x[c(1, i, i+1, 1)], y=y[c(i, i, i+1, i+1)],
+                border=pal[i], col=pal[i], xpd=T)
+      }else{
+        polygon(x=x[c(i, i, i+1, i+1)], y=y[c(1, i, i+1, 1)],
+                border=pal[i], col=pal[i], xpd=T)
+      }
+    })
+  }
   polygon(x=all.df$x, y=all.df$y, col=NA, border=colors[1], bty="n", xpd=T)
 }
 
 # Scatterplot of genes by scores with options for coloring and marginal densities
 scores.scatterplot <- function(scores, pt.colors, add.cor=TRUE, 
                                hc.cutoff=0.9, lc.cutoff=0.5,
-                               margin.dens.height=0.175, pt.cex=0.1, ax.tick=-0.03,
+                               margin.dens.height=0.175, margin.dens.gradient=FALSE,
+                               pt.cex=0.1, pt.alpha=1, ax.tick=-0.03,
                                bg.col="white", gridlines.col=bluewhite,
                                x.ax.title="Haploinsufficiency Score (pHI)",
                                y.ax.title="Triplosensitivity Score (pTS)",
@@ -83,14 +122,28 @@ scores.scatterplot <- function(scores, pt.colors, add.cor=TRUE,
            y0=ax.at, y1=ax.at, col=gridlines.col)
   
   # Add points
-  points(scores$pHI, scores$pTS, cex=pt.cex, col=pt.colors)
+  if(pt.alpha < 1){
+    pt.colors <- sapply(pt.colors, adjustcolor, alpha=pt.alpha)
+    points(scores$pHI, scores$pTS, cex=pt.cex, col=pt.colors, pch=19)
+  }else{
+    points(scores$pHI, scores$pTS, cex=pt.cex, col=pt.colors, pch=19)
+  }
   
   # Add marginal densities
   if(margin.dens.height > 0){
-    marginal.density(scores$pHI, colors=c(cnv.colors[1], control.cnv.colors[1], redwhite),
-                     bw=0.01, scale=margin.dens.height)
-    marginal.density(scores$pTS, colors=c(cnv.colors[2], control.cnv.colors[2], bluewhite), 
-                     bw=0.01, scale=margin.dens.height, rotate=T)
+    if(margin.dens.gradient==TRUE){
+      marginal.density(scores$pHI, colors=cnv.colors[1], gradient=TRUE,
+                       pal=colorRampPalette(c(ns.color.light, cnv.whites[1], control.cnv.colors[1], cnv.colors[1])),
+                       bw=0.01, scale=margin.dens.height)
+      marginal.density(scores$pTS, colors=cnv.colors[2], gradient=TRUE,
+                       pal=colorRampPalette(c(ns.color.light, cnv.whites[2], control.cnv.colors[2], cnv.colors[2])),
+                       bw=0.01, scale=margin.dens.height, rotate=T)
+    }else{
+      marginal.density(scores$pHI, colors=c(cnv.colors[1], control.cnv.colors[1], redwhite),
+                       bw=0.01, scale=margin.dens.height)
+      marginal.density(scores$pTS, colors=c(cnv.colors[2], control.cnv.colors[2], bluewhite), 
+                       bw=0.01, scale=margin.dens.height, rotate=T)
+    }
   }
   
   # Add delimiting lines
@@ -301,6 +354,22 @@ pdf(paste(out.prefix, "gene_scores_scatterplot.legend.pdf", sep="."),
 plot.scores.scatter.legend(scores, ds.groups)
 dev.off()
 
+# Plot scores without categories and colored by density
+# Optional: code below can be used to color by mixture of x,y coordinates
+# color.grid <- make.color.grid()
+# pt.colors.xybasis <- sapply(scores$gene, query.color.grid, scores, color.grid)
+# Color by density
+pt.colors.density.df.unsorted <- color.points.by.density(scores$pHI, scores$pTS)
+pt.colors.density <- pt.colors.density.df.unsorted$col[order(as.numeric(rownames(pt.colors.density.df.unsorted)))]
+pdf(paste(out.prefix, "gene_scores_scatterplot.no_categories.pdf", sep="."),
+    height=2.75, width=2.75)
+scores.scatterplot(scores, pt.colors.density, add.cor=FALSE,
+                   margin.dens.height=0.15, margin.dens.gradient=TRUE,
+                   hc.cutoff=NA, lc.cutoff=NA,
+                   bg.col=bluewhite, gridlines.col="white",
+                   pt.cex=0.15, ax.tick=-0.02, parmar=c(2.7, 2.7, 0.4, 0.4))
+dev.off()
+
 # Plot scores colored by DS gradient
 ds.gradient <- apply(scores[, -1], 1, function(vals){
   min(as.numeric(vals))
@@ -317,4 +386,3 @@ plot.gradients(scores, hits.gradient.norm, hits.gradient.pal,
                null.x=0.5, null.y=0.5,
                hist.x.ax.title="\"pTS\" - \"pHI\"",
                sub.out.prefix="hi_ts_gradient")
-

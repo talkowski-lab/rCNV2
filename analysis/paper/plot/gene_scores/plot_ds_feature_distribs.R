@@ -75,7 +75,7 @@ feat.meta <- load.gene.feature.metadata(feature.meta.in)
 sapply(2:ncol(feats), function(i){
   out.pdf <- paste(out.prefix, gsub("/", "", colnames(feats)[i], fixed=T),
                    "feature_distribs.pdf", sep=".")
-  pdf(out.pdf, height=2.25, width=3)
+  pdf(out.pdf, height=2.4, width=3)
   plot.feature.bydsgroup(feats, ds.groups, feat.idx=i, 
                          title=feat.meta$name[which(feat.meta$feature==colnames(feats)[i])],
                          swarm.max=1200)

@@ -170,7 +170,7 @@ opts <- args$options
 
 # Checks for appropriate positional arguments
 if(length(args$args) != 7){
-  stop(paste("Six positional arguments required: meta_stats.tsv, bfdps.tsv, true.genes, false.genes, exclude.genes, CNV, and output_prefix\n", sep=" "))
+  stop(paste("Seven positional arguments required: meta_stats.tsv, bfdps.tsv, true.genes, false.genes, exclude.genes, CNV, and output_prefix\n", sep=" "))
 }
 
 # Writes args & opts to vars
