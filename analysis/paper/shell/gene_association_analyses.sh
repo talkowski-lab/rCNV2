@@ -137,6 +137,53 @@ for CNV in DEL DUP; do
 done | wc -l
 
 
+# Count number of fine-mapped genes also present in OMIM
+zcat rCNV.final_genes.genes.bed.gz \
+| fgrep -v "#" | cut -f4 | sort | uniq \
+| fgrep -wf - refs/gene_lists/HP0000118.HPOdb.genes.list \
+| wc -l
+
+
+# Count number of fine-mapped duplication genes not present in OMIM, DECIPHER, or DDG2P (for abstract)
+zcat rCNV.final_genes.genes.bed.gz \
+| fgrep -v "#" | fgrep -w DUP | cut -f4 | sort | uniq \
+| fgrep -wvf <( cat refs/gene_lists/HP0000118.HPOdb.genes.list \
+                    refs/gene_lists/ClinGen.all_triplosensitive.genes.list \
+                    refs/gene_lists/DDG2P.all_gof.genes.list ) \
+| wc -l
+
+
+# Count number of triplosensitive genes that qualify as mechanism expansion per DECIPHER + DDG2P
+zcat rCNV.final_genes.genes.bed.gz \
+| fgrep -v "#" | fgrep -w DUP | cut -f4 | sort | uniq \
+| fgrep -wvf <( cat refs/gene_lists/ClinGen.all_triplosensitive.genes.list \
+                    refs/gene_lists/DDG2P.all_gof.genes.list ) \
+| fgrep -wf <( cat refs/gene_lists/ClinGen.all_haploinsufficient.genes.list \
+                   refs/gene_lists/DDG2P.all_lof.genes.list ) \
+| wc -l
+
+
+# # Count number of haploinsufficient genes that qualify as mechanism expansion per DECIPHER + DDG2P
+# zcat rCNV.final_genes.genes.bed.gz \
+# | fgrep -v "#" | fgrep -w DEL | cut -f4 | sort | uniq \
+# | fgrep -wf <( cat refs/gene_lists/ClinGen.all_triplosensitive.genes.list \
+#                    refs/gene_lists/DDG2P.all_gof.genes.list \
+#                    refs/gene_lists/DDG2P.all_other.genes.list ) \
+# | fgrep -wvf <( cat refs/gene_lists/ClinGen.all_haploinsufficient.genes.list \
+#                    refs/gene_lists/DDG2P.all_lof.genes.list ) \
+# | wc -l
+
+
+# Count number of constrained fine-mapped genes that aren't present in OMIM
+zcat rCNV.final_genes.genes.bed.gz \
+| fgrep -v "#" | cut -f4 | sort | uniq \
+| fgrep -wf - <( cat refs/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
+                     refs/gene_lists/gnomad.v2.1.1.mis_constrained.genes.list ) \
+| fgrep -wvf refs/gene_lists/HP0000118.HPOdb.genes.list \
+| wc -l
+
+
+
 # Copy all plots to final gs:// directory
 gsutil -m cp -r \
   feature_heatmap \

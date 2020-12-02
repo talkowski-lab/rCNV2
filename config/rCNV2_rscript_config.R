@@ -91,6 +91,7 @@ nc.anno.family.names <- c("chromhmm" = "Inferred Chromatin States",
 # COLORS #
 ##########
 graphabs.green <- "#027831"
+graphabs.green.darker <- "#235020"
 gw.sig.color <- "#FFB533"
 ns.color.dark <- "gray50"
 ns.color <- "gray70"

@@ -84,7 +84,7 @@ get.plot.data <- function(feats, feat, gene.groups, not.credset.genes, ci="boots
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Plot enrichment of gene groups for a single feature
-plot.enrichment <- function(feats, feat, gene.groups, ci="bootstrap",
+plot.enrichment <- function(feats, feat, gene.groups, ci="bootstrap", bars=FALSE, pt.cex=1,
                             y.ax.title="Proportion of Genes", y.ax.title.line=0.75,
                             add.y.labels=TRUE, parmar=c(0.2, 4, 0.2, 0.2)){
   # Collect data for plotting
@@ -93,10 +93,14 @@ plot.enrichment <- function(feats, feat, gene.groups, ci="bootstrap",
   
   # Get plot parameters
   ymax <- min(c(max(unlist(pdat), na.rm=T),
-                1.5*max(do.call("rbind", pdat)[, 1], na.rm=T)))
+                1.3*max(do.call("rbind", pdat)[, 1], na.rm=T)))
   min.means <- min(do.call("rbind", pdat)[, 1], na.rm=T)
-  ymin <- max(c(min(unlist(pdat), na.rm=T),
-                min.means - 0.5*abs(min.means)))
+  if(bars==TRUE){
+    ymin <- 0
+  }else{
+    ymin <- max(c(min(unlist(pdat), na.rm=T),
+                  min.means - 0.5*abs(min.means)))
+  }
   if(ci=="binomial"){
     ymax <- min(c(ymax, 1))
     ymin <- max(c(0, ymin))
@@ -123,21 +127,52 @@ plot.enrichment <- function(feats, feat, gene.groups, ci="bootstrap",
   abline(h=y.ax.at, col="white")
   abline(h=pdat[[1]]$mean[4], lty=5, col=ns.color)
   
-  # Add points
-  
+  # Add points (or bars, if bars==TRUE)
   point.colors <- lapply(1:2, function(i){c(cnv.colors[i], rep(control.cnv.colors[i], 2))})
+  if(bars==TRUE){
+    bar.border <- lapply(1:2, function(i){c(cnv.blacks[i], rep(cnv.colors[i], 2))})
+    ci.colors <- list(c(redblack, rep(cnv.colors[1], 2)), 
+                      c(blueblack, rep(cnv.colors[2], 2)))
+    ci.lwd <- 1
+    ci.x.at <- list(x.at-0.2, x.at+0.2)
+  }else{
+    ci.colors <- point.colors
+    ci.lwd <- 1.5
+    ci.x.at <- x.at.cnv
+  }
+  if(bars==TRUE){
+    lapply(1:2, function(i){
+      rect(xleft=x.at[1:3]+(0.4*(i-2)), xright=x.at[1:3]+(0.4*(i-1)), 
+           ybottom=rep(0, 3), ytop=pdat[[i]]$mean[1:3],
+           col=point.colors[[i]], border=bar.border[[i]])
+      segments(x0=rep(ci.x.at[[i]][1:3]-0.1, 2), x1=rep(ci.x.at[[i]][1:3]+0.1, 2),
+               y0=c(pdat[[i]]$lower[1:3], pdat[[i]]$upper[1:3]),
+               y1=c(pdat[[i]]$lower[1:3], pdat[[i]]$upper[1:3]),
+               lwd=ci.lwd, col=ci.colors[[i]], lend="butt")
+    })
+    rect(xleft=x.at[4]-0.2, xright=x.at[4]+0.2, 
+         ybottom=0, ytop=pdat[[1]]$mean[4], col=ns.color, border=ns.color.dark)
+    segments(x0=x.at[4], x1=x.at[4], y0=pdat[[1]]$lower[4], y1=pdat[[1]]$upper[4],
+             lwd=ci.lwd, col=ns.color.dark, lend="round")
+    segments(x0=rep(x.at[4]-0.1, 2), x1=rep(x.at[4]+0.1, 2),
+             y0=c(pdat[[1]]$lower[4], pdat[[1]]$upper[4]),
+             y1=c(pdat[[1]]$lower[4], pdat[[1]]$upper[4]),
+             lwd=ci.lwd, col=ns.color.dark, lend="butt")
+  }
   lapply(1:2, function(i){
-    segments(x0=x.at.cnv[[i]][1:3], x1=x.at.cnv[[i]][1:3], 
+    segments(x0=ci.x.at[[i]][1:3], x1=ci.x.at[[i]][1:3], 
              y0=pdat[[i]]$lower[1:3], y1=pdat[[i]]$upper[1:3], 
-             lwd=1.5, col=point.colors[[i]], lend="round")
+             lwd=ci.lwd, col=ci.colors[[i]], lend="round")
   })
-  lapply(1:2, function(i){
-    points(x=x.at.cnv[[i]][1:3], y=pdat[[i]]$mean[1:3],
-             col=point.colors[[i]], pch=19)
-  })
-  segments(x0=x.at[4], x1=x.at[4], y0=pdat[[1]]$lower[4], y1=pdat[[1]]$upper[4],
-           lwd=1.5, col=ns.color, lend="round")
-  points(x=x.at[4], y=pdat[[1]]$mean[4], col=ns.color, pch=19)
+  if(bars==F){
+    segments(x0=x.at[4], x1=x.at[4], y0=pdat[[1]]$lower[4], y1=pdat[[1]]$upper[4],
+             lwd=ci.lwd, col=ns.color, lend="round")
+    lapply(1:2, function(i){
+      points(x=x.at.cnv[[i]][1:3], y=pdat[[i]]$mean[1:3],
+             col=point.colors[[i]], pch=19, cex=pt.cex)
+    })
+    points(x=x.at[4], y=pdat[[1]]$mean[4], col=ns.color, pch=19, cex=pt.cex)
+  }
   
   # Add lower grid
   rect(xleft=par("usr")[1], xright=par("usr")[2], ybottom=par("usr")[3], ytop=ymin,
@@ -248,13 +283,13 @@ sapply(names(genelists), function(glist){
   }else{
     add.y.labels <- FALSE
   }
-  plot.enrichment(feats, glist, gene.groups, ci="binomial", add.y.labels=add.y.labels)
+  plot.enrichment(feats, glist, gene.groups, ci="binomial", add.y.labels=add.y.labels, bars=TRUE)
   dev.off()
 })
 
 # Plot DNM counts from DDD
 pdf(paste(out.prefix, "ddd_dn_lof", "enrichments.pdf", sep="."), 
     height=2.1, width=2.6)
-plot.enrichment(feats, "excess_ddd_dn_lof", gene.groups, ci="bootstrap",
+plot.enrichment(feats, "excess_ddd_dn_lof", gene.groups, ci="bootstrap", pt.cex=1.25,
                 y.ax.title="Excess De Novo\nPTVs per Gene", y.ax.title.line=0.2)
 dev.off()
