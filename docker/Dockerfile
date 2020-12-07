@@ -84,17 +84,17 @@ RUN wget -P /opt/ http://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/bigWigTo
 ENV PATH /opt:$PATH
 
 # Install Athena toolkit
-RUN git clone https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/athena /opt/athena \
+RUN git clone https://github.com/talkowski-lab/athena /opt/athena \
     && cd /opt/athena \
-    && git checkout 37e4c71ac6f63474abb67ffa0a606f3a11f356b9 \
+    && git checkout 0ce69db5fdbeaa7c18009d531fb6535bf1fc5248 \
     && cd -
 RUN cd /opt/athena \
     && pip install -e .
 
 # Clone rCNV2 repo
-RUN git clone -b master https://c9f6da1fb0dd9d5379c313700a1083f9633be849@github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
+RUN git clone -b master https://github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 8be3b01c43dbef2e95c5d2fc28e2267bd06f9ecb && \
+    git checkout bb3889d75a60f094c53e90c665091d1fa695ed64 && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)
