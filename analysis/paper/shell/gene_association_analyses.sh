@@ -144,24 +144,43 @@ zcat rCNV.final_genes.genes.bed.gz \
 | wc -l
 
 
-# Count number of fine-mapped duplication genes not present in OMIM, DECIPHER, or DDG2P (for abstract)
-zcat rCNV.final_genes.genes.bed.gz \
-| fgrep -v "#" | fgrep -w DUP | cut -f4 | sort | uniq \
-| fgrep -wvf <( cat refs/gene_lists/HP0000118.HPOdb.genes.list \
-                    refs/gene_lists/ClinGen.all_triplosensitive.genes.list \
-                    refs/gene_lists/DDG2P.all_gof.genes.list ) \
-| wc -l
-
-
-# Count number of triplosensitive genes that qualify as mechanism expansion per DECIPHER + DDG2P
+# Count number of fine-mapped triplosensitive genes not present in ClinGen TS or DDG2P GoF/other (for abstract)
 zcat rCNV.final_genes.genes.bed.gz \
 | fgrep -v "#" | fgrep -w DUP | cut -f4 | sort | uniq \
 | fgrep -wvf <( cat refs/gene_lists/ClinGen.all_triplosensitive.genes.list \
-                    refs/gene_lists/DDG2P.all_gof.genes.list ) \
+                    refs/gene_lists/DDG2P.all_gof.genes.list \
+                    refs/gene_lists/DDG2P.all_other.genes.list ) \
+| wc -l
+# Further count number of fine-mapped novel triplo genes with established LoF mechanism in ClinGen/DDG2P
+zcat rCNV.final_genes.genes.bed.gz \
+| fgrep -v "#" | fgrep -w DUP | cut -f4 | sort | uniq \
+| fgrep -wvf <( cat refs/gene_lists/ClinGen.all_triplosensitive.genes.list \
+                    refs/gene_lists/DDG2P.all_gof.genes.list \
+                    refs/gene_lists/DDG2P.all_other.genes.list ) \
 | fgrep -wf <( cat refs/gene_lists/ClinGen.all_haploinsufficient.genes.list \
                    refs/gene_lists/DDG2P.all_lof.genes.list ) \
 | wc -l
 
+
+# Gather mean odds ratio across all gw sig large segments and credsets
+for wrapper in 1; do
+  zcat rCNV.final_segments.associations.bed.gz \
+  | fgrep -v "#" | cut -f10
+  for CNV in DEL DUP; do
+    zcat rCNV.final_segments.loci.bed.gz \
+    | fgrep -w $CNV | cut -f22 | sed 's/\;/\n/g' \
+    | sort | uniq \
+    | fgrep -wvf - <( zcat rCNV.final_genes.credible_sets.bed.gz ) \
+    | fgrep -w $CNV
+  done | cut -f9
+done | awk '{ sum+=$1 }END{ print sum/NR }'
+
+
+# Gather mean & range of odds ratios across all credsets
+zcat rCNV.final_genes.credible_sets.bed.gz | fgrep -v "#" | cut -f9 \
+| awk '{ sum+=$1 }END{ print sum/NR }'
+zcat rCNV.final_genes.credible_sets.bed.gz | fgrep -v "#" | cut -f9 | sort -nk1,1 | head -n1
+zcat rCNV.final_genes.credible_sets.bed.gz | fgrep -v "#" | cut -f9 | sort -nk1,1 | tail -n1
 
 # # Count number of haploinsufficient genes that qualify as mechanism expansion per DECIPHER + DDG2P
 # zcat rCNV.final_genes.genes.bed.gz \

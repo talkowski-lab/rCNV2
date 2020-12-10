@@ -273,7 +273,11 @@ require(funr, quietly=T)
 option_list <- list(
   make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced."),
   make_option(c("--del-cutoff"), default=10e-6, help="Significant P-value cutoff for deletions."),
-  make_option(c("--dup-cutoff"), default=10e-6, help="Significant P-value cutoff for duplications.")
+  make_option(c("--dup-cutoff"), default=10e-6, help="Significant P-value cutoff for duplications."),
+  make_option(c("--del-nomsig-bed"), default="./del_nomsig.bed", 
+              help="Path to BED file with coordinates of nominally significant deletion windows."),
+  make_option(c("--dup-nomsig-bed"), default="./dup_nomsig.bed", 
+              help="Path to BED file with coordinates of nominally significant duplication windows.")
 )
 
 # Get command-line arguments & options
@@ -303,6 +307,8 @@ out.prefix <- args$args[7]
 rcnv.config <- opts$`rcnv-config`
 del.cutoff <- -log10(as.numeric(opts$`del-cutoff`))
 dup.cutoff <- -log10(as.numeric(opts$`dup-cutoff`))
+del.nomsig.bed <- opts$`del-nomsig-bed`
+dup.nomsig.bed <- opts$`dup-nomsig-bed`
 
 # # DEV PARAMETERS
 # primary.del.pvals.in <- "~/scratch/rCNV2_analysis_d1.DEL.meta_phred_p.all_hpos.bed.gz"
@@ -315,6 +321,8 @@ dup.cutoff <- -log10(as.numeric(opts$`dup-cutoff`))
 # rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
 # del.cutoff <- 6
 # dup.cutoff <- 6
+# del.nomsig.bed <- "~/scratch/del_nomsig.bed"
+# dup.nomsig.bed <- "~/scratch/dup_nomsig.bed"
 # script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
 
 # Source rCNV2 config, if optioned
@@ -332,9 +340,22 @@ dup.1 <- load.pval.matrix(primary.dup.pvals.in)
 del.2 <- load.pval.matrix(secondary.del.pvals.in)
 dup.2 <- load.pval.matrix(secondary.dup.pvals.in)
 
+# Write BED files of windows with at least one nominally significant association
+del.nomsig.coords <- del.1$coords[which(apply(del.1$pvals, 1, function(vals){any(!is.na(vals) & vals<0.05)})), ]
+write.table(del.nomsig.coords, del.nomsig.bed, col.names=F, row.names=F, sep="\t", quote=F)
+system(paste("bgzip -f", del.nomsig.bed), wait=T)
+dup.nomsig.coords <- dup.1$coords[which(apply(dup.1$pvals, 1, function(vals){any(!is.na(vals) & vals<0.05)})), ]
+write.table(dup.nomsig.coords, dup.nomsig.bed, col.names=F, row.names=F, sep="\t", quote=F)
+system(paste("bgzip -f", dup.nomsig.bed), wait=T)
+
 # Read reordered HPOs
 hpos <- as.character(read.table(hpos.in, header=F, sep="\t")[, 1])
 hpo.n <- load.hpo.samplesize(hpo.samplesize.in, hpos)
+
+# Print median lambda
+cat(paste("Median lambda, deletions only:", round(median(del.1$lambdas), 5), "\n"))
+cat(paste("Median lambda, duplications only:", round(median(dup.1$lambdas), 5), "\n"))
+cat(paste("Median lambda, deletions & duplications only:", round(median(c(del.1$lambdas, dup.1$lambdas)), 5), "\n"))
 
 # Plot grid of QQs
 n.plots.wide <- 10

@@ -180,6 +180,11 @@ mkdir basic_distribs
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   basic_distribs/${prefix}
+# Get range of effect sizes across all g-w sig associations
+zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f10 | sort -nk1,1 | head -n1
+zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f10 | sort -nk1,1 | tail -n1
+zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f10 \
+| awk '{ sum+=$1 }END{ print sum/NR }'
 
 
 # Run segment permutation tests
@@ -366,6 +371,8 @@ done
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   --del-cutoff ${del_cutoff} \
   --dup-cutoff ${dup_cutoff} \
+  --del-nomsig-bed ./nomsig_windows.DEL.bed \
+  --dup-nomsig-bed ./nomsig_windows.DUP.bed \
   meta_stats/matrices/${prefix}.DEL.meta_phred_p.all_hpos.bed.gz \
   meta_stats/matrices/${prefix}.DUP.meta_phred_p.all_hpos.bed.gz \
   meta_stats/matrices/${prefix}.DEL.meta_phred_p_secondary.all_hpos.bed.gz \
@@ -373,6 +380,13 @@ done
   refs/${prefix}.reordered_hpos.txt \
   refs/HPOs_by_metacohort.table.tsv \
   assoc_stat_plots/${prefix}
+# Calculate fraction of genome with nominal association with at least one phenotype
+searchspace=$( zcat meta_stats/matrices/${prefix}.DEL.meta_phred_p.all_hpos.bed.gz \
+               | cut -f1-3 | fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n \
+               | bedtools merge -i - | awk '{ sum+=$3-$2 }END{ print sum }' )
+zcat ./nomsig_windows.*.bed.gz \
+| sort -Vk1,1 -k2,2n -k3,3n | bedtools merge -i - \
+| awk -v denom=$searchspace '{ sum+=$3-$2 }END{ print sum/denom }'
 
 
 # Plot correlation of sizes for original significant regions and fine-mapped reigons
