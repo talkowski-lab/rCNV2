@@ -94,7 +94,7 @@ RUN cd /opt/athena \
 # Clone rCNV2 repo
 RUN git clone -b master https://github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd /opt/rCNV2 && \
-    git checkout 5c4e0ad795978abf4069013450b70520ebd0e2f1 && \
+    git checkout 26c5e51a076b44434f77a182a5c91b3580244c5e && \
     cd -
 
 # Developer utilities: add bash aliases, etc (for convenience)
