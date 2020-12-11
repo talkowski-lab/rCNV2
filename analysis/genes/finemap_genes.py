@@ -278,7 +278,7 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
 
 def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
                   secondary_or_nominal=True, block_merge_dist=500000,
-                  finemap_secondary=False):
+                  block_prefix='gene_block', finemap_secondary=False):
     """
     Wrapper function to process each HPO with process_hpo()
     Returns a dict with one entry per HPO
@@ -296,6 +296,7 @@ def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2,
                                         n_nominal_cutoff=n_nominal_cutoff, 
                                         secondary_or_nominal=secondary_or_nominal,
                                         block_merge_dist=block_merge_dist,
+                                        block_prefix=block_prefix,
                                         finemap_secondary=finemap_secondary)
 
     return hpo_data
@@ -919,7 +920,8 @@ def main():
     # Process data per hpo
     hpo_data = load_all_hpos(args.statslist, args.secondary_p_cutoff, 
                              args.min_nominal, args.secondary_or_nom, 
-                             args.distance, args.finemap_secondary)
+                             args.distance, '{}_gene_block'.format(args.cnv), 
+                             args.finemap_secondary)
 
     # Estimate null variance based on:
     #   1. most significant gene from each block

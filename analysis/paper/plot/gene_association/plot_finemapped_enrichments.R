@@ -118,7 +118,7 @@ plot.enrichment <- function(feats, feat, gene.groups, ci="bootstrap", bars=FALSE
   # Set plot parameters
   x.at <- (1:4)-0.5
   x.at.cnv <- list("DEL"=x.at-0.1, "DUP"=x.at+0.1)
-  y.ax.at <- axTicks(2)[which(axTicks(2) > ymin)]
+  y.ax.at <- sort(unique(round(10*axTicks(2)[which(axTicks(2) > ymin)])))/10
   
   # Add background shading
   rect(xleft=par("usr")[1], xright=par("usr")[2],
@@ -276,14 +276,13 @@ feats$excess_ddd_dn_lof <- calc.ddd.excess(feats)
 
 # Plot gene list-based panels
 sapply(names(genelists), function(glist){
-  pdf(paste(out.prefix, glist, "enrichments.pdf", sep="."), 
+  pdf(paste(out.prefix, glist, "enrichments.nolabel.pdf", sep="."), 
       height=2.1, width=2.6)
-  if(glist==names(genelists)[1]){
-    add.y.labels <- TRUE
-  }else{
-    add.y.labels <- FALSE
-  }
-  plot.enrichment(feats, glist, gene.groups, ci="binomial", add.y.labels=add.y.labels, bars=TRUE)
+  plot.enrichment(feats, glist, gene.groups, ci="binomial", add.y.labels=FALSE, bars=TRUE)
+  dev.off()
+  pdf(paste(out.prefix, glist, "enrichments.withlabel.pdf", sep="."), 
+      height=2.1, width=2.6)
+  plot.enrichment(feats, glist, gene.groups, ci="binomial", add.y.labels=TRUE, bars=TRUE)
   dev.off()
 })
 

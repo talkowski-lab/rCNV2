@@ -109,8 +109,10 @@ get.manhattan.plot.df <- function(df, chrom.colors, sig.color,
 # Custom Miami plot
 mini.miami <- function(del, dup, max.p=10, 
                        del.cutoff=del.cutoff, dup.cutoff=dup.cutoff, 
+                       cutoff.label="Genome-wide significance",
                        sig.buffer=500000, sig.color=blueblack,
                        middle.axis.width=1,
+                       xaxis.label="Chromosomes",
                        parmar=c(0.5, 2.7, 0.5, 0.3)){
   # Get plotting data for dels & dups
   del.df <- get.manhattan.plot.df(del, 
@@ -140,7 +142,7 @@ mini.miami <- function(del, dup, max.p=10,
   text(x=par("usr")[1], 
        y=c(dup.cutoff + gw.sig.label.buffer + middle.axis.width/2, 
            -del.cutoff - (4/3)*gw.sig.label.buffer - middle.axis.width/2),
-       labels="Genome-wide significance", col=sig.color, pos=4, font=3, cex=0.85)
+       labels=cutoff.label, col=sig.color, pos=4, font=3, cex=0.85)
   
   # Add points
   points(x=del.df$pos, y=del.df$p, 
@@ -168,7 +170,7 @@ mini.miami <- function(del, dup, max.p=10,
            y0=c(0.5, -0.5) * middle.axis.width, 
            y1=c(0.5, -0.5) * middle.axis.width, 
            col=blueblack, xpd=T, lend="round")
-  text(x=mean(par("usr")[1:2]), y=0, labels="Chromosomes")
+  text(x=mean(par("usr")[1:2]), y=0, labels=xaxis.label)
 }
 
 
@@ -181,7 +183,9 @@ require(optparse, quietly=T)
 option_list <- list(
   make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced."),
   make_option(c("--del-cutoff"), default=10e-6, help="Significant P-value cutoff for deletions."),
-  make_option(c("--dup-cutoff"), default=10e-6, help="Significant P-value cutoff for duplications.")
+  make_option(c("--dup-cutoff"), default=10e-6, help="Significant P-value cutoff for duplications."),
+  make_option(c("--cutoff-label"), default="Genome-wide significance", help="Label for Y-axis cutoffs."),
+  make_option(c("--xaxis-label"), default="Chromosomes", help="Label for center X-axis.")
 )
 
 # Get command-line arguments & options
@@ -202,6 +206,8 @@ out.png <- args$args[3]
 rcnv.config <- opts$`rcnv-config`
 del.cutoff <- -log10(as.numeric(opts$`del-cutoff`))
 dup.cutoff <- -log10(as.numeric(opts$`dup-cutoff`))
+cutoff.label <- opts$`cutoff-label`
+xaxis.label <- opts$`xaxis-label`
 
 # # DEV PARAMETERS
 # del.in <- "~/scratch/HP0012759.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz"
@@ -210,6 +216,8 @@ dup.cutoff <- -log10(as.numeric(opts$`dup-cutoff`))
 # rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
 # del.cutoff <- 6
 # dup.cutoff <- 6
+# cutoff.label <- "Genome-wide significance"
+# xaxis.label <- "Chromosomes"
 
 # Source rCNV2 config, if optioned
 if(!is.null(rcnv.config)){
@@ -227,7 +235,7 @@ dup <- load.sumstats(dup.in, p.col.name="meta_phred_p")
 # Plot miami
 dim.scalar <- 2.1
 png(out.png, height=dim.scalar*1.4*300, width=dim.scalar*1.95*300, res=300, family="sans", bg=NA)
-mini.miami(del, dup, del.cutoff=del.cutoff, dup.cutoff=dup.cutoff, 
-           middle.axis.width=1.25, sig.col=graphabs.green, max.p=8)
+mini.miami(del, dup, del.cutoff=del.cutoff, dup.cutoff=dup.cutoff, cutoff.label=cutoff.label,
+           middle.axis.width=1.25, xaxis.label=xaxis.label, sig.col=graphabs.green, max.p=8)
 dev.off()
 

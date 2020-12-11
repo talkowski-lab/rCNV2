@@ -58,6 +58,14 @@ gsutil -m cp \
 find meta_stats/ -name "*meta_analysis.stats.bed.gz" | xargs -I {} tabix -f {}
 
 
+# Get genome-wide significance thresholds
+example_hpo="HP0012759"
+del_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
+              refs/sliding_window.rCNV.DEL.bonferroni_pval.hpo_cutoffs.tsv )
+dup_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
+              refs/sliding_window.rCNV.DUP.bonferroni_pval.hpo_cutoffs.tsv )
+
+
 # Compute effect size and max P-value per phenotype per gw-sig segment
 /opt/rCNV2/analysis/paper/scripts/large_segments/calc_all_seg_stats.py \
   -o ${prefix}.final_segments.loci.all_sumstats.tsv \
@@ -154,14 +162,6 @@ cat \
 gsutil -m cp \
   ${prefix}.master_segments.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/
-
-
-# Get genome-wide significance thresholds
-example_hpo="HP0012759"
-del_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
-              refs/sliding_window.rCNV.DEL.bonferroni_pval.hpo_cutoffs.tsv )
-dup_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
-              refs/sliding_window.rCNV.DUP.bonferroni_pval.hpo_cutoffs.tsv )
 
 
 # Plot basic segment distributions
@@ -301,6 +301,7 @@ mkdir assoc_stat_plots
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   --del-cutoff ${del_cutoff} \
   --dup-cutoff ${dup_cutoff} \
+  --xaxis-label "200kb sliding windows in 10kb steps" \
   meta_stats/${example_hpo}.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
   meta_stats/${example_hpo}.rCNV.DUP.sliding_window.meta_analysis.stats.bed.gz \
   assoc_stat_plots/${prefix}.example_miami.png
