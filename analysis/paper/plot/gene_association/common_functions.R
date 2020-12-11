@@ -94,9 +94,9 @@ credsets.scatter <- function(credsets, x, y, subset_to_regions=NULL,
                          xlims=NULL, ylims=NULL, add.lm=T, pt.cex=1,
                          horiz.lines.at=NULL, horiz.lines.lty=1, horiz.lines.color=NULL,
                          abline.a=NULL, abline.b=NULL, abline.lty=1,
-                         xtitle=NULL, x.title.line=1.75, x.at=NULL, x.labs=NULL, x.labs.at=NULL, parse.x.labs=FALSE, x.title.cex=1,
-                         ytitle=NULL, y.title.line=1.75, y.at=NULL, y.labs=NULL, y.labs.at=NULL, parse.y.labs=FALSE, y.title.cex=1,
-                         parmar=c(3, 3, 0.8, 0.8)){
+                         xtitle=NULL, x.title.line=1.5, x.at=NULL, x.labs=NULL, x.labs.at=NULL, parse.x.labs=FALSE, x.title.cex=1,
+                         ytitle=NULL, y.title.line=1.7, y.at=NULL, y.labs=NULL, y.labs.at=NULL, parse.y.labs=FALSE, y.title.cex=1,
+                         parmar=c(2.7, 2.7, 0.25, 0.25)){
   # Get plot values
   if(!is.null(subset_to_regions)){
     keep.idx <- which(credsets$region_id %in% subset_to_regions)
@@ -158,13 +158,8 @@ credsets.scatter <- function(credsets, x, y, subset_to_regions=NULL,
   }
   
   # Add points (always add gw-sig last)
-  gw.idx <- which(credsets$gw_sig)
-  points(x[-gw.idx], y[-gw.idx], pch=credsets$pt.pch[-gw.idx], 
-         bg=credsets$pt.bg[-gw.idx], col=credsets$pt.border[-gw.idx], 
-         cex=pt.cex)
-  points(x[gw.idx], y[gw.idx], pch=credsets$pt.pch[gw.idx], 
-         bg=credsets$pt.bg[gw.idx], col=credsets$pt.border[gw.idx], 
-         cex=pt.cex)
+  points(x, y, pch=21, cex=pt.cex,
+         bg=cnv.colors[credsets$cnv], col=cnv.blacks[credsets$cnv])
   
   # Add axis ticks
   axis(1, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
@@ -203,8 +198,5 @@ credsets.scatter <- function(credsets, x, y, subset_to_regions=NULL,
   # Add axis titles
   mtext(1, text=xtitle, line=x.title.line, cex=x.title.cex)
   mtext(2, text=ytitle, line=y.title.line, cex=y.title.cex)
-  
-  # Add cleanup box
-  # box(col=blueblack, bty="o")
 }
 

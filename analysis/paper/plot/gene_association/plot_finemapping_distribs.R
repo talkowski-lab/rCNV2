@@ -268,6 +268,21 @@ pips <- list("Prior" = load.pips(prior.pips.in),
 # Annotate all credible sets with number of originally significant genes prior to fine-mapping
 credsets$n_genes.prior <- get.n.orig.sig.genes(credsets, pips[[1]])
 
+# Compute average decrease in # of genes per credset due to fine-mapping
+finemap.decrease.pct <- 100*(mean(credsets$n_genes.prior) - mean(credsets$n_genes)) / mean(credsets$n_genes.prior)
+cat(paste("Fine-mapping reduced the average number of genes per association by ",
+          round(finemap.decrease.pct), "%\n", sep=""))
+
+# Scatterplot of effect of fine-mapping on number of genes per association
+n_gene_range <- c(0, max(credsets[, c("n_genes.prior", "n_genes")]))
+pdf(paste(out.prefix, "genes_per_credset_before_vs_after.scatter.pdf", sep="."),
+    height=2.6, width=2.6)
+credsets.scatter(credsets, credsets$n_genes.prior, credsets$n_genes, add.lm=T, 
+                 xlims=n_gene_range, ylims=n_gene_range, 
+                 abline.a=0, abline.b=1, abline.lty=5, 
+                 xtitle="Genes Before Fine-Mapping", ytitle="Genes After Fine-Mapping")
+dev.off()
+
 # Plot pairwise comparisons of pips
 sapply(list(c(1, 2), c(1, 3), c(2, 3)), function(idxs){
   set1 <- pips[[idxs[1]]]

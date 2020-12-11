@@ -42,6 +42,7 @@ gsutil -m cp \
   ./
 gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/${prefix}.correct_nahr_labels.tsv \
   ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/wgs_common_cnvs.*.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/rCNV2_common_cnvs.*.bed.gz \
@@ -143,7 +144,7 @@ cat \
   --mc-gds refs/lit_GDs.mc.bed.gz \
   --lc-gds refs/lit_GDs.lc.bed.gz \
   --nahr-cnvs clustered_nahr_regions.reformatted.bed.gz \
-  --outfile ${prefix}.master_segments.bed.gz \
+  --outfile ${prefix}.master_segments.pre_nahr_polishing.bed.gz \
   --common-dels combined_common_cnvs.DEL.$af_suffix.bed.gz \
   --common-dups combined_common_cnvs.DUP.$af_suffix.bed.gz \
   --common-cnv-cov 0.5 \
@@ -159,6 +160,12 @@ cat \
   --gd-recip "10e-10" \
   --nahr-recip 0.25 \
   --bgzip
+# Polish NAHR labels following manual review (note: requires refs/${prefix}.correct_NAHR_labels.tsv)
+/opt/rCNV2/analysis/paper/scripts/large_segments/polish_nahr_labels.R \
+  ${prefix}.master_segments.pre_nahr_polishing.bed.gz \
+  refs/${prefix}.correct_nahr_labels.tsv \
+  ${prefix}.master_segments.bed
+bgzip -f ${prefix}.master_segments.bed
 gsutil -m cp \
   ${prefix}.master_segments.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/

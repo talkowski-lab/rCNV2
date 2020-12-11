@@ -82,6 +82,9 @@ axis(2, at=log10(logscale.demi), tck=-0.03, col=blueblack, labels=NA)
 axis(2, at=log10(logscale.demi.bp), tick=F, las=2, line=-0.65, labels=logscale.demi.bp.labels)
 mtext(2, line=2.75, text=bquote("log"[10] * "(Segment Size)"))
 dev.off()
+cat(paste("Two-sided Wilcox test of NAHR vs non-NAHR size:",
+          format(wilcox.test(segs$size ~ segs$nahr)$p.value, scientific=T),
+          "\n"))
 
 # Swarmplot of genes vs. mechanism
 pdf(paste(out.prefix, "segs_by_mechanism.n_genes.pdf", sep="."),
