@@ -940,7 +940,9 @@ def main():
     # Write naive and/or genetics-only fine-mapping results (for ROC comparisons)
     if args.naive_outfile is not None:
         naive_outfile = open(args.naive_outfile, 'w')
-        make_sig_genes_df(hpo_data, naive=True, sig_only=True, cs_val=args.cs_val).\
+        # Note: cs_val set to 1.0 fixed value here such that all genes will be assigned to their original credible set
+        # rather than randomly throwing out ~5% of genes
+        make_sig_genes_df(hpo_data, naive=True, sig_only=True, cs_val=1.0l).\
             rename(columns={'HPO' : '#HPO'}).\
             to_csv(naive_outfile, sep='\t', index=False, na_rep='NA')
         naive_outfile.close()
