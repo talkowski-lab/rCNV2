@@ -89,4 +89,122 @@ get.quadrant.genes <- function(gene.groups, top, conf){
 ##########################
 ### PLOTTING FUNCTIONS ###
 ##########################
+# Generic credsets scatterplot function
+credsets.scatter <- function(credsets, x, y, subset_to_regions=NULL,
+                         xlims=NULL, ylims=NULL, add.lm=T, pt.cex=1,
+                         horiz.lines.at=NULL, horiz.lines.lty=1, horiz.lines.color=NULL,
+                         abline.a=NULL, abline.b=NULL, abline.lty=1,
+                         xtitle=NULL, x.title.line=1.75, x.at=NULL, x.labs=NULL, x.labs.at=NULL, parse.x.labs=FALSE, x.title.cex=1,
+                         ytitle=NULL, y.title.line=1.75, y.at=NULL, y.labs=NULL, y.labs.at=NULL, parse.y.labs=FALSE, y.title.cex=1,
+                         parmar=c(3, 3, 0.8, 0.8)){
+  # Get plot values
+  if(!is.null(subset_to_regions)){
+    keep.idx <- which(credsets$region_id %in% subset_to_regions)
+    credsets <- credsets[keep.idx, ]
+    x <- x[keep.idx]
+    y <- y[keep.idx]
+  }
+  if(is.null(xlims)){
+    xlims <- range(x[which(!is.infinite(x))], na.rm=T)
+  }
+  if(is.null(ylims)){
+    ylims <- range(y[which(!is.infinite(y))], na.rm=T)
+  }
+  del.idx <- which(credsets$cnv=="DEL")
+  dup.idx <- which(credsets$cnv=="DUP")
+  
+  # Prep plot area
+  par(mar=parmar, bty="n")
+  plot(NA, xlim=xlims, ylim=ylims, xlab="", ylab="", xaxt="n", yaxt="n")
+  rect(xleft=par("usr")[1], xright=par("usr")[2],
+       ybottom=par("usr")[3], ytop=par("usr")[4],
+       border=NA, bty="n", col=bluewhite)
+  
+  # Add gridlines
+  if(is.null(x.at)){
+    x.at <- axTicks(1)
+  }
+  if(is.null(y.at)){
+    y.at <- axTicks(2)
+  }
+  abline(v=x.at, h=y.at, col="white")
+  if(!is.null(horiz.lines.at)){
+    n.horiz.lines <- length(horiz.lines.at)
+    if(is.null(horiz.lines.color) | length(horiz.lines.color) != n.horiz.lines){
+      horiz.lines.color <- rep(blueblack, n.horiz.lines)
+    }
+    sapply(1:length(horiz.lines.at), function(i){
+      abline(h=horiz.lines.at[i], lty=horiz.lines.lty[i], col=horiz.lines.color[i])
+    })
+  }
+  if(!is.null(abline.a)){
+    sapply(1:length(abline.a), function(i){
+      abline(a=abline.a[i], b=abline.b[i], lty=abline.lty[i], col=blueblack)
+    })
+  }
+  
+  # Add linear fits, if optioned
+  if(add.lm==T){
+    del.fit <- robust.lm(x=x[del.idx], y=y[del.idx], conf=0.95)
+    dup.fit <- robust.lm(x=x[dup.idx], y=y[dup.idx], conf=0.95)
+    polygon(x=c(del.fit$ci$x, rev(del.fit$ci$x)),
+            y=c(del.fit$ci$lower, rev(del.fit$ci$upper)),
+            border=NA, col=adjustcolor(cnv.colors[1], alpha=0.2))
+    polygon(x=c(dup.fit$ci$x, rev(dup.fit$ci$x)),
+            y=c(dup.fit$ci$lower, rev(dup.fit$ci$upper)),
+            border=NA, col=adjustcolor(cnv.colors[2], alpha=0.2))
+    abline(del.fit$fit, lwd=2, col=cnv.colors[1])
+    abline(dup.fit$fit, lwd=2, col=cnv.colors[2])
+  }
+  
+  # Add points (always add gw-sig last)
+  gw.idx <- which(credsets$gw_sig)
+  points(x[-gw.idx], y[-gw.idx], pch=credsets$pt.pch[-gw.idx], 
+         bg=credsets$pt.bg[-gw.idx], col=credsets$pt.border[-gw.idx], 
+         cex=pt.cex)
+  points(x[gw.idx], y[gw.idx], pch=credsets$pt.pch[gw.idx], 
+         bg=credsets$pt.bg[gw.idx], col=credsets$pt.border[gw.idx], 
+         cex=pt.cex)
+  
+  # Add axis ticks
+  axis(1, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
+  axis(1, at=x.at, labels=NA, tck=-0.03, col=blueblack)
+  axis(2, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
+  axis(2, at=y.at, labels=NA, tck=-0.03, col=blueblack)
+  
+  # Add axis labels
+  if(is.null(x.labs)){
+    x.labs <- x.at
+  }
+  if(is.null(x.labs.at)){
+    x.labs.at <- x.at
+  }
+  if(is.null(y.labs)){
+    y.labs <- y.at
+  }
+  if(is.null(y.labs.at)){
+    y.labs.at <- y.at
+  }
+  sapply(1:length(x.labs.at), function(i){
+    if(parse.x.labs==TRUE){
+      axis(1, at=x.labs.at[i], labels=parse(text=x.labs[i]), tick=F, line=-0.6)
+    }else{
+      axis(1, at=x.labs.at[i], labels=x.labs[i], tick=F, line=-0.6)
+    }
+  })
+  sapply(1:length(y.labs.at), function(i){
+    if(parse.y.labs==TRUE){
+      axis(2, at=y.labs.at[i], labels=parse(text=y.labs[i]), tick=F, line=-0.6, las=2)
+    }else{
+      axis(2, at=y.labs.at[i], labels=y.labs[i], tick=F, line=-0.6, las=2)
+    }
+  })
+  
+  # Add axis titles
+  mtext(1, text=xtitle, line=x.title.line, cex=x.title.cex)
+  mtext(2, text=ytitle, line=y.title.line, cex=y.title.cex)
+  
+  # Add cleanup box
+  # box(col=blueblack, bty="o")
+}
 

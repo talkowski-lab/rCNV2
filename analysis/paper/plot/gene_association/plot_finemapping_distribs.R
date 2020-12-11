@@ -24,6 +24,13 @@ load.pips <- function(path){
   return(pips)
 }
 
+# Compute number of originally significant genes per credible set
+get.n.orig.sig.genes <- function(credsets, prior.pips){
+  apply(credsets[, c("credible_set_id", "cnv")], 1, function(vals){
+    length(which(prior.pips$credible_set==vals[1] & prior.pips$cnv==vals[2]))
+  })
+}
+
 
 ##########################
 ### PLOTTING FUNCTIONS ###
@@ -130,11 +137,11 @@ pip.split.hist <- function(stats1, stats2, label1, label2, bin.width=0.05,
   abline(v=c(-1, 1)*bin.width, lty=5, col=blueblack)
   n.left <- sum(counts[[1]][-length(counts[[1]])])
   text(x=par("usr")[1]-(2*bin.width), y=0.6*par("usr")[4], pos=4,
-       labels=paste(label1, "\nlarger by\n", bin.width, " for\n", n.left, " assocs", sep=""),
+       labels=paste(label1, "\ngreater by\n", bin.width, " for\n", n.left, " assocs", sep=""),
        cex=5/6, font=3, col=control.cnv.colors[2])
   n.right <- sum(counts[[2]][-1])
   text(x=par("usr")[2]+(2*bin.width), y=0.6*par("usr")[4], pos=2,
-       labels=paste(label2, "\nlarger by\n", bin.width, " for\n", n.right, " assocs", sep=""),
+       labels=paste(label2, "\ngreater by\n", bin.width, " for\n", n.right, " assocs", sep=""),
        cex=5/6, font=3, col=cnv.colors[2])
 }
 
@@ -257,6 +264,9 @@ assocs <- load.associations(assocs.in)
 pips <- list("Prior" = load.pips(prior.pips.in),
              "Posterior" = load.pips(posterior.pips.in),
              "Full Model" = load.pips(final.pips.in))
+
+# Annotate all credible sets with number of originally significant genes prior to fine-mapping
+credsets$n_genes.prior <- get.n.orig.sig.genes(credsets, pips[[1]])
 
 # Plot pairwise comparisons of pips
 sapply(list(c(1, 2), c(1, 3), c(2, 3)), function(idxs){
