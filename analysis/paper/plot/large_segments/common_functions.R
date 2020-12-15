@@ -702,7 +702,11 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
       text(x=perm.means[i]-(0.03*(par("usr")[2]-par("usr")[1])), y=i-0.7, pos=4, 
            labels=perm.pvals[2, ][[i]], xpd=T, cex=stats.cex)
     }
-    print(paste(prettyNum(round(segs.dat.raw[i]/mean(perm.dat.raw[, i], na.rm=T), 2), small.interval=2), "fold", sep="-"))
+    perm.mean <- mean(perm.dat.raw[, i], na.rm=T)
+    fold <- round(segs.dat.raw[i]/perm.mean, 2)
+    cat(paste(prettyNum(fold, small.interval=2), "-fold; obs=", 
+                prettyNum(segs.dat.raw[i], small.interval=4), "; exp=", 
+                prettyNum(perm.mean, small.interval=4), "\n", sep=""))
   })
   
   # Axes & cleanup
@@ -878,7 +882,7 @@ plot.all.perm.res <- function(segs, gw.perms, lit.perms,
   }
   
   # Plot union of all segments
-  print("Union of all segments:")
+  cat("Union of all segments:\n")
   pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".union_all_segs.pdf", sep=""),
       height=pdf.dims.single[1], width=pdf.dims.single[2])
   plot.seg.perms(segs, union.perms, feature=feature, measure=measure, 
@@ -889,7 +893,7 @@ plot.all.perm.res <- function(segs, gw.perms, lit.perms,
   dev.off()
   
   # Plot gw-sig alone
-  print("Genome-wide significant alone:")
+  cat("Genome-wide significant alone:\n")
   pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".all_gw_sig.pdf", sep=""),
       height=pdf.dims.single[1], width=pdf.dims.single[2])
   plot.seg.perms(segs, gw.perms, feature=feature, measure=measure, 
@@ -900,7 +904,7 @@ plot.all.perm.res <- function(segs, gw.perms, lit.perms,
   dev.off()
   
   # Plot lit GDs alone
-  print("All literature GDs alone:")
+  cat("All literature GDs alone:\n")
   pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".all_gds.pdf", sep=""),
       height=pdf.dims.single[1], width=pdf.dims.single[2])
   plot.seg.perms(segs, lit.perms, feature=feature, measure=measure, 
@@ -911,7 +915,7 @@ plot.all.perm.res <- function(segs, gw.perms, lit.perms,
   dev.off()
   
   # Plot non-significant lit GDs alone
-  print("Non-significant literature GDs alone:")
+  cat("Non-significant literature GDs alone:\n")
   pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".nonsig_lit_gds.pdf", sep=""),
       height=pdf.dims.single[1], width=pdf.dims.single[2])
   plot.seg.perms(segs, lit.perms, feature=feature, measure=measure, 

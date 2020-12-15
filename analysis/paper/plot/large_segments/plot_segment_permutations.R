@@ -17,13 +17,33 @@ options(stringsAsFactors=F, scipen=1000)
 ######################
 ### DATA FUNCTIONS ###
 ######################
+# Load gene list
+load.genelist <- function(path){
+  if(!is.null(path)){
+    as.character(read.table(path, header=F)[, 1])
+  }else{
+    NULL
+  }
+}
+
 # Load & parse permutation results
-load.perms <- function(perm.res.in, subset_to_regions=NULL){
+load.perms <- function(perm.res.in, subset_to_regions=NULL, constrained.genes=NULL){
   # Read full permutation table
   perms <- read.table(perm.res.in, header=T, sep="\t", check.names=F, comment.char="")
   perms$perm_idx <- as.numeric(perms$perm_idx)
   perm.range <- sort(unique(perms$perm_idx))
   
+  # Post hoc annotation of constrained genes, if optioned
+  if(!is.null(constrained.genes)){
+    perms$n_gnomAD_constrained_genes <- as.numeric(sapply(perms$genes, function(gstr){
+      if(is.na(gstr)){
+        0
+      }else{
+        length(which(unlist(strsplit(gstr, split=";", fixed=T)) %in% constrained.genes))
+      }
+    }))
+  }
+
   # Drop unnecessary columns
   cols.to.drop <- c("#chr", "start", "end", "coords", "size", "genes")
   perms <- perms[, -which(colnames(perms) %in% cols.to.drop)]
@@ -103,7 +123,8 @@ require(VennDiagram, quietly=T)
 
 # List of command-line options
 option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
+  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced."),
+  make_option(c("--constrained-genes"), help="List of constrained genes to be annotated.")
 )
 
 # Get command-line arguments & options
@@ -125,6 +146,7 @@ lit.perm.res.in <- args$args[4]
 outdir <- args$args[5]
 prefix <- args$args[6]
 rcnv.config <- opts$`rcnv-config`
+constrained.in <- opts$`constrained-genes`
 
 # # DEV PARAMETERS
 # loci.in <- "~/scratch/rCNV.final_segments.loci.bed.gz"
@@ -134,6 +156,7 @@ rcnv.config <- opts$`rcnv-config`
 # outdir <- "~/scratch/"
 # prefix <- "test_seg_perm_res"
 # rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
+# constrained.in <- "~/scratch/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list"
 # script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
 
 # Source rCNV2 config, if optioned
@@ -162,8 +185,11 @@ all.lit.ids <- segs.all$region_id[which(segs.all$any_gd & !segs.all$gw_sig)]
 gw <- merge.loci.segs(loci, segs)
 
 # Load permutation results
-perms <- load.perms(perm.res.in, subset_to_regions=nomsig.ids)
-lit.perms <- load.perms(lit.perm.res.in, subset_to_regions=nomsig.ids)
+constrained.genes <- load.genelist(constrained.in)
+perms <- load.perms(perm.res.in, subset_to_regions=nomsig.ids, 
+                    constrained.genes=constrained.genes)
+lit.perms <- load.perms(lit.perm.res.in, subset_to_regions=nomsig.ids,
+                        constrained.genes=constrained.genes)
 
 # Plot single panel of overlap with known genomic disorders
 print("Overlap with known genomic disorders:")
@@ -196,6 +222,21 @@ plot.all.perm.res(segs, perms, lit.perms,
                   parmar.single=c(2.25, 2, 0, 2.2),
                   pdf.dims.multi=c(4, 3.5),
                   parmar.multi=c(2.25, 6.05, 0, 2.2))
+
+# Plot number of constrained genes
+if(!is.null(constrained.in)){
+  print("Fraction of segments with at least one constrained gene:")
+  plot.all.perm.res(segs, perms, lit.perms,
+                    feature="n_gnomAD_constrained_genes", measure="frac.any",
+                    outdir, prefix, norm=F, norm.multi=F,
+                    n.bins.single=15, n.bins.multi=30,
+                    xmax=100, x.title="Pct. w/Constrained Gene",
+                    pdf.dims.single=c(2.2, 2.4),
+                    parmar.single=c(2.25, 2, 0, 2),
+                    pdf.dims.multi=c(4, 3.5),
+                    parmar.multi=c(2.25, 6.25, 0, 3.5))
+  
+}
 
 # Plot single panel of enrichment for top P-values for non-significant GDs
 print("Enrichment for top P-values among non-sig lit GDs:")

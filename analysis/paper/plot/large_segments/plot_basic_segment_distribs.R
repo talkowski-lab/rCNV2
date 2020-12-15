@@ -173,3 +173,9 @@ text(x=par("usr")[2] + x.bump, y=8.3, labels="Genome-wide\nsignificance", cex=0.
 # text(x=par("usr")[2] + x.bump, y=-log10(0.05) + y.bump, labels=format.pval(0.05), cex=0.75, pos=2)
 dev.off()
 
+# # Fraction of segments with at least one constrained gene
+# atleastone.constr <- round(100*length(which(segs$n_gnomAD_constrained_genes>0))/nrow(segs), 2)
+# justone.constr <- round(100*length(which(segs$n_gnomAD_constrained_genes==0))/nrow(segs), 2)
+# atleasttwo.constr <- round(100*length(which(segs$n_gnomAD_constrained_genes>0))/nrow(segs), 2)
+
+
