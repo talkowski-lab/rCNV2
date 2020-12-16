@@ -54,8 +54,12 @@ load.associations <- function(assocs.in){
 
 # Categorize genes based on their rank in credible set & PIP
 categorize.genes <- function(credsets){
-  g.cats <- lapply(c("DEL", "DUP"), function(cnv){
-    cnv.idxs <- which(credsets$cnv==cnv)
+  g.cats <- lapply(c("DEL", "DUP", "CNV"), function(cnv){
+    if(cnv=="CNV"){
+      cnv.idxs <- 1:nrow(credsets)
+    }else{
+      cnv.idxs <- which(credsets$cnv==cnv)
+    }
     g.top <- unique(sort(credsets$top_gene[cnv.idxs]))
     g.nottop <- setdiff(unique(sort(unlist(credsets$all_genes[cnv.idxs]))),
                         g.top)
@@ -74,8 +78,26 @@ categorize.genes <- function(credsets){
          "top.conf"=g.top.conf, "nottop.conf"=g.nottop.conf,
          "top.notconf"=g.top.notconf, "nottop.notconf"=g.nottop.notconf)
   })
-  names(g.cats) <- c("DEL", "DUP")
+  names(g.cats) <- c("DEL", "DUP", "CNV")
   return(g.cats)
+}
+ 
+# Summarize gene categories as created by categorize.genes
+summarize.categories <- function(g.cats, cnv="CNV"){
+  # Extract groups for specified CNV type
+  groups <- g.cats[[cnv]]
+  cat(paste("Very confident genes & top in credible set =",
+            prettyNum(length(groups$top.vconf)), "\n"))
+  cat(paste("Very confident genes, not top in credible set =",
+            prettyNum(length(groups$nottop.vconf)), "\n"))
+  cat(paste("Confident genes & top in credible set =",
+            prettyNum(length(groups$top.conf)), "\n"))
+  cat(paste("Confident genes, not top in credible set =",
+            prettyNum(length(groups$nottop.conf)), "\n"))
+  cat(paste("Unlikely genes & top in credible set =",
+            prettyNum(length(groups$top.notconf)), "\n"))
+  cat(paste("Unlikely genes, not top in credible set =",
+            prettyNum(length(groups$nottop.notconf)), "\n"))
 }
 
 # Get all genes for a single quadrant of 2x2 grid

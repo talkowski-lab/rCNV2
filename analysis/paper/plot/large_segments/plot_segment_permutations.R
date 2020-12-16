@@ -232,9 +232,9 @@ if(!is.null(constrained.in)){
                     n.bins.single=15, n.bins.multi=30,
                     xmax=100, x.title="Pct. w/Constrained Gene",
                     pdf.dims.single=c(2.2, 2.4),
-                    parmar.single=c(2.25, 2, 0, 2),
+                    parmar.single=c(2.25, 2, 0, 3),
                     pdf.dims.multi=c(4, 3.5),
-                    parmar.multi=c(2.25, 6.25, 0, 3.5))
+                    parmar.multi=c(2.25, 6.05, 0, 3.25))
   
 }
 

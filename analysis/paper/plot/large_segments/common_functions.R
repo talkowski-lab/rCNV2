@@ -344,7 +344,7 @@ gw.scatter <- segs.scatter
 # Generic swarm/boxplot function
 segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL, subset_to_regions=NULL,
                        add.pvalue=FALSE, stat.test="wilcoxon", alternative="two.sided",
-                       xtitle=NULL, x.labs=c("FALSE", "TRUE"),
+                       print.fold=FALSE, xtitle=NULL, x.labs=c("FALSE", "TRUE"),
                        add.y.axis=TRUE, ytitle=NULL, y.title.line=1.75,
                        y.at=NULL, y.labs=NULL, y.labs.at=NULL, 
                        parse.y.labs=FALSE, violin=FALSE, pt.cex=1,
@@ -382,6 +382,12 @@ segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL, subset_to_re
                    y[intersect(which(!x.bool), dup.idx)],
                    y[intersect(which(x.bool), del.idx)],
                    y[intersect(which(x.bool), dup.idx)])
+    if(print.fold==TRUE){
+      del.fold <- mean(y.vals[[3]], na.rm=T)/mean(y.vals[[1]], na.rm=T)
+      cat(paste("Deletions:", round(del.fold, 3), "fold\n"))
+      dup.fold <- mean(y.vals[[4]], na.rm=T)/mean(y.vals[[2]], na.rm=T)
+      cat(paste("Duplications:", round(dup.fold, 3), "fold\n"))
+    }
     pt.color.list <- list(segs$pt.bg[intersect(which(!x.bool), del.idx)],
                           segs$pt.bg[intersect(which(!x.bool), dup.idx)],
                           segs$pt.bg[intersect(which(x.bool), del.idx)],
@@ -401,6 +407,11 @@ segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL, subset_to_re
     width <- 0.4
     y.vals <- list(y[which(!x.bool)],
                    y[which(x.bool)])
+    if(print.fold==TRUE){
+      cat(paste("True-vs-false:", 
+                round(mean(y.vals[[2]], na.rm=T)/mean(y.vals[[1]], na.rm=T), 3),
+                "fold\n"))
+    }
     pt.pch.list <- list(segs$pt.pch[which(!x.bool)],
                         segs$pt.pch[which(x.bool)])
     pt.color.list <- list(segs$pt.bg[which(!x.bool)],

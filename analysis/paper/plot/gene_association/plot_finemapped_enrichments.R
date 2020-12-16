@@ -41,7 +41,8 @@ calc.ddd.excess <- function(feats){
 }
 
 # Compute enrichment for a single feature for a pre-specified list of genes
-calc.enrichment <- function(genes, feats, feat, ci="bootstrap"){
+calc.enrichment <- function(genes, feats, feat, ci="bootstrap", add.sig=FALSE, 
+                            ref.genes=NULL){
   # Get values for genes in question
   vals <- feats[which(feats$gene %in% genes), feat]
   
@@ -52,29 +53,49 @@ calc.enrichment <- function(genes, feats, feat, ci="bootstrap"){
     estimate <- mean(vals, na.rm=T)
     ci <- boot.ci(boot(data=vals, statistic=mean.for.boot, R=1000), 
                   conf=0.95, type="norm")$normal[, -1]
-    as.numeric(c(estimate, ci))
+    res <- as.numeric(c(estimate, ci))
   }else if(ci=="binomial"){
     # Compute binomial mean & 95% CI
     baseline <- mean(feats[, feat], na.rm=T)
     binom.res <- binom.test(x=sum(vals), n=length(vals), p=baseline)
-    as.numeric(c(binom.res$estimate, binom.res$conf.int))
+    res <- as.numeric(c(binom.res$estimate, binom.res$conf.int))
   }
+  
+  # Add Fisher's exact significance test results, if optioned
+  if(add.sig==TRUE){
+    if(is.null(ref.genes)){
+      ref.vals <- feats[which(!(feats$gene %in% genes)), feat]
+    }else{
+      ref.vals <- feats[which(feats$gene %in% ref.genes), feat]
+    }
+    fisher.res <- fisher.test(matrix(c(length(which(ref.vals==0)), length(which(vals==0)),
+             length(which(ref.vals>0)), length(which(vals>0))),
+           nrow=2, byrow=T))
+    res <- c(res, as.numeric(c(fisher.res$estimate, fisher.res$p.value)))
+  }
+  
+  return(res)
 }
 
 # Compute enrichment for a single feature across all groups of genes for plotting
-get.plot.data <- function(feats, feat, gene.groups, not.credset.genes, ci="bootstrap"){
+get.plot.data <- function(feats, feat, gene.groups, not.credset.genes, ci="bootstrap", add.sig=FALSE){
   # Group 1: PIP ≥ 0.15, top gene
   # Group 2: PIP ≥ 0.15, not top gene
   # Group 3: PIP < 0.15, not top gene
   # Group 4: all genes outside of credible sets
-  pdat <- lapply(c("DEL", "DUP"), function(cnv){
+  lapply(c("DEL", "DUP", "CNV"), function(cnv){
     g1 <- unique(c(gene.groups[[cnv]]$top.vconf, gene.groups[[cnv]]$top.conf))
     g2 <- unique(c(gene.groups[[cnv]]$nottop.vconf, gene.groups[[cnv]]$nottop.conf))
     g3 <- unique(gene.groups[[cnv]]$nottop.notconf)
     g4 <- not.credset.genes
     pdat <- as.data.frame(do.call("rbind", lapply(list(g1, g2, g3, g4), calc.enrichment, 
-                                                  feats=feats, feat=feat, ci=ci)))
-    colnames(pdat) <- c("mean", "lower", "upper")
+                                                  feats=feats, feat=feat, ci=ci, 
+                                                  add.sig=add.sig, ref.genes=g4)))
+    if(add.sig==FALSE){
+      colnames(pdat) <- c("mean", "lower", "upper")
+    }else{
+      colnames(pdat) <- c("mean", "lower", "upper", "odds.ratio", "p.value")
+    }
     return(pdat)
   })
 }
@@ -84,12 +105,22 @@ get.plot.data <- function(feats, feat, gene.groups, not.credset.genes, ci="boots
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Plot enrichment of gene groups for a single feature
-plot.enrichment <- function(feats, feat, gene.groups, ci="bootstrap", bars=FALSE, pt.cex=1,
+plot.enrichment <- function(feats, feat, gene.groups, ci="bootstrap", 
+                            print.fisher=FALSE, bars=FALSE, pt.cex=1,
                             y.ax.title="Proportion of Genes", y.ax.title.line=0.75,
                             add.y.labels=TRUE, parmar=c(0.2, 4, 0.2, 0.2)){
   # Collect data for plotting
   not.credset.genes <- feats$gene[which(!(feats$gene %in% all.credset.genes))]
-  pdat <- get.plot.data(feats, feat, gene.groups, not.credset.genes, ci)
+  pdat <- get.plot.data(feats, feat, gene.groups, not.credset.genes, ci, add.sig=print.fisher)
+  
+  # Print Fisher exact test results, if optioned
+  if(print.fisher==TRUE){
+    or <- round(pdat[[3]]$odds.ratio[1], 2)
+    pval <- format(pdat[[3]]$p.value[1], scientific=TRUE, nsmall=2, digits=4)
+    cat(paste("Two-sided Fisher's exact test of top-ranked confident genes\nvs.",
+              "genes not present in any credible set:",
+              "\nOdds ratio =", or, "\nP-value =", pval, "\n\n"))
+  }
   
   # Get plot parameters
   ymax <- min(c(max(unlist(pdat), na.rm=T),
@@ -266,6 +297,7 @@ assocs <- load.associations(assocs.in)
 
 # Split fine-mapped genes into categories based on top/not top status and conf/vconf
 gene.groups <- categorize.genes(credsets)
+summarize.categories(gene.groups)
 all.credset.genes <- as.character(unlist(unlist(gene.groups)))
 
 # Load gene-level features & extract list of all genes _not_ in any credible set
@@ -278,7 +310,9 @@ feats$excess_ddd_dn_lof <- calc.ddd.excess(feats)
 sapply(names(genelists), function(glist){
   pdf(paste(out.prefix, glist, "enrichments.nolabel.pdf", sep="."), 
       height=2.1, width=2.6)
-  plot.enrichment(feats, glist, gene.groups, ci="binomial", add.y.labels=FALSE, bars=TRUE)
+  cat(paste(glist, "\n"))
+  plot.enrichment(feats, glist, gene.groups, ci="binomial", add.y.labels=FALSE, 
+                  bars=TRUE, print.fisher=TRUE)
   dev.off()
   pdf(paste(out.prefix, glist, "enrichments.withlabel.pdf", sep="."), 
       height=2.1, width=2.6)

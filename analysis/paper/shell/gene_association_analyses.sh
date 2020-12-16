@@ -205,6 +205,12 @@ done < refs/test_phenotypes.list \
 
 # Plot gene set enrichments for fine-mapped genes vs. various gene metadata
 echo -e "lof_constrained\trefs/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list" > enrichment.genelists.tsv
+echo -e "mis_constrained\trefs/gene_lists/gnomad.v2.1.1.mis_constrained.genes.list" >> enrichment.genelists.tsv
+cat refs/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
+    refs/gene_lists/gnomad.v2.1.1.mis_constrained.genes.list \
+| sort | uniq \
+> gnomad.v2.1.1.all_constrained.genes.list
+echo -e "all_constrained\tgnomad.v2.1.1.all_constrained.genes.list" >> enrichment.genelists.tsv
 cat refs/gene_lists/DDG2P.*.genes.list | sort | uniq > ddg2p.all_dom.genes.list
 echo -e "ddg2p\tddg2p.all_dom.genes.list" >> enrichment.genelists.tsv
 echo -e "omim\trefs/gene_lists/HP0000118.HPOdb.genes.list" >> enrichment.genelists.tsv

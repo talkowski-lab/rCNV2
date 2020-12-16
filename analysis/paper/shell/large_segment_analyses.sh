@@ -213,6 +213,7 @@ fi
 mkdir perm_test_plots
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_segment_permutations.R \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --constrained-genes gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   ${prefix}.${n_seg_perms}_permuted_segments.bed.gz \
