@@ -121,7 +121,7 @@ calc.frac.bcas <- function(gene.groups, meta){
 ##########################
 # Plot rCNV score vs. DNM enrichment for a single cohort
 plot.dnm.oe <- function(scores, score, meta, cohort, csqs, n.bins=10,
-                        xlab=NULL, ylab=NULL, ymax=NULL,
+                        xlab=NULL, ylab=NULL, ymax=NULL, blue.bg=TRUE,
                         parmar=c(2.25, 2.6, 0.5, 0.5)){
   # Collect plot data
   gene.groups <- bin.genes(scores, score, n.bins)
@@ -138,6 +138,17 @@ plot.dnm.oe <- function(scores, score, meta, cohort, csqs, n.bins=10,
   if(is.null(ylab)){
     ylab <- "Fold-Enrichment"
   }
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Prep plot area
   par(mar=parmar, bty="n")
@@ -145,8 +156,8 @@ plot.dnm.oe <- function(scores, score, meta, cohort, csqs, n.bins=10,
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
   rect(xleft=par("usr")[1], xright=par("usr")[2], 
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       border=NA, bty="n", col=bluewhite)
-  abline(h=axTicks(2), v=axTicks(1), col="white")
+       border=plot.border, bty=plot.bty, col=plot.bg)
+  abline(h=axTicks(2), v=axTicks(1), col=grid.col)
   abline(h=1, col=blueblack, lty=2)
   
   # Add points
@@ -177,7 +188,8 @@ plot.dnm.oe <- function(scores, score, meta, cohort, csqs, n.bins=10,
 
 # Plot rCNV score vs. BCA disruptions
 plot.bca.fracs <- function(scores, score, meta, n.bins=10,
-                        xlab=NULL, ymax=NULL, parmar=c(2.25, 4, 0.5, 0.5)){
+                        xlab=NULL, ymax=NULL, blue.bg=TRUE,
+                        parmar=c(2.25, 4, 0.5, 0.5)){
   # Collect plot data
   gene.groups <- bin.genes(scores, score, n.bins)
   all.plot.dat <- calc.frac.bcas(gene.groups, meta)
@@ -199,6 +211,17 @@ plot.bca.fracs <- function(scores, score, meta, n.bins=10,
   }else{
     color <- blueblack
   }
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Prep plot area
   par(mar=parmar, bty="n")
@@ -206,8 +229,8 @@ plot.bca.fracs <- function(scores, score, meta, n.bins=10,
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
   rect(xleft=par("usr")[1], xright=par("usr")[2], 
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       border=NA, bty="n", col=bluewhite)
-  abline(h=axTicks(2), v=axTicks(1), col="white")
+       border=plot.border, bty=plot.bty, col=plot.bg)
+  abline(h=axTicks(2), v=axTicks(1), col=grid.col)
   abline(h=baseline, col=blueblack, lty=2)
   text(x=par("usr")[1]-(0.05*(par("usr")[2]-par("usr")[1])),
        y=baseline+(0.04*(par("usr")[4]-par("usr")[3])), 
@@ -301,7 +324,7 @@ sapply(c("pHI", "pTS"), function(score){
   sapply(dnm.cohorts, function(cohort){
     pdf(paste(out.prefix, "dnm_enrichments", cohort, score, "pdf", sep="."),
         height=2, width=3)
-    plot.dnm.oe(scores, score, meta, cohort, csqs, ymax=5)
+    plot.dnm.oe(scores, score, meta, cohort, csqs, ymax=5, blue.bg=FALSE)
     dev.off()
   })
 })
@@ -310,7 +333,7 @@ sapply(c("pHI", "pTS"), function(score){
 sapply(c("pHI", "pTS"), function(score){
   pdf(paste(out.prefix, "dnm_enrichments.BCA", score, "pdf", sep="."),
       height=2, width=2.6)
-  plot.bca.fracs(scores, score, meta)
+  plot.bca.fracs(scores, score, meta, blue.bg=FALSE)
   dev.off()
 })
 

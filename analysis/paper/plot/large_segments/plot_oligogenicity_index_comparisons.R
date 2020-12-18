@@ -160,13 +160,11 @@ dnm.excess.cdf.barplots <- function(segs, dnms, csq, n.max.genes=5, norm=F, min.
 }
 
 
-
 #####################
 ### RSCRIPT BLOCK ###
 #####################
 require(optparse, quietly=T)
 require(funr, quietly=T)
-
 
 # List of command-line options
 option_list <- list(
@@ -274,7 +272,8 @@ sapply(c("asc", "ddd"), function(cohort){
                  abline.a=rep(1, length(abline.slopes)), 
                  abline.b=abline.slopes, 
                  abline.lty=rep(2, length(abline.slopes)),
-                 add.lm=T, pt.cex=0.85, parmar=c(2.3, 2.5, 0.6, 1.8))
+                 blue.bg=FALSE, add.lm=T, pt.cex=0.85, 
+                 parmar=c(2.3, 2.5, 0.6, 1.8))
     sapply(1:length(abline.slopes), function(i){
       axis(4, at=(par("usr")[2]*abline.slopes[i])+1, tck=-0.02, 
            labels=NA, col=blueblack, xpd=T)
@@ -362,6 +361,7 @@ pdf(paste(out.prefix, "neuro_segs", cohort, csq, "excess_dnm_distrib_bygene.resh
 dnm.excess.cdf.barplots(neuro.segs, dnms[[cohort]], csq=csq, norm=F, legend=T,
                         xtitle.suffix='"Neuro. rCNV Segments"',
                         ytitle=bquote("Excess" ~ italic("dn") * "PTVs"))
+abline(h=min.excess, col=blueblack, lty=5)
 dev.off()
 ytitle.2 <- bquote("Fraction of Excess")
 xtitle.suffix.2 <- paste('"Segs. w/" >= "', min.excess, ' Excess" ~ italic("dn") * "PTV"', sep="")

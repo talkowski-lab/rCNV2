@@ -30,7 +30,7 @@ family.barplot <- function(stats, parmar=c(0.5, 12, 2.25, 2)){
   
   # Add top axis & gridlines
   x.ax.at <- 1000*round(axTicks(1)/1000, 0)
-  abline(v=x.ax.at, col=bluewhite)
+  # abline(v=x.ax.at, col=bluewhite)
   axis(3, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
   axis(3, at=x.ax.at, tck=-0.025, labels=NA, col=blueblack)
   sapply(x.ax.at, function(x){
@@ -53,7 +53,7 @@ family.barplot <- function(stats, parmar=c(0.5, 12, 2.25, 2)){
 }
 
 # Scatterplot of mean element size vs. number of elements in class
-track.scatter <- function(stats, pt.cex=0.2, parmar=c(2.25, 2.5, 0.25, 1)){
+track.scatter <- function(stats, pt.cex=0.2, blue.bg=TRUE, parmar=c(2.25, 2.5, 0.25, 1)){
   # Get plot data
   plot.df <- stats[which(stats$cnv=="DEL"), c("mean_size", "n_elements", "family")]
   plot.df <- plot.df[which(plot.df$n_elements>0), ]
@@ -62,6 +62,17 @@ track.scatter <- function(stats, pt.cex=0.2, parmar=c(2.25, 2.5, 0.25, 1)){
   plot.df[, 1:2] <- apply(plot.df[, 1:2], 2, log10)
   xlims <- range(plot.df[, 1], na.rm=T)
   ylims <- range(plot.df[, 2], na.rm=T)
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Prep plot area
   par(bty="n", mar=parmar)
@@ -71,8 +82,8 @@ track.scatter <- function(stats, pt.cex=0.2, parmar=c(2.25, 2.5, 0.25, 1)){
   # Add background shading
   rect(xleft=par("usr")[1], xright=par("usr")[2], 
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       bty="n", border=NA, col=bluewhite)
-  abline(h=ax.at, v=ax.at, col="white")
+       bty=plot.bty, border=plot.border, col=plot.bg)
+  abline(h=ax.at, v=ax.at, col=grid.col)
   
   # Add points
   points(plot.df[, 1:2], pch=19, cex=pt.cex, col=nc.anno.family.colors[plot.df$family])
@@ -152,6 +163,6 @@ dev.off()
 # Scatterplot of mean element size vs number of elements in track
 pdf(paste(out.prefix, "track_stats.scatterplot.pdf", sep="."),
     height=2.75, width=2.9)
-track.scatter(stats)
+track.scatter(stats, blue.bg=FALSE)
 dev.off()
 

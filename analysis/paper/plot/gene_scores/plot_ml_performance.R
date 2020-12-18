@@ -97,13 +97,13 @@ evals <- lapply(scores, evaluate.score, score="score",
 # Plot ROC
 pdf(paste(out.prefix, "model_eval.roc.pdf", sep="."),
     height=2.75, width=2.75)
-plot.roc(evals)
+plot.roc(evals, grid.col=NA)
 dev.off()
 
 # Plot PRC
 pdf(paste(out.prefix, "model_eval.prc.pdf", sep="."),
     height=2.75, width=2.75)
-plot.prc(evals)
+plot.prc(evals, grid.col=NA)
 dev.off()
 
 # Plot legend

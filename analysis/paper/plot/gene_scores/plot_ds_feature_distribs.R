@@ -78,7 +78,7 @@ sapply(2:ncol(feats), function(i){
   pdf(out.pdf, height=2.4, width=3)
   plot.feature.bydsgroup(feats, ds.groups, feat.idx=i, 
                          title=feat.meta$name[which(feat.meta$feature==colnames(feats)[i])],
-                         swarm.max=1200)
+                         swarm.max=1200, blue.bg=FALSE)
   dev.off()
 })
 

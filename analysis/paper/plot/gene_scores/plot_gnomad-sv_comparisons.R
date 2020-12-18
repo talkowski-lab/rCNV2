@@ -124,7 +124,7 @@ gnomad.stratified <- function(oe.dat, scores, high.cutoff=0.8, low.cutoff=0.5, m
 ##########################
 # Plot a single comparison of rCNV score vs. gnomAD-SV counts
 plot.oe <- function(oe.dat, scores, score, var, metric="oe", n.bins=10,
-                    xlab=NULL, parmar=c(2.25, 4, 0.5, 0.5)){
+                    xlab=NULL, blue.bg=TRUE, parmar=c(2.25, 4, 0.5, 0.5)){
   # Collect plot data
   plot.dat <- gnomad.by.score.bin(oe.dat, scores, score, var, n.bins)
   if(score=="pHI"){
@@ -148,6 +148,17 @@ plot.oe <- function(oe.dat, scores, score, var, metric="oe", n.bins=10,
   if(is.null(xlab)){
     xlab <- paste("Genes Binned by", score)
   }
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Prep plot area
   par(mar=parmar, bty="n")
@@ -155,8 +166,8 @@ plot.oe <- function(oe.dat, scores, score, var, metric="oe", n.bins=10,
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i")
   rect(xleft=par("usr")[1], xright=par("usr")[2], 
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       border=NA, bty="n", col=bluewhite)
-  abline(h=axTicks(2), v=axTicks(1), col="white")
+       border=plot.border, bty=plot.bty, col=plot.bg)
+  abline(h=axTicks(2), v=axTicks(1), col=grid.col)
   if(metric=="oe"){
     abline(h=1, col=blueblack, lty=2)
   }
@@ -187,7 +198,7 @@ plot.oe.by.scorebin <- function(oe.dat, scores, score, var, metric="oe", n.bins=
                                 x.ax.labels=NULL, parse.x.ax.labels=T, ylims=NULL,
                                 cex.x.ax.labels=1, pt.color=blueblack, 
                                 baseline.color=blueblack, null.color=bluewhite, 
-                                parmar=c(3.5, 3.5, 0.5, 0.5)){
+                                blue.bg=TRUE, parmar=c(3.5, 3.5, 0.5, 0.5)){
   # Collect plot data
   all.plot.dat <- gnomad.by.score.bin(oe.dat, scores, score, var, n.bins)
   if(metric == "oe"){
@@ -201,15 +212,26 @@ plot.oe.by.scorebin <- function(oe.dat, scores, score, var, metric="oe", n.bins=
   if(is.null(ylims)){
     ylims <- range(plot.dat[, -1], na.rm=T)
   }
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=c(0, n.bins), ylim=ylims, xaxt="n", yaxt="n", xlab="", ylab="")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       border=NA, bty="n", col=bluewhite)
+       border=plot.border, bty=plot.bty, col=plot.bg)
   y.ax.at <- sort(unique(round(axTicks(2), 1)))
-  abline(h=y.ax.at, col="white")
+  abline(h=y.ax.at, col=grid.col)
   abline(h=c(0, baseline), lty=c(1, 2), col=c(null.color, baseline.color))
   text(x=par("usr")[1]-(0.05*(par("usr")[2]-par("usr")[1])),
        y=baseline+(0.035*(par("usr")[4]-par("usr")[3])), 
@@ -316,21 +338,21 @@ oe.dat <- calc.expected(var.meta, genomic.meta, train.genes)
 # Plot rCNV scores vs obs/exp ratios of gnomAD SVs
 pdf(paste(out.prefix, "scores_vs_gnomAD-SV.pHI_oe.pdf", sep="."),
     height=2, width=2.6)
-plot.oe(oe.dat, scores, "pHI", "gnomad_sv_lof_del", n.bins=10)
+plot.oe(oe.dat, scores, "pHI", "gnomad_sv_lof_del", n.bins=10, blue.bg=FALSE)
 dev.off()
 pdf(paste(out.prefix, "scores_vs_gnomAD-SV.pTS_oe.pdf", sep="."),
     height=2, width=2.6)
-plot.oe(oe.dat, scores, "pTS", "gnomad_sv_cg", n.bins=10)
+plot.oe(oe.dat, scores, "pTS", "gnomad_sv_cg", n.bins=10, blue.bg=FALSE)
 dev.off()
 
 # Plot rCNV scores vs mean SVs per gene from gnomAD-SV
 pdf(paste(out.prefix, "scores_vs_gnomAD-SV.pHI_raw.pdf", sep="."),
     height=2, width=2.6)
-plot.oe(oe.dat, scores, "pHI", "gnomad_sv_lof_del", metric="raw", n.bins=10)
+plot.oe(oe.dat, scores, "pHI", "gnomad_sv_lof_del", metric="raw", n.bins=10, blue.bg=FALSE)
 dev.off()
 pdf(paste(out.prefix, "scores_vs_gnomAD-SV.pTS_raw.pdf", sep="."),
     height=2, width=2.6)
-plot.oe(oe.dat, scores, "pTS", "gnomad_sv_cg", metric="raw", n.bins=10)
+plot.oe(oe.dat, scores, "pTS", "gnomad_sv_cg", metric="raw", n.bins=10, blue.bg=FALSE)
 dev.off()
 
 # Plot gnomAD-SV stratified by high/low pHI & pTS
@@ -349,7 +371,8 @@ plot.oe.by.scorebin(oe.dat, scores, "pHI", "gnomad_sv_lof_del", metric="mean", n
                     x.ax.labels=paste("\"Q\"[", 1:5, "]", sep=""),
                     parse.x.ax.labels=T, cex.x.ax.labels=0.9, 
                     pt.color=cnv.colors[1], baseline.color=NA, 
-                    null.color=blueblack, parmar=c(3.25, 2.75, 0.5, 0.5))
+                    null.color=blueblack, blue.bg=FALSE,
+                    parmar=c(3.25, 2.75, 0.5, 0.5))
 mtext(1, line=2.1, text="in Quintiles by pHI")
 dev.off()
 
@@ -362,6 +385,7 @@ plot.oe.by.scorebin(oe.dat, scores, "pTS", "gnomad_sv_cg", metric="mean", n.bins
                     x.ax.labels=paste("\"Q\"[", 1:5, "]", sep=""),
                     parse.x.ax.labels=T, cex.x.ax.labels=0.9, 
                     pt.color=cnv.colors[2], baseline.color=NA,
-                    null.color=blueblack, parmar=c(3.25, 2.75, 0.5, 0.5))
+                    null.color=blueblack, blue.bg=FALSE,
+                    parmar=c(3.25, 2.75, 0.5, 0.5))
 mtext(1, line=2.1, text="in Quintiles by pTS")
 dev.off()

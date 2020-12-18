@@ -33,7 +33,7 @@ load.hpo.samplesize <- function(hpo.samplesize.in, hpos=NULL){
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Mini quantile-quantile plot for deletions & duplications for a single phenotype
-mini.qq <- function (del, dup, hpo, ymax=NULL, 
+mini.qq <- function (del, dup, hpo, ymax=NULL, blue.bg=TRUE,
                      pt.cex=0.1, title.cex=1, axis.cex=1,
                      parmar=c(1.85, 1.85, 1, 1)){
   # Reformat HPO
@@ -53,6 +53,15 @@ mini.qq <- function (del, dup, hpo, ymax=NULL,
     ymax <- max(max(plot.dat$DEL[which(!is.infinite(plot.dat$DEL$obs)), ], na.rm=T), 
                 max(plot.dat$DUP[which(!is.infinite(plot.dat$DUP$obs)), ], na.rm=T))
   }
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+  }
   
   # Prep plot area
   par(mar=parmar, bty="n")
@@ -60,7 +69,7 @@ mini.qq <- function (del, dup, hpo, ymax=NULL,
        xaxt="n", xaxs="i", yaxt="n", ylab="")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       col=bluewhite, border=NA, bty="n")
+       col=plot.bg, border=plot.border, bty=plot.bty)
   x.ax.at <- seq(0, max(par("usr")[2]), by=ceiling(max(par("usr")[2]) / 4))
   y.ax.at <- seq(0, max(par("usr")[4]), by=ceiling(max(par("usr")[4]) / 4))
   # abline(v=x.ax.at, h=y.ax.at, col="white")
@@ -108,7 +117,7 @@ plot.lambdas <- function(del, dup, hpos,
        xaxt="n", xlab="", yaxt="n", ylab="", yaxs="i")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=y.at-0.35, ytop=y.at+0.35, border=NA, bty="n", col=bluewhite)
-  abline(v=axTicks(3), col="white")
+  # abline(v=axTicks(3), col="white")
   abline(v=1, col=blueblack)
   
   # Add points
@@ -127,7 +136,7 @@ plot.lambdas <- function(del, dup, hpos,
 }
 
 # Scatterplot of lambdas vs sample size
-lambda.scatter <- function(del, dup, hpo.n,
+lambda.scatter <- function(del, dup, hpo.n, blue.bg=TRUE,
                            parmar=c(2.5, 3, 0.25, 0.25)){
   # Get plot data
   plot.dat <- as.data.frame(t(sapply(hpos, function(hpo){
@@ -141,6 +150,17 @@ lambda.scatter <- function(del, dup, hpo.n,
   # xlims <- range(log10(plot.dat$n), na.rm=T)
   xlims <- log10(c(1000, 500000))
   ylims <- range(plot.dat[, 3:4], na.rm=T)
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Prep plot area
   par(mar=parmar, bty="n")
@@ -148,10 +168,10 @@ lambda.scatter <- function(del, dup, hpo.n,
        xaxt="n", xlab="", yaxt="n", ylab="")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4], 
-       border=NA, bty="n", col=bluewhite)
+       border=plot.border, bty=plot.bty, col=plot.bg)
   x.ax.at <- log10(logscale.major)
   y.ax.at <- seq(0, 2, 0.1)
-  abline(h=y.ax.at, v=x.ax.at, col="white")
+  abline(h=y.ax.at, v=x.ax.at, col=grid.col)
   abline(h=1, col=blueblack)
   
   # Add linear fits
@@ -202,6 +222,7 @@ primary.vs.secondary.scatter <- function(pvals.1, pvals.2, keep.idx=NULL,
                                          cutoff.1=6, cutoff.2=-log10(0.05),
                                          sig.color="black", nonsig.color="gray75",
                                          min.point.plot=-log10(0.5), pt.cex=0.2, 
+                                         blue.bg=TRUE, 
                                          parmar=c(2.25, 2.25, 0.25, 0.25)){
   # Fill NA P-values with P=1
   pvals.1 <- as.data.frame(apply(pvals.1, 2, function(ps){ps[which(is.na(ps))] <- 1; return(ps)}))
@@ -228,6 +249,17 @@ primary.vs.secondary.scatter <- function(pvals.1, pvals.2, keep.idx=NULL,
       nonsig.color
     }
   })
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Prep plot area
   par(mar=parmar, bty="n")
@@ -235,8 +267,8 @@ primary.vs.secondary.scatter <- function(pvals.1, pvals.2, keep.idx=NULL,
        xaxt="n", xlab="", yaxt="n", ylab="")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4], 
-       border=NA, bty="n", col=bluewhite)
-  abline(h=axTicks(2), v=axTicks(1), col="white")
+       border=plot.border, bty=plot.bty, col=plot.bg)
+  abline(h=axTicks(2), v=axTicks(1), col=grid.col)
   rect(xleft=0, xright=min.point.plot,
        ybottom=0, ytop=min.point.plot,
        border=NA, bty="n", col=nonsig.color)
@@ -366,7 +398,7 @@ png(paste(out.prefix, "qq_grid_byHPO.png", sep="."),
     res=300)
 par(mfrow=c(n.plots.tall, n.plots.wide))
 for(hpo in hpos){
-  mini.qq(del.1, dup.1, hpo, title.cex=0.5, axis.cex=0.7)
+  mini.qq(del.1, dup.1, hpo, title.cex=0.5, axis.cex=0.7, blue.bg=FALSE)
 }
 dev.off()
 
@@ -379,7 +411,7 @@ dev.off()
 # Scatterplot of lambdas vs sample size
 pdf(paste(out.prefix, "primary_lambdas_vs_sampleSize.pdf", sep="."),
     height=2.3, width=2.4)
-lambda.scatter(del.1, dup.1, hpo.n)
+lambda.scatter(del.1, dup.1, hpo.n, blue.bg=FALSE)
 dev.off()
 
 # Scatterplots of primary vs. secondary P-values
@@ -387,12 +419,12 @@ png(paste(out.prefix, "primary_vs_secondary_pvalue.DEL.png", sep="."),
     height=2.25*300, width=2.25*300, res=300)
 primary.vs.secondary.scatter(del.1$pvals, del.2$pvals, cutoff.1=del.cutoff,
                              sig.color=cnv.colors[1], nonsig.color=control.cnv.colors[1],
-                             pt.cex=0.175, parmar=c(2.5, 2.5, 0.15, 0.15))
+                             pt.cex=0.175, blue.bg=FALSE, parmar=c(2.5, 2.5, 0.15, 0.15))
 dev.off()
 png(paste(out.prefix, "primary_vs_secondary_pvalue.DUP.png", sep="."),
     height=2.25*300, width=2.25*300, res=300)
 primary.vs.secondary.scatter(dup.1$pvals, dup.2$pvals, cutoff.1=dup.cutoff,
                              sig.color=cnv.colors[2], nonsig.color=control.cnv.colors[2],
-                             pt.cex=0.175, parmar=c(2.5, 2.5, 0.15, 0.15))
+                             pt.cex=0.175, blue.bg=FALSE, parmar=c(2.5, 2.5, 0.15, 0.15))
 dev.off()
 

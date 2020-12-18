@@ -79,7 +79,8 @@ get.cutoff <- function(score.lnor.full, score.lnor.fine, min.lnor){
 plot.score.vs.or <- function(bins, baseline, score.cutoff, score,
                              avg.pt.cex=1, avg.genes.per.bin=NULL, 
                              x.ax.at=NULL, ylims=NULL, xtitle=NULL, ytitle=NULL,
-                             ax.tck=-0.025, parmar=c(2.4, 2.4, 0.25, 0.25)){
+                             blue.bg=TRUE, ax.tck=-0.025, 
+                             parmar=c(2.4, 2.4, 0.25, 0.25)){
   # Get plot values
   x <- bins$cutoff
   pt.y <- bins$margin_lnOR
@@ -113,6 +114,17 @@ plot.score.vs.or <- function(bins, baseline, score.cutoff, score,
   if(is.null(ytitle)){
     ytitle <- paste(cnv.label, "Odds Ratio")
   }
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Prep plot area
   par(mar=parmar, bty="n")
@@ -120,12 +132,12 @@ plot.score.vs.or <- function(bins, baseline, score.cutoff, score,
        xaxt="n", yaxt="n", xlab="", ylab="")
   rect(xleft=par("usr")[1], xright=score.cutoff,
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       col=bluewhite, border=NA, bty="n")
+       col=plot.bg, border=plot.border, bty=plot.bty)
   rect(xleft=score.cutoff, xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       col=adjustcolor(highlight.color, alpha=0.6), border=NA, bty="n")
+       col=adjustcolor(highlight.color, alpha=0.3), border=NA, bty="n")
   y.ax.at <- log(2^(-10:10))
-  abline(h=y.ax.at, col="white")
+  abline(h=y.ax.at, col=grid.col)
   abline(v=score.cutoff, lty=1, col=highlight.color)
   
   # Add points & lines
@@ -253,7 +265,7 @@ pdf(paste(out.prefix, "phi_vs_effect_size.full.pdf", sep="."),
     height=pdf.height, width=pdf.width)
 plot.score.vs.or(phi.lnor.full, del.constr.lnor[1], phi.cutoff, "pHI", 
                  ylims=ylims, avg.pt.cex=pt.cex, avg.genes.per.bin=avg.genes.per.bin,
-                 parmar=pdf.parmar)
+                 blue.bg=FALSE, parmar=pdf.parmar)
 dev.off()
 
 # Plot full pTS vs lnOR
@@ -261,7 +273,7 @@ pdf(paste(out.prefix, "pts_vs_effect_size.full.pdf", sep="."),
     height=pdf.height, width=pdf.width)
 plot.score.vs.or(pts.lnor.full, del.constr.lnor[1], pts.cutoff, "pTS", 
                  ylims=ylims, avg.pt.cex=pt.cex, avg.genes.per.bin=avg.genes.per.bin,
-                 parmar=pdf.parmar)
+                 blue.bg=FALSE, parmar=pdf.parmar)
 # text(x=par("usr")[1], y=del.constr.lnor[1]+(0.08*diff(par("usr")[3:4])), 
 #      labels="Rare deletions of\nall constrained genes",
 #      font=3, cex=5/6, col=graphabs.green, pos=4)
@@ -272,7 +284,7 @@ pdf(paste(out.prefix, "pts_vs_effect_size.fine.pdf", sep="."),
     height=(5/6)*pdf.height, width=(1/2)*pdf.width)
 plot.score.vs.or(pts.lnor.fine.forplot, del.constr.lnor[1], pts.cutoff, "pTS", 
                  ylims=ylims, avg.pt.cex=pt.cex, xtitle="pTS", ytitle=NA, 
-                 parmar=c(pdf.parmar[1], 1.3, pdf.parmar[3:4]))
+                 blue.bg=FALSE, parmar=c(pdf.parmar[1], 1.3, pdf.parmar[3:4]))
 axis(1, at=1, tick=F, line=-0.7)
 dev.off()
 

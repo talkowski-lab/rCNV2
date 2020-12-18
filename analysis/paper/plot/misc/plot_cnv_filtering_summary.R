@@ -169,7 +169,8 @@ get.2d.data <- function(stats, metacohorts, log=F){
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Plot horizontal grouped dotplots of CNVs per sample
-plot.persample <- function(stats, metacohorts, xlims=NULL, title=NULL, y.axis="left"){
+plot.persample <- function(stats, metacohorts, xlims=NULL, title=NULL, 
+                           y.axis="left", blue.bg=TRUE){
   # Collect plot data
   del <- get.cnv.persample(stats, unlist(metacohorts), "DEL", log=T)
   dup <- get.cnv.persample(stats, unlist(metacohorts), "DUP", log=T)
@@ -178,6 +179,15 @@ plot.persample <- function(stats, metacohorts, xlims=NULL, title=NULL, y.axis="l
   }
   n.meta <- length(metacohorts)
   n.cohorts <- sum(sapply(metacohorts, length))
+  if(blue.bg==TRUE){
+    sep.col <- "white"
+    grid.col <- "white"
+    plot.bg <- bluewhite
+  }else{
+    sep.col <- bluewhite
+    grid.col <- NA
+    plot.bg <- "white"
+  }
   
   # Prep plot area
   par(mar=c(2.2, 7.25, 1.2, 0.3), bty="n")
@@ -200,13 +210,22 @@ plot.persample <- function(stats, metacohorts, xlims=NULL, title=NULL, y.axis="l
   for(m in 1:length(metacohorts)){
     cohorts <- sort(metacohorts[[m]])
     pdat <- get.persample.plot.data(del, dup, cohorts, rows.plotted)
-    rect(xleft=pdat$rects$xleft, xright=pdat$rects$xright,
-         ybottom=pdat$rects$ybottom, ytop=pdat$rects$ytop,
-         bty="n", border=NA, col=bluewhite)
+    # rect(xleft=par("usr")[1], xright=par("usr")[2], 
+    #      ybottom=rows.plotted, ytop=rows.plotted+length(cohorts),
+    #      col=sep.col, bty="n", border=NA)
+    if(blue.bg==TRUE){
+      rect(xleft=pdat$rects$xleft, xright=pdat$rects$xright,
+           ybottom=pdat$rects$ybottom, ytop=pdat$rects$ytop,
+           bty="n", border=NA, col=plot.bg)
+    }else{
+      segments(x0=pdat$rects$xleft, x1=pdat$rects$xright,
+               y0=pdat$rects$ybottom-0.15, y1=pdat$rects$ybottom-0.15,
+               col=sep.col)
+    }
     segments(x0=log10(logscale.major), x1=log10(logscale.major),
              y0=rep(rows.plotted, length(logscale.major)), 
              y1=rep(rows.plotted+length(cohorts), length(logscale.major)),
-             col="white", lend="butt")
+             col=grid.col, lend="butt")
     segments(x0=pdat$segs$x0, x1=pdat$segs$x1,
              y0=pdat$segs$y0, y1=pdat$segs$y1,
              col=pdat$segs$color)
@@ -255,12 +274,22 @@ plot.boxes <- function(cohort.sizes, y, y.buffer=0.05, row.width=1){
 }
 
 # Plot horizontal boxplots of CNV size per cohort
-plot.size <- function(sizes, metacohorts, xlims=NULL, title=NULL, y.axis="left"){
+plot.size <- function(sizes, metacohorts, xlims=NULL, title=NULL, y.axis="left",
+                      blue.bg=TRUE){
   if(is.null(xlims)){
     xlims <- range(log10(as.numeric(unlist(unlist(sizes)))), na.rm=T)
   }
   n.meta <- length(metacohorts)
   n.cohorts <- sum(sapply(metacohorts, length))
+  if(blue.bg==TRUE){
+    sep.col <- "white"
+    grid.col <- "white"
+    plot.bg <- bluewhite
+  }else{
+    sep.col <- bluewhite
+    grid.col <- NA
+    plot.bg <- "white"
+  }
   
   # Prep plot area
   par(mar=c(2.2, 7.25, 1.2, 0.6), bty="n")
@@ -282,14 +311,21 @@ plot.size <- function(sizes, metacohorts, xlims=NULL, title=NULL, y.axis="left")
   for(m in 1:length(metacohorts)){
     cohorts <- sort(metacohorts[[m]])
     sdat <- sizes[[m]]
-    rect(xleft=par("usr")[1], xright=par("usr")[2],
-         ybottom=(1:length(cohorts))-1+rows.plotted+0.15, 
-         ytop=(1:length(cohorts))+rows.plotted-0.15,
-         bty="n", border=NA, col=bluewhite)
+    if(blue.bg==TRUE){
+      rect(xleft=par("usr")[1], xright=par("usr")[2],
+           ybottom=(1:length(cohorts))-1+rows.plotted+0.15, 
+           ytop=(1:length(cohorts))+rows.plotted-0.15,
+           bty="n", border=NA, col=plot.bg)
+    }else{
+      segments(x0=par("usr")[1], x1=par("usr")[2],
+               y0=(1:length(cohorts))-1+rows.plotted, 
+               y1=(1:length(cohorts))-1+rows.plotted,
+               col=sep.col)
+    }
     segments(x0=log10(logscale.major), x1=log10(logscale.major),
              y0=rep(rows.plotted, length(logscale.major)), 
              y1=rep(rows.plotted+length(cohorts), length(logscale.major)),
-             col="white", lend="butt")
+             col=grid.col, lend="butt")
     sapply(1:length(cohorts), function(i){
       plot.boxes(sizes[[which(names(sizes)==cohorts[i])]], y=rows.plotted+i-0.5)
     })
@@ -315,7 +351,7 @@ plot.size <- function(sizes, metacohorts, xlims=NULL, title=NULL, y.axis="left")
 
 # Plot 2d scatterplot of CNVs per sample vs median CNV size
 plot.2dscatter <- function(stats, metacohorts, persample.lims=NULL, size.lims=NULL,
-                           background=TRUE, title=NULL, y.axis="left"){
+                           background=TRUE, title=NULL, y.axis="left", blue.bg=TRUE){
   # Collect plot data
   pdat <- get.2d.data(stats, metacohorts, log=T)
   if(is.null(size.lims)){
@@ -327,6 +363,17 @@ plot.2dscatter <- function(stats, metacohorts, persample.lims=NULL, size.lims=NU
     ylims <- range(pdat$y, na.rm=T)
   }else{
     ylims <- persample.lims
+  }
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
   }
   
   # Prep plot area
@@ -342,9 +389,9 @@ plot.2dscatter <- function(stats, metacohorts, persample.lims=NULL, size.lims=NU
   if(background==T){
     rect(xleft=par("usr")[1], xright=par("usr")[2],
          ybottom=par("usr")[3], ytop=par("usr")[4],
-         bty="n", border=NA, col=bluewhite)
+         bty=plot.bty, border=plot.border, col=plot.bg)
     # abline(h=log10(logscale.minor), v=log10(logscale.minor), lwd=0.75, col="white")
-    abline(h=log10(logscale.major), v=log10(logscale.major), lwd=1, col="white")
+    abline(h=log10(logscale.major), v=log10(logscale.major), lwd=1, col=grid.col)
   }
   
   # Add X axis
@@ -424,6 +471,8 @@ rcnv.config <- opts$`rcnv-config`
 if(!is.null(rcnv.config)){
   source(rcnv.config)
 }
+cnv.colors <- cnv.colors[1:2]
+control.cnv.colors <- control.cnv.colors[1:2]
 
 # Read data
 raw.sizes <- load.sizes(raw.paths.in)
@@ -439,11 +488,12 @@ persamp.xlims <- range(persamp.vals[which(!is.infinite(persamp.vals))], na.rm=T)
 persamp.pdf.dims <- c(3.1, 3.2)
 pdf(paste(out.prefix, "cnv_per_sample.raw.pdf", sep="."), 
     height=persamp.pdf.dims[1], width=persamp.pdf.dims[2])
-plot.persample(raw, metacohorts, xlims=persamp.xlims, title="Raw Data")
+plot.persample(raw, metacohorts, xlims=persamp.xlims, title="Raw Data", blue.bg=FALSE)
 dev.off()
 pdf(paste(out.prefix, "cnv_per_sample.filtered.pdf", sep="."), 
     height=persamp.pdf.dims[1], width=persamp.pdf.dims[2])
-plot.persample(rcnv, metacohorts, xlims=persamp.xlims, title="Harmonized Data", y.axis="right")
+plot.persample(rcnv, metacohorts, xlims=persamp.xlims, title="Harmonized Data", 
+               y.axis="right", blue.bg=FALSE)
 dev.off()
 
 # Plot CNV sizes
@@ -452,11 +502,12 @@ size.xlims <- log10(c(1000, 1000000))
 size.pdf.dims <- c(3.1, 3.3)
 pdf(paste(out.prefix, "sizes.raw.pdf", sep="."), 
     height=size.pdf.dims[1], width=size.pdf.dims[2])
-plot.size(raw.sizes, metacohorts, xlims=size.xlims, title="Raw Data")
+plot.size(raw.sizes, metacohorts, xlims=size.xlims, title="Raw Data", blue.bg=FALSE)
 dev.off()
 pdf(paste(out.prefix, "sizes.filtered.pdf", sep="."), 
     height=size.pdf.dims[1], width=size.pdf.dims[2])
-plot.size(rcnv.sizes, metacohorts, xlims=size.xlims, title="Harmonized Data", y.axis="right")
+plot.size(rcnv.sizes, metacohorts, xlims=size.xlims, title="Harmonized Data", 
+          y.axis="right", blue.bg=FALSE)
 dev.off()
 
 # Plot 2d scatter of CNVs per sample vs median CNV size
@@ -469,10 +520,10 @@ scatter.pdf.dim <- 2.5
 pdf(paste(out.prefix, "size_vs_per_sample.raw.pdf", sep="."), 
     height=scatter.pdf.dim, width=scatter.pdf.dim)
 plot.2dscatter(raw, size.lims=medsize.xlims, metacohorts, persample.lims=persamp.xlims,
-               title="Raw Data")
+               title="Raw Data", blue.bg=FALSE)
 dev.off()
 pdf(paste(out.prefix, "size_vs_per_sample.filtered.pdf", sep="."), 
     height=scatter.pdf.dim, width=scatter.pdf.dim)
 plot.2dscatter(rcnv, size.lims=medsize.xlims, metacohorts, persample.lims=persamp.xlims,
-               title="Harmonized Data", y.axis="right")
+               title="Harmonized Data", y.axis="right", blue.bg=FALSE)
 dev.off()

@@ -199,19 +199,35 @@ evaluate.score.asd_cnv <- function(cnvs, phenos, score){
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Plot odds ratios for de novo CNVs by CNV score (either percentile or absolute bin)
-plot.or.by.scorebin <- function(cnvs, phenos, score, n.bins=3, cnv.pct=TRUE,
+plot.or.by.scorebin <- function(cnvs, phenos, score, n.bins=3, cnv.pct=TRUE, print.ors=TRUE,
                                 x.label=NULL, parse.x.label=T, x.label.line=2,
                                 x.ax.labels=NULL, parse.x.ax.labels=T,
                                 cex.x.ax.labels=1, pt.color=blueblack, 
                                 baseline.color=blueblack, null.color=bluewhite, 
-                                parmar=c(3.5, 3.5, 0.5, 0.5)){
+                                blue.bg=TRUE, parmar=c(3.5, 3.5, 0.5, 0.5)){
   # Gather plot data
   baseline <- log2(calc.or(cnvs, phenos)[1])
-  ors <- log2(calc.or.by.scorebin(cnvs, phenos, score, n.bins, cnv.pct))
+  ors <- calc.or.by.scorebin(cnvs, phenos, score, n.bins, cnv.pct)
+  if(print.ors==TRUE){
+    cat("ASD risk per score bin:\n")
+    cat(paste(paste(round(ors[, 1], 3), collapse=", "), "\n"))
+  }
+  ors <- log2(ors)
   or.vals <- as.numeric(unlist(ors))
   ylims <- range(or.vals[which(!is.infinite(or.vals) & !is.nan(or.vals) & !is.na(or.vals))])
   if(ylims[1] > 0){
     ylims[1] <- 0
+  }
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
   }
   
   # Prep plot area
@@ -219,9 +235,9 @@ plot.or.by.scorebin <- function(cnvs, phenos, score, n.bins=3, cnv.pct=TRUE,
   plot(NA, xlim=c(0, n.bins), ylim=ylims, xaxt="n", yaxt="n", xlab="", ylab="")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       border=NA, bty="n", col=bluewhite)
+       border=plot.border, bty=plot.bty, col=plot.bg)
   y.ax.at <- axTicks(2)
-  abline(h=y.ax.at, col="white")
+  abline(h=y.ax.at, col=grid.col)
   abline(h=c(0, baseline), lty=c(1, 2), col=c(null.color, baseline.color))
   text(x=par("usr")[1]-(0.05*(par("usr")[2]-par("usr")[1])),
        y=baseline+(0.035*(par("usr")[4]-par("usr")[3])), 
@@ -330,7 +346,8 @@ plot.or.by.scorebin(cnvs[which(cnvs$cnv=="DEL"), ], phenos, score="pHI", cnv.pct
                     x.ax.labels=paste("\"Q\"[", 1:4, "]", sep=""),
                     parse.x.ax.labels=T, cex.x.ax.labels=0.9, 
                     pt.color=cnv.colors[1], baseline.color=control.cnv.colors[1], 
-                    null.color=blueblack, parmar=c(3.25, 2.75, 0.5, 0.5))
+                    null.color=blueblack, blue.bg=FALSE, 
+                    parmar=c(3.25, 2.75, 0.5, 0.5))
 mtext(1, line=2.1, text="in Quartiles by pHI")
 dev.off()
 pdf(paste(out.prefix, "asc_spark_denovo_cnvs.odds_ratios.dup.pdf", sep="."),
@@ -341,7 +358,8 @@ plot.or.by.scorebin(cnvs[which(cnvs$cnv=="DUP"), ], phenos, score="pTS", cnv.pct
                     x.ax.labels=paste("\"Q\"[", 1:4, "]", sep=""),
                     parse.x.ax.labels=T, cex.x.ax.labels=0.9, 
                     pt.color=cnv.colors[2], baseline.color=control.cnv.colors[2], 
-                    null.color=blueblack, parmar=c(3.25, 2.75, 0.5, 0.5))
+                    null.color=blueblack, blue.bg=FALSE,
+                    parmar=c(3.25, 2.75, 0.5, 0.5))
 mtext(1, line=2.1, text="in Quartiles by pTS")
 dev.off()
 
@@ -369,21 +387,21 @@ score.text.colors <- rev(c(rep("white", 2),
 # Plot ROC
 pdf(paste(out.prefix, "asc_spark_denovo_cnvs.roc.del.pdf", sep="."),
     height=2.75, width=2.75)
-plot.roc(del.evals, colors=score.colors, auc.text.colors=score.text.colors)
+plot.roc(del.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
 dev.off()
 pdf(paste(out.prefix, "asc_spark_denovo_cnvs.roc.dup.pdf", sep="."),
     height=2.75, width=2.75)
-plot.roc(dup.evals, colors=score.colors, auc.text.colors=score.text.colors)
+plot.roc(dup.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
 dev.off()
 
 # Plot PRC
 pdf(paste(out.prefix, "asc_spark_denovo_cnvs.prc.del.pdf", sep="."),
     height=2.75, width=2.75)
-plot.prc(del.evals, colors=score.colors, auc.text.colors=score.text.colors)
+plot.prc(del.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
 dev.off()
 pdf(paste(out.prefix, "asc_spark_denovo_cnvs.prc.dup.pdf", sep="."),
     height=2.75, width=2.75)
-plot.prc(dup.evals, colors=score.colors, auc.text.colors=score.text.colors)
+plot.prc(dup.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
 dev.off()
 
 # Plot legend

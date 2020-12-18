@@ -111,7 +111,7 @@ mini.miami <- function(del, dup, max.p=10,
                        del.cutoff=del.cutoff, dup.cutoff=dup.cutoff, 
                        cutoff.label="Genome-wide significance",
                        sig.buffer=500000, sig.color=blueblack,
-                       middle.axis.width=1,
+                       middle.axis.width=1, lwd=1.111,
                        xaxis.label="Chromosomes",
                        parmar=c(0.5, 2.7, 0.5, 0.3)){
   # Get plotting data for dels & dups
@@ -137,7 +137,7 @@ mini.miami <- function(del, dup, max.p=10,
   plot(NA, xlim=x.range, ylim=y.range,
        xaxt="n", xlab="", yaxt="n", ylab="")
   abline(h=c(dup.cutoff + middle.axis.width/2, -del.cutoff - middle.axis.width/2),
-         lty=2, col=sig.color)
+         lty=2, lwd=lwd, col=sig.color)
   gw.sig.label.buffer <- 0.03*(diff(par("usr")[3:4]))
   text(x=par("usr")[1], 
        y=c(dup.cutoff + gw.sig.label.buffer + middle.axis.width/2, 
@@ -157,9 +157,9 @@ mini.miami <- function(del, dup, max.p=10,
   
   # Add axes
   y.at <- seq(0, ceiling(par("usr")[4]), by=ceiling(par("usr")[4]/6))
-  axis(2, at=y.at+middle.axis.width/2, labels=NA, tck=-0.02, col=blueblack)
+  axis(2, at=y.at+middle.axis.width/2, labels=NA, tck=-0.02, col=blueblack, lwd=lwd)
   axis(2, at=y.at+middle.axis.width/2, tick=F, line=-0.5, labels=abs(y.at), las=2, cex.axis=0.9)
-  axis(2, at=-y.at-middle.axis.width/2, labels=NA, tck=-0.02, col=blueblack)
+  axis(2, at=-y.at-middle.axis.width/2, labels=NA, tck=-0.02, col=blueblack, lwd=lwd)
   axis(2, at=-y.at-middle.axis.width/2, tick=F, line=-0.5, labels=abs(y.at), las=2, cex.axis=0.9)
   axis(2, at=middle.axis.width/2 + (par("usr")[4]-par("usr")[3])/4,
        tick=F, line=0.1, labels=bquote(-log[10](italic(P)["DUP"])))
@@ -169,7 +169,7 @@ mini.miami <- function(del, dup, max.p=10,
            x1=rep(par("usr")[2], 2),
            y0=c(0.5, -0.5) * middle.axis.width, 
            y1=c(0.5, -0.5) * middle.axis.width, 
-           col=blueblack, xpd=T, lend="round")
+           col=blueblack, xpd=T, lend="round", lwd=lwd)
   text(x=mean(par("usr")[1:2]), y=0, labels=xaxis.label)
 }
 

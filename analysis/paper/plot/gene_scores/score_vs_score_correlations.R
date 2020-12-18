@@ -46,7 +46,8 @@ merge.scores <- function(rcnv.scores, features, scores.to.keep){
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Plot basic distribution for a single score
-plot.score.hist <- function(scores, score, n.bins=100, parmar=c(1.1, 2.4, 1.1, 0.25)){
+plot.score.hist <- function(scores, score, n.bins=100, blue.bg=TRUE,
+                            parmar=c(1.1, 2.4, 1.1, 0.25)){
   # Extract plotting values
   vals <- as.numeric(scores[, score])
   vals <- vals[which(!is.na(vals))]
@@ -60,15 +61,28 @@ plot.score.hist <- function(scores, score, n.bins=100, parmar=c(1.1, 2.4, 1.1, 0
   })
   ymax <- 1.05*max(counts, na.rm=T)
   
+  # Set parameters
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
+  
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=xlim, ylim=c(0, ymax),
        xaxt="n", yaxt="n", xlab="", ylab="", yaxs="i")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       col=bluewhite, border=NA, bty="n")
+       col=plot.bg, border=plot.border, bty=plot.bty)
   y.ax.at <- axTicks(2)
-  abline(h=y.ax.at, col="white")
+  abline(h=y.ax.at, col=grid.col)
   
   # Add rectangles
   rect(xleft=breaks[-length(breaks)], xright=breaks[-1],
@@ -88,21 +102,32 @@ plot.score.hist <- function(scores, score, n.bins=100, parmar=c(1.1, 2.4, 1.1, 0
 
 # Plot correlation of two scores
 score.corplot <- function(scores, x.score, y.score, palette, pt.cex=0.15,
-                          parmar=c(1.1, 1.1, 1.1, 1.1)){
+                          blue.bg=TRUE, parmar=c(1.1, 1.1, 1.1, 1.1)){
   # Get plot values
   plot.df <- data.frame("x"=scores[, x.score], "y"=scores[, y.score])
   plot.df <- plot.df[which(complete.cases(plot.df)), ]
   plot.df <- color.points.by.density(plot.df$x, plot.df$y, palette=palette)
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(plot.df[, 1:2], type="n", xaxt="n", yaxt="n", xlab="", ylab="")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       col=bluewhite, border=NA, bty="n")
+       col=plot.bg, border=plot.border, bty=plot.bty)
   x.tick.at <- seq(par("usr")[1], par("usr")[2], length.out=6)
   y.tick.at <- seq(par("usr")[3], par("usr")[4], length.out=6)
-  abline(v=x.tick.at, h=y.tick.at, col="white")
+  abline(v=x.tick.at, h=y.tick.at, col=grid.col)
   
   # Add points
   points(plot.df[, 1:2], pch=19, col=plot.df$col, cex=pt.cex)
@@ -179,7 +204,7 @@ scores <- merge.scores(rcnv.scores, features, scores.to.keep)
 # Plot basic histogram of each score
 sapply(scores.to.keep, function(score){
   pdf(paste(out.prefix, score, "hist.pdf", sep="."), height=plot.height, width=2.15)
-  plot.score.hist(scores, score, n.bins=40)
+  plot.score.hist(scores, score, n.bins=40, blue.bg=FALSE)
   dev.off()
 })
 
@@ -195,7 +220,7 @@ sapply(scores.to.keep, function(score){
   #     height=plot.height, width=plot.height)
   png(paste(out.prefix, score, "vs_pHI.png", sep="."), 
       height=png.res*plot.height, width=png.res*plot.height, res=png.res)
-  score.corplot(scores, score, "pHI", del.pal)
+  score.corplot(scores, score, "pHI", del.pal, blue.bg=FALSE)
   dev.off()
 })
 
@@ -205,7 +230,7 @@ sapply(scores.to.keep, function(score){
   #     height=plot.height, width=plot.height)
   png(paste(out.prefix, score, "vs_pTS.png", sep="."), 
       height=png.res*plot.height, width=png.res*plot.height, res=png.res)
-  score.corplot(scores, score, "pTS", dup.pal)
+  score.corplot(scores, score, "pTS", dup.pal, blue.bg=FALSE)
   dev.off()
 })
 

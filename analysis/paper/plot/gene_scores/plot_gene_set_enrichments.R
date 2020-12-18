@@ -68,6 +68,16 @@ calc.enrichments <- function(gsets, scores, score, n.bins=10){
   return(enrich.df)
 }
 
+# K-S test of scores for all gene sets
+geneset.ks.tests <- function(gsets, scores, score){
+  sapply(1:length(gsets), function(i){
+    cat(paste("K-S test for ", names(gsets)[i], ":\n", sep=""))
+    scores.hits <- as.numeric(scores[which(scores$gene %in% gsets[[i]]$genes), score])
+    ks.p <- ks.test(scores[, score], scores.hits)$p.value
+    cat(paste("P =", format(ks.p, scientific=T, digits=3, nsmall=2), "\n"))
+  })
+}
+
 
 ##########################
 ### PLOTTING FUNCTIONS ###
@@ -233,6 +243,9 @@ scores <- load.scores(scores.in)
 
 # Load gene sets
 gsets <- load.genesets(genesets.in, elig.genes=scores$gene)
+
+# Perform K-S tests for all gene sets
+geneset.ks.tests(gsets, scores, score)
 
 # Stratify gene sets per score bin
 enrich.df <- calc.enrichments(gsets, scores, score, n.bins=10)

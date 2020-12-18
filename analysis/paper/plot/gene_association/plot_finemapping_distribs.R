@@ -37,7 +37,7 @@ get.n.orig.sig.genes <- function(credsets, prior.pips){
 ##########################
 # Scatterplot of two sets of PIPs matched on gene, CNV, and phenotype
 pip.scatter <- function(stats1, stats2, label1, label2, pt.cex=0.75, pt.lwd=1, 
-                        parmar=c(2.75, 2.75, 0.25, 0.25)){
+                        blue.bg=TRUE, parmar=c(2.75, 2.75, 0.25, 0.25)){
   # Join PIP sets & assign colors
   x <- merge(stats1, stats2, by=c("HPO", "gene", "cnv"), suffix=c(".1", ".2"))
   set.seed(2020)
@@ -53,14 +53,25 @@ pip.scatter <- function(stats1, stats2, label1, label2, pt.cex=0.75, pt.lwd=1,
   pt.col <- pw.params[, 2]
   pt.bcol <- pw.params[, 3]
   x <- x[, grep("PIP", colnames(x), fixed=T)]
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=c(0, 1), ylim=c(0, 1), xaxt="n", yaxt="n", xlab="", ylab="")
   rect(xleft=par("usr")[1], xright=par("usr")[2], ybottom=par("usr")[3], ytop=par("usr")[4],
-       col=bluewhite, border=NA, bty="n")
+       col=plot.bg, border=plot.border, bty=plot.bty)
   ax.at <- seq(0, 1, 0.2)
-  abline(h=ax.at, v=ax.at, col="white")
+  abline(h=ax.at, v=ax.at, col=grid.col)
   abline(0, 1, lty=5, col=blueblack)
   
   # Add axes
@@ -103,7 +114,7 @@ pip.split.hist <- function(stats1, stats2, label1, label2, bin.width=0.05,
        xaxt="n", yaxt="n", xlab="", ylab="", yaxs="i")
   x.ax.at <- seq(-1, 1, 0.5)
   y.ax.at <- seq(0, 20000, 100)
-  abline(h=y.ax.at, col=bluewhite)
+  # abline(h=y.ax.at, col=bluewhite)
   
   # Add axes
   axis(1, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
@@ -176,7 +187,7 @@ plot.pip.hist <- function(allgenes, conf.cutoff=0.15, vconf.cutoff=0.85,
   #      ybottom=0, ytop=par("usr")[4], col=c(cnv.whites[cnv], control.cnv.colors[cnv]),
   #      border=NA, bty="n")
   y.ax.at <- axTicks(2)
-  abline(h=y.ax.at, col=bluewhite)
+  # abline(h=y.ax.at, col=bluewhite)
   abline(v=c(conf.cutoff, vconf.cutoff), lty=2, col=blueblack)
   text(x=c(conf.cutoff, vconf.cutoff)+0.05, y=sum(par("usr")[3:4])/2, srt=90,
        labels=c("Confident", "Highly Confident"), cex=5/6)
@@ -279,7 +290,7 @@ pdf(paste(out.prefix, "genes_per_credset_before_vs_after.scatter.pdf", sep="."),
     height=2.6, width=2.6)
 credsets.scatter(credsets, credsets$n_genes.prior, credsets$n_genes, add.lm=T, 
                  xlims=n_gene_range, ylims=n_gene_range, 
-                 abline.a=0, abline.b=1, abline.lty=5, 
+                 abline.a=0, abline.b=1, abline.lty=5, blue.bg=FALSE,
                  xtitle="Genes Before Fine-Mapping", ytitle="Genes After Fine-Mapping")
 dev.off()
 
@@ -295,7 +306,7 @@ sapply(list(c(1, 2), c(1, 3), c(2, 3)), function(idxs){
             gsub(" ", "_", name2, fixed=T), 
             "pdf", sep="."),
       height=2.3, width=2.3)
-  pip.scatter(set1, set2, name1, name2)
+  pip.scatter(set1, set2, name1, name2, blue.bg=FALSE)
   dev.off()
   # Histogram of residuals
   pdf(paste(out.prefix, "residual_hist", 

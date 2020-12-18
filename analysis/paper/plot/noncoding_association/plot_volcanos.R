@@ -18,12 +18,24 @@ options(stringsAsFactors=F, scipen=1000)
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Volcano plot for a single CNV type
-plot.volcano <- function(stats, cnv, pt.cex=0.2, parmar=c(2.25, 2.25, 0.25, 0.25)){
+plot.volcano <- function(stats, cnv, pt.cex=0.2, blue.bg=FALSE,
+                         parmar=c(2.25, 2.25, 0.25, 0.25)){
   # Get plot data
   plot.df <- stats[which(stats$cnv==cnv), c("meta.lnOR", "meta.phred_p")]
   xlims <- range(stats$meta.lnOR, na.rm=T)
   ylims <- range(stats$meta.phred_p, na.rm=T)
   x.label <- paste(c("DEL"="Deletion", "DUP"="Duplication")[cnv], "Odds Ratio")
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Assign point colors
   plot.df$color <- apply(plot.df, 1, function(vals){
@@ -52,8 +64,8 @@ plot.volcano <- function(stats, cnv, pt.cex=0.2, parmar=c(2.25, 2.25, 0.25, 0.25
   # Add background shading
   rect(xleft=par("usr")[1], xright=par("usr")[2], 
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       bty="n", border=NA, col=bluewhite)
-  abline(h=y.ax.at, v=x.ax.at, col="white")
+       bty=plot.bty, border=plot.border, col=plot.bg)
+  abline(h=y.ax.at, v=x.ax.at, col=grid.col)
   
   # Add points & nomsig marker
   points(plot.df[, 1:2], pch=19, cex=pt.cex, col=plot.df$color)
@@ -131,7 +143,7 @@ stats <- load.track.stats(stats.in)
 sapply(c("DEL", "DUP"), function(cnv){
   pdf(paste(out.prefix, "track_volcano", cnv, "pdf", sep="."),
       height=2.25, width=2.25)
-  plot.volcano(stats, cnv)
+  plot.volcano(stats, cnv, blue.bg=FALSE)
   dev.off()
 })
 

@@ -204,7 +204,7 @@ mod.features <- function(feats){
 ##########################
 # Plot distributions of values by gene score category
 plot.feature.bydsgroup <- function(feats, ds.groups, feat.idx=2, title=NULL, 
-                                   swarm.max=5000, max.ylim=6, 
+                                   swarm.max=5000, max.ylim=6, blue.bg=TRUE,
                                    parmar=c(2.25, 2.75, 1.25, 0.5)){
   # Get plot values
   vals <- lapply(ds.groups, function(genes){
@@ -226,6 +226,17 @@ plot.feature.bydsgroup <- function(feats, ds.groups, feat.idx=2, title=NULL,
   if(is.null(title)){
     title <- colnames(feats)[feat.idx]
   }
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Prep plot area
   par(mar=parmar, bty="n")
@@ -233,12 +244,12 @@ plot.feature.bydsgroup <- function(feats, ds.groups, feat.idx=2, title=NULL,
        xaxt="n", xlab="", yaxt="n", ylab="")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       bty="n", border=NA, col=bluewhite)
+       bty=plot.bty, border=plot.border, col=plot.bg)
   y.ax.at <- sort(unique(round(axTicks(2))))
   if(length(y.ax.at) > 6){
     y.ax.at <- y.ax.at[seq(1, length(y.ax.at), 2)]
   }
-  abline(h=0, col="white", lwd=2)
+  abline(h=0, col=blueblack, lty=5)
   # rect(xleft=c(par("usr")[1], 3.1, 7.1, 9.1), 
   #      xright=c(-0.1, 3.9, 7.9, par("usr")[2]), 
   #      ybottom=par("usr")[3], ytop=par("usr")[4],
@@ -336,6 +347,7 @@ superimposed.barplot <- function(values, colors, xleft, xright, ybottom, ytop,
 
 # Plot ROC curves from a list of evaluate.score() outputs
 plot.roc <- function(data, colors=NULL, nested.auc=TRUE, auc.text.colors=NULL, 
+                     grid.col=bluewhite, diag.col=bluewhite, 
                      ax.tick=-0.025, parmar=c(2.5, 2.5, 0.75, 0.75)){
   # Get plot data
   if(is.null(colors)){
@@ -349,8 +361,8 @@ plot.roc <- function(data, colors=NULL, nested.auc=TRUE, auc.text.colors=NULL,
   rect(xleft=par("usr")[1], xright=par("usr")[2], 
        ybottom=par("usr")[3], ytop=par("usr")[4],
        border=NA, bty="n", col="white")
-  abline(h=axTicks(2), v=axTicks(1), col=bluewhite)
-  abline(0, 1, col=bluewhite, lwd=2, lty=2)
+  abline(h=axTicks(2), v=axTicks(1), col=grid.col)
+  abline(0, 1, col=diag.col, lwd=2, lty=5)
   box(col=bluewhite, bty="o", xpd=T)
   
   # Add curves
@@ -380,7 +392,8 @@ plot.roc <- function(data, colors=NULL, nested.auc=TRUE, auc.text.colors=NULL,
 
 # Plot PRC curves from a list of evaluate.score() outputs
 plot.prc <- function(data, colors=NULL, nested.auc=TRUE, auc.text.colors=NULL,
-                     ax.tick=-0.025, parmar=c(2.5, 2.5, 0.75, 0.75)){
+                     grid.col=bluewhite, ax.tick=-0.025, 
+                     parmar=c(2.5, 2.5, 0.75, 0.75)){
   # Get plot data
   if(is.null(colors)){
     colors <- rev(viridis(length(data)))
@@ -393,7 +406,7 @@ plot.prc <- function(data, colors=NULL, nested.auc=TRUE, auc.text.colors=NULL,
   rect(xleft=par("usr")[1], xright=par("usr")[2], 
        ybottom=par("usr")[3], ytop=par("usr")[4],
        border=NA, bty="n", col="white")
-  abline(h=axTicks(2), v=axTicks(1), col=bluewhite)
+  abline(h=axTicks(2), v=axTicks(1), col=grid.col)
   box(col=bluewhite, bty="o", xpd=T)
   
   # Add curves

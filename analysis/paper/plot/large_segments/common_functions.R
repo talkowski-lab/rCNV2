@@ -222,7 +222,7 @@ calc.segs.dat <- function(segs, feature, measure, subset_to_regions=NULL){
 ##########################
 # Generic segment scatterplot function
 segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
-                         xlims=NULL, ylims=NULL, add.lm=T, pt.cex=1,
+                         xlims=NULL, ylims=NULL, add.lm=T, pt.cex=1, blue.bg=TRUE,
                          horiz.lines.at=NULL, horiz.lines.lty=1, horiz.lines.color=NULL,
                          abline.a=NULL, abline.b=NULL, abline.lty=1,
                          xtitle=NULL, x.title.line=1.75, x.at=NULL, x.labs=NULL, x.labs.at=NULL, parse.x.labs=FALSE, x.title.cex=1,
@@ -243,13 +243,24 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
   }
   del.idx <- which(segs$cnv=="DEL")
   dup.idx <- which(segs$cnv=="DUP")
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=xlims, ylim=ylims, xlab="", ylab="", xaxt="n", yaxt="n")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       border=NA, bty="n", col=bluewhite)
+       border=plot.border, bty=plot.bty, col=plot.bg, xpd=TRUE)
   
   # Add gridlines
   if(is.null(x.at)){
@@ -258,7 +269,7 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
   if(is.null(y.at)){
     y.at <- axTicks(2)
   }
-  abline(v=x.at, h=y.at, col="white")
+  abline(v=x.at, h=y.at, col=grid.col)
   if(!is.null(horiz.lines.at)){
     n.horiz.lines <- length(horiz.lines.at)
     if(is.null(horiz.lines.color) | length(horiz.lines.color) != n.horiz.lines){

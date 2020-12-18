@@ -32,10 +32,21 @@ load.sizes <- function(tsv.in){
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Scatterplot of original vs refined sizes
-sizes.scatter <- function(sizes, parmar=c(3.2, 3.2, 0.75, 0.75)){
+sizes.scatter <- function(sizes, blue.bg=TRUE, parmar=c(3.2, 3.2, 0.75, 0.75)){
   # Get plot data
   ax.lims <- range(c(sizes$original_size, sizes$refined_size), na.rm=T)
   ax.lims <- c(floor(ax.lims[1]), ceiling(ax.lims[2]))
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Prep plot area
   par(mar=parmar, bty="n")
@@ -43,8 +54,8 @@ sizes.scatter <- function(sizes, parmar=c(3.2, 3.2, 0.75, 0.75)){
        xaxt="n", yaxt="n", xlab="", ylab="")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       bty="n", border=NA, col=bluewhite)
-  abline(h=log10(logscale.major.bp), v=log10(logscale.major.bp), col="white")
+       bty=plot.bty, border=plot.border, col=plot.bg)
+  abline(h=log10(logscale.major.bp), v=log10(logscale.major.bp), col=grid.col)
   abline(0, 1, col=blueblack)
   
   # Add points
@@ -113,5 +124,5 @@ sizes <- load.sizes(tsv.in)
 # Plot correlation of sizes
 pdf(paste(out.prefix, "original_vs_refined_sizes.pdf", sep="."),
     height=2.65, width=2.65)
-sizes.scatter(sizes)
+sizes.scatter(sizes, blue.bg=FALSE)
 dev.off()

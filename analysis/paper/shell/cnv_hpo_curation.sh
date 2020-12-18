@@ -79,13 +79,13 @@ gsutil -m cp \
 
 # Gather stats per cohort for raw and filtered CNVs
 awk -v OFS="\t" '{ print $0, "cnvs/"$1".raw.bed.gz" }' \
-  /opt/rCNV2/refs/rCNV_sample_counts.tsv \
+  /opt/rCNV2/refs/rCNV_sample_counts.txt \
 | fgrep -v "#" > raw_cnv.input.tsv
 /opt/rCNV2/data_curation/CNV/build_cnv_stats_table.py \
   --tsv raw_cnv.stats.tsv \
   raw_cnv.input.tsv
 awk -v OFS="\t" '{ print $0, "cnvs/"$1".rCNV.bed.gz" }' \
-  /opt/rCNV2/refs/rCNV_sample_counts.tsv \
+  /opt/rCNV2/refs/rCNV_sample_counts.txt \
 | fgrep -v "#" > rCNV.input.tsv
 /opt/rCNV2/data_curation/CNV/build_cnv_stats_table.py \
   --tsv rCNV.stats.tsv \

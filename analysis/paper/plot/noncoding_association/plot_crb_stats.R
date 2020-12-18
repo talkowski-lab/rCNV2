@@ -18,11 +18,23 @@ options(stringsAsFactors=F, scipen=1000)
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Scatterplot of CRB size vs. number of elements
-crb.scatter <- function(crbs, pt.cex=0.2, parmar=c(2.25, 3.25, 0.25, 0.25)){
+crb.scatter <- function(crbs, pt.cex=0.2, blue.bg=TRUE, 
+                        parmar=c(2.25, 3.25, 0.25, 0.25)){
   # Get plot data
   plot.df <- color.points.by.density(log10(crbs$size), log10(crbs$n_elements))
   xlims <- range(plot.df[, 1], na.rm=T)
   ylims <- range(plot.df[, 2], na.rm=T)
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Prep plot area
   par(bty="n", mar=parmar)
@@ -32,8 +44,8 @@ crb.scatter <- function(crbs, pt.cex=0.2, parmar=c(2.25, 3.25, 0.25, 0.25)){
   # Add background shading
   rect(xleft=par("usr")[1], xright=par("usr")[2], 
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       bty="n", border=NA, col=bluewhite)
-  abline(h=log10(logscale.demi), v=ax.at, col="white")
+       bty=plot.bty, border=plot.border, col=plot.bg)
+  abline(h=log10(logscale.demi), v=ax.at, col=grid.col)
   
   # Add points
   points(plot.df[, 1:2], pch=19, cex=pt.cex, col=plot.df$col)
@@ -112,6 +124,6 @@ print(paste("Median elements per CRB:", round(median(crbs$n_elements))))
 # Scatterplot of CRB size vs number of elements in CRB
 pdf(paste(out.prefix, "crb_stats.scatterplot.pdf", sep="."),
     height=2.75, width=2.9)
-crb.scatter(crbs)
+crb.scatter(crbs, blue.bg=FALSE)
 dev.off()
 

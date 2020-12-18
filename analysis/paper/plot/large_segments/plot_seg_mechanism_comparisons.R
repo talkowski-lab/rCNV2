@@ -85,6 +85,9 @@ dev.off()
 cat(paste("Two-sided Wilcox test of NAHR vs non-NAHR size:",
           format(wilcox.test(segs$size ~ segs$nahr)$p.value, scientific=T),
           "\n"))
+cat(paste("NAHR CNVs are ", 
+          round(mean(segs$size[which(segs$nahr)])/mean(segs$size[which(!segs$nahr)]), 2), 
+          "-fold larger on average\n", sep=""))
 
 # Swarmplot of genes vs. mechanism
 pdf(paste(out.prefix, "segs_by_mechanism.n_genes.pdf", sep="."),

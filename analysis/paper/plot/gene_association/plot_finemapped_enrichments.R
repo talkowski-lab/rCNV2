@@ -108,7 +108,8 @@ get.plot.data <- function(feats, feat, gene.groups, not.credset.genes, ci="boots
 plot.enrichment <- function(feats, feat, gene.groups, ci="bootstrap", 
                             print.fisher=FALSE, bars=FALSE, pt.cex=1,
                             y.ax.title="Proportion of Genes", y.ax.title.line=0.75,
-                            add.y.labels=TRUE, parmar=c(0.2, 4, 0.2, 0.2)){
+                            add.y.labels=TRUE, blue.bg=TRUE, 
+                            parmar=c(0.2, 4, 0.2, 0.2)){
   # Collect data for plotting
   not.credset.genes <- feats$gene[which(!(feats$gene %in% all.credset.genes))]
   pdat <- get.plot.data(feats, feat, gene.groups, not.credset.genes, ci, add.sig=print.fisher)
@@ -140,6 +141,17 @@ plot.enrichment <- function(feats, feat, gene.groups, ci="bootstrap",
   cell.height <- cell.hex*diff(c(ymin, ymax))
   cell.buffer <- 0.3*cell.height
   ylims <- c(ymin-(2*cell.height)-cell.buffer, ymax)
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Prep plot area
   par(mar=parmar, bty="n")
@@ -154,8 +166,8 @@ plot.enrichment <- function(feats, feat, gene.groups, ci="bootstrap",
   # Add background shading
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       border=NA, bty="n", col=bluewhite)
-  abline(h=y.ax.at, col="white")
+       border=plot.border, bty=plot.bty, col=plot.bg)
+  abline(h=y.ax.at, col=grid.col)
   abline(h=pdat[[1]]$mean[4], lty=5, col=ns.color)
   
   # Add points (or bars, if bars==TRUE)
@@ -209,7 +221,7 @@ plot.enrichment <- function(feats, feat, gene.groups, ci="bootstrap",
   rect(xleft=par("usr")[1], xright=par("usr")[2], ybottom=par("usr")[3], ytop=ymin,
        border=NA, bty="n", xpd=T, col="white")
   rect(xleft=par("usr")[1], xright=1, ybottom=par("usr")[3], ytop=ymin-cell.buffer,
-       border=NA, bty="n", xpd=T, col=bluewhite)
+       border=NA, bty="n", xpd=T, col=adjustcolor(highlight.color, alpha=0.3))
   sapply(1:2, function(i){
     rect(xleft=0:2, xright=1:3, 
          ybottom=ymin-((i-1)*cell.height)-cell.buffer, 
@@ -229,12 +241,15 @@ plot.enrichment <- function(feats, feat, gene.groups, ci="bootstrap",
          labels=c("PIP", "Top"), las=2)
   }
   
-  # Add Y-axis
+  # Add remaining axes
   axis(2, at=c(ymin, 10e10), tck=0, labels=NA, col=blueblack)
   axis(2, at=y.ax.at, labels=NA, tck=-0.025, col=blueblack)
   axis(2, at=y.ax.at, tick=F, line=-0.65, las=2)
   if(add.y.labels==TRUE){
     axis(2, at=mean(c(ymin, ymax)), tick=F, line=y.ax.title.line, labels=y.ax.title)
+  }
+  if(bars==TRUE){
+    abline(h=0, col=blueblack)
   }
 }
 
@@ -312,11 +327,12 @@ sapply(names(genelists), function(glist){
       height=2.1, width=2.6)
   cat(paste(glist, "\n"))
   plot.enrichment(feats, glist, gene.groups, ci="binomial", add.y.labels=FALSE, 
-                  bars=TRUE, print.fisher=TRUE)
+                  bars=TRUE, print.fisher=TRUE, blue.bg=FALSE)
   dev.off()
   pdf(paste(out.prefix, glist, "enrichments.withlabel.pdf", sep="."), 
       height=2.1, width=2.6)
-  plot.enrichment(feats, glist, gene.groups, ci="binomial", add.y.labels=TRUE, bars=TRUE)
+  plot.enrichment(feats, glist, gene.groups, ci="binomial", add.y.labels=TRUE, 
+                  bars=TRUE, blue.bg=FALSE)
   dev.off()
 })
 
@@ -324,5 +340,6 @@ sapply(names(genelists), function(glist){
 pdf(paste(out.prefix, "ddd_dn_lof", "enrichments.pdf", sep="."), 
     height=2.1, width=2.6)
 plot.enrichment(feats, "excess_ddd_dn_lof", gene.groups, ci="bootstrap", pt.cex=1.25,
-                y.ax.title="Excess De Novo\nPTVs per Gene", y.ax.title.line=0.2)
+                y.ax.title="Excess De Novo\nPTVs per Gene", y.ax.title.line=0.2,
+                blue.bg=FALSE)
 dev.off()

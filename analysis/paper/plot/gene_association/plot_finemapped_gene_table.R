@@ -166,7 +166,9 @@ plot.gene.grid <- function(gene.groups, credsets, assocs,
   
   # Add grid
   rect(xleft=0, xright=quadrant.width, ytop=0, ybottom=n.rows.top+n.rows.bottom, xpd=T, 
-       col=bluewhite, border=NA, bty="n", lwd=1.5)
+       col="white", border=NA, bty="n", lwd=1.5)
+  rect(xleft=0, xright=quadrant.width, ytop=0, ybottom=n.rows.top+n.rows.bottom, xpd=T, 
+       col=adjustcolor(highlight.color, alpha=0.3), border=NA, bty="n", lwd=1.5)
   rect(xleft=0, xright=n.cols, ytop=0, ybottom=n.rows.total, xpd=T, 
        col=NA, border=blueblack, lwd=1.5)
   segments(x0=0, x1=n.cols, 
@@ -174,6 +176,8 @@ plot.gene.grid <- function(gene.groups, credsets, assocs,
            y1=c(n.rows.top, n.rows.top+n.rows.bottom), 
            col=blueblack)
   segments(x0=quadrant.width, x1=quadrant.width, y0=0, y1=n.rows.total, col=blueblack)
+  # rect(xleft=0, xright=quadrant.width, ytop=0, ybottom=n.rows.top+n.rows.bottom, xpd=T, 
+  #      col=NA, border=highlight.color, bty="o", lwd=2, xpd=T)
   
   # Add axes
   axis(3, at=quadrant.width/2, tick=F, line=-0.85, labels="Top gene in at least one credible set")

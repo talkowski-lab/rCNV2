@@ -115,7 +115,7 @@ get.quadrant.genes <- function(gene.groups, top, conf){
 credsets.scatter <- function(credsets, x, y, subset_to_regions=NULL,
                          xlims=NULL, ylims=NULL, add.lm=T, pt.cex=1,
                          horiz.lines.at=NULL, horiz.lines.lty=1, horiz.lines.color=NULL,
-                         abline.a=NULL, abline.b=NULL, abline.lty=1,
+                         abline.a=NULL, abline.b=NULL, abline.lty=1, blue.bg=TRUE,
                          xtitle=NULL, x.title.line=1.5, x.at=NULL, x.labs=NULL, x.labs.at=NULL, parse.x.labs=FALSE, x.title.cex=1,
                          ytitle=NULL, y.title.line=1.7, y.at=NULL, y.labs=NULL, y.labs.at=NULL, parse.y.labs=FALSE, y.title.cex=1,
                          parmar=c(2.7, 2.7, 0.25, 0.25)){
@@ -134,13 +134,24 @@ credsets.scatter <- function(credsets, x, y, subset_to_regions=NULL,
   }
   del.idx <- which(credsets$cnv=="DEL")
   dup.idx <- which(credsets$cnv=="DUP")
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=xlims, ylim=ylims, xlab="", ylab="", xaxt="n", yaxt="n")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       border=NA, bty="n", col=bluewhite)
+       border=plot.border, bty=plot.bty, col=plot.bg)
   
   # Add gridlines
   if(is.null(x.at)){
@@ -149,7 +160,7 @@ credsets.scatter <- function(credsets, x, y, subset_to_regions=NULL,
   if(is.null(y.at)){
     y.at <- axTicks(2)
   }
-  abline(v=x.at, h=y.at, col="white")
+  abline(v=x.at, h=y.at, col=grid.col)
   if(!is.null(horiz.lines.at)){
     n.horiz.lines <- length(horiz.lines.at)
     if(is.null(horiz.lines.color) | length(horiz.lines.color) != n.horiz.lines){

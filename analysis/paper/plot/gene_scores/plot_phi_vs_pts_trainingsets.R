@@ -75,12 +75,12 @@ evals <- lapply(c("pHI", "pTS"), evaluate.score, stats=scores,
 # Plot ROC
 pdf(paste(out.prefix, "pHI_vs_pTS.roc.pdf", sep="."),
     height=2.75, width=2.75)
-plot.roc(evals, colors=cnv.colors[1:2], auc.text.colors=rep("white", 2))
+plot.roc(evals, colors=cnv.colors[1:2], auc.text.colors=rep("white", 2), grid.col=NA)
 dev.off()
 
 # Plot PRC
 pdf(paste(out.prefix, "pHI_vs_pTS.prc.pdf", sep="."),
     height=2.75, width=2.75)
-plot.prc(evals, colors=cnv.colors[1:2], auc.text.colors=rep("white", 2))
+plot.prc(evals, colors=cnv.colors[1:2], auc.text.colors=rep("white", 2), grid.col=NA)
 dev.off()
 

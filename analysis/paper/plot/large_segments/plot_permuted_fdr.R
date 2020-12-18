@@ -38,7 +38,7 @@ load.fdrs <- function(fdrs.in){
 ##########################
 # Plot permutation results against targeted FDR
 plot.fdrs <- function(fdrs, hpos, cnv, fdr.target,
-                      xlims=NULL, ylims=NULL,
+                      xlims=NULL, ylims=NULL, blue.bg=TRUE,
                       parmar=c(2.2, 2.5, 0.25, 0.25)){
   # Get plot data
   if(is.null(xlims)){
@@ -48,6 +48,17 @@ plot.fdrs <- function(fdrs, hpos, cnv, fdr.target,
     ylims <- c(0, max(as.matrix(fdrs), na.rm=T))
   }
   medians <- apply(fdrs, 2, median, na.rm=T)
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Prep plot area
   par(mar=parmar, bty="n")
@@ -55,8 +66,8 @@ plot.fdrs <- function(fdrs, hpos, cnv, fdr.target,
        xaxt="n", xlab="", yaxt="n", ylab="")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       bty="n", border=NA, col=bluewhite)
-  abline(h=axTicks(2), v=log10(logscale.major), col="white")
+       bty=plot.bty, border=plot.border, col=plot.bg)
+  abline(h=axTicks(2), v=log10(logscale.major), col=grid.col)
   
   # Add points
   sapply(hpos[, 1], function(hpo){
@@ -153,7 +164,7 @@ fdrs <- list("DEL" = del.fdrs, "DUP" = dup.fdrs)
 sapply(c("DEL", "DUP"), function(cnv){
   pdf(paste(out.prefix, "fdr_by_hpo", cnv, "pdf", sep="."),
       height=2.25, width=2.5)
-  plot.fdrs(fdrs[[cnv]], hpos, cnv, fdr.target)
+  plot.fdrs(fdrs[[cnv]], hpos, cnv, fdr.target, blue.bg=FALSE)
   dev.off()
 })
 

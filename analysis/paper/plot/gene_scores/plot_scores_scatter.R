@@ -366,7 +366,7 @@ pdf(paste(out.prefix, "gene_scores_scatterplot.no_categories.pdf", sep="."),
 scores.scatterplot(scores, pt.colors.density, add.cor=FALSE,
                    margin.dens.height=0.15, margin.dens.gradient=TRUE,
                    hc.cutoff=NA, lc.cutoff=NA,
-                   bg.col=bluewhite, gridlines.col="white",
+                   bg.col="white", gridlines.col=NA,
                    pt.cex=0.15, ax.tick=-0.02, parmar=c(2.7, 2.7, 0.4, 0.4))
 dev.off()
 

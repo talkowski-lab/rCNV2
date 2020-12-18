@@ -35,13 +35,25 @@ load.bfdps <- function(bfdps.in, xlist){
 ##########################
 # Violin plots of effect sizes per gene per training subgroup
 plot.lnors <- function(lnors, true.genes, false.genes, CNV,
-                       pt.cex=0.2, parmar=c(1.1, 2.7, 0.2, 0.2)){
+                       blue.bg=TRUE, pt.cex=0.2, 
+                       parmar=c(1.1, 2.7, 0.2, 0.2)){
   # Collect plot data
   plot.dat <- list(lnors$meta_lnOR[which(lnors$gene %in% false.genes)],
                    lnors$meta_lnOR[which(!(lnors$gene %in% c(false.genes, true.genes)))],
                    lnors$meta_lnOR[which(lnors$gene %in% true.genes)])
   plot.dat <- lapply(plot.dat, function(lnors){log2(exp(lnors))})
   ylim <- quantile(lnors$meta_lnOR, probs=c(0.005, 0.995), na.rm=T)
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
 
   # Set CNV type-specific parameters
   if(CNV == "DEL"){
@@ -58,9 +70,9 @@ plot.lnors <- function(lnors, true.genes, false.genes, CNV,
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       border=NA, bty="n", col=bluewhite)
+       border=plot.border, bty=plot.bty, col=plot.bg)
   y.ax.at <- -3:10
-  abline(h=y.ax.at, col="white")
+  abline(h=y.ax.at, col=grid.col)
   
   # Add swarms
   sapply(1:3, function(i){
@@ -83,7 +95,7 @@ plot.lnors <- function(lnors, true.genes, false.genes, CNV,
 
 # Scatterplot of BFDP vs meta-analysis effect size
 plot.bfdp.vs.lnor <- function(bfdps, lnors, true.genes, false.genes, CNV,
-                              add.legend=TRUE, pt.cex=0.2, 
+                              add.legend=TRUE, pt.cex=0.2, blue.bg=TRUE,
                               parmar=c(2.4, 2.7, 0.3, 0.2)){
   # Get plot data
   g.dat <- merge(lnors, bfdps, all=F, by="gene", sort=F)
@@ -96,6 +108,17 @@ plot.bfdp.vs.lnor <- function(bfdps, lnors, true.genes, false.genes, CNV,
   })
   # xlim <- quantile(lnors$meta_lnOR, probs=c(0.001, 0.999), na.rm=T)
   xlim <- range(log2(exp(lnors$meta_lnOR)), na.rm=T)
+  if(blue.bg==TRUE){
+    plot.bg <- bluewhite
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- "white"
+  }else{
+    plot.bg <- "white"
+    plot.border <- NA
+    plot.bty <- "n"
+    grid.col <- NA
+  }
   
   # Set CNV type-specific parameters
   if(CNV == "DEL"){
@@ -112,10 +135,10 @@ plot.bfdp.vs.lnor <- function(bfdps, lnors, true.genes, false.genes, CNV,
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
-       border=NA, bty="n", col=bluewhite)
+       border=plot.border, bty=plot.bty, col=plot.bg)
   x.ax.at <- axTicks(1)
   y.ax.at <- axTicks(2)
-  abline(v=x.ax.at, h=y.ax.at, col="white")
+  abline(v=x.ax.at, h=y.ax.at, col=grid.col)
   
   # Add points
   sapply(c(2, 1, 3), function(i){
@@ -214,7 +237,7 @@ lnors <- load.lnors(meta.in, xlist)
 # Plot odds ratios
 pdf(paste(out.prefix, "gene_scoring_training_distribs.effect_sizes.pdf", sep="."),
     height=2.25, width=1.85)
-plot.lnors(lnors, true.genes, false.genes, CNV, pt.cex=0.15)
+plot.lnors(lnors, true.genes, false.genes, CNV, pt.cex=0.15, blue.bg=FALSE)
 dev.off()
 
 # Load BFDPs
@@ -223,5 +246,5 @@ bfdps <- load.bfdps(bfdps.in, xlist)
 # Plot odds ratios
 pdf(paste(out.prefix, "gene_scoring_training_distribs.bfdps.pdf", sep="."),
     height=2.25, width=2.4)
-plot.bfdp.vs.lnor(bfdps, lnors, true.genes, false.genes, CNV, pt.cex=0.15)
+plot.bfdp.vs.lnor(bfdps, lnors, true.genes, false.genes, CNV, pt.cex=0.15, blue.bg=FALSE)
 dev.off()
