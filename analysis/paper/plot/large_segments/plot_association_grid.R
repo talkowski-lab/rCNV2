@@ -446,6 +446,10 @@ gw <- merge.loci.segs(loci, segs)
 # Subset segment data for nominal (but not genome-wide significant) sites
 nom <- segs[which(segs$nom_sig & !segs$gw_sig), ]
 
+# Print size distributions for various subsets of segments:
+cat("Size stats for genome-wide significant segments:")
+quantile(gw$size, probs=seq(0, 1, 0.25))
+
 # Load other data
 sumstats <- load.sumstats(sumstats.in)
 hpos <- as.character(read.table(hpos.in, header=F, sep="\t")[, 1])

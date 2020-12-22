@@ -482,6 +482,12 @@ rcnv <- load.cnv.stats(rcnv.stats.in)
 cohorts <- sort(raw$cohort)
 metacohorts <- load.metacohorts(metacohorts.in)
 
+# Report size statistics
+cat("Raw CNV size quantiles:\n")
+print(quantile(unlist(raw.sizes)))
+cat("Harmonized CNV size quantiles:\n")
+print(quantile(unlist(rcnv.sizes)))
+
 # Plot CNVs per sample (raw & filtered)
 persamp.vals <- log10(as.numeric(unlist(lapply(list(raw, rcnv), function(df){df[, grep("_per_", colnames(df), fixed=T)]}))))
 persamp.xlims <- range(persamp.vals[which(!is.infinite(persamp.vals))], na.rm=T)

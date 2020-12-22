@@ -237,6 +237,26 @@ for(csq in csqs){
 neuro.region_ids <- get.neuro.region_ids(loci, segs)
 neuro.segs <- segs[which(segs$region_id %in% neuro.region_ids), ]
 
+# Swarmplots of average excess DNMs per gene split by CNV type
+sapply(c("ddd", "asc"), function(cohort){
+  sapply(csqs, function(csq){
+    if(csq=="lof"){
+      csq.name <- "PTV"
+    }else if(csq=="mis"){
+      csq.name <- "Mis."
+    }else{
+      csq.name <- "Syn."
+    }
+    pdf(paste(out.prefix, "neuro_segs", cohort, csq, "excess_per_gene.pdf", sep="."),
+        height=2, width=1.6)
+    segs.simple.vioswarm(neuro.segs, y=neuro.segs[, paste(toupper(cohort), "dnm", csq, "norm_excess_per_gene", sep="_")], add.pvalue=T, 
+                         ytitle=paste("Excess", csq.name, "DNMs per Gene"),
+                         pt.cex=0.65, parmar=c(1.2, 2.65, 1.5, 0))
+    dev.off()
+    
+  })
+})
+
 # Swarmplots of oligogenicity index for all deletions & duplications
 pdf(paste(out.prefix, "neuro_segs.ddd_lof_oligogenicity_index.main.pdf", sep="."),
     height=2.25, width=2)
@@ -361,7 +381,7 @@ pdf(paste(out.prefix, "neuro_segs", cohort, csq, "excess_dnm_distrib_bygene.resh
 dnm.excess.cdf.barplots(neuro.segs, dnms[[cohort]], csq=csq, norm=F, legend=T,
                         xtitle.suffix='"Neuro. rCNV Segments"',
                         ytitle=bquote("Excess" ~ italic("dn") * "PTVs"))
-abline(h=min.excess, col=blueblack, lty=5)
+# abline(h=min.excess, col=blueblack, lty=5)
 dev.off()
 ytitle.2 <- bquote("Fraction of Excess")
 xtitle.suffix.2 <- paste('"Segs. w/" >= "', min.excess, ' Excess" ~ italic("dn") * "PTV"', sep="")
