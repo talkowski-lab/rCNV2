@@ -17,7 +17,7 @@
 
 
 # Launch docker image
-docker run --rm -it talkowski/rcnv
+docker run --rm -it gcr.io/gnomad-wgs-v2-sv/rcnv
 
 
 # Copy all raw CNV data and refs from Google Bucket (note: requires permissions)

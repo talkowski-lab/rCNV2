@@ -32,4 +32,4 @@ Note that permissions must be granted per user prior to data access.
 
 System dependencies for rCNV data processing & analyses are managed via Docker.  
 
-The public Docker image for this project is `talkowski/rcnv`.  
+The public Docker image for this project is `gcr.io/gnomad-wgs-v2-sv/rcnv`.  

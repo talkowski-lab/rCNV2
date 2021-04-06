@@ -15,7 +15,7 @@
 
 
 # Launch docker image
-docker run --rm -it talkowski/rcnv
+docker run --rm -it gcr.io/gnomad-wgs-v2-sv/rcnv
 
 
 # Download basic refs
