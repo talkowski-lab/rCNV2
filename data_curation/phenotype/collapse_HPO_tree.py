@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2019 Ryan L. Collins <rlcollins@g.harvard.edu> 
+# Copyright (c) 2019-Present Ryan L. Collins <rlcollins@g.harvard.edu> 
 # and the Talkowski Laboratory
 # Distributed under terms of the MIT license.
 
@@ -10,6 +10,8 @@ Determine the minimal set of most specific HPO terms to retain for analysis
 based on a list of patients and corresponding HPO terms
 """
 
+
+import gzip
 import networkx
 import obonet
 import csv
@@ -17,7 +19,46 @@ import argparse
 from sys import stdout
 
 
-def tally_hpo_counts(pheno_file, ignore_terms):
+def load_precomp_pairs_single_cohort(pairs_tsv_in):
+    """
+    Load precomputed HPO pairs for a single cohorts, if optioned
+    Returns a dict of sample counts keyed on sorted HPO term pairs
+    """
+
+    counts = {}
+
+    if pairs_tsv_in.endswith('.gz'):
+        fin = gzip.open(pairs_tsv_in, 'rt')
+    else:
+        fin = open(pairs_tsv_in)
+
+    for term1, term2, n1, n2, n12 in csv.reader(fin, delimiter='\t'):
+
+        if term1.startswith('#'):
+            continue
+
+        pair_key = tuple(sorted((term1, term2)))
+        if pair_key not in counts.keys():
+            counts[pair_key] = int(n12)
+
+    return counts
+
+
+def load_precomp_pairs(hpo_pair_cohorts_tsv):
+    """
+    Wraps load_precomp_pairs_single_cohort() for all cohorts in --hpo-pair-cohorts
+    """
+
+    precomp_pairs = {}
+
+    with open(hpo_pair_cohorts_tsv) as fin:
+        for cohort, tsv_path in csv.reader(fin, delimiter='\t'):
+            precomp_pairs[cohort] = load_precomp_pairs_single_cohort(tsv_path)
+
+    return precomp_pairs
+
+
+def tally_hpo_counts(pheno_file, ignore_terms, precomp_pairs=None):
     """
     Create dictionary of counts of samples per HPO term in input file
     """
@@ -38,6 +79,25 @@ def tally_hpo_counts(pheno_file, ignore_terms):
                     hpo_counts[term] += 1
                 else:
                     hpo_counts[term] = 1
+
+    if precomp_pairs is not None:
+        for cohort_dict in precomp_pairs.values():
+
+            cohort_pairs = cohort_dict.keys()
+            cohort_terms = set([term for pair in cohort_pairs for term in pair])
+
+            for term in cohort_terms:
+
+                if ignore_terms is not None:
+                    if term in ignore_terms:
+                        continue
+
+                N = cohort_dict.get((term, term), 0)
+
+                if term in hpo_counts.keys():
+                    hpo_counts[term] += N
+                else:
+                    hpo_counts[term] = N
 
     return hpo_counts
 
@@ -154,7 +214,7 @@ def filter_related_term_list(hpo_counts, related_terms, min_diff):
     return filtered_pairs
 
 
-def count_overlapping_samples(related_terms, pheno_file):
+def count_overlapping_samples(related_terms, pheno_file, precomp_pairs=None):
     """
     Count number of overlapping samples for pairs of HPO terms
     """
@@ -162,14 +222,33 @@ def count_overlapping_samples(related_terms, pheno_file):
     pairwise_counts = {}
     eligible_terms = []
 
+    # Populate list of all eligible terms to be considered for pairwise overlap
     for termA, termB in related_terms:
-        pairwise_counts[(termA, termB)] = 0
+        term_pair = tuple(sorted([termA, termB]))
+        pairwise_counts[term_pair] = 0
 
         if termA not in eligible_terms:
             eligible_terms.append(termA)
         if termB not in eligible_terms:
             eligible_terms.append(termB)
 
+    # if precomp_pairs is not None:
+    #     for cohort_dict in precomp_pairs.values():
+    #         for termA, termB in cohort_dict.keys():
+    #             if termA == termB:
+    #                 continue
+
+    #             if termA in eligible_terms and termB in eligible_terms:
+    #                 term_pair = tuple(sorted([termA, termB]))
+    #                 if term_pair not in pairwise_counts.keys():
+    #                     pairwise_counts[term_pair] = 0
+
+    #             if termA not in eligible_terms:
+    #                 eligible_terms.append(termA)
+    #             if termB not in eligible_terms:
+    #                 eligible_terms.append(termB)
+
+    # Count pairwise overlap from phenos input
     with open(pheno_file) as infile:
         reader = csv.reader(infile, delimiter='\t')
 
@@ -181,10 +260,21 @@ def count_overlapping_samples(related_terms, pheno_file):
                     for j in range(i + 1, len(filtered_terms)):
                         termA = filtered_terms[i]
                         termB = filtered_terms[j]
-                        if (termA, termB) in pairwise_counts.keys():
-                            pairwise_counts[(termA, termB)] += 1
-                        elif (termB, termA) in pairwise_counts.keys():
-                            pairwise_counts[(termB, termA)] += 1
+                        term_pair = tuple(sorted([termA, termB]))
+                        if term_pair in pairwise_counts.keys():
+                            pairwise_counts[term_pair] += 1
+
+    # Add pairwise overlaps from precomp_pairs, if optioned
+    if precomp_pairs is not None:
+        for cohort_dict in precomp_pairs.values():
+
+            for termA, termB in cohort_dict.keys():
+                if termA == termB:
+                    continue
+
+                term_pair = tuple(sorted([termA, termB]))
+                if term_pair in pairwise_counts.keys():
+                    pairwise_counts[term_pair] += cohort_dict.get(term_pair, 0)
 
     return pairwise_counts
 
@@ -359,6 +449,9 @@ def main():
     parser.add_argument('phenos', help='Test file of phenotypes. One line per ' +
                         'patient. Two tab-delimited columns: patient ID and ' +
                         'string of semicolon-delimited HPO terms.')
+    parser.add_argument('--hpo-pair-cohorts', help='Two-column .tsv of cohort ' +
+                        'name and path to pairwise HPO counts for cohorts where ' +
+                        'necessary')
     parser.add_argument('--obo', help='Path to HPO .obo file. [default: ' + 
                         'http://purl.obolibrary.org/obo/hp.obo]',
                         default='http://purl.obolibrary.org/obo/hp.obo',
@@ -393,8 +486,14 @@ def main():
     else:
         outfile = open(args.outfile, 'w')
 
+    # Load counts from cohorts with precomputed HPO pairs, if any
+    if args.hpo_pair_cohorts is not None:
+        precomp_pairs = load_precomp_pairs(args.hpo_pair_cohorts)
+    else:
+        precomp_pairs = None
+
     # Count number of samples per HPO term
-    hpo_counts = tally_hpo_counts(args.phenos, args.ignore_term)
+    hpo_counts = tally_hpo_counts(args.phenos, args.ignore_term, precomp_pairs)
 
     # Write out raw counts, if optioned
     if args.raw_counts is not None:
@@ -407,7 +506,8 @@ def main():
     related_terms = get_related_terms(hpo_counts, hpo_g)
     related_terms = filter_related_term_list(hpo_counts, related_terms, 
                                              args.min_diff)
-    pairwise_counts = count_overlapping_samples(related_terms, args.phenos)
+    pairwise_counts = count_overlapping_samples(related_terms, args.phenos, 
+                                                precomp_pairs)
     hpo_counts = prune_related_terms(hpo_counts, related_terms, pairwise_counts, 
                                      hpo_g, args.min_diff, args.filter_log)
 

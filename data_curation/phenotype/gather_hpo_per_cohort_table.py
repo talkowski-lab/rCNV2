@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2019 Ryan L. Collins <rlcollins@g.harvard.edu> 
+# Copyright (c) 2019-Present Ryan L. Collins <rlcollins@g.harvard.edu> 
 # and the Talkowski Laboratory
 # Distributed under terms of the MIT license.
 
@@ -10,6 +10,7 @@ Compute summary table of counts of samples per HPO term per cohort
 """
 
 
+from collapse_HPO_tree import load_precomp_pairs, load_precomp_pairs_single_cohort
 from os import path
 import csv
 import locale
@@ -20,7 +21,7 @@ from sys import stdout
 locale.setlocale(locale.LC_ALL, 'en_US.utf8')
 
 
-def gather_counts(cohort_table, hpo_metadata, hpo_dir):
+def gather_counts(cohort_table, hpo_metadata, hpo_dir, precomp_counts={}):
     """
     Gather nested dictionary of sample counts per HPO per study
     """
@@ -58,6 +59,16 @@ def gather_counts(cohort_table, hpo_metadata, hpo_dir):
 
                         for pheno in terms:
                             counts[cohort][pheno] += 1
+
+            elif cohort in precomp_counts.keys():
+                
+                for pheno in phenos:
+                    counts[cohort][pheno] = precomp_counts[cohort].get((pheno, pheno), 0)
+
+            else:
+                err = 'ERROR: could not locate phenotype information for cohort {}. Exiting.'
+                from sys import exit
+                exit(err.format(cohort))
 
     return counts
 
@@ -188,6 +199,9 @@ def main():
     parser.add_argument('cohort_table', help='Table of cohorts and total samples.')
     parser.add_argument('hpo_dir', help='Path to directory with cleaned ' + 
                         'sample-level HPO assignments.')
+    parser.add_argument('--hpo-pair-cohorts', help='Two-column .tsv of cohort ' +
+                        'name and path to pairwise HPO counts for cohorts where ' +
+                        'necessary')
     parser.add_argument('--meta-cohorts', help='Path to tsv specifying ' + 
                         'metacohorts to consider. Two columns: metacohort ID ' + 
                         'and semicolon-separated cohorts to include. ' + 
@@ -213,8 +227,14 @@ def main():
     else:
         hpo_dir = args.hpo_dir + '/'
 
+    # Load counts from cohorts with precomputed HPO pairs, if any
+    if args.hpo_pair_cohorts is not None:
+        precomp_pairs = load_precomp_pairs(args.hpo_pair_cohorts)
+    else:
+        precomp_pairs = None
+
     # Gather table of HPO codes per cohort
-    counts = gather_counts(args.cohort_table, args.hpo_metadata, hpo_dir)
+    counts = gather_counts(args.cohort_table, args.hpo_metadata, hpo_dir, precomp_pairs)
 
     # Open connection to outfile
     if args.outfile is None:

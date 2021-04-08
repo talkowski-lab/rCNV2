@@ -1,14 +1,15 @@
 name: rcnv
 channels:
   - biobuilds
-  - anaconda
   - r
   - bioconda
+  - anaconda
   - conda-forge
   - defaults
 dependencies:
   - _libgcc_mutex=0.1=conda_forge
   - _openmp_mutex=4.5=1_gnu
+  - _pytorch_select=0.2=gpu_0
   - _r-mutex=1.0.1=anacondar_1
   - argon2-cffi=20.1.0=py37h7b6447c_1
   - async_generator=1.10=py37h28b3542_0
@@ -22,10 +23,12 @@ dependencies:
   - bwidget=1.9.11=1
   - bzip2=1.0.8=h7b6447c_0
   - c-ares=1.17.1=h7f98852_1
-  - ca-certificates=2020.10.14=0
+  - ca-certificates=2020.12.5=ha878542_0
   - cairo=1.14.12=h8948797_3
-  - certifi=2020.6.20=py37_0
+  - certifi=2020.12.5=py37h89c1867_1
   - click=7.1.2=py_0
+  - cudatoolkit=10.0.130=hf841e97_8
+  - cudnn=7.6.5.32=ha8d7eb6_1
   - curl=7.76.0=h979ede3_0
   - cycler=0.10.0=py37_0
   - dbus=1.13.18=hb2f20db_0
@@ -105,6 +108,7 @@ dependencies:
   - ncurses=6.2=he6710b0_1
   - nest-asyncio=1.4.1=py_0
   - networkx=2.5=py_0
+  - ninja=1.10.2=h4bd325d_0
   - notebook=6.1.4=py37_0
   - numpy=1.19.1=py37hbc911f0_0
   - numpy-base=1.19.1=py37hfa32c7d_0
@@ -138,6 +142,7 @@ dependencies:
   - python=3.7.9=h7579374_0
   - python-dateutil=2.8.1=py_0
   - python_abi=3.7=1_cp37m
+  - pytorch=1.3.1=cuda100py37h53c1284_0
   - pytz=2020.1=py_0
   - pyzmq=19.0.2=py37he6710b0_1
   - qt=5.9.7=h5867ecd_1
@@ -310,6 +315,7 @@ dependencies:
   - r-xts=0.11_2=r36h96ca727_0
   - r-yaml=2.2.0=r36h96ca727_0
   - r-zoo=1.8_6=r36h96ca727_0
+  - rapidfuzz=1.4.1=py37hcd2ae1e_0
   - readline=8.0=h7b6447c_0
   - samtools=1.12=h9aed4be_1
   - scikit-learn=0.23.2=py37h0573a6f_0
@@ -329,7 +335,6 @@ dependencies:
   - traitlets=5.0.5=py_0
   - wcwidth=0.2.5=py_0
   - webencodings=0.5.1=py37_1
-  - wheel=0.35.1=py_0
   - xz=5.2.5=h7b6447c_0
   - zeromq=4.3.3=he6710b0_3
   - zipp=3.3.1=py_0
@@ -354,5 +359,5 @@ dependencies:
     - requests==2.24.0
     - rsa==4.6
     - urllib3==1.25.10
+    - wheel==0.36.2
 prefix: /opt/conda/envs/rcnv
-

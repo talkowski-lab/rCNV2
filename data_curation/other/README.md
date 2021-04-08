@@ -8,6 +8,31 @@ Below, we describe curation steps for other datasets not already listed in a dif
 * Balanced chromosomal abnormality breakpoints from sequencing studies of congenital anomalies
 
 
+---   
+
+## Microarray probesets used for control samples  
+
+We collected the microarray SNP probesets used for all control samples from each cohort included in our analyses.  
+
+The code to curate these data are provided in `curate_control_probesets.sh`.  
+
+These datasets were accessed as follows:  
+
+| Array | Abbreviation | Source |  
+| :--- | :--- | :--- |  
+| Affymetrix Human Mapping 500K | `affy_500k` | UCSC Genome Browser (table `snpArrayAffy250Nsp` combined with table `snpArrayAffy250Sty`) |  
+| Affymetrix Genome-Wide Human SNP Array 5.0 | `affy_5.0` | UCSC Genome Browser (table `snpArrayAffy5`) |  
+| Affymetrix Genome-Wide Human SNP Array 5.0 | `affy_6.0` | UCSC Genome Browser (table `snpArrayAffy6`) |  
+| Illumina Human Hap 300 | `illumina_300k` | UCSC Genome Browser (table `snpArrayIllumina300`) |  
+| Illumina Human Hap 550 | `illumina_550k` | UCSC Genome Browser (table `snpArrayIllumina550`) |  
+| Illumina Human610-Quad | `illumina_610k_quad` | Downloaded from Illumina website ([link](https://support.illumina.com/content/dam/illumina-support/documents/downloads/productfiles/human610/human610-quadv1_h.zip)) |  
+| Illumina Human Hap 650 | `illumina_650k` | UCSC Genome Browser (table `snpArrayIllumina650`) |  
+| Illumina Human1M-Duo | `illumina_1m_duo` | UCSC Genome Browser (table `snpArrayIllumina1M`) |  
+| Illumina Infinium Global Screening Array | `illumina_gsa` | Provided by the Estonian Biobank |  
+| Illumina Infinium OmniExpress | `omniexpress` | Downloaded from Illumina website ([link](https://support.illumina.com/content/dam/illumina-support/documents/downloads/productfiles/humanomniexpress-24/v1-3/infinium-omniexpress-24-v1-3-a1-bed.zip)) |  
+| Illumina Infinium Omni2.5 | `omni_2.5` | Downloaded from Illumina website ([link](https://support.illumina.com/content/dam/illumina-support/documents/downloads/productfiles/humanomni25/v1-5/infinium-omni2-5-8v1-5-a1-bed.zip)) |  
+| ThermoFisher Applied Biosystems UK Biobank Axiom | `ukbbaxiom` | Downloaded from ThermoFisher website ([link](https://www.thermofisher.com/order/catalog/product/902502?us&en#/902502?us&en)) |  
+
 ---  
 
 ## Genomic disorders  

@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -194,12 +194,18 @@ done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt | fgrep -v "#" ) \
 > all_phenos.merged.txt
 
 
+# Make list of counts per HPO pair for EstBB & BioVU
+echo -e "EstBB\traw_phenos/EstBB.HPO_terms_full_cooccurrence_table.tsv.gz" > hpo_pair_cohorts.inputs.tsv
+# TODO: add BioVU
+
 # Determine minimum HPO tree to use
 /opt/rCNV2/data_curation/phenotype/collapse_HPO_tree.py \
+  --hpo-pair-cohorts hpo_pair_cohorts.inputs.tsv \
   --ignore "HP:0000001" \
   --ignore "HP:0031796" \
   --ignore "HP:0031797" \
   --ignore "HP:0011008" \
+  --ignore "HP:0025303" \
   --obo hp.obo \
   --raw-counts samples_per_HPO.txt \
   --filter-log HPO_tree_filter.log \
@@ -235,10 +241,15 @@ gsutil cp gs://rcnv_project/analysis/analysis_refs/rCNV_metacohort_list.txt ./
   --meta-out HPOs_by_metacohort.table.tsv \
   --min-metacohorts 2 \
   --min-per-metacohort 500 \
+  --hpo-pair-cohorts hpo_pair_cohorts.inputs.tsv \
   phenotype_groups.HPO_metadata.intermediate.txt \
   /opt/rCNV2/refs/rCNV_sample_counts.txt \
   cleaned_phenos/intermediate/
 
+
+######
+###### TODO: NEED TO UPDATE ALL CODE BELOW TO ACCOUNT FOR COHORTS LIKE ESTBB
+######
 
 # Clean up output from original HPO tree consolidation to reflect metacohort filtering
 fgrep -v "#" HPOs_by_cohort.table.tsv \
