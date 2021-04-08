@@ -12,7 +12,6 @@ workflow create_genome_bins {
   Int binsize
   Int stepsize
   Float blacklist_cov
-  File contiglist
   String rCNV_bucket
 
   Array[Array[String]] contigs = read_tsv(contiglist)
@@ -26,38 +25,19 @@ workflow create_genome_bins {
       rCNV_bucket=rCNV_bucket
   }
 
-  # Annotate bins per-chromosome
-  scatter ( contig in contigs ) {
-    call annotate_bins {
-      input:
-        bins=create_raw_bins.bins,
-        binsize=binsize,
-        stepsize=stepsize,
-        contig=contig[0]
-    }
-  }
-  call cat_annotated_bins {
+  # Annotate bins
+  call annotate_bins {
     input:
-      bins=annotate_bins.annotated_bins,
+      bins=create_raw_bins.bins,
       binsize=binsize,
-      stepsize=stepsize,
-      rCNV_bucket=rCNV_bucket
-  }
-
-  # Decompose annotations
-  call decompose_annotations {
-    input:
-      bins=cat_annotated_bins.merged_bins,
-      binsize=binsize,
-      stepsize=stepsize,
-      rCNV_bucket=rCNV_bucket
+      stepsize=stepsize
   }
 
   output {
     File raw_bins = create_raw_bins.bins
-    File annotated_bins = cat_annotated_bins.merged_bins
-    File eigen_bins = decompose_annotations.eigen_bins
-    File bin_eigenfeature_stats = decompose_annotations.stats
+    File raw_bins_idx = create_raw_bins.bins_idx
+    File annotated_bins = annotate_bins.annotated_bins
+    File annotated_bins_idx = annotate_bins.annotated_bins_idx
   }
 }
 
@@ -85,9 +65,10 @@ task create_raw_bins {
       refs/GRCh37.autosomes.genome \
       ${binsize}000 \
       GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz
+    tabix -f GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz
 
     # Move copy to master rCNV bucket
-    gsutil cp GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz \
+    gsutil cp GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz* \
       ${rCNV_bucket}/cleaned_data/binned_genome/
   >>>
 
@@ -99,35 +80,37 @@ task create_raw_bins {
 
   output {
     File bins = "GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz"
+    File bins_idx = "GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz.tbi"
   }
 }
 
 
-# Annotate bins
+# Annotate bins with probe counts
 task annotate_bins {
   File bins
   Int binsize
   Int stepsize
-  String contig
 
   command <<<
-    # Gather reference files
-    mkdir refs/
-    gsutil -m cp -r gs://rcnv_project/refs/Affy_UKBB_axiom_probes.bed.gz* refs/
-    gsutil -m cp -r gs://rcnv_project/GRCh37_ref_build/* refs/
+    set -euo pipefail
 
-    # Re-index reference fasta, otherwise pybedtools nuc throws an error
-    samtools faidx refs/GRCh37.primary_assembly.fa
+    # Build athena input
+    gsutil cp -r gs://rcnv_project/cleaned_data/control_probesets ./
+    for file in control_probesets/*bed.gz; do
+      echo -e "$file\tcount\t$( basename $file | sed 's/\.bed\.gz//g' )"
+    done > probeset_tracks.athena.tsv
 
-    # Annotate bins
-    athena annotate-bins -z \
-      --include-chroms ${contig} \
-      -t refs/Affy_UKBB_axiom_probes.bed.gz -a count -n ukbbAxiom_probes \
-      --ucsc-list /opt/rCNV2/data_curation/binned_genome/genome_bin_ucsc_annotations.tsv \
-      --fasta refs/GRCh37.primary_assembly.fa \
-      --ucsc-ref hg19 \
+    # Annotate
+    athena annotate-bins \
+      --track-list probeset_tracks.athena.tsv \
+      --bgzip \
       ${bins} \
-      GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.${contig}.bed.gz
+      GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz
+    tabix -f GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz
+
+    # Move copy to master rCNV bucket
+    gsutil cp GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz* \
+      gs://rcnv_project/cleaned_data/binned_genome/
   >>>
 
   runtime {
@@ -139,94 +122,7 @@ task annotate_bins {
   }
 
   output {
-    File annotated_bins = "GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.${contig}.bed.gz"
-  }
-}
-
-
-# Merge an array of annotated bins
-task cat_annotated_bins {
-  Array[File] bins
-  Int binsize
-  Int stepsize
-  String rCNV_bucket
-
-  command <<<
-    # Get header row from first file
-    zcat ${bins[0]} \
-    | head -n1 \
-    > header.txt
-
-    # Merge array of bins and add header
-    zcat ${sep=" " bins} \
-    | fgrep -v "#" \
-    | sort -Vk1,1 -k2,2n -k3,3n \
-    | cat header.txt - \
-    | bgzip -c \
-    > GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz
-
-    # Move copy to master rCNV bucket
-    gsutil cp GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz \
-      ${rCNV_bucket}/cleaned_data/binned_genome/
-  >>>
-
-  runtime {
-    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
-    preemptible: 1
-  }
-
-  output {
-    File merged_bins = "GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz"
-  }
-}
-
-
-# Perform Eigendecomposition on a set of annotated bins
-task decompose_annotations {
-  File bins
-  Int binsize
-  Int stepsize
-  String rCNV_bucket
-
-  command <<<
-    athena eigen-bins -z \
-      -e 10 \
-      --sqrt-transform max_recomb_rate \
-      --sqrt-transform mean_recomb_rate \
-      --log-transform affy6_probes \
-      --log-transform affy5_probes \
-      --log-transform illOmni_probes \
-      --log-transform ill1M_probes \
-      --log-transform ill650_probes \
-      --log-transform ill550_probes \
-      --log-transform ukbbAxiom_probes \
-      --log-transform rmsk_LINE \
-      --log-transform rmsk_SINE \
-      --log-transform rmsk_LTR \
-      --log-transform rmsk_DNA_repeats \
-      --log-transform rmsk_simple_repeats \
-      --log-transform rmsk_low_complexity_repeats \
-      --log-transform segdups \
-      --log-transform max_segdup_identity \
-      --log-transform simple_repeats \
-      --log-transform self_chain \
-      --stats GRCh37.${binsize}kb_bins_${stepsize}kb_steps.eigenfeature_stats.txt \
-      ${bins} \
-      GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.eigen.bed.gz
-
-    # Move copy to master rCNV bucket
-    gsutil cp GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.eigen.bed.gz \
-      ${rCNV_bucket}/cleaned_data/binned_genome/
-  >>>
-
-  runtime {
-    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
-    preemptible: 1
-    memory: "8 GB"
-  }
-
-  output {
-    File eigen_bins = "GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.eigen.bed.gz"
-    File stats = "GRCh37.${binsize}kb_bins_${stepsize}kb_steps.eigenfeature_stats.txt"
+    File annotated_bins = "GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz"
+    File annotated_bins = "GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz.tbi"
   }
 }

@@ -21,7 +21,7 @@ mkdir refs/
 gsutil cp -r gs://rcnv_project/refs/GRCh37.Nmask.autosomes.bed.gz refs/
 gsutil cp -r gs://rcnv_project/refs/GRCh37.somatic_hypermutable_sites.bed.gz refs/
 gsutil cp -r gs://rcnv_project/refs/GRCh37.autosomes.genome refs/
-gsutil cp -r gs://rcnv_project/refs/Affy_UKBB_axiom_probes.bed.gz* refs/
+gsutil cp -r gs://rcnv_project/cleaned_data/control_probesets ./
 
 
 # Prep reference fasta
@@ -30,7 +30,7 @@ gsutil cp -r gs://rcnv_project/refs/Affy_UKBB_axiom_probes.bed.gz* refs/
 # samtools faidx Homo_sapiens.GRCh37.dna.primary_assembly.fa
 # gsutil cp Homo_sapiens.GRCh37.dna.primary_assembly.fa gs://rcnv_project/GRCh37_ref_build/GRCh37.primary_assembly.fa
 # gsutil cp Homo_sapiens.GRCh37.dna.primary_assembly.fa.fai gs://rcnv_project/GRCh37_ref_build/GRCh37.primary_assembly.fa.fai
-gsutil cp -r gs://rcnv_project/GRCh37_ref_build/* refs/
+# gsutil cp -r gs://rcnv_project/GRCh37_ref_build/* refs/
 
 
 # Set desired bin size & step size resolution (in kb)
@@ -47,45 +47,22 @@ athena make-bins -z \
 	refs/GRCh37.autosomes.genome \
 	${binsize}000 \
 	GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz
-gsutil cp GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz \
+tabix -f GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz
+gsutil cp GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz* \
   gs://rcnv_project/cleaned_data/binned_genome/
 
 
-# Annotate bins
-athena annotate-bins -z \
-  --include-chroms 20 \
-  -t refs/Affy_UKBB_axiom_probes.bed.gz -a count -n ukbbAxiom_probes \
-  --ucsc-list /opt/rCNV2/data_curation/binned_genome/genome_bin_ucsc_annotations.tsv \
-  --fasta refs/GRCh37.primary_assembly.fa \
-  --ucsc-ref hg19 \
-  GRCh37."$binsize"kb_bins_"$stepsize"kb_steps.raw.bed.gz \
-  GRCh37."$binsize"kb_bins_"$stepsize"kb_steps.annotated.bed.gz
-
-
-# Decompose annotated bins to top 10 PCs
-athena eigen-bins -z \
-  -e 10 \
-  --sqrt-transform max_recomb_rate \
-  --sqrt-transform mean_recomb_rate \
-  --log-transform affy6_probes \
-  --log-transform affy5_probes \
-  --log-transform illOmni_probes \
-  --log-transform ill1M_probes \
-  --log-transform ill650_probes \
-  --log-transform ill550_probes \
-  --log-transform ukbbAxiom_probes \
-  --log-transform rmsk_LINE \
-  --log-transform rmsk_SINE \
-  --log-transform rmsk_LTR \
-  --log-transform rmsk_DNA_repeats \
-  --log-transform rmsk_simple_repeats \
-  --log-transform rmsk_low_complexity_repeats \
-  --log-transform segdups \
-  --log-transform max_segdup_identity \
-  --log-transform simple_repeats \
-  --log-transform self_chain \
-  --stats GRCh37."$binsize"kb_bins_"$stepsize"kb_steps.eigenfeature_stats.txt \
-  GRCh37."$binsize"kb_bins_"$stepsize"kb_steps.annotated.bed.gz \
-  GRCh37."$binsize"kb_bins_"$stepsize"kb_steps.annotated.eigen.bed.gz
+# # Annotate bins with count of probes per array
+for file in control_probesets/*bed.gz; do
+  echo -e "$file\tcount\t$( basename $file | sed 's/\.bed\.gz//g' )"
+done > probeset_tracks.athena.tsv
+athena annotate-bins \
+  --track-list probeset_tracks.athena.tsv \
+  --bgzip \
+  GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz \
+  GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz
+tabix -f GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz
+gsutil cp GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz* \
+  gs://rcnv_project/cleaned_data/binned_genome/
 
 
