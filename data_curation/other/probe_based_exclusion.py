@@ -20,6 +20,7 @@ import pandas as pd
 import argparse
 from athena.mutrate import annotate_bins
 from os import path
+from sys import stdout
 
 
 def expand_interval(interval, min_size):
@@ -119,9 +120,9 @@ def load_array_counts(samples_tsv, cohorts, elig_arrays):
     return counts
 
 
-def get_passing_fracs(array_counts, array_labels_df, min_frac, keep_n_columns):
+def get_passing_fracs(array_counts, array_labels_df, keep_n_columns):
     """
-    Label all intervals with fraction 
+    Compute fraction of passing samples per cohort for all intervals
     """
 
     cohorts = array_counts.keys()
@@ -137,6 +138,31 @@ def get_passing_fracs(array_counts, array_labels_df, min_frac, keep_n_columns):
         fracs_df[cohort] = npass / cohort_totals[cohort]
 
     return fracs_df
+
+
+def label_cohort_fails(cohort_fracs_df, min_frac, keep_n_columns):
+    """
+    Label all intervals with failing cohorts, if any
+    """
+
+    cohorts = list(cohort_fracs_df.columns[keep_n_columns:])
+
+    fails_df = cohort_fracs_df.iloc[:, :keep_n_columns].copy()
+    fails_df['exclude_cohorts'] = ''
+
+    def _append_cohort(x, cohort):
+        if x == '':
+            return cohort
+        else:
+            return ';'.join([x, cohort])
+
+    for cohort in cohorts:
+        fail_labs = (cohort_fracs_df[cohort] < min_frac)
+        fails_df.loc[fail_labs, 'exclude_cohorts'] = \
+            fails_df.loc[fail_labs, 'exclude_cohorts'].\
+                apply(_append_cohort, cohort=cohort)
+
+    return fails_df
 
 
 def main():
@@ -155,7 +181,7 @@ def main():
                         'arrays (rows) X cohorts (columns)')
     parser.add_argument('cohorts', help='.tsv of metacohort assignments')
     parser.add_argument('-o', '--outfile', help='Output BED file annotated with ' +
-                        'exclusion criteria [default: stdout]')
+                        'exclusion criteria [default: stdout]', default='stdout')
     parser.add_argument('--probecounts-outfile', help='Output BED file annotated with ' +
                         'number of probes per interval [optional]')
     parser.add_argument('--frac-pass-outfile', help='Output BED file annotated with ' +
@@ -201,7 +227,7 @@ def main():
     # Step 4. Compute fraction of passing samples per interval per cohort
     array_counts = load_array_counts(args.samples_tsv, args.cohorts, tnames)
     cohort_fracs_df = get_passing_fracs(array_counts, array_labels_df, 
-                                        args.min_frac_samples, args.keep_n_columns)
+                                        args.keep_n_columns)
     fracs_outfile = args.frac_pass_outfile
     if fracs_outfile is not None:
         if 'compressed' in determine_filetype(fracs_outfile):
@@ -211,12 +237,21 @@ def main():
             bgzip(fracs_outfile)
 
     # Step 5. Label each interval with cohorts to be excluded
-    # TODO: IMPLEMENT THIS
-    import pdb; pdb.set_trace()
+    cohort_labels_df = label_cohort_fails(cohort_fracs_df, args.min_frac_samples,
+                                          args.keep_n_columns)
 
     # Step 6. Format output file and write out
-
+    if args.outfile in '- stdout /dev/stdout'.split():
+        cohort_labels_df.to_csv(stdout, sep='\t', index=False)
+    else:
+        outfile = args.outfile
+        if 'compressed' in determine_filetype(outfile):
+            outfile = path.splitext(outfile)[0]
+        cohort_labels_df.to_csv(outfile, sep='\t', index=False)
+        if args.bgzip:
+            bgzip(outfile)
 
 
 if __name__ == '__main__':
     main()
+
