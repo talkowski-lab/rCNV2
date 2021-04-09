@@ -14,6 +14,7 @@ based on a list of patients and corresponding HPO terms
 import pybedtools as pbt
 import numpy as np
 from athena.utils.misc import determine_filetype, bgzip
+from athena.utils.dfutils import float_cleanup
 import gzip
 import csv
 import pandas as pd
@@ -137,7 +138,7 @@ def get_passing_fracs(array_counts, array_labels_df, keep_n_columns):
             npass[array_labels_df[array]] += n_samps
         fracs_df[cohort] = npass / cohort_totals[cohort]
 
-    return fracs_df
+    return float_cleanup(fracs_df, 6, keep_n_columns)
 
 
 def label_cohort_fails(cohort_fracs_df, min_frac, keep_n_columns):
@@ -191,9 +192,9 @@ def main():
                         'be at least this size [default: 100,000]')
     parser.add_argument('--min-probes', type=int, default=10, help='Minimum number ' +
                         'of probes required per interval to pass [default: 10]')
-    parser.add_argument('--min-frac-samples', type=float, default=0.8, 
+    parser.add_argument('--min-frac-samples', type=float, default=0.9, 
                         help='Minimum fraction of samples required per interval ' +
-                        'to pass [default: 0.8]')
+                        'to pass [default: 0.9]')
     parser.add_argument('-k', '--keep-n-columns', type=int, default=3, 
                         help='Number of columns from input BED to keep in ' +
                         '--outfile [default: 3]')
