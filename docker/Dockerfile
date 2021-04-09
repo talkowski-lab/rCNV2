@@ -81,6 +81,8 @@ RUN apt-get -qqy clean && \
 # Install R packages not available through conda
 RUN Rscript -e "sapply(c('EQL'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
+ARG rCNV2_Rpkg_source="/opt/rCNV2/source/rCNV2_0.1.0.tar.gz"
+RUN Rscript -e "install.packages('$rCNV2_Rpkg_source', source=TRUE, repos=NULL)"
 
 # Install Athena toolkit
 ARG athena_commit_hash="master"

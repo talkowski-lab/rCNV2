@@ -24,6 +24,7 @@ mkdir windows/
 gsutil -m cp -r gs://rcnv_project/cleaned_data/binned_genome/* windows/
 mkdir refs/
 gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
+# gsutil -m cp -r gs://rcnv_project/cleaned_data/control_probesets refs/
 
 
 # Test/dev parameters (seizures)
@@ -42,9 +43,6 @@ meta_model_prefix="fe"
 bin_overlap=0.5
 pad_controls=50000
 max_manhattan_phred_p=30
-# Test/dev parameters (anxiety, with bad case:control imbalance)
-hpo="HP:0100852"
-prefix="HP0100852"
 
 
 
@@ -319,14 +317,51 @@ echo -e "\nANALYZING P-VALUE MATRIX\n"
 awk -v pval=${p_cutoff} -v FS="\t" -v OFS="\t" \
   '{ print $1, pval }' ${phenotype_list} \
 > sliding_window.${freq_code}.${CNV}.bonferroni_pval.hpo_cutoffs.tsv
-  
 
 
 
 
-# Test/dev parameters (all cases)
-hpo="HP:0000118"
-prefix="HP0000118"
+
+
+### Determine probe density-based conditional exclusion list
+# Test/dev parameters
+binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
+binned_genome_prefix="GRCh37.200kb_bins_10kb_steps.raw" #Note: this can be inferred in WDL as basename(binned_genome, ".bed.gz")
+min_probes_per_window=10
+min_frac_controls_probe_exclusion=0.9
+metacohort_list="refs/rCNV_metacohort_list.txt"
+rCNV_bucket="gs://rcnv_project"
+freq_code="rCNV"
+
+# Download probesets (note: requires permissions)
+gsutil -m cp -r \
+  ${rCNV_bucket}/cleaned_data/control_probesets \
+  ./
+
+# Compute conditional cohort exclusion mask
+for file in control_probesets/*bed.gz; do
+  echo -e "$file\t$( basename $file | sed 's/\.bed\.gz//g' )"
+done > probeset_tracks.tsv
+/opt/rCNV2/data_curation/other/probe_based_exclusion.py \
+  --outfile ${binned_genome_prefix}.cohort_exclusion.bed.gz \
+  --probecounts-outfile ${binned_genome_prefix}.probe_counts.bed.gz \
+  --frac-pass-outfile ${binned_genome_prefix}.frac_passing.bed.gz \
+  --min-probes ${min_probes_per_window} \
+  --min-frac-samples ${min_frac_controls_probe_exclusion} \
+  --keep-n-columns 3 \
+  --bgzip \
+  ${binned_genome} \
+  probeset_tracks.tsv \
+  control_probesets/rCNV.control_counts_by_array.tsv \
+  ${metacohort_list}
+
+
+
+
+
+# # Test/dev parameters (all cases)
+# hpo="HP:0000118"
+# prefix="HP0000118"
 # Test/dev parameters (seizures)
 hpo="HP:0001250"
 prefix="HP0001250"
@@ -342,9 +377,10 @@ meta_p_cutoff=0.000003715428
 meta_model_prefix="fe"
 bin_overlap=0.5
 pad_controls=50000
-# Test/dev parameters (anxiety, with bad case:control imbalance)
-hpo="HP:0100852"
-prefix="HP0100852"
+conditional_exclusion_list=GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz #Note: this file must be generated directly above
+# # Test/dev parameters (anxiety, with bad case:control imbalance)
+# hpo="HP:0100852"
+# prefix="HP0100852"
 
 # Copy necessary data for local testing (without running the above -- this is not in the WDL)
 gsutil -m cp \

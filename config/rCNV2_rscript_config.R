@@ -16,36 +16,36 @@ options(scipen=1000, stringsAsFactors=F, family="sans")
 ########
 # DATA #
 ########
-hpo.abbrevs <- c("HEALTHY_CONTROL" = "Control", 
-                 "HP:0000118" = "All cases", 
-                 "HP:0000707" = "Nervous system", 
-                 "HP:0012638" = "Nervous sys. physiol.", 
-                 "HP:0000708" = "Behavioral", 
-                 "UNKNOWN" = "Unpecified", 
-                 "HP:0012639" = "Nervous sys. morph.", 
-                 "HP:0002715" = "Immune", 
-                 "HP:0012759" = "Neurodevelopmental", 
-                 "HP:0002960" = "Autoimmune", 
-                 "HP:0002011" = "CNS abnormality", 
-                 "HP:0001626" = "Cardiovascular", 
-                 "HP:0100753" = "Schizophrenia", 
-                 "HP:0000729" = "Autistic behavior", 
-                 "HP:0002597" = "Vascular", 
-                 "HP:0100022" = "Movement", 
-                 "HP:0001250" = "Seizures", 
-                 "HP:0100545" = "Arterial", 
-                 "HP:0000717" = "Autism", 
-                 "HP:0000752" = "Hyperactivity", 
-                 "HP:0001197" = "Birth defects", 
-                 "HP:0000924" = "Skeletal", 
-                 "HP:0031466" = "Personality", 
-                 "HP:0000152" = "Head/Neck", 
-                 "HP:0001627" = "Cardiac", 
-                 "HP:0025031" = "Digestive", 
-                 "HP:0001507" = "Growth abnormality", 
-                 "HP:0100852" = "Anxiety", 
-                 "HP:0012443" = "Brain morphology", 
-                 "HP:0003011" = "Muscle", 
+hpo.abbrevs <- c("HEALTHY_CONTROL" = "Control",
+                 "HP:0000118" = "All cases",
+                 "HP:0000707" = "Nervous system",
+                 "HP:0012638" = "Nervous sys. physiol.",
+                 "HP:0000708" = "Behavioral",
+                 "UNKNOWN" = "Unspecified",
+                 "HP:0012639" = "Nervous sys. morph.",
+                 "HP:0002715" = "Immune",
+                 "HP:0012759" = "Neurodevelopmental",
+                 "HP:0002960" = "Autoimmune",
+                 "HP:0002011" = "CNS abnormality",
+                 "HP:0001626" = "Cardiovascular",
+                 "HP:0100753" = "Schizophrenia",
+                 "HP:0000729" = "Autistic behavior",
+                 "HP:0002597" = "Vascular",
+                 "HP:0100022" = "Movement",
+                 "HP:0001250" = "Seizures",
+                 "HP:0100545" = "Arterial",
+                 "HP:0000717" = "Autism",
+                 "HP:0000752" = "Hyperactivity",
+                 "HP:0001197" = "Birth defects",
+                 "HP:0000924" = "Skeletal",
+                 "HP:0031466" = "Personality",
+                 "HP:0000152" = "Head/Neck",
+                 "HP:0001627" = "Cardiac",
+                 "HP:0025031" = "Digestive",
+                 "HP:0001507" = "Growth abnormality",
+                 "HP:0100852" = "Anxiety",
+                 "HP:0012443" = "Brain morphology",
+                 "HP:0003011" = "Muscle",
                  "HP:0011446" = "Cognition")
 
 cohort.abbrevs <- c("meta1" = "Cohort 1",
@@ -53,16 +53,16 @@ cohort.abbrevs <- c("meta1" = "Cohort 1",
                     "meta3" = "Cohort 3",
                     "meta4" = "Cohort 4")
 
-neuro.hpos <- c("HP:0000707", "HP:0012638", "HP:0000708", 
-                "HP:0100753", "HP:0031466", "HP:0100852", 
-                "HP:0000729", "HP:0000717", "HP:0100022", 
-                "HP:0000752", "HP:0012759", "HP:0011446", 
-                "HP:0001250", "HP:0012639", "HP:0002011", 
+neuro.hpos <- c("HP:0000707", "HP:0012638", "HP:0000708",
+                "HP:0100753", "HP:0031466", "HP:0100852",
+                "HP:0000729", "HP:0000717", "HP:0100022",
+                "HP:0000752", "HP:0012759", "HP:0011446",
+                "HP:0001250", "HP:0012639", "HP:0002011",
                 "HP:0012443")
 
-somatic.hpos <- c("HP:0000152", "HP:0003011", "HP:0001507", 
-                  "HP:0000924", "HP:0002715", "HP:0002960", 
-                  "HP:0025031", "HP:0001626", "HP:0001627", 
+somatic.hpos <- c("HP:0000152", "HP:0003011", "HP:0001507",
+                  "HP:0000924", "HP:0002715", "HP:0002960",
+                  "HP:0025031", "HP:0001626", "HP:0001627",
                   "HP:0002597", "HP:0100545", "HP:0001197")
 
 pheno.abbrevs <- c("Mixed", "Neuro.", "Non-Neuro.")
@@ -170,8 +170,8 @@ nc.anno.family.colors <- c("chromhmm" = "#490C65",
 ##########
 logscale.major <- 10^(-10:10)
 logscale.major.bp <- 10^(0:9)
-logscale.major.bp.labels <- c(sapply(c("bp", "kb", "Mb"), 
-                                     function(suf){paste(c(1, 10, 100), suf, sep="")}), 
+logscale.major.bp.labels <- c(sapply(c("bp", "kb", "Mb"),
+                                     function(suf){paste(c(1, 10, 100), suf, sep="")}),
                               "1 Gb")
 
 logscale.demi <- as.numeric(sapply(logscale.major, function(e){c(1, 5)*e}))
@@ -215,7 +215,7 @@ format.pval <- function(p, nsmall=2, max.decimal=3, equality="=", min.phred.p=10
 # Calculate & format permuted P-value
 calc.perm.p <- function(perm.vals, obs.val, alternative="greater"){
   if(alternative=="greater"){
-    p <- length(which(perm.vals >= obs.val)) / length(perm.vals) 
+    p <- length(which(perm.vals >= obs.val)) / length(perm.vals)
   }else{
     p <- length(which(perm.vals <= obs.val)) / length(perm.vals)
   }
@@ -243,18 +243,18 @@ robust.lm <- function(x, y, conf=0.95){
 # Fit exponential decay to a list of points
 fit.exp.decay <- function(x, y){
   # Following example on https://rpubs.com/mengxu/exponential-model
-  
-  train.df <- data.frame("x"=as.numeric(x), 
+
+  train.df <- data.frame("x"=as.numeric(x),
                          "y"=as.numeric(y))
   train.df <- train.df[which(train.df$y > 0), ]
-  
+
   # Estimate initial parameters
   theta.0 <- 0.5 * min(train.df$y)
   model.0 <- lm(log(y - theta.0) ~ x, data=train.df)
   alpha.0 <- exp(coef(model.0)[1])
   beta.0 <- coef(model.0)[2]
   start <- list(alpha = alpha.0, beta = beta.0, theta = theta.0)
-  
+
   # Re-fit the model with estimated starting parameters
   return(nls(y ~ alpha * exp(beta * x) + theta, start = start, data=train.df,
              control=nls.control(maxiter=1000, warnOnly=T)))
