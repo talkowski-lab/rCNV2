@@ -7,7 +7,7 @@
 or.corplot.grid(stats.list, pt.cex = 1)
 }
 \arguments{
-\item{stats.list}{path to .tsv list of single-cohort association stats}
+\item{stats.list}{list of single-cohort association stats}
 
 \item{pt.cex}{scaling factor for points}
 }

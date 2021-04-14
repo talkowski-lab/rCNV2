@@ -25,6 +25,9 @@ option_list <- list(
   make_option(c("--model"), type="character", default="fe",
               help="specify meta-analysis model ('re': random effects, 'fe': fixed effects, 'mh': Mantel-Haenszel) [default '%default']",
               metavar="string"),
+  make_option(c("--conditional-exclusion"), type="character", default=NULL,
+              help="BED file annotated with cohorts to conditionally exclude on a locus-specific basis",
+              metavar="path"),
   make_option(c("--p-is-phred"), action="store_true", default=FALSE,
               help="provided P-values are Phred-scaled (-log10(P)) [default %default]"),
   make_option(c("--spa"), action="store_true", default=FALSE,
@@ -44,21 +47,18 @@ infile <- args$args[1]
 outfile <- args$args[2]
 corplot.out <- opts$`or-corplot`
 model <- opts$model
+cond.excl.in <- opts$`conditional-exclusion`
 p.is.phred <- opts$`p-is-phred`
 spa <- opts$spa
 secondary <- !(opts$`no-secondary`)
 
 # # Dev parameters
-# setwd("~/scratch")
-# # infile <- "~/scratch/HP0100852.rCNV.DEL.sliding_window.meta_analysis.input.txt"
-# # infile <- "~/scratch/HP0001250.rCNV.DEL.sliding_window.meta_analysis.input.txt"
-# infile <- "~/scratch/HP0100852.rCNV.DEL.sliding_window.meta_analysis.input.txt"
-# # infile <- "~/scratch/window_meta_dummy_input.ndd.txt"
-# # outfile <- "~/scratch/HP0100852.rCNV.DEL.window_meta_test_results.bed"
-# # outfile <- "~/scratch/HP0001250.rCNV.DEL.window_meta_test_results.bed"
-# outfile <- "~/scratch/HP0100852.rCNV.DEL.window_meta_test_results.bed"
-# corplot.out <- "~/scratch/corplot.test.jpg"
+# setwd("~/scratch/assoc_test_dev")
+# infile <- "HP0001250.rCNV.DEL.sliding_window.meta_analysis.input.txt"
+# outfile <- "HP0001250.rCNV.DEL.window_meta_test_results.bed"
+# corplot.out <- "corplot.test.jpg"
 # model <- "fe"
+# cond.excl.in <- "GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz"
 # p.is.phred <- T
 # spa <- T
 # secondary <- T
@@ -81,7 +81,7 @@ if(!is.null(corplot.out)){
 }
 
 # Conduct meta-analysis & write to file
-stats.merged <- combine.single.cohort.assoc.stats(stats.list)
+stats.merged <- combine.single.cohort.assoc.stats(stats.list, cond.excl.in)
 stats.meta <- meta(stats.merged, cohort.info[, 1], model=model,
                    saddle=spa, secondary=secondary)
 colnames(stats.meta)[1] <- "#chr"

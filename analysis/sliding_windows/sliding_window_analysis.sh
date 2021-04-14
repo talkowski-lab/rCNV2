@@ -353,7 +353,7 @@ done > probeset_tracks.tsv
   ${binned_genome} \
   probeset_tracks.tsv \
   control_probesets/rCNV.control_counts_by_array.tsv \
-  ${metacohort_list}
+  <( fgrep -v mega ${metacohort_list} )
 
 
 

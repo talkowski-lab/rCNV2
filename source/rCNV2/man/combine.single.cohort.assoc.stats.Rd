@@ -4,10 +4,12 @@
 \alias{combine.single.cohort.assoc.stats}
 \title{Merge single-cohort association stats}
 \usage{
-combine.single.cohort.assoc.stats(stats.list)
+combine.single.cohort.assoc.stats(stats.list, cond.excl.in = NULL)
 }
 \arguments{
-\item{stats.list}{path to .tsv list of single-cohort association stats}
+\item{stats.list}{list of single-cohort association stats}
+
+\item{cond.excl.in}{path to BED file of cohorts to be excluded on locus-specific basis}
 }
 \value{
 data frame of association stats for all cohorts

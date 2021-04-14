@@ -4,13 +4,7 @@
 \alias{make.meta.df}
 \title{Create meta-analysis data frame}
 \usage{
-make.meta.df(
-  stats.merged,
-  cohorts,
-  row.idx,
-  empirical.continuity = T,
-  drop_top_cohort = F
-)
+make.meta.df(stats.merged, cohorts, row.idx, empirical.continuity = T)
 }
 \arguments{
 \item{stats.merged}{association statistics for all cohorts (see \code{\link[=combine.single.cohort.assoc.stats]{combine.single.cohort.assoc.stats()}})}
@@ -21,9 +15,6 @@ make.meta.df(
 
 \item{empirical.continuity}{boolean indicator to apply Sweeting empirical
 continuity correction [default: TRUE]}
-
-\item{drop_top_cohort}{boolean indicator to drop most significant individual
-cohort from meta-analysis [default: FALSE]}
 }
 \value{
 data frame of statistics ready for meta-analysis

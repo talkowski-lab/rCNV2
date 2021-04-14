@@ -207,7 +207,7 @@ calc.or <- function(control_ref, control_alt, case_ref, case_alt, adj=0.5){
 #'
 #' Make a grid of scatterplots of log odds ratios pairwise for all cohorts in a meta-analysis
 #'
-#' @param stats.list path to .tsv list of single-cohort association stats
+#' @param stats.list list of single-cohort association stats
 #' @param pt.cex scaling factor for points
 #'
 #' @return None
@@ -279,14 +279,15 @@ or.corplot.grid <- function(stats.list, pt.cex=1){
 #'
 #' Merges a list of association statistics generated for multiple independent cohorts
 #'
-#' @param stats.list path to .tsv list of single-cohort association stats
+#' @param stats.list list of single-cohort association stats
+#' @param cond.excl.in path to BED file of cohorts to be excluded on locus-specific basis
 #'
 #' @return data frame of association stats for all cohorts
 #'
 #' @seealso [read.assoc.stats.single()]
 #'
 #' @export
-combine.single.cohort.assoc.stats <- function(stats.list){
+combine.single.cohort.assoc.stats <- function(stats.list, cond.excl.in=NULL){
   # Merge all cohorts
   merged <- stats.list[[1]]
   for(i in 2:length(stats.list)){
@@ -307,6 +308,18 @@ combine.single.cohort.assoc.stats <- function(stats.list){
                                       head(names(stats.list)[which(pvals == min(pvals, na.rm=T))], 1)
                                     }))
   merged <- merged[, -grep(".p_value", colnames(merged), fixed=T)]
+
+  # Annotate rows with cohorts to be conditionally excluded
+  if(!is.null(cond.excl.in)){
+    cond.excl.df <- read.table(cond.excl.in, header=T, sep="\t", comment.char="")
+    colnames(cond.excl.df)[1] <- gsub('^X.', '', colnames(cond.excl.df)[1])
+    cond.excl.df$exclude_cohorts
+    merged <- merge(merged, cond.excl.df, by=c("chr", "start", "end"),
+                    all.x=T, all.y=F, sort=F)
+  }else{
+    merged$exclude_cohorts <- ""
+  }
+
   return(as.data.frame(merged))
 }
 
@@ -381,20 +394,13 @@ sweeting.correction <- function(meta.df, cc.sum=0.01){
 #' @param row.idx row index in `stats.merged` corresponding to locus of interest
 #' @param empirical.continuity boolean indicator to apply Sweeting empirical
 #' continuity correction \[default: TRUE\]
-#' @param drop_top_cohort boolean indicator to drop most significant individual
-#' cohort from meta-analysis \[default: FALSE\]
 #'
 #' @return data frame of statistics ready for meta-analysis
 #'
 #' @seealso [combine.single.cohort.assoc.stats()]
 #'
 #' @export
-make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T, drop_top_cohort=F){
-  if(drop_top_cohort==T){
-    top_cohort <- stats.merged$top_cohort[row.idx]
-    cohorts <- cohorts[which(cohorts != top_cohort)]
-    stats.merged <- stats.merged[, grep(top_cohort, colnames(stats.merged), fixed=T, invert=T)]
-  }
+make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T){
   ncohorts <- length(cohorts)
   meta.df <- data.frame("cohort"=1:ncohorts,
                         "control_ref"=as.numeric(stats.merged[row.idx, grep("control_ref", colnames(stats.merged), fixed=T)]),
@@ -432,56 +438,85 @@ make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T,
 #' @seealso [make.meta.df()]
 #'
 #' @export
-meta.single <- function(stats.merged, cohorts, row.idx, model="fe", empirical.continuity=T, drop_top_cohort=F){
-  # If no CNVs are observed, return all NAs
-  if(sum(stats.merged[row.idx, grep("_alt", colnames(stats.merged), fixed=T)])>0){
-    meta.df <- make.meta.df(stats.merged, cohorts, row.idx, empirical.continuity, drop_top_cohort)
-    # If strictly zero case CNVs are observed, unable to estimate effect size
-    if(all(meta.df$case_alt==0)){
-      out.v <- c(rep(NA, 4), 0)
-    }else{
-      # Meta-analysis
-      if(model=="re"){
-        meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                                     measure="OR", data=meta.df, method="REML", random = ~ 1 | cohort, slab=cohort_name,
-                                     add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
-                             error=function(e){
-                               print(paste("row", row.idx, "failed to converge. Retrying with more iterations...", sep=" "))
-                               rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+meta.single <- function(stats.merged, cohorts, row.idx, model="fe",
+                        empirical.continuity=T, drop_top_cohort=F){
+  # Collect list of cohorts to exclude
+  exclude.cohorts <- unlist(strsplit(stats.merged$exclude_cohorts[row.idx], split=";"))
+  if(drop_top_cohort == TRUE){
+    exclude.cohorts <- unique(sort(c(exclude.cohorts, stats.merged$top_cohort[row.idx])))
+  }
+  exclude.cohorts <- exclude.cohorts[which(exclude.cohorts %in% cohorts)]
+  cohorts <- setdiff(cohorts, exclude.cohorts)
+
+  # Hard drop cohorts for exclusion from stats.merged for this row
+  if(length(exclude.cohorts) > 0){
+    cols.to.drop <- unique(sort(as.vector(sapply(exclude.cohorts, function(cohort){
+      grep(paste(cohort, ".", sep=""), colnames(stats.merged))
+    }))))
+    if(length(cols.to.drop) > 0){
+      stats.merged.sub <- stats.merged[row.idx, -cols.to.drop]
+    }
+  }else{
+    stats.merged.sub <- stats.merged[row.idx, ]
+  }
+
+  # Check that at least two cohorts remain
+  n.cohorts <- length(cohorts)
+  if(n.cohorts >= 2){
+
+    # Check if at least one CNV was observed
+    n.cnvs <- sum(stats.merged.sub[, grep("_alt", colnames(stats.merged.sub), fixed=T)])
+    if(n.cnvs > 0){
+      meta.df <- make.meta.df(stats.merged.sub, cohorts, 1, empirical.continuity)
+      # If strictly zero case CNVs are observed, unable to estimate effect size
+      if(all(meta.df$case_alt==0)){
+        out.v <- c(rep(NA, 4), 0)
+      }else{
+        # Meta-analysis
+        if(model=="re"){
+          meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
                                        measure="OR", data=meta.df, method="REML", random = ~ 1 | cohort, slab=cohort_name,
-                                       add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
-                             })
-        out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
-                              meta.res$zval, -log10(meta.res$pval)))
-      }else if(model=="mh"){
-        meta.res <- rma.mh(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                           measure="OR", data=meta.df, slab=cohort_name,
-                           add=0, drop00=F, correct=F)
-        out.v <- as.numeric(c(meta.res$b, meta.res$ci.lb, meta.res$ci.ub,
-                              meta.res$zval, -log10(meta.res$MHp)))
-      }else if(model=="fe"){
-        meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                                     measure="OR", data=meta.df, method="FE", slab=cohort_name,
-                                     add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
-                             error=function(e){
-                               print(paste("row", row.idx, "failed to converge. Retrying with more iterations...", sep=" "))
-                               rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                                       add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
+                               error=function(e){
+                                 print(paste("row", row.idx, "failed to converge. Retrying with more iterations...", sep=" "))
+                                 rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                                         measure="OR", data=meta.df, method="REML", random = ~ 1 | cohort, slab=cohort_name,
+                                         add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
+                               })
+          out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
+                                meta.res$zval, -log10(meta.res$pval)))
+        }else if(model=="mh"){
+          meta.res <- rma.mh(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                             measure="OR", data=meta.df, slab=cohort_name,
+                             add=0, drop00=F, correct=F)
+          out.v <- as.numeric(c(meta.res$b, meta.res$ci.lb, meta.res$ci.ub,
+                                meta.res$zval, -log10(meta.res$MHp)))
+        }else if(model=="fe"){
+          meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
                                        measure="OR", data=meta.df, method="FE", slab=cohort_name,
-                                       add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
-                             })
-        out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
-                              meta.res$zval, -log10(meta.res$pval)))
-      }
-      # Force to p-values reflecting Ha : OR > 1
-      if(!is.na(out.v[1]) & !is.na(out.v[5])){
-        if(out.v[1] < 0){
-          out.v[5] <- 0
+                                       add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
+                               error=function(e){
+                                 print(paste("row", row.idx, "failed to converge. Retrying with more iterations...", sep=" "))
+                                 rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                                         measure="OR", data=meta.df, method="FE", slab=cohort_name,
+                                         add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
+                               })
+          out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
+                                meta.res$zval, -log10(meta.res$pval)))
+        }
+        # Force to p-values reflecting Ha : OR > 1
+        if(!is.na(out.v[1]) & !is.na(out.v[5])){
+          if(out.v[1] < 0){
+            out.v[5] <- 0
+          }
         }
       }
+      return(out.v)
+    }else{
+      return(rep(NA, 5))
     }
-    return(out.v)
   }else{
-    rep(NA, 5)
+    return(rep(NA, 5))
   }
 }
 
@@ -506,7 +541,8 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="fe", empirical.co
 #' @export
 make.meta.lookup.table <- function(stats.merged, cohorts, model, empirical.continuity=T){
   unique.counts.df <- unique(stats.merged[, sort(unique(c(grep("_ref", colnames(stats.merged), fixed=T),
-                                                          grep("_alt", colnames(stats.merged), fixed=T))))])
+                                                          grep("_alt", colnames(stats.merged), fixed=T),
+                                                          which(colnames(stats.merged) == "exclude_cohorts"))))])
 
   unique.stats <- t(sapply(1:nrow(unique.counts.df), function(i){
     meta.single(unique.counts.df, cohorts, i, model, empirical.continuity)
