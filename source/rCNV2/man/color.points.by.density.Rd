@@ -11,7 +11,7 @@ color.points.by.density(x, y, palette = NULL)
 
 \item{y}{dependent variable vector}
 
-\item{palette}{256-color palette to be applied based on density [default: \code{viridis(256)}]}
+\item{palette}{256-color palette to be applied based on density [default: \code{viridis()}]}
 }
 \value{
 dataframe of values to be plotted with density and colors
