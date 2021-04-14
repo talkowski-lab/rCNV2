@@ -24,5 +24,5 @@ Inspired by heatscatter.R from Colby Chiang:
 https://github.com/cc2qe/voir/blob/master/bin/heatscatter.R
 }
 \seealso{
-\code{viridis()}
+\code{\link[=viridis]{viridis()}}
 }

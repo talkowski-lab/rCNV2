@@ -22,5 +22,5 @@ environment into the global environment and can be referenced as any other
 variable within your R session.
 }
 \seealso{
-.GlobalEnv
+\link{.GlobalEnv}
 }

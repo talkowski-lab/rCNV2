@@ -23,7 +23,7 @@
 #' environment into the global environment and can be referenced as any other
 #' variable within your R session.
 #'
-#' @seealso .GlobalEnv
+#' @seealso [.GlobalEnv]
 #'
 #' @export
 load.rcnv.env <- function(load.strings=TRUE, load.colors=TRUE, load.scales=TRUE){

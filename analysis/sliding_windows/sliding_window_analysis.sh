@@ -24,7 +24,6 @@ mkdir windows/
 gsutil -m cp -r gs://rcnv_project/cleaned_data/binned_genome/* windows/
 mkdir refs/
 gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
-# gsutil -m cp -r gs://rcnv_project/cleaned_data/control_probesets refs/
 
 
 # Test/dev parameters (seizures)
@@ -32,6 +31,7 @@ hpo="HP:0001250"
 prefix="HP0001250"
 meta="meta1"
 freq_code="rCNV"
+CNV="DEL"
 phenotype_list="refs/test_phenotypes.list"
 metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
@@ -96,7 +96,7 @@ while read prefix hpo; do
       tabix -f "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz"
 
       # Perform burden test
-      /opt/rCNV2/analysis/sliding_windows/window_burden_test.R \
+      /opt/rCNV2/analysis/generic_scripts/fisher_test_single_cohort.R \
         --pheno-table ${metacohort_sample_table} \
         --cohort-name $meta \
         --case-hpo ${hpo} \
@@ -432,9 +432,9 @@ while read prefix hpo; do
     # Perform meta-analysis
     while read meta cohorts; do
       echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
-    done < <( fgrep -v mega ${metacohort_list} ) \
+    done < <( fgrep -v mega ${metacohort_list}) \
     > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
-    /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
+    /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
       --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
       --model ${meta_model_prefix} \
       --p-is-phred \

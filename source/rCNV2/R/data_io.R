@@ -11,6 +11,35 @@
 # Functions for handling I/O of various preformatted datasets
 
 
+#' Load single-cohort association statistics
+#'
+#' Load association statistics for a single cohort from an input file
+#'
+#' @param stats.in path to input BED file with association statistics
+#' @param prefix cohort name (to be appended to columns)
+#' @param p.is.phred boolean indicator of the P-value being -log10-scaled in `stats.in`
+#'
+#' @return data frame of formatted associtation stats
+#'
+#' @export
+read.assoc.stats.single <- function(stats.in, prefix, p.is.phred){
+  # Read data & subset to necessary columns
+  stats <- read.table(stats.in, header=T, sep="\t", comment.char="")
+  colnames(stats)[1] <- "chr"
+  cols.to.keep <- c("chr", "start", "end", "case_alt", "case_ref",
+                    "control_alt", "control_ref", "fisher_phred_p")
+  stats <- stats[, which(colnames(stats) %in% cols.to.keep)]
+  stats$odds_ratio <- calc.or(stats$control_ref, stats$control_alt,
+                              stats$case_ref, stats$case_alt)
+  colnames(stats)[which(colnames(stats)=="fisher_phred_p")] <- "p_value"
+  if(p.is.phred==T){
+    stats$p_value <- 10^-stats$p_value
+  }
+  colnames(stats)[-(1:3)] <- paste(prefix, colnames(stats)[-(1:3)], sep=".")
+  return(stats)
+}
+
+
 #' Load P-value matrix
 #'
 #' Loads a precomputed matrix of P-values

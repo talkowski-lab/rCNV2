@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019-2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -97,17 +97,17 @@ get.cutoff.stat <- function(cutoff.mat, stat){
 # Fit exponential decay to a list of points
 fit.exp.decay <- function(x, y){
   # Following example on https://rpubs.com/mengxu/exponential-model
-  
-  train.df <- data.frame("x"=as.numeric(x), 
+
+  train.df <- data.frame("x"=as.numeric(x),
                          "y"=as.numeric(y))
-  
+
   # Estimate initial parameters
   theta.0 <- 0.5 * min(train.df$y)
   model.0 <- lm(log(y - theta.0) ~ x, data=train.df)
   alpha.0 <- exp(coef(model.0)[1])
   beta.0 <- coef(model.0)[2]
   start <- list(alpha = alpha.0, beta = beta.0, theta = theta.0)
-  
+
   # Re-fit the model with estimated starting parameters
   return(nls(y ~ alpha * exp(beta * x) + theta, start = start, data=train.df,
              control=nls.control(maxiter=1000, warnOnly=T)))
@@ -137,7 +137,7 @@ get.adjusted.cutoffs <- function(cutoff.mat, stat, pred.n=NULL, exclude.outliers
     stat.iqr <- stat.quants[2] - stat.quants[1]
     outlier.cutoffs <- c(stat.quants[1] - (1.5 * stat.iqr),
                          stat.quants[2] + (1.5 * stat.iqr))
-    outlier.hpos <- unlist(cutoff.stat.df.noOutliers$hpo[which(cutoff.stat.df.noOutliers$fdr.cutoff < outlier.cutoffs[1] 
+    outlier.hpos <- unlist(cutoff.stat.df.noOutliers$hpo[which(cutoff.stat.df.noOutliers$fdr.cutoff < outlier.cutoffs[1]
                                                         | cutoff.stat.df.noOutliers$fdr.cutoff > outlier.cutoffs[2])])
     # Combine indexes to exclude
     outlier.exclude.idxs <- unique(c(outlier.perms, which(cutoff.mat$hpo %in% outlier.hpos)))
@@ -154,7 +154,7 @@ get.adjusted.cutoffs <- function(cutoff.mat, stat, pred.n=NULL, exclude.outliers
     pred.labs <- pred.n
     col1.name <- "#n_cases"
   }
-    
+
   if(linear.fit==T){
     weights <- sqrt(cutoff.stat.df$n.cases)
     wmean <- calc.wmean(cutoff.stat.df$fdr.cutoff, weights)
@@ -172,14 +172,14 @@ get.adjusted.cutoffs <- function(cutoff.mat, stat, pred.n=NULL, exclude.outliers
 }
 
 # Plot FDR, annotated with means and fitted curve
-plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target, 
+plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target,
                       model="exponential", title=NULL, linear.fit=F, plot.exp=T, floor=F){
-  
+
   phred.target <- -log10(fdr.target)
   if(is.null(title)){
     title <- stat
   }
-  
+
   # Prep plot area & add points for raw permutations
   par(mar=c(3, 3, 2, 0.5))
   plot(x=c(0, max(cutoff.mat$n.cases)),
@@ -187,7 +187,7 @@ plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target,
            type="n", xaxt="n", yaxt="n", xlab="", ylab="")
   points(x=cutoff.mat$n.cases, y=cutoff.mat$fdr.cutoff, col="gray75")
   abline(h=phred.target, lty=2)
-  
+
   # Add trendline
   if(model=="exponential"){
     fit <- get.adjusted.cutoffs(cutoff.mat, tolower(stat), exclude.outliers=T)$fit
@@ -199,14 +199,14 @@ plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target,
     if(plot.exp==T){
       lines(fit.df$x, fit.df$y, col="red", lwd=3)
     }else if(linear.fit==T){
-      abline(h=calc.wmean(cutoff.stat.df$fdr.cutoff, sqrt(cutoff.stat.df$n.cases)), 
+      abline(h=calc.wmean(cutoff.stat.df$fdr.cutoff, sqrt(cutoff.stat.df$n.cases)),
              lwd=3, col="red")
     }
   }
-  
+
   # Add group means
   points(x=cutoff.stat.df$n.cases, y=cutoff.stat.df$fdr.cutoff, pch=15)
-  
+
   # Add axes
   axis(1, labels=NA)
   axis(1, at=axTicks(1), tick=F, line=-0.5, cex.axis=0.85, labels=axTicks(1)/1000)
@@ -215,19 +215,19 @@ plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target,
   axis(2, at=axTicks(2), tick=F, line=-0.5, las=2, cex.axis=0.85)
   mtext(2, line=1.5, text=bquote(-log[10](italic(P))))
   mtext(3, line=0.1, text=title, font=2)
-  
+
   # Add legend
   if(plot.exp==T){
-    legend("topright", pch=c(1, 15, NA, NA), lwd=c(1, 1, 3, 1), lty=c(NA, NA, 1, 2), 
-           col=c("gray75", "black", "red", "black"), cex=0.9, 
+    legend("topright", pch=c(1, 15, NA, NA), lwd=c(1, 1, 3, 1), lty=c(NA, NA, 1, 2),
+           col=c("gray75", "black", "red", "black"), cex=0.9,
            legend=c("Permutation", stat, "Exponential Fit", "FDR Target"))
   }else if(linear.fit==T){
-    legend("topright", pch=c(1, 15, NA, NA), lwd=c(1, 1, 3, 1), lty=c(NA, NA, 1, 2), 
-           col=c("gray75", "black", "red", "black"), cex=0.9, 
+    legend("topright", pch=c(1, 15, NA, NA), lwd=c(1, 1, 3, 1), lty=c(NA, NA, 1, 2),
+           col=c("gray75", "black", "red", "black"), cex=0.9,
            legend=c("Permutation", stat, "Weighted Mean", "FDR Target"))
   }else{
-    legend("topright", pch=c(1, 15, NA), lwd=c(1, 1, 1), lty=c(NA, NA, 2), 
-           col=c("gray75", "black", "black"), cex=0.9, 
+    legend("topright", pch=c(1, 15, NA), lwd=c(1, 1, 1), lty=c(NA, NA, 2),
+           col=c("gray75", "black", "black"), cex=0.9,
            legend=c("Permutation", stat, "FDR Target"))
   }
 }
@@ -313,7 +313,7 @@ max.cutoffs <- get.cutoff.stat(cutoff.mat, "max")
 # df.out.mean.noOutliers <- get.adjusted.cutoffs(cutoff.mat, "mean", exclude.outliers=T)$df
 if(linear.fit==T){
   # Compute flat weighted mean of all HPOs, if optioned
-  df.out.mean <- get.adjusted.cutoffs(cutoff.mat, "mean", exclude.outliers=F, 
+  df.out.mean <- get.adjusted.cutoffs(cutoff.mat, "mean", exclude.outliers=F,
                                       linear.fit=linear.fit)$df
 }else{
   # Otherwise, compute empirical mean for each HPO independently
@@ -331,7 +331,7 @@ if(flat.ladder == T){
                               "min_p"=fdr.target)
   colnames(df.out.ladder)[1] <- "#n_cases"
 }else{
-  df.out.ladder <- get.adjusted.cutoffs(cutoff.mat, "mean", 
+  df.out.ladder <- get.adjusted.cutoffs(cutoff.mat, "mean",
                                         pred.n=as.numeric(sapply(3:5, function(x){seq(1, 9.9, 0.1) * 10 ^ x})),
                                         exclude.outliers=T)$df
 }
@@ -343,7 +343,7 @@ write.table(df.out.ladder, outfile.ladder, sep="\t", quote=F,
 if(!is.null(plot.out)){
   plot.exp <- all(flat.ladder==F & linear.fit==F)
   png(plot.out, res=300, height=4*300, width=5*300)
-  plot.fdrs(cutoff.mat, mean.cutoffs, "Mean", fdr.target, 
+  plot.fdrs(cutoff.mat, mean.cutoffs, "Mean", fdr.target,
             title=paste(cnvtype, "Permutation Results for FDR =",
                         format(fdr.target, scientific=T, digits=3)),
             linear.fit=linear.fit, plot.exp=plot.exp, floor=F)

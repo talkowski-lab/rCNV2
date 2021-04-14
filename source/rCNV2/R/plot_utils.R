@@ -18,6 +18,7 @@
 #' @param hpo HPO code
 #'
 #' @return color code
+#'
 #' @export
 get.hpo.color <- function(hpo){
   # TODO: automatically load pheno.colors from constants.R within this function
@@ -45,6 +46,8 @@ get.hpo.color <- function(hpo){
 #' P-value to be arbitrarily/meaninglessly small \[default: 100\]
 #'
 #' @return formatted P-value as character
+#'
+#' @export format.pval
 #' @export
 format.pval <- function(p, nsmall=2, max.decimal=3, equality="=", min.phred.p=100){
   if(-log10(p)>min.phred.p){
@@ -71,6 +74,8 @@ format.pval <- function(p, nsmall=2, max.decimal=3, equality="=", min.phred.p=10
 #' to be converted to scientific notation \[default: 3\]
 #'
 #' @return formatted value as character
+#'
+#' @export format.scientific
 #' @export
 format.scientific <- function(x, nsmall=2, max.decimal=3){
   parts <- unlist(strsplit(format(x, scientific=T), split="e", fixed=T))
@@ -93,7 +98,8 @@ format.scientific <- function(x, nsmall=2, max.decimal=3){
 #'
 #' @return dataframe of values to be plotted with density and colors
 #'
-#' @seealso `viridis()`
+#' @seealso [viridis()]
+#'
 #' @export
 color.points.by.density <- function(x, y, palette=NULL){
   # Based on heatscatter.R from Colby Chiang
@@ -110,3 +116,44 @@ color.points.by.density <- function(x, y, palette=NULL){
   plot.df$col <- palette[plot.df$dens]
   plot.df[order(plot.df$dens), ]
 }
+
+#' Density-colored scatterplot
+#'
+#' Generate a 2D scatterplot colored by local density
+#'
+#' @param x independent variable vector
+#' @param y dependent variable vector
+#' @param pt.cex scaling factor for points
+#' @param parmar argument for option(parmar=...)
+#' @param add.cor boolean indicator to add correlation coefficient to plot \[default: TRUE\]
+#'
+#' @return None
+#'
+#' @seealso [color.points.by.density()]
+#'
+#' @export dens.scatter
+#' @export
+dens.scatter <- function(x, y, pt.cex=1, parmar=rep(0.5, 4), add.cor=T){
+  # Based on heatscatter.R from Colby Chiang
+  # (https://github.com/cc2qe/voir/blob/master/bin/heatscatter.R)
+  par(mar=parmar, bty="o")
+  plot.df <- data.frame("x"=x, "y"=y)
+  plot.df <- plot.df[which(!is.infinite(plot.df$x) & !is.infinite(plot.df$y)
+                           & !is.na(plot.df$x) & !is.na(plot.df$y)), ]
+  dens <- densCols(plot.df$x, plot.df$y, colramp=colorRampPalette(c("black", "white")))
+  plot.df$dens <- col2rgb(dens)[1, ] + 1L
+  palette <- colorRampPalette(c("#440154", "#33638d", "#218f8d",
+                                "#56c667", "#fde725"))(256)
+  plot.df$col <- palette[plot.df$dens]
+  plot.df <- plot.df[order(plot.df$dens), ]
+  plot(plot.df$x, plot.df$y, type="n",
+       xlab="", xaxt="n", ylab="", yaxt="n")
+  abline(lm(y ~ x, data=plot.df), lwd=2)
+  points(plot.df$x, plot.df$y, col=plot.df$col, pch=19, cex=pt.cex)
+  if(add.cor==T){
+    r <- cor(plot.df$x, plot.df$y)
+    text(x=par("usr")[2], y=par("usr")[3]+(0.075*(par("usr")[4]-par("usr")[3])),
+         labels=bquote(italic(R) == .(formatC(round(r, 3), digits=3))), pos=2)
+  }
+}
+

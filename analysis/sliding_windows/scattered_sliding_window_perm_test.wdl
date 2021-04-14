@@ -141,7 +141,7 @@ task permuted_burden_test {
           ${binned_genome}
 
         # Perform burden test
-        /opt/rCNV2/analysis/sliding_windows/window_burden_test.R \
+        /opt/rCNV2/analysis/generic_scripts/fisher_test_single_cohort.R \
           --pheno-table ${metacohort_sample_table} \
           --cohort-name $meta \
           --case-hpo ${hpo} \
@@ -157,7 +157,7 @@ task permuted_burden_test {
         echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
-      /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
+      /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
         --model ${meta_model_prefix} \
         --p-is-phred \
         --spa \

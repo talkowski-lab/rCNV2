@@ -21,7 +21,7 @@ _Note: most subdirectories have their own documentation, which outlines specific
 | [`utils/`](https://github.com/talkowski-lab/rCNV2/tree/master/utils/) | Miscellaneous small utilities and scripts |  
 
 
-## Citation  
+### Citation  
 
 If you use the code in this repository, please cite:  
 > Collins _et al._, _A cross-disorder dosage sensitivity map of the human genome_, _medRxiv_ (2021). DOI: [10.1101/2021.01.26.21250098](https://doi.org/10.1101/2021.01.26.21250098)  
