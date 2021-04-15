@@ -437,6 +437,7 @@ while read prefix hpo; do
     /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
       --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
       --model ${meta_model_prefix} \
+      --conditional-exclusion ${conditional_exclusion_list} \
       --p-is-phred \
       --spa \
       ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \

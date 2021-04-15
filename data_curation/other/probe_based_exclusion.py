@@ -76,6 +76,21 @@ def parse_probesets(probes_tsv):
     return tracks, tnames
 
 
+def replace_coords(intervals, orig_bed, cols_to_keep):
+    """
+    Replace expanded coordinates for all intervals with their original coordinates
+    """
+
+    old_df = pd.read_csv(orig_bed, sep='\t')
+    new_df = intervals.to_dataframe(names=range(intervals.field_count()))
+
+    fixed_df = pd.concat([old_df.iloc[:, range(cols_to_keep)],
+                          new_df.iloc[:, cols_to_keep:(new_df.shape[1])]],
+                         ignore_index=True, axis=1)
+
+    return pbt.BedTool().from_dataframe(fixed_df).saveas()
+
+
 def label_array_fails(intervals, min_probes, bed_header, tnames):
     """
     Generate pd.DataFrame of pass/fail labels per interval per array
@@ -214,6 +229,7 @@ def main():
                               actions=['count' for i in range(len(tracks))], 
                               fasta=None, snv_mus=None, maxfloat=8, 
                               ucsc_chromsplit=False, quiet=False)
+    intervals = replace_coords(intervals, args.bed, args.keep_n_columns)
     counts_outfile = args.probecounts_outfile
     if counts_outfile is not None:
         if 'compressed' in determine_filetype(counts_outfile):

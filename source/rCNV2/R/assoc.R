@@ -637,17 +637,29 @@ meta <- function(stats.merged, cohorts, model="fe", saddle=T, secondary=T){
     meta.res$meta_phred_p_secondary <- meta.res.secondary$meta_phred_p
   }
 
-  # Compute pooled carrier frequencies
-  case.alt <- apply(meta.res[, grep("case_alt", colnames(meta.res), fixed=T)], 1, sum, na.rm=T)
-  case.ref <- apply(meta.res[, grep("case_ref", colnames(meta.res), fixed=T)], 1, sum, na.rm=T)
+  # Compute pooled carrier frequencies (while taking into account excluded cohorts)
+  sum_cols_helper <- function(meta.res, substring){
+    hits <- grep(substring, colnames(meta.res), fixed=T)
+    excl.cohorts <- strsplit(meta.res$exclude_cohorts, split=";")
+    sapply(1:nrow(meta.res), function(i){
+      excl <- unique(unlist(sapply(excl.cohorts[[i]], grep, x=colnames(meta.res), fixed=TRUE)))
+      keep <- setdiff(hits, excl)
+      sum(as.numeric(meta.res[i, keep]), na.rm=T)
+    })
+  }
+  case.alt <- sum_cols_helper(meta.res, "case_alt")
+  case.ref <- sum_cols_helper(meta.res, "case_ref")
   meta.res$case_freq <- case.alt / (case.alt + case.ref)
-  control.alt <- apply(meta.res[, grep("control_alt", colnames(meta.res), fixed=T)], 1, sum, na.rm=T)
-  control.ref <- apply(meta.res[, grep("control_ref", colnames(meta.res), fixed=T)], 1, sum, na.rm=T)
+  control.alt <- sum_cols_helper(meta.res, "control_alt")
+  control.ref <- sum_cols_helper(meta.res, "control_ref")
   meta.res$control_freq <- control.alt / (control.alt + control.ref)
 
   # Format output
-  return(as.data.frame(cbind(meta.res[, which(colnames(meta.res) %in% c("chr", "start", "end",
-                                                                        "n_nominal_cohorts", "top_cohort",
-                                                                        "case_freq", "control_freq"))],
+  meta.res$exclude_cohorts[which(meta.res$exclude_cohorts == "")] <- NA
+  colnames(meta.res)[which(colnames(meta.res)=="exclude_cohorts")] <- "cohorts_excluded_from_meta"
+  cols.to.keep <- c("chr", "start", "end", "n_nominal_cohorts", "top_cohort",
+                    "cohorts_excluded_from_meta", "case_freq", "control_freq")
+  return(as.data.frame(cbind(meta.res[, cols.to.keep],
                              meta.res[, grep("meta_", colnames(meta.res), fixed=T)])))
 }
+
