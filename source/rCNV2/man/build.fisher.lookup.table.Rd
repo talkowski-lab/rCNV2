@@ -4,10 +4,12 @@
 \alias{build.fisher.lookup.table}
 \title{Compute Fisher's exact test lookup table}
 \usage{
-build.fisher.lookup.table(bed)
+build.fisher.lookup.table(bed, keep.n.cols = 3)
 }
 \arguments{
 \item{bed}{data frame of case/control CNV counts as loaded by \code{load.cc.cnv.counts()}}
+
+\item{keep.n.cols}{number of columns from original BED format to retain}
 }
 \value{
 data frame of all unique case & control CNV counts

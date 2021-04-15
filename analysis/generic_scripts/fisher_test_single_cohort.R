@@ -36,6 +36,9 @@ option_list <- list(
   make_option(c("--control-column"), type="character", default='control_cnvs',
               help="name of column to use for control CNV counts [default %default]",
               metavar="string"),
+  make_option(c("--keep-n-columns"), type="integer", default=3,
+              help="retain first N columns from BED format [default %default]",
+              metavar="integer"),
   make_option(c("--precision"), type="integer", default=6,
               help="level of precision for floats [default %default]",
               metavar="integer"),
@@ -48,6 +51,8 @@ args <- parse_args(OptionParser(usage="%prog bins outfile",
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
+
+print(args)
 
 # Checks for appropriate positional arguments
 if(length(args$args) != 2){
@@ -72,6 +77,7 @@ case.hpo <- opts$`case-hpo`
 control.hpo <- opts$`control-hpo`
 case.col.name <- opts$`case-column`
 control.col.name <- opts$`control-column`
+keep.n.cols <- opts$`keep-n-columns`
 precision <- opts$precision
 
 # Extract sample counts
@@ -79,10 +85,11 @@ sample.counts <- get.sample.counts(pheno.table.in, cohort.name, case.hpo, contro
 
 # Process input BED
 bed <- load.cc.cnv.counts(bed.in, case.col.name, sample.counts$case.n,
-                          control.col.name, sample.counts$control.n)
+                          control.col.name, sample.counts$control.n,
+                          keep.n.cols)
 
 # Run burden tests
-fisher.bed <- fisher.burden.test(bed, precision)
+fisher.bed <- fisher.burden.test(bed, keep.n.cols, precision)
 
 # Format output
 colnames(fisher.bed)[1] <- "#chr"

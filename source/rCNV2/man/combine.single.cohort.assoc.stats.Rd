@@ -4,12 +4,18 @@
 \alias{combine.single.cohort.assoc.stats}
 \title{Merge single-cohort association stats}
 \usage{
-combine.single.cohort.assoc.stats(stats.list, cond.excl.in = NULL)
+combine.single.cohort.assoc.stats(
+  stats.list,
+  cond.excl.in = NULL,
+  keep.n.cols = 3
+)
 }
 \arguments{
 \item{stats.list}{list of single-cohort association stats}
 
 \item{cond.excl.in}{path to BED file of cohorts to be excluded on locus-specific basis}
+
+\item{keep.n.cols}{number of columns from original BED format to retain}
 }
 \value{
 data frame of association stats for all cohorts

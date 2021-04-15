@@ -4,7 +4,14 @@
 \alias{meta}
 \title{CNV meta-analysis for one or more loci}
 \usage{
-meta(stats.merged, cohorts, model = "fe", saddle = T, secondary = T)
+meta(
+  stats.merged,
+  cohorts,
+  model = "fe",
+  saddle = T,
+  secondary = T,
+  keep.n.cols = 3
+)
 }
 \arguments{
 \item{stats.merged}{association statistics for all cohorts (see \code{\link[=combine.single.cohort.assoc.stats]{combine.single.cohort.assoc.stats()}})}
@@ -18,6 +25,8 @@ meta(stats.merged, cohorts, model = "fe", saddle = T, secondary = T)
 
 \item{secondary}{boolean indicator to also compute meta-analysis statistics
 after dropping most significant individual cohort [default: TRUE]}
+
+\item{keep.n.cols}{number of columns from original BED format to retain}
 }
 \value{
 data frame of meta-analysis summary statistics

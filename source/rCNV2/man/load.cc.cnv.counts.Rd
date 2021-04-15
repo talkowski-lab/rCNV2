@@ -4,7 +4,14 @@
 \alias{load.cc.cnv.counts}
 \title{Load case/control CNV counts}
 \usage{
-load.cc.cnv.counts(bed.in, case.col.name, case.n, control.col.name, control.n)
+load.cc.cnv.counts(
+  bed.in,
+  case.col.name,
+  case.n,
+  control.col.name,
+  control.n,
+  keep.n.cols = 3
+)
 }
 \arguments{
 \item{bed.in}{path to input BED3+ file}
@@ -16,6 +23,8 @@ load.cc.cnv.counts(bed.in, case.col.name, case.n, control.col.name, control.n)
 \item{control.col.name}{name of column containing control CNV counts}
 
 \item{control.n}{total number of control samples in cohort}
+
+\item{keep.n.cols}{number of columns from original BED format to retain}
 }
 \value{
 data frame of CNV counts and frequencies per locus

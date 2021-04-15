@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -24,6 +24,46 @@ mkdir windows/
 gsutil -m cp -r gs://rcnv_project/cleaned_data/binned_genome/* windows/
 mkdir refs/
 gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
+
+
+
+
+
+
+### Determine probe density-based conditional exclusion list
+# Test/dev parameters
+binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
+binned_genome_prefix="GRCh37.200kb_bins_10kb_steps.raw" #Note: this can be inferred in WDL as basename(binned_genome, ".bed.gz")
+min_probes_per_window=10
+min_frac_controls_probe_exclusion=0.9
+metacohort_list="refs/rCNV_metacohort_list.txt"
+rCNV_bucket="gs://rcnv_project"
+freq_code="rCNV"
+
+# Download probesets (note: requires permissions)
+gsutil -m cp -r \
+  ${rCNV_bucket}/cleaned_data/control_probesets \
+  ./
+
+# Compute conditional cohort exclusion mask
+for file in control_probesets/*bed.gz; do
+  echo -e "$file\t$( basename $file | sed 's/\.bed\.gz//g' )"
+done > probeset_tracks.tsv
+/opt/rCNV2/data_curation/other/probe_based_exclusion.py \
+  --outfile ${binned_genome_prefix}.cohort_exclusion.bed.gz \
+  --probecounts-outfile ${binned_genome_prefix}.probe_counts.bed.gz \
+  --frac-pass-outfile ${binned_genome_prefix}.frac_passing.bed.gz \
+  --min-probes ${min_probes_per_window} \
+  --min-frac-samples ${min_frac_controls_probe_exclusion} \
+  --keep-n-columns 3 \
+  --bgzip \
+  ${binned_genome} \
+  probeset_tracks.tsv \
+  control_probesets/rCNV.control_counts_by_array.tsv \
+  <( fgrep -v mega ${metacohort_list} )
+
+
+
 
 
 # Test/dev parameters (seizures)
@@ -155,6 +195,7 @@ binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
 p_cutoff=0.000003715428
 n_pheno_perms=50
+exclusion_bed=GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz #Note: this file must be generated above
 meta_model_prefix="fe"
 i=1
 bin_overlap=0.5
@@ -257,6 +298,7 @@ while read prefix hpo; do
       > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
       /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
         --model ${meta_model_prefix} \
+        --conditional-exclusion ${exclusion_bed} \
         --p-is-phred \
         --spa \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
@@ -322,43 +364,6 @@ awk -v pval=${p_cutoff} -v FS="\t" -v OFS="\t" \
 
 
 
-
-### Determine probe density-based conditional exclusion list
-# Test/dev parameters
-binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
-binned_genome_prefix="GRCh37.200kb_bins_10kb_steps.raw" #Note: this can be inferred in WDL as basename(binned_genome, ".bed.gz")
-min_probes_per_window=10
-min_frac_controls_probe_exclusion=0.9
-metacohort_list="refs/rCNV_metacohort_list.txt"
-rCNV_bucket="gs://rcnv_project"
-freq_code="rCNV"
-
-# Download probesets (note: requires permissions)
-gsutil -m cp -r \
-  ${rCNV_bucket}/cleaned_data/control_probesets \
-  ./
-
-# Compute conditional cohort exclusion mask
-for file in control_probesets/*bed.gz; do
-  echo -e "$file\t$( basename $file | sed 's/\.bed\.gz//g' )"
-done > probeset_tracks.tsv
-/opt/rCNV2/data_curation/other/probe_based_exclusion.py \
-  --outfile ${binned_genome_prefix}.cohort_exclusion.bed.gz \
-  --probecounts-outfile ${binned_genome_prefix}.probe_counts.bed.gz \
-  --frac-pass-outfile ${binned_genome_prefix}.frac_passing.bed.gz \
-  --min-probes ${min_probes_per_window} \
-  --min-frac-samples ${min_frac_controls_probe_exclusion} \
-  --keep-n-columns 3 \
-  --bgzip \
-  ${binned_genome} \
-  probeset_tracks.tsv \
-  control_probesets/rCNV.control_counts_by_array.tsv \
-  <( fgrep -v mega ${metacohort_list} )
-
-
-
-
-
 # # Test/dev parameters (all cases)
 # hpo="HP:0000118"
 # prefix="HP0000118"
@@ -377,7 +382,7 @@ meta_p_cutoff=0.000003715428
 meta_model_prefix="fe"
 bin_overlap=0.5
 pad_controls=50000
-conditional_exclusion_list=GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz #Note: this file must be generated directly above
+exclusion_bed=GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz #Note: this file must be generated above
 # # Test/dev parameters (anxiety, with bad case:control imbalance)
 # hpo="HP:0100852"
 # prefix="HP0100852"
@@ -437,7 +442,7 @@ while read prefix hpo; do
     /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
       --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
       --model ${meta_model_prefix} \
-      --conditional-exclusion ${conditional_exclusion_list} \
+      --conditional-exclusion ${exclusion_bed} \
       --p-is-phred \
       --spa \
       ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \

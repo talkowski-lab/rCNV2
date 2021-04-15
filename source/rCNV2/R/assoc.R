@@ -45,6 +45,7 @@ get.sample.counts <- function(pheno.table.in, cohort.name, case.hpo, control.hpo
 #' @param case.n total number of case samples in cohort
 #' @param control.col.name name of column containing control CNV counts
 #' @param control.n total number of control samples in cohort
+#' @param keep.n.cols number of columns from original BED format to retain
 #'
 #' @return data frame of CNV counts and frequencies per locus
 #'
@@ -54,23 +55,24 @@ get.sample.counts <- function(pheno.table.in, cohort.name, case.hpo, control.hpo
 #' * `analysis/noncoding/count_cnvs_per_crb.py`
 #'
 #' @export
-load.cc.cnv.counts <- function(bed.in, case.col.name, case.n, control.col.name, control.n){
+load.cc.cnv.counts <- function(bed.in, case.col.name, case.n, control.col.name,
+                               control.n, keep.n.cols=3){
   bed <- read.table(bed.in, sep="\t", header=T, comment.char="")
 
-  case.col.idx <- grep(case.col.name, colnames(bed), fixed=T)
+  case.col.idx <- which(colnames(bed) == case.col.name)
   if(length(case.col.idx) == 0){
     stop(paste("--case-column \"",case.col.name,"\" cannot be found ",
                "in BED header", sep=""))
   }
 
-  control.col.idx <- grep(control.col.name, colnames(bed), fixed=T)
+  control.col.idx <- which(colnames(bed) == control.col.name)
   if(length(control.col.idx) == 0){
     stop(paste("--control-column \"",control.col.idx,"\" cannot be found ",
                "in BED header", sep=""))
   }
 
-  bed <- bed[,c(1:3, case.col.idx, control.col.idx)]
-  colnames(bed) <- c("chr", "start", "end", "case.CNV", "control.CNV")
+  bed <- bed[,c(1:keep.n.cols, case.col.idx, control.col.idx)]
+  colnames(bed) <- c("chr", colnames(bed[2:keep.n.cols]), "case.CNV", "control.CNV")
   bed$case.ref <- case.n - bed$case.CNV
   bed$control.ref <- control.n - bed$control.CNV
   bed$case.CNV.freq <- bed$case.CNV / case.n
@@ -127,14 +129,15 @@ fisher.burden.test.single <- function(counts, alternative="greater"){
 #' Build a lookup table of all case/control count pairings for Fisher's Exact Tests
 #'
 #' @param bed data frame of case/control CNV counts as loaded by `load.cc.cnv.counts()`
+#' @param keep.n.cols number of columns from original BED format to retain
 #'
 #' @return data frame of all unique case & control CNV counts
 #'
 #' @seealso [load.cc.cnv.counts()]
 #'
 #' @export
-build.fisher.lookup.table <- function(bed){
-  counts.df <- unique(bed[,4:7])
+build.fisher.lookup.table <- function(bed, keep.n.cols=3){
+  counts.df <- unique(bed[, (1:4)+keep.n.cols])
   counts.df <- counts.df[with(counts.df, order(control.CNV, case.CNV)),]
 
   f.stats <- t(apply(counts.df, 1, fisher.burden.test.single))
@@ -149,6 +152,7 @@ build.fisher.lookup.table <- function(bed){
 #' Fisher's exact test of case:control CNV burden per locus for one or more loci
 #'
 #' @param bed data frame of case/control CNV counts as loaded by `load.cc.cnv.counts()`
+#' @param keep.n.cols number of columns from original BED format to retain
 #' @param precision maximum precision for floating point values
 #'
 #' @return data frame of association test resuts
@@ -156,8 +160,8 @@ build.fisher.lookup.table <- function(bed){
 #' @seealso [fisher.burden.test.single()]
 #'
 #' @export
-fisher.burden.test <- function(bed, precision=10){
-  f.table <- build.fisher.lookup.table(bed)
+fisher.burden.test <- function(bed, keep.n.cols=3, precision=10){
+  f.table <- build.fisher.lookup.table(bed, keep.n.cols)
 
   f.res <- merge(bed, f.table, sort=F, all.x=T, all.y=F)
   f.res <- f.res[with(f.res, order(chr, start)),]
@@ -176,7 +180,7 @@ fisher.burden.test <- function(bed, precision=10){
                            "fisher_OR_lower" = round(f.res$OR.lower, precision),
                            "fisher_OR_upper" = round(f.res$OR.upper, precision))
 
-  return(fisher.bed)
+  return(merge(bed[, 1:keep.n.cols], fisher.bed, all.y=T, sort=F))
 }
 
 
@@ -281,21 +285,22 @@ or.corplot.grid <- function(stats.list, pt.cex=1){
 #'
 #' @param stats.list list of single-cohort association stats
 #' @param cond.excl.in path to BED file of cohorts to be excluded on locus-specific basis
+#' @param keep.n.cols number of columns from original BED format to retain
 #'
 #' @return data frame of association stats for all cohorts
 #'
 #' @seealso [read.assoc.stats.single()]
 #'
 #' @export
-combine.single.cohort.assoc.stats <- function(stats.list, cond.excl.in=NULL){
+combine.single.cohort.assoc.stats <- function(stats.list, cond.excl.in=NULL,
+                                              keep.n.cols=3){
   # Merge all cohorts
   merged <- stats.list[[1]]
+  mergeby.cols <- colnames(merged)[1:keep.n.cols]
   for(i in 2:length(stats.list)){
-    merged <- merge(merged, stats.list[[i]],
-                    by=c("chr", "start", "end"),
-                    all=F, sort=F)
+    merged <- merge(merged, stats.list[[i]], by=mergeby.cols, all=F, sort=F)
   }
-  merged[, -c(1:3)] <- apply(merged[, -c(1:3)], 2, as.numeric)
+  merged[, -c(1:keep.n.cols)] <- apply(merged[, -c(1:keep.n.cols)], 2, as.numeric)
 
   # Count number of nominally significant individual cohorts
   n_nom_sig <- apply(merged[, grep(".p_value", colnames(merged), fixed=T)],
@@ -314,7 +319,7 @@ combine.single.cohort.assoc.stats <- function(stats.list, cond.excl.in=NULL){
     cond.excl.df <- read.table(cond.excl.in, header=T, sep="\t", comment.char="")
     colnames(cond.excl.df)[1] <- gsub('^X.', '', colnames(cond.excl.df)[1])
     cond.excl.df$exclude_cohorts
-    merged <- merge(merged, cond.excl.df, by=c("chr", "start", "end"),
+    merged <- merge(merged, cond.excl.df, by=mergeby.cols,
                     all.x=T, all.y=F, sort=F)
   }else{
     merged$exclude_cohorts <- ""
@@ -595,6 +600,7 @@ saddlepoint.adj <- function(zscores, phred=T){
 #' (see [saddlepoint.adj()]) \[default: TRUE\]
 #' @param secondary boolean indicator to also compute meta-analysis statistics
 #' after dropping most significant individual cohort \[default: TRUE\]
+#' @param keep.n.cols number of columns from original BED format to retain
 #'
 #' @details `model` accepts several character inputs, including:
 #' * `fe` : fixed-effects model implemented by [metafor::rma.uni()] \[default\]
@@ -604,7 +610,7 @@ saddlepoint.adj <- function(zscores, phred=T){
 #' @return data frame of meta-analysis summary statistics
 #'
 #' @export
-meta <- function(stats.merged, cohorts, model="fe", saddle=T, secondary=T){
+meta <- function(stats.merged, cohorts, model="fe", saddle=T, secondary=T, keep.n.cols=3){
   # Make meta-analysis lookup table
   meta.lookup.table <- make.meta.lookup.table(stats.merged, cohorts, model,
                                               empirical.continuity=T)
@@ -657,7 +663,8 @@ meta <- function(stats.merged, cohorts, model="fe", saddle=T, secondary=T){
   # Format output
   meta.res$exclude_cohorts[which(meta.res$exclude_cohorts == "")] <- NA
   colnames(meta.res)[which(colnames(meta.res)=="exclude_cohorts")] <- "cohorts_excluded_from_meta"
-  cols.to.keep <- c("chr", "start", "end", "n_nominal_cohorts", "top_cohort",
+  cols.to.keep <- c(colnames(stats.merged)[1:keep.n.cols],
+                    "n_nominal_cohorts", "top_cohort",
                     "cohorts_excluded_from_meta", "case_freq", "control_freq")
   return(as.data.frame(cbind(meta.res[, cols.to.keep],
                              meta.res[, grep("meta_", colnames(meta.res), fixed=T)])))

@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019-2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -31,10 +31,10 @@ gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 hpo="HP:0001250"
 prefix="HP0001250"
 meta="meta2"
-# Params for NDDs
-hpo="HP:0012759"
-prefix="HP0012759"
-meta="meta1"
+# # Params for NDDs
+# hpo="HP:0012759"
+# prefix="HP0012759"
+# meta="meta1"
 # General params
 freq_code="rCNV"
 CNV="DEL"
@@ -116,11 +116,11 @@ while read pheno hpo; do
       tabix -f "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz"
 
       # Perform burden test
-      /opt/rCNV2/analysis/genes/gene_burden_test.R \
+      /opt/rCNV2/analysis/generic_scripts/fisher_test_single_cohort.R \
         --pheno-table ${metacohort_sample_table} \
         --cohort-name $meta \
-        --cnv $CNV \
         --case-hpo ${hpo} \
+        --keep-n-columns 4 \
         --bgzip \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
@@ -159,6 +159,49 @@ while read pheno hpo; do
       "$meta.${prefix}.${freq_code}.gene_burden"
   done < ${metacohort_list}
 done < ${phenotype_list}
+
+
+
+
+
+
+### Determine probe density-based conditional exclusion list
+# Test/dev parameters
+genes_bed="$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz" #Note: in the WDL, this file is extracted as the first stats bed from the array (as a test case)
+# For convenience, this can be downloaded from a precomputed file here (but will be generated dynamically in the WDL)
+gsutil -m cp ${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/stats/$genes_bed ./
+gtf_prefix="gencode.v19.canonical" #Note: this can be inferred in WDL as basename(gtf, ".gtf.gz")
+min_probes_per_gene=10
+min_frac_controls_probe_exclusion=0.9
+metacohort_list="refs/rCNV_metacohort_list.txt"
+rCNV_bucket="gs://rcnv_project"
+freq_code="rCNV"
+
+# Download probesets (note: requires permissions)
+gsutil -m cp -r \
+  ${rCNV_bucket}/cleaned_data/control_probesets \
+  ./
+
+# Subset gene coordinates to minimal BED4
+zcat ${genes_bed} | cut -f1-4 | bgzip -c > gene_coords.bed.gz
+
+# Compute conditional cohort exclusion mask
+for file in control_probesets/*bed.gz; do
+  echo -e "$file\t$( basename $file | sed 's/\.bed\.gz//g' )"
+done > probeset_tracks.tsv
+/opt/rCNV2/data_curation/other/probe_based_exclusion.py \
+  --outfile ${gtf_prefix}.cohort_exclusion.bed.gz \
+  --probecounts-outfile ${gtf_prefix}.probe_counts.bed.gz \
+  --frac-pass-outfile ${gtf_prefix}.frac_passing.bed.gz \
+  --min-probes ${min_probes_per_gene} \
+  --min-frac-samples ${min_frac_controls_probe_exclusion} \
+  --keep-n-columns 4 \
+  --bgzip \
+  gene_coords.bed.gz \
+  probeset_tracks.tsv \
+  control_probesets/rCNV.control_counts_by_array.tsv \
+  <( fgrep -v mega ${metacohort_list} )
+
 
 
 
@@ -250,11 +293,11 @@ while read prefix hpo; do
         tabix -f "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz"
 
         # Perform burden test
-        /opt/rCNV2/analysis/genes/gene_burden_test.R \
+        /opt/rCNV2/analysis/generic_scripts/fisher_test_single_cohort.R \
           --pheno-table ${metacohort_sample_table} \
           --cohort-name $meta \
-          --cnv $CNV \
           --case-hpo ${hpo} \
+          --keep-n-columns 4 \
           --bgzip \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.bed.gz" \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
@@ -315,7 +358,31 @@ paste perm_res/*.gene_burden.meta_analysis.permuted_p_values.*.txt \
 
 
 
-# Run meta-analysis for each phenotype
+
+
+### Run meta-analysis for each phenotype
+# Test/dev parameters (seizures)
+hpo="HP:0001250"
+prefix="HP0001250"
+freq_code="rCNV"
+cnv="DEL"
+phenotype_list="refs/test_phenotypes.list"
+metacohort_list="refs/rCNV_metacohort_list.txt"
+metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
+rCNV_bucket="gs://rcnv_project"
+p_cutoff=0.000002896368
+max_manhattan_phred_p=30
+meta_model_prefix="fe"
+exclusion_bed="gencode.v19.canonical.cohort_exclusion.bed.gz" #Note: this file must be generated above
+
+# Copy necessary data for local testing (without running the above -- this is not in the WDL)
+gsutil -m cp \
+  ${rCNV_bucket}/analysis/analysis_refs/gene_burden.${freq_code}.*.bonferroni_pval.hpo_cutoffs.tsv \
+  ./
+gsutil -m cp \
+  ${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/stats/meta**.stats.bed.gz* \
+  ./
+
 while read prefix hpo; do
 
     # Get metadata for meta-analysis
@@ -362,9 +429,11 @@ while read prefix hpo; do
         echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt
-      /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
+      /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
         --or-corplot ${prefix}.${freq_code}.$CNV.gene_burden.or_corplot_grid.jpg \
         --model ${meta_model_prefix} \
+        --conditional-exclusion ${exclusion_bed} \
+        --keep-n-columns 4 \
         --p-is-phred \
         --spa \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \

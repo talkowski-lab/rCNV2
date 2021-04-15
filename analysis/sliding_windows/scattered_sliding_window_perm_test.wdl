@@ -13,6 +13,7 @@ workflow scattered_sliding_window_perm_test {
   String hpo
   File metacohort_list
   File metacohort_sample_table
+  File exclusion_bed
   String freq_code
   File binned_genome
   Float bin_overlap
@@ -33,6 +34,7 @@ workflow scattered_sliding_window_perm_test {
 	      hpo=hpo,
 	      metacohort_list=metacohort_list,
 	      metacohort_sample_table=metacohort_sample_table,
+        exclusion_bed=exclusion_bed,
 	      freq_code=freq_code,
 	      binned_genome=binned_genome,
 	      bin_overlap=bin_overlap,
@@ -57,6 +59,7 @@ task permuted_burden_test {
   String hpo
   File metacohort_list
   File metacohort_sample_table
+  File exclusion_bed
   String freq_code
   File binned_genome
   Float bin_overlap
@@ -159,6 +162,7 @@ task permuted_burden_test {
       > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
       /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
         --model ${meta_model_prefix} \
+        --conditional-exclusion ${exclusion_bed} \
         --p-is-phred \
         --spa \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \

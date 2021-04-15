@@ -4,10 +4,12 @@
 \alias{fisher.burden.test}
 \title{Fisher's Exact Test for a list of loci}
 \usage{
-fisher.burden.test(bed, precision = 10)
+fisher.burden.test(bed, keep.n.cols = 3, precision = 10)
 }
 \arguments{
 \item{bed}{data frame of case/control CNV counts as loaded by \code{load.cc.cnv.counts()}}
+
+\item{keep.n.cols}{number of columns from original BED format to retain}
 
 \item{precision}{maximum precision for floating point values}
 }

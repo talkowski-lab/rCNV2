@@ -33,7 +33,10 @@ option_list <- list(
   make_option(c("--spa"), action="store_true", default=FALSE,
               help="apply saddlepoint approximation of null distribution [default %default]"),
   make_option(c("--no-secondary"), action="store_true", default=FALSE,
-              help="do not compute secondary P-value [default %default]")
+              help="do not compute secondary P-value [default %default]"),
+  make_option(c("--keep-n-columns"), type="integer", default=3,
+              help="retain first N columns from BED format [default %default]",
+              metavar="integer")
 )
 
 # Get command-line arguments & options
@@ -51,24 +54,26 @@ cond.excl.in <- opts$`conditional-exclusion`
 p.is.phred <- opts$`p-is-phred`
 spa <- opts$spa
 secondary <- !(opts$`no-secondary`)
+keep.n.cols <- opts$`keep-n-columns`
 
 # # Dev parameters
 # setwd("~/scratch/assoc_test_dev")
-# infile <- "HP0001250.rCNV.DEL.sliding_window.meta_analysis.input.txt"
-# outfile <- "HP0001250.rCNV.DEL.window_meta_test_results.bed"
+# infile <- "HP0001250.rCNV.DEL.gene_burden.meta_analysis.input.txt"
+# outfile <- "HP0001250.rCNV.DEL.gene_meta_test_results.bed"
 # corplot.out <- "corplot.test.jpg"
 # model <- "fe"
-# cond.excl.in <- "GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz"
+# cond.excl.in <- "gencode.v19.canonical.cohort_exclusion.bed.gz"
 # p.is.phred <- T
 # spa <- T
 # secondary <- T
+# keep.n.cols <- 4
 
 # Read list of cohorts to meta-analyze
 cohort.info <- read.table(infile, header=F, sep="\t")
 ncohorts <- nrow(cohort.info)
-stats.list <- lapply(1:ncohorts, function(i){read.assoc.stats.single(cohort.info[i, 2],
-                                                                     cohort.info[i, 1],
-                                                                     p.is.phred)})
+stats.list <- lapply(1:ncohorts, function(i){
+  read.assoc.stats.single(cohort.info[i, 2], cohort.info[i, 1], p.is.phred, keep.n.cols)
+})
 names(stats.list) <- cohort.info[, 1]
 
 # Plot correlations of odds ratios between cohorts, if optioned
@@ -81,9 +86,9 @@ if(!is.null(corplot.out)){
 }
 
 # Conduct meta-analysis & write to file
-stats.merged <- combine.single.cohort.assoc.stats(stats.list, cond.excl.in)
+stats.merged <- combine.single.cohort.assoc.stats(stats.list, cond.excl.in, keep.n.cols)
 stats.meta <- meta(stats.merged, cohort.info[, 1], model=model,
-                   saddle=spa, secondary=secondary)
+                   saddle=spa, secondary=secondary, keep.n.cols=keep.n.cols)
 colnames(stats.meta)[1] <- "#chr"
 write.table(stats.meta, outfile, sep="\t",
             row.names=F, col.names=T, quote=F)
