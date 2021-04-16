@@ -19,6 +19,8 @@ workflow gene_burden_analysis {
   File gtf
   Int n_pheno_perms
   Int pad_controls
+  Int min_probes_per_window
+  Float min_frac_controls_probe_exclusion
   String meta_model_prefix
   String weight_mode
   Float min_cds_ovr_del
@@ -77,13 +79,29 @@ workflow gene_burden_analysis {
         prefix=pheno[0],
         cache_string=fisher_cache_string
     }
+  }
 
+  # Determine conditional cohort exclusion list based on probe density
+  call build_exclusion_list {
+    input:
+      genes_bed=rCNV_burden_test.stats_beds[0],
+      gtf_prefix=basename(gtf, '.gtf.gz'),
+      min_probes_per_window=min_probes_per_window,
+      min_frac_controls_probe_exclusion=min_frac_controls_probe_exclusion,
+      metacohort_list=metacohort_list,
+      rCNV_bucket=rCNV_bucket,
+      freq_code=freq_code
+  }
+
+  # Scatter over phenotypes
+  scatter ( pheno in phenotypes ) {
     # Permute phenotypes to estimate empirical FDR
     call scattered_perm.scattered_gene_burden_perm_test as rCNV_perm_test {
       input:
         hpo=pheno[1],
         metacohort_list=metacohort_list,
         metacohort_sample_table=metacohort_sample_table,
+        exclusion_bed=build_exclusion_list.exclusion_bed,
         freq_code="rCNV",
         gtf=gtf,
         pad_controls=pad_controls,
@@ -99,7 +117,6 @@ workflow gene_burden_analysis {
         cache_string=perm_cache_string
     }
   }
-
 
   # Determine appropriate P-value thresholds for primary and secondary meta-analysis
   scatter ( cnv in cnv_types ) {
@@ -128,6 +145,7 @@ workflow gene_burden_analysis {
         hpo=pheno[1],
         metacohort_list=metacohort_list,
         metacohort_sample_table=metacohort_sample_table,
+        exclusion_bed=build_exclusion_list.exclusion_bed,
         freq_code="rCNV",
         meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
         max_manhattan_phred_p=max_manhattan_phred_p,
@@ -483,6 +501,60 @@ task burden_test {
 }
 
 
+# Build list of cohorts to exclude per gene based on inadequate probe density
+task build_exclusion_list {
+  File genes_bed
+  String gtf_prefix
+  Int min_probes_per_window
+  Float min_frac_controls_probe_exclusion
+  File metacohort_list
+  String rCNV_bucket
+  String freq_code
+
+  command <<<
+    set -euo pipefail
+
+    # Download control probesets
+    gsutil -m cp -r \
+      ${rCNV_bucket}/cleaned_data/control_probesets \
+      ./
+
+    # Make inputs for conditional exclusion script
+    zcat ${genes_bed} | cut -f1-4 | bgzip -c > gene_coords.bed.gz
+    for file in control_probesets/*bed.gz; do
+      echo -e "$file\t$( basename $file | sed 's/\.bed\.gz//g' )"
+    done > probeset_tracks.tsv
+
+    # Build conditional exclusion list
+    /opt/rCNV2/data_curation/other/probe_based_exclusion.py \
+      --outfile ${gtf_prefix}.cohort_exclusion.bed.gz \
+      --probecounts-outfile ${gtf_prefix}.probe_counts.bed.gz \
+      --frac-pass-outfile ${gtf_prefix}.frac_passing.bed.gz \
+      --min-probes ${min_probes_per_gene} \
+      --min-frac-samples ${min_frac_controls_probe_exclusion} \
+      --keep-n-columns 4 \
+      --bgzip \
+      gene_coords.bed.gz \
+      probeset_tracks.tsv \
+      control_probesets/rCNV.control_counts_by_array.tsv \
+      <( fgrep -v mega ${metacohort_list} )
+  >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
+    preemptible: 1
+    memory: "4 GB"
+    bootDiskSizeGb: "20"
+  }
+
+  output {
+    File exclusion_bed = "${gtf_prefix}.cohort_exclusion.bed.gz"
+    File probe_counts = "${gtf_prefix}.probe_counts.bed.gz"
+    File frac_passing = "${gtf_prefix}.frac_passing.bed.gz"
+  }  
+}
+
+
 # Aggregate all permutation results to determine empirical P-value cutoff
 task calc_meta_p_cutoff {
   File phenotype_list
@@ -569,6 +641,7 @@ task meta_analysis {
   String hpo
   File metacohort_list
   File metacohort_sample_table
+  File exclusion_bed
   String freq_code
   Array[File] meta_p_cutoff_tables
   Int max_manhattan_phred_p
@@ -634,9 +707,11 @@ task meta_analysis {
         echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt
-      /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
+      /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
         --or-corplot ${prefix}.${freq_code}.$CNV.gene_burden.or_corplot_grid.jpg \
         --model ${meta_model_prefix} \
+        --conditional-exclusion ${exclusion_bed} \
+        --keep-n-columns 4 \
         --p-is-phred \
         --spa \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \

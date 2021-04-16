@@ -13,6 +13,7 @@ workflow scattered_gene_burden_perm_test {
   String hpo
   File metacohort_list
   File metacohort_sample_table
+  File exclusion_bed
   String freq_code
   File gtf
   Int pad_controls
@@ -36,6 +37,7 @@ workflow scattered_gene_burden_perm_test {
         hpo=hpo,
         metacohort_list=metacohort_list,
         metacohort_sample_table=metacohort_sample_table,
+        exclusion_bed=exclusion_bed,
         freq_code=freq_code,
         gtf=gtf,
         pad_controls=pad_controls,
@@ -63,6 +65,7 @@ task permuted_burden_test {
   String hpo
   File metacohort_list
   File metacohort_sample_table
+  File exclusion_bed
   String freq_code
   File gtf
   Int pad_controls
@@ -189,8 +192,10 @@ task permuted_burden_test {
         echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt
-      /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
+      /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
         --model ${meta_model_prefix} \
+        --conditional-exclusion ${exclusion_bed} \
+        --keep-n-columns 4 \
         --p-is-phred \
         --spa \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
