@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2019 Ryan L. Collins <rlcollins@g.harvard.edu> 
+# Copyright (c) 2019-Present Ryan L. Collins <rlcollins@g.harvard.edu> 
 # and the Talkowski Laboratory
 # Distributed under terms of the MIT license.
 
@@ -112,7 +112,6 @@ def read_vcf(vcfin, maxfreq, af_fields='AF'):
                             af = af[0]
                     afs.append(af)
                 return afs
-
             max_af = max(_scrape_afs(record, af_fields))
             if max_af <= maxfreq:
                 continue

@@ -80,9 +80,9 @@ while read cohort N; do
     --xcov 0.3 \
     --cohorts-list raw_CNVs.per_cohort.txt \
     --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
-    --vcf refs/1000Genomes_phase3.sites.vcf.gz \
+    --vcf refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
     --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-    --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
+    --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF,CN_NONREF_FREQ,AFR_CN_NONREF_FREQ,AMR_CN_NONREF_FREQ,EAS_CN_NONREF_FREQ,EUR_CN_NONREF_FREQ,SAS_CN_NONREF_FREQ,OTH_CN_NONREF_FREQ \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     rare_cnv_curated/$cohort.rCNV.bed.gz
@@ -105,9 +105,9 @@ while read cohort N; do
     --xcov 0.3 \
     --cohorts-list raw_CNVs.per_cohort.txt \
     --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
-    --vcf refs/1000Genomes_phase3.sites.vcf.gz \
+    --vcf refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
     --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-    --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
+    --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF,CN_NONREF_FREQ,AFR_CN_NONREF_FREQ,AMR_CN_NONREF_FREQ,EAS_CN_NONREF_FREQ,EUR_CN_NONREF_FREQ,SAS_CN_NONREF_FREQ,OTH_CN_NONREF_FREQ \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     ultrarare_cnv_curated/$cohort.vCNV.bed.gz
@@ -130,9 +130,9 @@ while read cohort N; do
     --xcov 0.3 \
     --cohorts-list raw_CNVs.per_cohort.txt \
     --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
-    --vcf refs/1000Genomes_phase3.sites.vcf.gz \
+    --vcf refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
     --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-    --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
+    --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF,CN_NONREF_FREQ,AFR_CN_NONREF_FREQ,AMR_CN_NONREF_FREQ,EAS_CN_NONREF_FREQ,EUR_CN_NONREF_FREQ,SAS_CN_NONREF_FREQ,OTH_CN_NONREF_FREQ \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     ultrarare_cnv_curated/$cohort.uCNV.bed.gz

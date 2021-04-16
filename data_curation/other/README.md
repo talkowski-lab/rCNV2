@@ -2,6 +2,8 @@
 
 Below, we describe curation steps for other datasets not already listed in a different subdirectory, including:  
 
+* Various microarray probesets  
+* Structural variant calls from the Human Genome Diversity Panel
 * Previously reported genomic disorders  
 * Predicted NAHR-mediated CNV loci  
 * _De novo_ point mutations from exome sequencing studies of neurodevelopmental disorders
@@ -32,6 +34,14 @@ These datasets were accessed as follows:
 | Illumina Infinium OmniExpress | `omniexpress` | Downloaded from Illumina website ([link](https://support.illumina.com/content/dam/illumina-support/documents/downloads/productfiles/humanomniexpress-24/v1-3/infinium-omniexpress-24-v1-3-a1-bed.zip)) |  
 | Illumina Infinium Omni2.5 | `omni_2.5` | Downloaded from Illumina website ([link](https://support.illumina.com/content/dam/illumina-support/documents/downloads/productfiles/humanomni25/v1-5/infinium-omni2-5-8v1-5-a1-bed.zip)) |  
 | ThermoFisher Applied Biosystems UK Biobank Axiom | `ukbbaxiom` | Downloaded from ThermoFisher website ([link](https://www.thermofisher.com/order/catalog/product/902502?us&en#/902502?us&en)) |  
+
+---  
+
+## Structural variant callset from whole-genome sequencing of the Human Genome Diversity Panel  
+
+We curated structural variants from the Human Genome Diversity Panel as described in [Almarri _et al._, _Cell_ (2020)](https://pubmed.ncbi.nlm.nih.gov/32531199/).  
+
+The code to curate the HGDP SV callset is provided in `curate_hgdp_svs.sh`.  
 
 ---  
 

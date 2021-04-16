@@ -157,7 +157,7 @@ task filter_cnvs_singleChrom {
       --xcov 0.3 \
       --cohorts-list raw_CNVs.per_cohort.txt \
       --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
-      --vcf refs/1000Genomes_phase3.sites.vcf.gz \
+      --vcf refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
       --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
       --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
       --bgzip \
