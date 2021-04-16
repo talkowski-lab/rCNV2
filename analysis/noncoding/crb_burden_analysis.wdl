@@ -2,7 +2,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -21,6 +21,8 @@ workflow crb_burden_analysis {
   String noncoding_filter
   Int n_pheno_perms
   Int pad_controls
+  Int min_probes_per_crb
+  Float min_frac_controls_probe_exclusion
   String meta_model_prefix
   Float min_element_ovr
   Float min_frac_all_elements
@@ -36,6 +38,18 @@ workflow crb_burden_analysis {
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
 
   Array[String] cnv_types = ["DEL", "DUP"]
+
+  # Determine conditional cohort exclusion list based on probe density
+  call build_exclusion_list {
+    input:
+      crbs=crbs,
+      crbs_prefix=basename(crbs, '.bed.gz'),
+      min_probes_per_crb=min_probes_per_crb,
+      min_frac_controls_probe_exclusion=min_frac_controls_probe_exclusion,
+      metacohort_list=metacohort_list,
+      rCNV_bucket=rCNV_bucket,
+      freq_code=freq_code
+  }
 
   # Scatter over phenotypes
   scatter ( pheno in phenotypes ) {
@@ -80,6 +94,7 @@ workflow crb_burden_analysis {
         hpo=pheno[1],
         metacohort_list=metacohort_list,
         metacohort_sample_table=metacohort_sample_table,
+        exclusion_bed=build_exclusion_list.exclusion_bed,
         freq_code="rCNV",
         noncoding_filter=noncoding_filter,
         crbs=crbs,
@@ -125,6 +140,7 @@ workflow crb_burden_analysis {
         hpo=pheno[1],
         metacohort_list=metacohort_list,
         metacohort_sample_table=metacohort_sample_table,
+        exclusion_bed=build_exclusion_list.exclusion_bed,
         freq_code="rCNV",
         noncoding_filter=noncoding_filter,
         meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
@@ -141,6 +157,7 @@ workflow crb_burden_analysis {
         hpo=pheno[1],
         metacohort_list=metacohort_list,
         metacohort_sample_table=metacohort_sample_table,
+        exclusion_bed=build_exclusion_list.exclusion_bed,
         freq_code="rCNV",
         noncoding_filter=noncoding_filter,
         meta_model_prefix=meta_model_prefix,
@@ -151,6 +168,60 @@ workflow crb_burden_analysis {
   }
 
   output {}
+}
+
+
+# Build list of cohorts to exclude per CRB based on inadequate probe density
+task build_exclusion_list {
+  File crbs
+  String crbs_prefix
+  Int min_probes_per_crb
+  Float min_frac_controls_probe_exclusion
+  File metacohort_list
+  String rCNV_bucket
+  String freq_code
+
+  command <<<
+    set -euo pipefail
+
+    # Download control probesets
+    gsutil -m cp -r \
+      ${rCNV_bucket}/cleaned_data/control_probesets \
+      ./
+
+    # Make inputs for conditional exclusion script
+    zcat ${crbs} | cut -f1-4 | bgzip -c > crb_coords.bed.gz
+    for file in control_probesets/*bed.gz; do
+      echo -e "$file\t$( basename $file | sed 's/\.bed\.gz//g' )"
+    done > probeset_tracks.tsv
+
+    # Build conditional exclusion list
+    /opt/rCNV2/data_curation/other/probe_based_exclusion.py \
+      --outfile ${crbs_prefix}.cohort_exclusion.bed.gz \
+      --probecounts-outfile ${crbs_prefix}.probe_counts.bed.gz \
+      --frac-pass-outfile ${crbs_prefix}.frac_passing.bed.gz \
+      --min-probes ${min_probes_per_crb} \
+      --min-frac-samples ${min_frac_controls_probe_exclusion} \
+      --keep-n-columns 4 \
+      --bgzip \
+      crb_coords.bed.gz \
+      probeset_tracks.tsv \
+      control_probesets/rCNV.control_counts_by_array.tsv \
+      <( fgrep -v mega ${metacohort_list} )
+  >>>
+
+  runtime {
+    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
+    preemptible: 1
+    memory: "4 GB"
+    bootDiskSizeGb: "20"
+  }
+
+  output {
+    File exclusion_bed = "${crbs_prefix}.cohort_exclusion.bed.gz"
+    File probe_counts = "${crbs_prefix}.probe_counts.bed.gz"
+    File frac_passing = "${crbs_prefix}.frac_passing.bed.gz"
+  }  
 }
 
 
@@ -221,11 +292,11 @@ task burden_test {
         tabix -f "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.counts.bed.gz"
 
         # Perform burden test
-        /opt/rCNV2/analysis/noncoding/crb_burden_test.R \
+        /opt/rCNV2/analysis/generic_scripts/fisher_test_single_cohort.R \
           --pheno-table ${metacohort_sample_table} \
           --cohort-name $meta \
-          --cnv $CNV \
           --case-hpo ${hpo} \
+          --keep-n-columns 4 \
           --bgzip \
           "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.counts.bed.gz" \
           "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.stats.bed.gz"
@@ -333,11 +404,11 @@ task coding_burden_test {
         tabix -f "$meta.${prefix}.${freq_code}.$CNV.crb_burden.counts.bed.gz"
 
         # Perform burden test
-        /opt/rCNV2/analysis/noncoding/crb_burden_test.R \
+        /opt/rCNV2/analysis/generic_scripts/fisher_test_single_cohort.R \
           --pheno-table ${metacohort_sample_table} \
           --cohort-name $meta \
-          --cnv $CNV \
           --case-hpo ${hpo} \
+          --keep-n-columns 4 \
           --bgzip \
           "$meta.${prefix}.${freq_code}.$CNV.crb_burden.counts.bed.gz" \
           "$meta.${prefix}.${freq_code}.$CNV.crb_burden.stats.bed.gz"
@@ -456,6 +527,7 @@ task meta_analysis {
   String hpo
   File metacohort_list
   File metacohort_sample_table
+  File exclusion_bed
   String freq_code
   String noncoding_filter
   Array[File] meta_p_cutoff_tables
@@ -515,11 +587,13 @@ task meta_analysis {
         echo -e "$meta\t$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.stats.bed.gz"
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt
-      /opt/rCNV2/analysis/noncoding/crb_meta_analysis.R \
+      /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
         --or-corplot ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.or_corplot_grid.jpg \
         --model ${meta_model_prefix} \
+        --conditional-exclusion ${exclusion_bed} \
         --p-is-phred \
         --spa \
+        --keep-n-columns 4 \
         ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed
       bgzip -f ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed
@@ -585,6 +659,7 @@ task coding_meta_analysis {
   String hpo
   File metacohort_list
   File metacohort_sample_table
+  File exclusion_bed
   String freq_code
   String noncoding_filter
   String meta_model_prefix
@@ -610,10 +685,12 @@ task coding_meta_analysis {
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.input.txt
 
-      /opt/rCNV2/analysis/noncoding/crb_meta_analysis.R \
+      /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
         --or-corplot ${prefix}.${freq_code}.$CNV.crb_burden.or_corplot_grid.jpg \
         --model ${meta_model_prefix} \
+        --conditional-exclusion ${exclusion_bed} \
         --p-is-phred \
+        --keep-n-columns 4 \
         --spa \
         ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed

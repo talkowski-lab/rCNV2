@@ -19,7 +19,7 @@ workflow gene_burden_analysis {
   File gtf
   Int n_pheno_perms
   Int pad_controls
-  Int min_probes_per_window
+  Int min_probes_per_gene
   Float min_frac_controls_probe_exclusion
   String meta_model_prefix
   String weight_mode
@@ -86,7 +86,7 @@ workflow gene_burden_analysis {
     input:
       genes_bed=rCNV_burden_test.stats_beds[0],
       gtf_prefix=basename(gtf, '.gtf.gz'),
-      min_probes_per_window=min_probes_per_window,
+      min_probes_per_gene=min_probes_per_gene,
       min_frac_controls_probe_exclusion=min_frac_controls_probe_exclusion,
       metacohort_list=metacohort_list,
       rCNV_bucket=rCNV_bucket,
@@ -505,7 +505,7 @@ task burden_test {
 task build_exclusion_list {
   File genes_bed
   String gtf_prefix
-  Int min_probes_per_window
+  Int min_probes_per_gene
   Float min_frac_controls_probe_exclusion
   File metacohort_list
   String rCNV_bucket

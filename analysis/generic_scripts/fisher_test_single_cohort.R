@@ -52,8 +52,6 @@ args <- parse_args(OptionParser(usage="%prog bins outfile",
                    positional_arguments=TRUE)
 opts <- args$options
 
-print(args)
-
 # Checks for appropriate positional arguments
 if(length(args$args) != 2){
   stop("Incorrect number of required positional arguments\n")

@@ -58,11 +58,11 @@ keep.n.cols <- opts$`keep-n-columns`
 
 # # Dev parameters
 # setwd("~/scratch/assoc_test_dev")
-# infile <- "HP0001250.rCNV.DEL.gene_burden.meta_analysis.input.txt"
-# outfile <- "HP0001250.rCNV.DEL.gene_meta_test_results.bed"
+# infile <- "HP0001250.rCNV.loose_noncoding.DEL.crb_burden.meta_analysis.input.txt"
+# outfile <- "HP0001250.rCNV.DEL.crb_meta_test_results.bed"
 # corplot.out <- "corplot.test.jpg"
 # model <- "fe"
-# cond.excl.in <- "gencode.v19.canonical.cohort_exclusion.bed.gz"
+# cond.excl.in <- "rCNV.crbs.cohort_exclusion.bed.gz"
 # p.is.phred <- T
 # spa <- T
 # secondary <- T

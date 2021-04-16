@@ -317,8 +317,7 @@ combine.single.cohort.assoc.stats <- function(stats.list, cond.excl.in=NULL,
   # Annotate rows with cohorts to be conditionally excluded
   if(!is.null(cond.excl.in)){
     cond.excl.df <- read.table(cond.excl.in, header=T, sep="\t", comment.char="")
-    colnames(cond.excl.df)[1] <- gsub('^X.', '', colnames(cond.excl.df)[1])
-    cond.excl.df$exclude_cohorts
+    colnames(cond.excl.df)[1:3] <- mergeby.cols[1:3]
     merged <- merge(merged, cond.excl.df, by=mergeby.cols,
                     all.x=T, all.y=F, sort=F)
   }else{
