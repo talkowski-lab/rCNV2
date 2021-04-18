@@ -64,6 +64,12 @@ done < <( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f1-2 ) \
 > raw_CNVs.per_cohort.txt
 
 
+# Make list of all populations to filter for allele frequency
+for pop in AFR AMR CSA EAS EUR MID OCN OTH SAS; do
+  echo $pop | awk -v OFS="\n" '{ print $1"_AF", $1"_NONREF_FREQ" }'
+done > all_pop_af_fields.txt
+
+
 # Filter each cohort for rare CNV callset
 mkdir rare_cnv_curated/
 while read cohort N; do
@@ -81,8 +87,10 @@ while read cohort N; do
     --cohorts-list raw_CNVs.per_cohort.txt \
     --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
     --vcf refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
+    --vcf refs/HGDP.hg19.sites.vcf.gz \
     --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-    --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF,CN_NONREF_FREQ,AFR_CN_NONREF_FREQ,AMR_CN_NONREF_FREQ,EAS_CN_NONREF_FREQ,EUR_CN_NONREF_FREQ,SAS_CN_NONREF_FREQ,OTH_CN_NONREF_FREQ \
+    --vcf refs/HGDP.hg19.sites.vcf.gz \
+    --vcf-af-fields "AF,$( paste -s -d, all_pop_af_fields.txt )" \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     rare_cnv_curated/$cohort.rCNV.bed.gz
@@ -107,7 +115,8 @@ while read cohort N; do
     --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
     --vcf refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
     --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-    --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF,CN_NONREF_FREQ,AFR_CN_NONREF_FREQ,AMR_CN_NONREF_FREQ,EAS_CN_NONREF_FREQ,EUR_CN_NONREF_FREQ,SAS_CN_NONREF_FREQ,OTH_CN_NONREF_FREQ \
+    --vcf refs/HGDP.hg19.sites.vcf.gz \
+    --vcf-af-fields "AF,$( paste -s -d, all_pop_af_fields.txt )" \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     ultrarare_cnv_curated/$cohort.vCNV.bed.gz
@@ -132,7 +141,8 @@ while read cohort N; do
     --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
     --vcf refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
     --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-    --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF,CN_NONREF_FREQ,AFR_CN_NONREF_FREQ,AMR_CN_NONREF_FREQ,EAS_CN_NONREF_FREQ,EUR_CN_NONREF_FREQ,SAS_CN_NONREF_FREQ,OTH_CN_NONREF_FREQ \
+    --vcf refs/HGDP.hg19.sites.vcf.gz \
+    --vcf-af-fields "AF,$( paste -s -d, all_pop_af_fields.txt )" \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     ultrarare_cnv_curated/$cohort.uCNV.bed.gz

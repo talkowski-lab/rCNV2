@@ -75,10 +75,11 @@ def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
 
 
 # Read sites VCF for frequency filtering
-def read_vcf(vcfin, maxfreq, af_fields='AF'):
+def read_vcf(vcfin, maxfreq, af_fields='AF', singleton_min_samples=200):
     """
     Reads a SV sites vcf and converts it to a BedTool
     """
+
     vcf = pysam.VariantFile(vcfin)
     header = vcf.header
 
@@ -98,9 +99,33 @@ def read_vcf(vcfin, maxfreq, af_fields='AF'):
             and record.filter.keys() != ['MULTIALLELIC']:
                 continue
 
-            def _scrape_afs(record, af_fields):
+            def _scrape_afs(record, af_fields, singleton_min_samples):
                 afs = []
                 for field in af_fields:
+                    if field not in record.info.keys():
+                        continue
+
+                    # Check if number of samples >= singleton_min_samples
+                    if 'CN_NONREF_FREQ' in field:
+                        n_samps = record.info[field.replace('NONREF_FREQ', 'NUMBER')]
+                    else:
+                        if field == 'AF':
+                            n_samps = record.info['N_BI_GENOS']
+                        else:
+                            n_samps = record.info[field.replace('_AF', '_N_BI_GENOS')]
+                    if n_samps < singleton_min_samples:
+                        # If population is too small, make sure variant is not observed in a single sample
+                        if 'CN_NONREF_FREQ' in field:
+                            n_carriers = record.info[field.replace('NONREF_FREQ', 'NONREF_COUNT')]
+                        else:
+                            if field == 'AF':
+                                n_carriers = n_samps - record.info['N_HOMREF']
+                            else:
+                                n_carriers = n_samps - record.info[field.replace('_AF', '_N_HOMREF')]
+                        if n_carriers == 1:
+                            continue
+
+                    # If variant passes singleton check, proceed with AF computation
                     if field in record.info.keys():
                         af = record.info[field]
                     else:
@@ -112,9 +137,10 @@ def read_vcf(vcfin, maxfreq, af_fields='AF'):
                             af = af[0]
                     afs.append(af)
                 return afs
-            max_af = max(_scrape_afs(record, af_fields))
-            if max_af <= maxfreq:
-                continue
+            afs = _scrape_afs(record, af_fields, singleton_min_samples)
+            if len(afs) > 0:
+                if max(afs) <= maxfreq:
+                    continue
 
             flist = [str(record.chrom), str(record.pos), str(record.stop), 
                      str(record.id), str(record.info['SVTYPE']).split('_')[0],
@@ -178,6 +204,10 @@ def main():
                         'entries with commas. If multiple entries are specified, ' +
                         'will take the max. Will default to AF if entry not found.',
                          default='AF', dest='af_fields')
+    parser.add_argument('--vcf-min-samples-for-singletons', dest='singleton_min_samples', 
+                        type=int, help='Minimum number of samples for singleton ' +
+                        '(AC=1) variants from --vcf inputs to be considered for ' +
+                        'filtering [default: 200]', default=200)
     parser.add_argument('-z', '--bgzip', dest='bgzip', action='store_true',
                         help='Compress output BED with bgzip.')
 
@@ -216,7 +246,8 @@ def main():
     # Restrict on VCFs 
     if args.vcf is not None:
         for vcfpath in args.vcf:
-            vbed = read_vcf(vcfpath, args.maxfreq, args.af_fields)
+            vbed = read_vcf(vcfpath, args.maxfreq, args.af_fields, 
+                            args.singleton_min_samples)
             cnvs = freq_filter(cnvs, vbed, 0, maxFreq=args.maxfreq, 
                                ro=args.recipoverlap, dist=args.dist)
 
