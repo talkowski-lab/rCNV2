@@ -32,6 +32,8 @@ option_list <- list(
               help="provided P-values are Phred-scaled (-log10(P)) [default %default]"),
   make_option(c("--spa"), action="store_true", default=FALSE,
               help="apply saddlepoint approximation of null distribution [default %default]"),
+  make_option(c("--no-fdr"), action="store_true", default=FALSE,
+              help="do not compute Benjamini-Hochberg FDR q-values [default: compute FDR]"),
   make_option(c("--no-secondary"), action="store_true", default=FALSE,
               help="do not compute secondary P-value [default %default]"),
   make_option(c("--keep-n-columns"), type="integer", default=3,
@@ -53,6 +55,7 @@ model <- opts$model
 cond.excl.in <- opts$`conditional-exclusion`
 p.is.phred <- opts$`p-is-phred`
 spa <- opts$spa
+calc.fdr <- !(opts$`no-fdr`)
 secondary <- !(opts$`no-secondary`)
 keep.n.cols <- opts$`keep-n-columns`
 
@@ -65,6 +68,7 @@ keep.n.cols <- opts$`keep-n-columns`
 # cond.excl.in <- "rCNV.crbs.cohort_exclusion.bed.gz"
 # p.is.phred <- T
 # spa <- T
+# calc.fdr <- T
 # secondary <- T
 # keep.n.cols <- 4
 
@@ -88,7 +92,8 @@ if(!is.null(corplot.out)){
 # Conduct meta-analysis & write to file
 stats.merged <- combine.single.cohort.assoc.stats(stats.list, cond.excl.in, keep.n.cols)
 stats.meta <- meta(stats.merged, cohort.info[, 1], model=model,
-                   saddle=spa, secondary=secondary, keep.n.cols=keep.n.cols)
+                   saddle=spa, calc.fdr=calc.fdr, secondary=secondary,
+                   keep.n.cols=keep.n.cols)
 colnames(stats.meta)[1] <- "#chr"
 write.table(stats.meta, outfile, sep="\t",
             row.names=F, col.names=T, quote=F)

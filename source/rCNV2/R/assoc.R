@@ -597,6 +597,7 @@ saddlepoint.adj <- function(zscores, phred=T){
 #' @param model specify meta-analysis model to use (see `Details`)
 #' @param saddle boolean indicator of whether to apply saddlepoint approximation
 #' (see [saddlepoint.adj()]) \[default: TRUE\]
+#' @param calc.fdr boolean indicator to calculate B-H FDR q-value per locus \[default: TRUE\]
 #' @param secondary boolean indicator to also compute meta-analysis statistics
 #' after dropping most significant individual cohort \[default: TRUE\]
 #' @param keep.n.cols number of columns from original BED format to retain
@@ -609,7 +610,8 @@ saddlepoint.adj <- function(zscores, phred=T){
 #' @return data frame of meta-analysis summary statistics
 #'
 #' @export
-meta <- function(stats.merged, cohorts, model="fe", saddle=T, secondary=T, keep.n.cols=3){
+meta <- function(stats.merged, cohorts, model="fe", saddle=T, calc.fdr=T,
+                 secondary=T, keep.n.cols=3){
   # Make meta-analysis lookup table
   meta.lookup.table <- make.meta.lookup.table(stats.merged, cohorts, model,
                                               empirical.continuity=T)
@@ -621,6 +623,11 @@ meta <- function(stats.merged, cohorts, model="fe", saddle=T, secondary=T, keep.
   # Adjust P-values using saddlepoint approximation of null distribution, if optioned
   if(saddle==T){
     meta.res$meta_phred_p <- saddlepoint.adj(meta.res$meta_z)
+  }
+
+  # Calculate B-H adjusted q-values, if optioned
+  if(calc.fdr==T){
+    meta.res$meta_phred_fdr_q <- -log10(p.adjust(10^-meta.res$meta_phred_p, method="BH"))
   }
 
   # Compute secondary P-value
@@ -640,6 +647,9 @@ meta <- function(stats.merged, cohorts, model="fe", saddle=T, secondary=T, keep.
     meta.res$meta_lnOR_upper_secondary <- meta.res.secondary$meta_lnOR_upper
     meta.res$meta_z_secondary <- meta.res.secondary$meta_z
     meta.res$meta_phred_p_secondary <- meta.res.secondary$meta_phred_p
+    if(calc.fdr==T){
+      meta.res$meta_phred_fdr_q_secondary <- -log10(p.adjust(10^-meta.res$meta_phred_p_secondary, method="BH"))
+    }
   }
 
   # Compute pooled carrier frequencies (while taking into account excluded cohorts)

@@ -9,6 +9,7 @@ meta(
   cohorts,
   model = "fe",
   saddle = T,
+  calc.fdr = T,
   secondary = T,
   keep.n.cols = 3
 )
@@ -22,6 +23,8 @@ meta(
 
 \item{saddle}{boolean indicator of whether to apply saddlepoint approximation
 (see \code{\link[=saddlepoint.adj]{saddlepoint.adj()}}) [default: TRUE]}
+
+\item{calc.fdr}{boolean indicator to calculate B-H FDR q-value per locus [default: TRUE]}
 
 \item{secondary}{boolean indicator to also compute meta-analysis statistics
 after dropping most significant individual cohort [default: TRUE]}

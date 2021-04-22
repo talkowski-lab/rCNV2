@@ -30,6 +30,7 @@ workflow sliding_window_analysis {
   Int meta_nominal_cohorts_cutoff
   Float credible_interval
   Int sig_window_pad
+  Float FDR_cutoff
   File gtf
   File contigfile
   String rCNV_bucket
@@ -148,7 +149,7 @@ workflow sliding_window_analysis {
   }
 
   # Refine minimal credible regions
-  call refine_regions as refine_DEL {
+  call refine_regions as refine_DEL_gw {
     input:
       completion_tokens=rCNV_meta_analysis.completion_token,
       phenotype_list=phenotype_list,
@@ -161,10 +162,13 @@ workflow sliding_window_analysis {
       meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
       sig_window_pad=sig_window_pad,
       credset=credible_interval,
+      use_FDR="FALSE",
+      FDR_cutoff=FDR_cutoff,
+      output_suffix="strict_gw_sig",
       gtf=gtf,
       rCNV_bucket=rCNV_bucket
   }
-  call refine_regions as refine_DUP {
+  call refine_regions as refine_DUP_gw {
     input:
       completion_tokens=rCNV_meta_analysis.completion_token,
       phenotype_list=phenotype_list,
@@ -177,31 +181,92 @@ workflow sliding_window_analysis {
       meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
       sig_window_pad=sig_window_pad,
       credset=credible_interval,
+      use_FDR="FALSE",
+      FDR_cutoff=FDR_cutoff,
+      output_suffix="strict_gw_sig",
+      gtf=gtf,
+      rCNV_bucket=rCNV_bucket
+  }
+  call refine_regions as refine_DEL_fdr {
+    input:
+      completion_tokens=rCNV_meta_analysis.completion_token,
+      phenotype_list=phenotype_list,
+      metacohort_list=metacohort_list,
+      metacohort_sample_table=metacohort_sample_table,
+      freq_code="rCNV",
+      CNV="DEL",
+      meta_p_cutoffs_tsv=calc_genome_wide_cutoffs.bonferroni_cutoff_table[0],
+      meta_secondary_p_cutoff=1,
+      meta_nominal_cohorts_cutoff=0,
+      sig_window_pad=sig_window_pad,
+      credset=credible_interval,
+      use_FDR="TRUE",
+      FDR_cutoff=FDR_cutoff,
+      output_suffix="fdr",
+      gtf=gtf,
+      rCNV_bucket=rCNV_bucket
+  }
+  call refine_regions as refine_DUP_fdr {
+    input:
+      completion_tokens=rCNV_meta_analysis.completion_token,
+      phenotype_list=phenotype_list,
+      metacohort_list=metacohort_list,
+      metacohort_sample_table=metacohort_sample_table,
+      freq_code="rCNV",
+      CNV="DUP",
+      meta_p_cutoffs_tsv=calc_genome_wide_cutoffs.bonferroni_cutoff_table[1],
+      meta_secondary_p_cutoff=1,
+      meta_nominal_cohorts_cutoff=0,
+      sig_window_pad=sig_window_pad,
+      credset=credible_interval,
+      use_FDR="TRUE",
+      FDR_cutoff=FDR_cutoff,
+      output_suffix="fdr",
       gtf=gtf,
       rCNV_bucket=rCNV_bucket
   }
 
   # Merge refined associations & regions
-  call merge_refined_regions {
+  call merge_refined_regions as merge_gw {
     input:
-      assoc_beds=[refine_DEL.associations, refine_DUP.associations],
-      loci_beds=[refine_DEL.loci, refine_DUP.loci],
+      assoc_beds=[refine_DEL_gw.associations, refine_DUP_gw.associations],
+      loci_beds=[refine_DEL_gw.loci, refine_DUP_gw.loci],
       freq_code="rCNV",
+      output_suffix="strict_gw_sig",
+      rCNV_bucket=rCNV_bucket
+  }
+  call merge_refined_regions as merge_fdr {
+    input:
+      assoc_beds=[refine_DEL_fdr.associations, refine_DUP_fdr.associations],
+      loci_beds=[refine_DEL_fdr.loci, refine_DUP_fdr.loci],
+      freq_code="rCNV",
+      output_suffix="fdr",
       rCNV_bucket=rCNV_bucket
   }
 
   # Plot summary metrics for final credible regions
-  call plot_region_summary as plot_rCNV_regions {
+  call plot_region_summary as plot_rCNV_regions_gw {
     input:
       freq_code="rCNV",
-      DEL_regions=refine_DEL.loci,
-      DUP_regions=refine_DUP.loci,
+      DEL_regions=refine_DEL_gw.loci,
+      DUP_regions=refine_DUP_gw.loci,
+      output_suffix="strict_gw_sig",
+      rCNV_bucket=rCNV_bucket
+  }
+  call plot_region_summary as plot_rCNV_regions_fdr {
+    input:
+      freq_code="rCNV",
+      DEL_regions=refine_DEL_fdr.loci,
+      DUP_regions=refine_DUP_fdr.loci,
+      output_suffix="fdr",
       rCNV_bucket=rCNV_bucket
   }
 
   output {
-    File final_sig_loci = merge_refined_regions.final_loci
-    File final_sig_associations = merge_refined_regions.final_associations
+    File final_gw_sig_loci = merge_gw.final_loci
+    File final_gw_sig_associations = merge_gw.final_associations
+    File final_fdr_loci = merge_fdr.final_loci
+    File final_fdr_associations = merge_fdr.final_associations
   }
 }
 
@@ -627,6 +692,9 @@ task refine_regions {
   Int meta_nominal_cohorts_cutoff
   Int sig_window_pad
   Float credset
+  String use_FDR
+  Float FDR_cutoff
+  String output_suffix
   File gtf
 
   command <<<
@@ -674,8 +742,12 @@ task refine_regions {
       for wrapper in 1; do
         echo "$hpo"
         echo "stats/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.subset.bed.gz"
-        awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' \
-          ${meta_p_cutoffs_tsv}
+        if [ ${use_FDR} == "TRUE" ]; then
+          echo "${FDR_cutoff}"
+        else
+          awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' \
+            ${meta_p_cutoffs_tsv}
+        fi
       done | paste -s
     done < ${phenotype_list} \
     > ${freq_code}.${CNV}.segment_refinement.stats_input.tsv
@@ -683,32 +755,51 @@ task refine_regions {
     > known_causal_loci_lists.${CNV}.tsv
 
     # Refine significant segments
-    /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
-      --cnv ${CNV} \
-      --secondary-p-cutoff ${meta_secondary_p_cutoff} \
-      --min-nominal ${meta_nominal_cohorts_cutoff} \
-      --secondary-or-nominal \
-      --credible-sets ${credset} \
-      --distance ${sig_window_pad} \
-      --known-causal-loci-list known_causal_loci_lists.${CNV}.tsv \
-      --cytobands refs/GRCh37.cytobands.bed.gz \
-      --sig-loci-bed ${freq_code}.${CNV}.final_segments.loci.pregenes.bed \
-      --sig-assoc-bed ${freq_code}.${CNV}.final_segments.associations.pregenes.bed \
-      ${freq_code}.${CNV}.segment_refinement.stats_input.tsv \
-      ${metacohort_sample_table}
+    if [ ${use_FDR} == "TRUE" ]; then
+      /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
+        --cnv ${CNV} \
+        --use-fdr \
+        --secondary-p-cutoff 1 \
+        --min-nominal 0 \
+        --secondary-or-nominal \
+        --credible-sets ${credset} \
+        --distance ${sig_window_pad} \
+        --known-causal-loci-list known_causal_loci_lists.${CNV}.tsv \
+        --cytobands refs/GRCh37.cytobands.bed.gz \
+        --sig-loci-bed ${freq_code}.${CNV}.final_segments.${output_suffix}.loci.pregenes.bed \
+        --sig-assoc-bed ${freq_code}.${CNV}.final_segments.${output_suffix}.associations.pregenes.bed \
+        --prefix ${output_suffix} \
+        ${freq_code}.${CNV}.segment_refinement.stats_input.tsv \
+        ${metacohort_sample_table}
+    else
+      /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
+        --cnv ${CNV} \
+        --secondary-p-cutoff ${meta_secondary_p_cutoff} \
+        --min-nominal ${meta_nominal_cohorts_cutoff} \
+        --secondary-or-nominal \
+        --credible-sets ${credset} \
+        --distance ${sig_window_pad} \
+        --known-causal-loci-list known_causal_loci_lists.${CNV}.tsv \
+        --cytobands refs/GRCh37.cytobands.bed.gz \
+        --sig-loci-bed ${freq_code}.${CNV}.final_segments.${output_suffix}.loci.pregenes.bed \
+        --sig-assoc-bed ${freq_code}.${CNV}.final_segments.${output_suffix}.associations.pregenes.bed \
+        --prefix ${output_suffix} \
+        ${freq_code}.${CNV}.segment_refinement.stats_input.tsv \
+        ${metacohort_sample_table}
+    fi
 
     # Annotate final regions with genes & sort by coordinates
     for entity in loci associations; do
       /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
-        -o ${freq_code}.${CNV}.final_segments.$entity.bed \
-        ${freq_code}.${CNV}.final_segments.$entity.pregenes.bed \
+        -o ${freq_code}.${CNV}.final_segments.${output_suffix}.$entity.bed \
+        ${freq_code}.${CNV}.final_segments.${output_suffix}.$entity.pregenes.bed \
         ${gtf}
     done
   >>>
 
   output {
-    File loci = "${freq_code}.${CNV}.final_segments.loci.bed"
-    File associations = "${freq_code}.${CNV}.final_segments.associations.bed"
+    File loci = "${freq_code}.${CNV}.final_segments.${output_suffix}.loci.bed"
+    File associations = "${freq_code}.${CNV}.final_segments.${output_suffix}.associations.bed"
   }
 
   runtime {
@@ -725,6 +816,7 @@ task merge_refined_regions {
   Array[File] assoc_beds
   Array[File] loci_beds
   String freq_code
+  String output_suffix
   String rCNV_bucket
 
   command <<<
@@ -740,7 +832,7 @@ task merge_refined_regions {
     | sort -Vk1,1 -k2,2n -k3,3n -k5,5V -k6,6V \
     | cat assoc_header.tsv - \
     | bgzip -c \
-    > ${freq_code}.final_segments.associations.bed.gz
+    > ${freq_code}.final_segments.${output_suffix}.associations.bed.gz
 
     # Merge segments
     cat ${sep=" " loci_beds} \
@@ -748,17 +840,17 @@ task merge_refined_regions {
     | sort -Vk1,1 -k2,2n -k3,3n -k5,5V \
     | cat loci_header.tsv - \
     | bgzip -c \
-    > ${freq_code}.final_segments.loci.bed.gz
+    > ${freq_code}.final_segments.${output_suffix}.loci.bed.gz
 
     # Copy final files to results bucket (note: requires permissions)
     gsutil -m cp \
-      ${freq_code}.final_segments.*.bed.gz \
+      ${freq_code}.final_segments.${output_suffix}.*.bed.gz \
       ${rCNV_bucket}/results/segment_association/
   >>>
 
   output {
-    File final_associations = "${freq_code}.final_segments.associations.bed.gz"
-    File final_loci = "${freq_code}.final_segments.loci.bed.gz"
+    File final_associations = "${freq_code}.final_segments.${output_suffix}.associations.bed.gz"
+    File final_loci = "${freq_code}.final_segments.${output_suffix}.loci.bed.gz"
   }
 
   runtime {
@@ -773,25 +865,23 @@ task plot_region_summary {
   String freq_code
   File DEL_regions
   File DUP_regions
+  String output_suffix
   String rCNV_bucket
 
   command <<<
     /opt/rCNV2/analysis/sliding_windows/regions_summary.plot.R \
-      -o "${freq_code}.final_segments." \
+      -o "${freq_code}.final_segments.${output_suffix}." \
       ${DEL_regions} \
       ${DUP_regions}
 
-    # gsutil -m cp \
-    #   ./*.jpg \
-    #   "${rCNV_bucket}/results/sliding_windows/plots/"
     gsutil -m cp \
-      "${freq_code}.final_segments.multipanel_summary.jpg" \
+      "${freq_code}.final_segments.${output_suffix}.multipanel_summary.jpg" \
       ${rCNV_bucket}/public/
     gsutil acl ch -u AllUsers:R ${rCNV_bucket}/public/*.jpg
   >>>
 
   output {
-    File summary_plot = "${freq_code}.final_segments.multipanel_summary.jpg"
+    File summary_plot = "${freq_code}.final_segments.${output_suffix}.multipanel_summary.jpg"
   }
 
   runtime {

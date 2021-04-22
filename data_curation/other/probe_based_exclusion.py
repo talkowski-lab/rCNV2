@@ -82,7 +82,7 @@ def replace_coords(intervals, orig_bed, cols_to_keep):
     """
 
     old_df = pd.read_csv(orig_bed, sep='\t')
-    new_df = intervals.to_dataframe(names=range(intervals.field_count()))
+    new_df = pd.read_csv(intervals.fn, sep='\t', header=None)
 
     fixed_df = pd.concat([old_df.iloc[:, range(cols_to_keep)],
                           new_df.iloc[:, cols_to_keep:(new_df.shape[1])]],
