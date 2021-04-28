@@ -73,6 +73,23 @@ def gather_counts(cohort_table, hpo_metadata, hpo_dir, precomp_counts={}):
     return counts
 
 
+def apply_pairwise_curation(counts, tsvin):
+    """
+    Apply manual pairwise similarity pruning
+    """
+
+    with open(tsvin) as f:
+        for keep, discard in csv.reader(f, delimiter='\t'):
+            if keep.startswith('#'):
+                continue
+
+            for cohort in counts.keys():
+                if discard in counts[cohort].keys():
+                    counts[cohort].pop(discard)
+
+    return counts
+
+
 def gather_metacounts(counts, metalist):
     """
     Combine sample counts across individual cohorts within each metacohort
@@ -215,6 +232,9 @@ def main():
     parser.add_argument('--min-metacohorts', type=int, default=1,
                         help='Minimum number of metacohorts required to have ' +
                         'at least --min-per-metacohort samples each. [default 1]')
+    parser.add_argument('--pairwise-curation', help='Two-column .tsv specifying ' +
+                        'manual pairs to prune. First column = term to keep; ' +
+                        'second column = term to drop')
     parser.add_argument('-o', '--outfile', help='Path to output file. ' +
                         '[default: stdout]')
     parser.add_argument('--html', action='store_true', help='Output tables in ' + 
@@ -235,6 +255,10 @@ def main():
 
     # Gather table of HPO codes per cohort
     counts = gather_counts(args.cohort_table, args.hpo_metadata, hpo_dir, precomp_pairs)
+
+    # Manually prune pairs that are too similar, if optioned
+    if args.pairwise_curation is not None:
+        counts = apply_pairwise_curation(counts, args.pairwise_curation)
 
     # Open connection to outfile
     if args.outfile is None:

@@ -20,7 +20,6 @@ import subprocess
 import csv
 
 
-# Generic BED vs BED frequency filtering function
 def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
     """
     Compare two sets of CNVs, and retain those in set A that have fewer than
@@ -74,7 +73,6 @@ def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
     return cnvsA.filter(_remove_fails, hits, cutoff)
 
 
-# Read sites VCF for frequency filtering
 def read_vcf(vcfin, maxfreq, af_fields='AF', singleton_min_samples=200):
     """
     Reads a SV sites vcf and converts it to a BedTool
@@ -157,8 +155,10 @@ def read_vcf(vcfin, maxfreq, af_fields='AF', singleton_min_samples=200):
     return gbed
 
 
-# Main block
 def main():
+    """
+    Main block
+    """
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)

@@ -13,7 +13,7 @@
 
 # Set parameters
 options(scipen=1000, stringsAsFactors=F)
-meta.colors <- c("#264653", "#2A9D8F", "#E9C46A", "#F4A261")
+meta.colors <- c("#264653", "#2A9D8F", "#E9C46A", "#F4A261", "#984464", "#C0AFFB")
 
 
 # Plotting functions
@@ -64,7 +64,7 @@ counts$label <- paste(counts[, 1], " (", counts$description, ")", sep="")
 
 
 # Plot data
-jpeg(plot.out, res=300, height=6*300, width=9*300)
+jpeg(plot.out, res=300, height=7*300, width=9*300)
 layout(matrix(1:3, nrow=1), widths=c(3, 2, 2))
 par(bty="n", mar=c(0.25, 0.25, 2.5, 0.25))
 plot.labels(counts$label)
@@ -73,6 +73,6 @@ fraction.barplot(counts, colors=meta.colors)
 mtext(3, line=1, text="Metacohort composition", font=2)
 total.barplot(counts$Total)
 mtext(3, line=1, text="Total samples", font=2)
-legend("right", legend=paste("meta", 1:4, sep=""),
+legend("right", legend=paste("meta", 1:6, sep=""),
        fill=meta.colors)
 dev.off()
