@@ -13,6 +13,7 @@ Flatten a single cohort's CNV callset
 import gzip
 import csv
 import pandas as pd
+import numpy as np
 import random
 import argparse
 from sys import stdout
@@ -41,13 +42,21 @@ def load_hpo_pairs(tsv_in):
         elig_hpos.add(hpo1)
         elig_hpos.add(hpo2)
 
-        # Compute overlap probability
-        ovr = int(n12) / int(n1)
+        # Compute overlap probability given hpo1
+        ovr1 = int(n12) / int(n1)
         if hpo1 not in overlap_probs.keys():
             overlap_probs[hpo1] = {}
         if hpo2 not in overlap_probs[hpo1].keys():
             overlap_probs[hpo1][hpo2] = 0
-        overlap_probs[hpo1][hpo2] = ovr
+        overlap_probs[hpo1][hpo2] = ovr1
+
+        # Compute overlap probability given hpo2
+        ovr2 = int(n12) / int(n2)
+        if hpo2 not in overlap_probs.keys():
+            overlap_probs[hpo2] = {}
+        if hpo1 not in overlap_probs[hpo2].keys():
+            overlap_probs[hpo2][hpo1] = 0
+        overlap_probs[hpo2][hpo1] = ovr2
 
     # Return values as nested dict
     return {'hpos' : elig_hpos, 'overlap_probs' : overlap_probs}
@@ -73,15 +82,16 @@ def load_input_bed(infile, elig_hpos, cnv_type_col=4):
     return cnv_df
 
 
-def get_hpo_probability(new_hpo, existing_hpos):
+def get_hpo_probability(new_hpo, existing_hpos, overlap_probs):
     """
-    Get the probability of observing 
+    Get the probability of observing new_hpo given existing_hpos
     """
 
     if len(existing_hpos) == 0:
         return 1
     else:
-        import pdb; pdb.set_trace()
+        pairwise_probs = [overlap_probs.get(new_hpo, {}).get(h, 0) for h in existing_hpos]
+        return np.prod(np.array(pairwise_probs))
 
 
 def assign_case_hpos(hpo_counts, overlap_probs, case_n):
@@ -95,17 +105,17 @@ def assign_case_hpos(hpo_counts, overlap_probs, case_n):
                                            key=lambda item: item[1])}
 
     for hpo, n in hpo_counts.items():
-        while n > 0:
-            for i in range(case_n):
-                if hpo in cases[i]:
-                    continue
-                else:
-                    p_add = get_hpo_probability(hpo, cases[i])
-                    if random.random() < p_add:
-                        cases[i].add(hpo)
-                        n -= 1
+        # Compute probability of hpo matching each of the cases based on the 
+        # phenotypes that have already been assigned
+        match_probs = [(get_hpo_probability(hpo, cases[i], overlap_probs), i) for i in range(case_n)]
 
-    import pdb; pdb.set_trace()
+        # Add HPO to the top n most-likely cases
+        sorted_probs = sorted(match_probs, key=lambda x: x[0])
+        ordered_fits = [i for p, i in sorted_probs]
+        for i in ordered_fits[:n]:
+            cases[i].add(hpo)
+
+    return [';'.join(sorted(x)) for x in cases]
 
 
 def flatten_cnv(vals, overlap_probs, prefix, k, control_hpo='HEALTHY_CONTROL', 
