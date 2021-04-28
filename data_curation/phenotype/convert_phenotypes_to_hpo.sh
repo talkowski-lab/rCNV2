@@ -253,10 +253,6 @@ gsutil cp gs://rcnv_project/analysis/analysis_refs/rCNV_metacohort_list.txt ./
   cleaned_phenos/intermediate/
 
 
-######
-###### TODO: NEED TO UPDATE ALL CODE BELOW TO ACCOUNT FOR COHORTS LIKE ESTBB
-######
-
 # Clean up output from original HPO tree consolidation to reflect metacohort filtering
 fgrep -v "#" HPOs_by_cohort.table.tsv \
 | cut -f1 \

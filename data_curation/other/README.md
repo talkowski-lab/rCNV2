@@ -33,6 +33,7 @@ These datasets were accessed as follows:
 | Illumina Infinium Global Screening Array | `illumina_gsa` | Provided by the Estonian Biobank |  
 | Illumina Infinium OmniExpress | `omniexpress` | Downloaded from Illumina website ([link](https://support.illumina.com/content/dam/illumina-support/documents/downloads/productfiles/humanomniexpress-24/v1-3/infinium-omniexpress-24-v1-3-a1-bed.zip)) |  
 | Illumina Infinium Omni2.5 | `omni_2.5` | Downloaded from Illumina website ([link](https://support.illumina.com/content/dam/illumina-support/documents/downloads/productfiles/humanomni25/v1-5/infinium-omni2-5-8v1-5-a1-bed.zip)) |  
+| Illumina Multi-Ethnic Global Array | `illumina_mega` | Downloaded from Illumina website ([link](https://support.illumina.com/content/dam/illumina-support/documents/downloads/productfiles/multiethnic-global/multi-ethnic-global-8-d1-bed.zip)) |  
 | ThermoFisher Applied Biosystems UK Biobank Axiom | `ukbbaxiom` | Downloaded from ThermoFisher website ([link](https://www.thermofisher.com/order/catalog/product/902502?us&en#/902502?us&en)) |  
 
 ---  

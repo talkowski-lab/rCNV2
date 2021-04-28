@@ -63,6 +63,12 @@ unzip infinium-omni2-5-8v1-5-a1-bed.zip
 sed '1d' InfiniumOmni2-5-8v1-5_A1.bed \
 | cut -f1-3 | sed 's/^chr//g' | sort -Vk1,1 -k2,2n -k3,3n | uniq | bgzip -c \
 > control_probesets/omni_2.5.bed.gz
+# MEGA
+wget https://support.illumina.com/content/dam/illumina-support/documents/downloads/productfiles/multiethnic-global/multi-ethnic-global-8-d1-bed.zip
+unzip multi-ethnic-global-8-d1-bed.zip
+sed '1d' Multi-EthnicGlobal_D1.bed \
+| cut -f1-3 | sed 's/^chr//g' | sort -Vk1,1 -k2,2n -k3,3n | uniq | bgzip -c \
+> control_probesets/illumina_mega.bed.gz
 
 
 # Download all array probesets stored as UCSC tables
