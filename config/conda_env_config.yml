@@ -26,7 +26,6 @@ dependencies:
   - ca-certificates=2021.4.13=h06a4308_1
   - cairo=1.14.12=h8948797_3
   - certifi=2020.12.5=py37h89c1867_1
-  - cudatoolkit=10.0.130=hf841e97_8
   - curl=7.76.0=h979ede3_0
   - cycler=0.10.0=py37_0
   - dbus=1.13.18=hb2f20db_0
@@ -91,8 +90,6 @@ dependencies:
   - lz4-c=1.9.2=heb0550a_3
   - make=4.2.1=h1bed415_1
   - markupsafe=1.1.1=py37h14c3975_1
-  - matplotlib=3.3.1=0
-  - matplotlib-base=3.3.1=py37h817c723_0
   - mistune=0.8.4=py37h14c3975_1001
   - mkl=2019.4=243
   - mkl-service=2.3.0=py37he904b0f_0
