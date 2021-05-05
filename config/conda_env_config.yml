@@ -1,4 +1,4 @@
-name: rcnv
+name: base
 channels:
   - biobuilds
   - r
@@ -23,12 +23,10 @@ dependencies:
   - bwidget=1.9.11=1
   - bzip2=1.0.8=h7b6447c_0
   - c-ares=1.17.1=h7f98852_1
-  - ca-certificates=2020.12.5=ha878542_0
+  - ca-certificates=2021.4.13=h06a4308_1
   - cairo=1.14.12=h8948797_3
   - certifi=2020.12.5=py37h89c1867_1
-  - click=7.1.2=py_0
   - cudatoolkit=10.0.130=hf841e97_8
-  - cudnn=7.6.5.32=ha8d7eb6_1
   - curl=7.76.0=h979ede3_0
   - cycler=0.10.0=py37_0
   - dbus=1.13.18=hb2f20db_0
@@ -114,7 +112,7 @@ dependencies:
   - numpy-base=1.19.1=py37hfa32c7d_0
   - obonet=0.2.3=py_0
   - olefile=0.46=py37_0
-  - openssl=1.1.1k=h7f98852_0
+  - openssl=1.1.1k=h27cfd23_0
   - packaging=20.4=py_0
   - pandas=1.1.3=py37he6710b0_0
   - pandoc=2.11=hb0f4dca_0
@@ -132,7 +130,6 @@ dependencies:
   - prompt-toolkit=3.0.8=py_0
   - ptyprocess=0.6.0=py37_0
   - pybedtools=0.8.2=py37hccf3b7b_1
-  - pybigwig=0.3.18=py37hbd7a627_1
   - pycparser=2.20=py_2
   - pygments=2.7.1=py_0
   - pyparsing=2.4.7=py_0
@@ -142,7 +139,6 @@ dependencies:
   - python=3.7.9=h7579374_0
   - python-dateutil=2.8.1=py_0
   - python_abi=3.7=1_cp37m
-  - pytorch=1.3.1=cuda100py37h53c1284_0
   - pytz=2020.1=py_0
   - pyzmq=19.0.2=py37he6710b0_1
   - qt=5.9.7=h5867ecd_1
@@ -315,7 +311,6 @@ dependencies:
   - r-xts=0.11_2=r36h96ca727_0
   - r-yaml=2.2.0=r36h96ca727_0
   - r-zoo=1.8_6=r36h96ca727_0
-  - rapidfuzz=1.4.1=py37hcd2ae1e_0
   - readline=8.0=h7b6447c_0
   - samtools=1.12=h9aed4be_1
   - scikit-learn=0.23.2=py37h0573a6f_0
@@ -360,4 +355,4 @@ dependencies:
     - rsa==4.6
     - urllib3==1.25.10
     - wheel==0.36.2
-prefix: /opt/conda/envs/rcnv
+prefix: /opt/conda

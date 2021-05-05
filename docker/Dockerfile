@@ -45,10 +45,7 @@ RUN git clone https://github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
 
 # Create python environment from .yml file
 RUN conda update -n base conda
-RUN conda env create -f /opt/rCNV2/config/conda_env_config.yml
-ENV CONDA_DEFAULT_ENV rcnv
-RUN echo "source activate rcnv" >> ~/.bashrc
-ENV PATH /opt/conda/envs/rcnv/bin:$PATH
+RUN conda env update --file /opt/rCNV2/config/conda_env_config.yml
 
 # Install google cloud tools
 RUN pip install google-cloud-storage
@@ -84,14 +81,14 @@ RUN Rscript -e "sapply(c('EQL'),\
 ARG rCNV2_Rpkg_source="/opt/rCNV2/source/rCNV2_0.1.0.tar.gz"
 RUN Rscript -e "install.packages('$rCNV2_Rpkg_source', source=TRUE, repos=NULL)"
 
-# Install Athena toolkit
-ARG athena_commit_hash="master"
-RUN git clone https://github.com/talkowski-lab/athena /opt/athena && \
-    cd /opt/athena && \
-    git checkout "$athena_commit_hash" && \
-    cd /opt/athena && \
-    pip install -e . && \
-    cd -
+# # Install Athena toolkit
+# ARG athena_commit_hash="master"
+# RUN git clone https://github.com/talkowski-lab/athena /opt/athena && \
+#     cd /opt/athena && \
+#     git checkout "$athena_commit_hash" && \
+#     cd /opt/athena && \
+#     pip install -e . && \
+#     cd -
 
 # Launch bash
 CMD ["/bin/bash"]

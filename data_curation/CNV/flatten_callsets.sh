@@ -34,7 +34,19 @@ gsutil -m cp \
 tabix -f EstBB.raw.bed.gz
 
 
+# Flatten BioVU data
+# TODO: ADD THIS
+/opt/rCNV2/data_curation/CNV/flatten_callset.py \
+  --outfile BioVU.raw.bed.gz \
+  --hpo-pairs BioVU.final_cooccurrence_table.tsv.gz \
+  --cohort BioVU \
+  --bgzip \
+  TBD
+tabix -f BioVU.raw.bed.gz
+
+
 # Copy to Google Cloud (note: permissions required)
 gsutil -m cp \
   EstBB.raw.bed.gz* \
+  BioVU.raw.bed.gz* \
   gs://rcnv_project/raw_data/cnv/
