@@ -81,6 +81,9 @@ RUN Rscript -e "sapply(c('EQL'),\
 ARG rCNV2_Rpkg_source="/opt/rCNV2/source/rCNV2_0.1.0.tar.gz"
 RUN Rscript -e "install.packages('$rCNV2_Rpkg_source', source=TRUE, repos=NULL)"
 
+# Clean conda caches to decrease image size
+RUN conda clean --all
+
 # # Install Athena toolkit
 # ARG athena_commit_hash="master"
 # RUN git clone https://github.com/talkowski-lab/athena /opt/athena && \
