@@ -44,8 +44,10 @@ RUN git clone https://github.com/talkowski-lab/rCNV2.git /opt/rCNV2 && \
     cd -
 
 # Create python environment from .yml file
+# Note: install packages from two separate .yml files to make Docker layers more manageable
 RUN conda update -n base conda
 RUN conda env update --file /opt/rCNV2/config/conda_env_config.yml
+RUN conda env update --file /opt/rCNV2/config/conda_env_config.r_packages.yml
 
 # Install google cloud tools
 RUN pip install google-cloud-storage
@@ -82,7 +84,7 @@ ARG rCNV2_Rpkg_source="/opt/rCNV2/source/rCNV2_0.1.0.tar.gz"
 RUN Rscript -e "install.packages('$rCNV2_Rpkg_source', source=TRUE, repos=NULL)"
 
 # Clean conda caches to decrease image size
-RUN conda clean --all
+RUN conda clean -y --all
 
 # # Install Athena toolkit
 # ARG athena_commit_hash="master"

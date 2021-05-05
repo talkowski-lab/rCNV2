@@ -24,6 +24,7 @@ gsutil -m cp -r \
   gs://rcnv_project/refs/GRCh37.*.bed.gz \
   gs://rcnv_project/analysis/analysis_refs/* \
   gs://rcnv_project/cleaned_data/genes/gene_lists \
+  gs://rcnv_project/refs/HPO_dict.tsv.gz \
   refs/
 
 
@@ -119,6 +120,11 @@ done < refs/test_phenotypes.list | sort -nrk4,4 \
 
 
 # Partition phenotypes by effect size of whole-gene deletions of constrained genes
+/opt/rCNV2/analysis/other/split_phenos_by_severity.R \
+  --out-prefix rCNV2.hpos_by_severity \
+  --threshold 2 \
+  constrained_gene_del_stats.all_hpos.tsv \
+  refs/HPO_dict.tsv.gz
 
 
 

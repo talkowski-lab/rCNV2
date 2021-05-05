@@ -35,13 +35,12 @@ tabix -f EstBB.raw.bed.gz
 
 
 # Flatten BioVU data
-# TODO: ADD THIS
 /opt/rCNV2/data_curation/CNV/flatten_callset.py \
   --outfile BioVU.raw.bed.gz \
   --hpo-pairs BioVU.final_cooccurrence_table.tsv.gz \
   --cohort BioVU \
   --bgzip \
-  TBD
+  biovu_hpo.final.bed.gz
 tabix -f BioVU.raw.bed.gz
 
 

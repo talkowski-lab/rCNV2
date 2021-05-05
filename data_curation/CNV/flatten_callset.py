@@ -18,7 +18,7 @@ import random
 import argparse
 from sys import stdout
 from os.path import splitext
-from athena.utils.misc import bgzip
+import subprocess
 
 
 def load_hpo_pairs(tsv_in):
@@ -71,6 +71,20 @@ def load_input_bed(infile, elig_hpos, cnv_type_col=4):
     cnv_df = pd.read_csv(infile, sep='\t')
     cnv_df.sort_values(cnv_df.columns[:3].tolist(), inplace=True)
 
+    # Rewrite columns and CNV types, if necessary
+    cnv_df.rename(columns={k : v for k, v in zip(cnv_df.columns.values[:5],
+                                                 'CHR START END TYPE TOTAL'.split())},
+                  inplace=True)
+    if pd.api.types.is_numeric_dtype(cnv_df.TYPE):
+        cnv_df = cnv_df[(cnv_df.TYPE != 2)]
+        def __convert_cnvtypes(x):
+            if x < 2:
+                return 'DEL'
+            else:
+                return 'DUP'
+        cnvtypes = cnv_df.TYPE.apply(__convert_cnvtypes)
+        cnv_df.TYPE = cnvtypes
+
     # Subset HPO columns to only those present also in --hpo-pairs
     hpos_in_header = list(cnv_df.columns[cnv_type_col:])
     for hpo in hpos_in_header:
@@ -118,8 +132,8 @@ def assign_case_hpos(hpo_counts, overlap_probs, case_n):
     return [';'.join(sorted(x)) for x in cases]
 
 
-def flatten_cnv(vals, overlap_probs, prefix, k, control_hpo='HEALTHY_CONTROL', 
-                cnv_type_col=4):
+def flatten_cnv(vals, overlap_probs, prefix, k, all_case_hpo='HP:0000118', 
+                control_hpo='HEALTHY_CONTROL', cnv_type_col=4):
     """
     Flattens a single row from input BED file
     Returns a BED-styled string of flattened CNV calls
@@ -133,7 +147,10 @@ def flatten_cnv(vals, overlap_probs, prefix, k, control_hpo='HEALTHY_CONTROL',
 
     total_n = vals.TOTAL
     control_n = vals[control_hpo]
-    case_n = total_n - control_n
+    if 'HP:0000118' in vals.keys():
+        case_n = vals[all_case_hpo]
+    else:
+        case_n = total_n - control_n
 
     for i in range(control_n):
         k += 1
@@ -166,6 +183,8 @@ def main():
     parser.add_argument('-p', '--hpo-pairs', help='.tsv of precomputed sample ' +
                         'counts for all HPO pairs', required=True)
     parser.add_argument('-c', '--cohort', required=True, help='Cohort name')
+    parser.add_argument('--all-case-hpo', default='HP:0000118',
+                        help='Top HPO term to use for all cases [default: "HP:0000118"]')
     parser.add_argument('--control-hpo', default='HEALTHY_CONTROL',
                         help='HPO term to consider healthy control [default: "HEALTHY_CONTROL"]')
     parser.add_argument('--cnv-type-column', type=int, default=4,
@@ -200,7 +219,8 @@ def main():
     random.seed(args.seed)
     for row in cnv_df.iterrows():
         newcnvs = flatten_cnv(row[1], hpo_dict['overlap_probs'], args.cohort, k,
-                              args.control_hpo, args.cnv_type_column)
+                              args.all_case_hpo, args.control_hpo, 
+                              args.cnv_type_column)
         n_new = len(newcnvs)
         k += n_new
         if n_new > 0:
@@ -209,7 +229,7 @@ def main():
 
     # Bgzip --outfile, if optioned
     if args.bgzip and outpath != 'stdout':
-        bgzip(outpath)
+        subprocess.run(['bgzip', '-f', outpath])
 
 
 if __name__ == '__main__':
