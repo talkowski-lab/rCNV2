@@ -8,7 +8,7 @@
 
 # Filter raw CNV data to rare, very rare, and ultra rare subsets
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:filter_cnvs_singleCohort/versions/53/plain-WDL/descriptor" as filter_single
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:filter_cnvs_singleCohort/versions/54/plain-WDL/descriptor" as filter_single
 
 
 workflow filter_CNV_data {
