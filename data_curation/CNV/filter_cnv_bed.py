@@ -73,7 +73,8 @@ def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
     return cnvsA.filter(_remove_fails, hits, cutoff)
 
 
-def read_vcf(vcfin, maxfreq, af_fields='AF', singleton_min_samples=200):
+def read_vcf(vcfin, maxfreq, af_fields='AF', singleton_min_samples=200, 
+             apply_min_samples_filter=False):
     """
     Reads a SV sites vcf and converts it to a BedTool
     """
@@ -85,7 +86,8 @@ def read_vcf(vcfin, maxfreq, af_fields='AF', singleton_min_samples=200):
     if 'AF' not in af_fields:
         af_fields.append('AF')
 
-    def _filter_vcf(vcf, maxfreq):
+    def _filter_vcf(vcf, maxfreq, singleton_min_samples=200, 
+                    apply_min_samples_filter=False):
         vcf_str = ''
 
         for record in vcf:
@@ -97,31 +99,33 @@ def read_vcf(vcfin, maxfreq, af_fields='AF', singleton_min_samples=200):
             and record.filter.keys() != ['MULTIALLELIC']:
                 continue
 
-            def _scrape_afs(record, af_fields, singleton_min_samples):
+            def _scrape_afs(record, af_fields, singleton_min_samples=200, 
+                            apply_min_samples_filter=False):
                 afs = []
                 for field in af_fields:
                     if field not in record.info.keys():
                         continue
 
                     # Check if number of samples >= singleton_min_samples
-                    if 'CN_NONREF_FREQ' in field:
-                        n_samps = record.info[field.replace('NONREF_FREQ', 'NUMBER')]
-                    else:
-                        if field == 'AF':
-                            n_samps = record.info['N_BI_GENOS']
-                        else:
-                            n_samps = record.info[field.replace('_AF', '_N_BI_GENOS')]
-                    if n_samps < singleton_min_samples:
-                        # If population is too small, make sure variant is not observed in a single sample
+                    if apply_min_samples_filter:
                         if 'CN_NONREF_FREQ' in field:
-                            n_carriers = record.info[field.replace('NONREF_FREQ', 'NONREF_COUNT')]
+                            n_samps = record.info[field.replace('NONREF_FREQ', 'NUMBER')]
                         else:
                             if field == 'AF':
-                                n_carriers = n_samps - record.info['N_HOMREF']
+                                n_samps = record.info['N_BI_GENOS']
                             else:
-                                n_carriers = n_samps - record.info[field.replace('_AF', '_N_HOMREF')]
-                        if n_carriers == 1:
-                            continue
+                                n_samps = record.info[field.replace('_AF', '_N_BI_GENOS')]
+                        if n_samps < singleton_min_samples:
+                            # If population is too small, make sure variant is not observed in a single sample
+                            if 'CN_NONREF_FREQ' in field:
+                                n_carriers = record.info[field.replace('NONREF_FREQ', 'NONREF_COUNT')]
+                            else:
+                                if field == 'AF':
+                                    n_carriers = n_samps - record.info['N_HOMREF']
+                                else:
+                                    n_carriers = n_samps - record.info[field.replace('_AF', '_N_HOMREF')]
+                            if n_carriers == 1:
+                                continue
 
                     # If variant passes singleton check, proceed with AF computation
                     if field in record.info.keys():
@@ -135,7 +139,8 @@ def read_vcf(vcfin, maxfreq, af_fields='AF', singleton_min_samples=200):
                             af = af[0]
                     afs.append(af)
                 return afs
-            afs = _scrape_afs(record, af_fields, singleton_min_samples)
+
+            afs = _scrape_afs(record, af_fields, singleton_min_samples, apply_min_samples_filter)
             if len(afs) > 0:
                 if max(afs) <= maxfreq:
                     continue
@@ -150,7 +155,7 @@ def read_vcf(vcfin, maxfreq, af_fields='AF', singleton_min_samples=200):
 
         return pybedtools.BedTool(vcf_str, from_string=True)
 
-    gbed = _filter_vcf(vcf, maxfreq)
+    gbed = _filter_vcf(vcf, maxfreq, singleton_min_samples, apply_min_samples_filter)
 
     return gbed
 
@@ -204,10 +209,14 @@ def main():
                         'entries with commas. If multiple entries are specified, ' +
                         'will take the max. Will default to AF if entry not found.',
                          default='AF', dest='af_fields')
+    parser.add_argument('--vcf-with-min-sample-filter', action='append', 
+                        help='SV VCFs to use for frequency filtering while also ' + 
+                        'applying --vcf-min-samples-for-singleton. May be ' +
+                        'specified multiple times.')
     parser.add_argument('--vcf-min-samples-for-singletons', dest='singleton_min_samples', 
                         type=int, help='Minimum number of samples for singleton ' +
-                        '(AC=1) variants from --vcf inputs to be considered for ' +
-                        'filtering [default: 200]', default=200)
+                        '(AC=1) variants from --vcf-with-min-sample-filter inputs ' +
+                        'to be considered for filtering [default: 200]', default=200)
     parser.add_argument('-z', '--bgzip', dest='bgzip', action='store_true',
                         help='Compress output BED with bgzip.')
 
@@ -248,6 +257,13 @@ def main():
         for vcfpath in args.vcf:
             vbed = read_vcf(vcfpath, args.maxfreq, args.af_fields, 
                             args.singleton_min_samples)
+            cnvs = freq_filter(cnvs, vbed, 0, maxFreq=args.maxfreq, 
+                               ro=args.recipoverlap, dist=args.dist)
+    if args.vcf_with_min_sample_filter is not None:
+        for vcfpath in args.vcf_with_min_sample_filter:
+            vbed = read_vcf(vcfpath, args.maxfreq, args.af_fields, 
+                            args.singleton_min_samples,
+                            apply_min_samples_filter=True)
             cnvs = freq_filter(cnvs, vbed, 0, maxFreq=args.maxfreq, 
                                ro=args.recipoverlap, dist=args.dist)
 

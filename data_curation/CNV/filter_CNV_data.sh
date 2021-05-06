@@ -86,10 +86,9 @@ while read cohort N; do
     --xcov 0.3 \
     --cohorts-list raw_CNVs.per_cohort.txt \
     --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
-    --vcf refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
-    --vcf refs/HGDP.hg19.sites.vcf.gz \
     --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-    --vcf refs/HGDP.hg19.sites.vcf.gz \
+    --vcf-with-min-sample-filter refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
+    --vcf-with-min-sample-filter refs/HGDP.hg19.sites.vcf.gz \
     --vcf-af-fields "AF,$( paste -s -d, all_pop_af_fields.txt )" \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
@@ -113,9 +112,9 @@ while read cohort N; do
     --xcov 0.3 \
     --cohorts-list raw_CNVs.per_cohort.txt \
     --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
-    --vcf refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
     --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-    --vcf refs/HGDP.hg19.sites.vcf.gz \
+    --vcf-with-min-sample-filter refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
+    --vcf-with-min-sample-filter refs/HGDP.hg19.sites.vcf.gz \
     --vcf-af-fields "AF,$( paste -s -d, all_pop_af_fields.txt )" \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
@@ -139,9 +138,9 @@ while read cohort N; do
     --xcov 0.3 \
     --cohorts-list raw_CNVs.per_cohort.txt \
     --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
-    --vcf refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
     --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-    --vcf refs/HGDP.hg19.sites.vcf.gz \
+    --vcf-with-min-sample-filter refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
+    --vcf-with-min-sample-filter refs/HGDP.hg19.sites.vcf.gz \
     --vcf-af-fields "AF,$( paste -s -d, all_pop_af_fields.txt )" \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
