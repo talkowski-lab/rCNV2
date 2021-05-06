@@ -357,7 +357,7 @@ prior_lnor_thresholding_pct=1
   ${dup_meta_stats} \
   ${freq_code}.DEL.training_blacklist.genes.list \
   ${freq_code}.DUP.training_blacklist.genes.list \
-  gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
+  genes/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
   gold_standard.haploinsufficient.genes.list \
   gold_standard.haplosufficient.genes.list \
   gold_standard.triplosensitive.genes.list \

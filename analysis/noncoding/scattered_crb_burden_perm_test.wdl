@@ -2,7 +2,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -13,6 +13,7 @@ workflow scattered_crb_burden_perm_test {
   String hpo
   File metacohort_list
   File metacohort_sample_table
+  File exclusion_bed
   String freq_code
   File crbs
   File crb_elements
@@ -36,6 +37,7 @@ workflow scattered_crb_burden_perm_test {
         hpo=hpo,
         metacohort_list=metacohort_list,
         metacohort_sample_table=metacohort_sample_table,
+        exclusion_bed=exclusion_bed,
         freq_code=freq_code,
         noncoding_filter=noncoding_filter,
         crbs=crbs,
@@ -63,6 +65,7 @@ task permuted_burden_test {
   String hpo
   File metacohort_list
   File metacohort_sample_table
+  File exclusion_bed
   String freq_code
   File crbs
   File crb_elements
@@ -156,11 +159,11 @@ task permuted_burden_test {
         tabix -f "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.counts.bed.gz"
 
         # Perform burden test
-        /opt/rCNV2/analysis/noncoding/crb_burden_test.R \
+        /opt/rCNV2/analysis/generic_scripts/fisher_test_single_cohort.R \
           --pheno-table ${metacohort_sample_table} \
           --cohort-name $meta \
-          --cnv $CNV \
           --case-hpo ${hpo} \
+          --keep-n-columns 4 \
           --bgzip \
           "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.counts.bed.gz" \
           "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.stats.bed.gz"
@@ -173,9 +176,11 @@ task permuted_burden_test {
         echo -e "$meta\t$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.stats.bed.gz"
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt
-      /opt/rCNV2/analysis/noncoding/crb_meta_analysis.R \
+      /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
         --model ${meta_model_prefix} \
+        --conditional-exclusion ${exclusion_bed} \
         --p-is-phred \
+        --keep-n-columns 4 \
         --spa \
         ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.perm_$i.bed

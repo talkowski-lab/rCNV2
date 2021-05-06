@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -26,11 +26,52 @@ mkdir refs/
 gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
 
+
+
+
+
+### Determine probe density-based conditional exclusion list
+# Test/dev parameters
+binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
+binned_genome_prefix="GRCh37.200kb_bins_10kb_steps.raw" #Note: this can be inferred in WDL as basename(binned_genome, ".bed.gz")
+min_probes_per_window=10
+min_frac_controls_probe_exclusion=0.9
+metacohort_list="refs/rCNV_metacohort_list.txt"
+rCNV_bucket="gs://rcnv_project"
+freq_code="rCNV"
+
+# Download probesets (note: requires permissions)
+gsutil -m cp -r \
+  ${rCNV_bucket}/cleaned_data/control_probesets \
+  ./
+
+# Compute conditional cohort exclusion mask
+for file in control_probesets/*bed.gz; do
+  echo -e "$file\t$( basename $file | sed 's/\.bed\.gz//g' )"
+done > probeset_tracks.tsv
+/opt/rCNV2/data_curation/other/probe_based_exclusion.py \
+  --outfile ${binned_genome_prefix}.cohort_exclusion.bed.gz \
+  --probecounts-outfile ${binned_genome_prefix}.probe_counts.bed.gz \
+  --frac-pass-outfile ${binned_genome_prefix}.frac_passing.bed.gz \
+  --min-probes ${min_probes_per_window} \
+  --min-frac-samples ${min_frac_controls_probe_exclusion} \
+  --keep-n-columns 3 \
+  --bgzip \
+  ${binned_genome} \
+  probeset_tracks.tsv \
+  control_probesets/rCNV.control_counts_by_array.tsv \
+  <( fgrep -v mega ${metacohort_list} )
+
+
+
+
+
 # Test/dev parameters (seizures)
 hpo="HP:0001250"
 prefix="HP0001250"
 meta="meta1"
 freq_code="rCNV"
+CNV="DEL"
 phenotype_list="refs/test_phenotypes.list"
 metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
@@ -42,9 +83,6 @@ meta_model_prefix="fe"
 bin_overlap=0.5
 pad_controls=50000
 max_manhattan_phred_p=30
-# Test/dev parameters (anxiety, with bad case:control imbalance)
-hpo="HP:0100852"
-prefix="HP0100852"
 
 
 
@@ -98,7 +136,7 @@ while read prefix hpo; do
       tabix -f "$meta.${prefix}.${freq_code}.$CNV.sliding_window.counts.bed.gz"
 
       # Perform burden test
-      /opt/rCNV2/analysis/sliding_windows/window_burden_test.R \
+      /opt/rCNV2/analysis/generic_scripts/fisher_test_single_cohort.R \
         --pheno-table ${metacohort_sample_table} \
         --cohort-name $meta \
         --case-hpo ${hpo} \
@@ -157,6 +195,7 @@ binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
 p_cutoff=0.000003715428
 n_pheno_perms=50
+exclusion_bed=GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz #Note: this file must be generated above
 meta_model_prefix="fe"
 i=1
 bin_overlap=0.5
@@ -259,6 +298,7 @@ while read prefix hpo; do
       > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
       /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
         --model ${meta_model_prefix} \
+        --conditional-exclusion ${exclusion_bed} \
         --p-is-phred \
         --spa \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
@@ -319,17 +359,20 @@ echo -e "\nANALYZING P-VALUE MATRIX\n"
 awk -v pval=${p_cutoff} -v FS="\t" -v OFS="\t" \
   '{ print $1, pval }' ${phenotype_list} \
 > sliding_window.${freq_code}.${CNV}.bonferroni_pval.hpo_cutoffs.tsv
-  
 
 
 
 
-# Test/dev parameters (all cases)
-hpo="HP:0000118"
-prefix="HP0000118"
-# Test/dev parameters (seizures)
-hpo="HP:0001250"
-prefix="HP0001250"
+
+# # Test/dev parameters (all cases)
+# hpo="HP:0000118"
+# prefix="HP0000118"
+# Test/dev parameters (NDDs)
+hpo="HP:0012759"
+prefix="HP0012759"
+# # Test/dev parameters (seizures)
+# hpo="HP:0001250"
+# prefix="HP0001250"
 meta="meta1"
 freq_code="rCNV"
 phenotype_list="refs/test_phenotypes.list"
@@ -342,9 +385,10 @@ meta_p_cutoff=0.000003715428
 meta_model_prefix="fe"
 bin_overlap=0.5
 pad_controls=50000
-# Test/dev parameters (anxiety, with bad case:control imbalance)
-hpo="HP:0100852"
-prefix="HP0100852"
+exclusion_bed=GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz #Note: this file must be generated above
+# # Test/dev parameters (anxiety, with bad case:control imbalance)
+# hpo="HP:0100852"
+# prefix="HP0100852"
 
 # Copy necessary data for local testing (without running the above -- this is not in the WDL)
 gsutil -m cp \
@@ -396,11 +440,12 @@ while read prefix hpo; do
     # Perform meta-analysis
     while read meta cohorts; do
       echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
-    done < <( fgrep -v mega ${metacohort_list} ) \
+    done < <( fgrep -v mega ${metacohort_list}) \
     > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
-    /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
+    /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
       --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
       --model ${meta_model_prefix} \
+      --conditional-exclusion ${exclusion_bed} \
       --p-is-phred \
       --spa \
       ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
@@ -524,6 +569,9 @@ meta_secondary_p_cutoff=0.05
 meta_nominal_cohorts_cutoff=2
 sig_window_pad=200000
 credset=0.99
+use_FDR="FALSE"
+FDR_cutoff=0.01
+output_suffix="strict_gw_sig"
 gtf="gencode.v19.canonical.pext_filtered.gtf.gz"
 
 
@@ -569,8 +617,12 @@ while read prefix hpo; do
   for wrapper in 1; do
     echo "$hpo"
     echo "stats/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.subset.bed.gz"
-    awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' \
-      ${meta_p_cutoffs_tsv}
+    if [ ${use_FDR} == "TRUE" ]; then
+      echo "${FDR_cutoff}"
+    else
+      awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' \
+        ${meta_p_cutoffs_tsv}
+    fi
   done | paste -s
 done < ${phenotype_list} \
 > ${freq_code}.${CNV}.segment_refinement.stats_input.tsv
@@ -578,25 +630,44 @@ echo "/opt/rCNV2/refs/UKBB_GD.Owen_2018.${CNV}.bed.gz" \
 > known_causal_loci_lists.${CNV}.tsv
 
 # Refine significant segments
-/opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
-  --cnv ${CNV} \
-  --secondary-p-cutoff ${meta_secondary_p_cutoff} \
-  --min-nominal ${meta_nominal_cohorts_cutoff} \
-  --secondary-or-nominal \
-  --credible-sets ${credset} \
-  --distance ${sig_window_pad} \
-  --known-causal-loci-list known_causal_loci_lists.${CNV}.tsv \
-  --cytobands refs/GRCh37.cytobands.bed.gz \
-  --sig-loci-bed ${freq_code}.${CNV}.final_segments.loci.pregenes.bed \
-  --sig-assoc-bed ${freq_code}.${CNV}.final_segments.associations.pregenes.bed \
-  ${freq_code}.${CNV}.segment_refinement.stats_input.tsv \
-  ${metacohort_sample_table}
+if [ ${use_FDR} == "TRUE" ]; then
+  /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
+    --cnv ${CNV} \
+    --use-fdr \
+    --secondary-p-cutoff 1 \
+    --min-nominal 0 \
+    --secondary-or-nominal \
+    --credible-sets ${credset} \
+    --distance ${sig_window_pad} \
+    --known-causal-loci-list known_causal_loci_lists.${CNV}.tsv \
+    --cytobands refs/GRCh37.cytobands.bed.gz \
+    --sig-loci-bed ${freq_code}.${CNV}.final_segments.${output_suffix}.loci.pregenes.bed \
+    --sig-assoc-bed ${freq_code}.${CNV}.final_segments.${output_suffix}.associations.pregenes.bed \
+    --prefix ${output_suffix} \
+    ${freq_code}.${CNV}.segment_refinement.stats_input.tsv \
+    ${metacohort_sample_table}
+else
+  /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
+    --cnv ${CNV} \
+    --secondary-p-cutoff ${meta_secondary_p_cutoff} \
+    --min-nominal ${meta_nominal_cohorts_cutoff} \
+    --secondary-or-nominal \
+    --credible-sets ${credset} \
+    --distance ${sig_window_pad} \
+    --known-causal-loci-list known_causal_loci_lists.${CNV}.tsv \
+    --cytobands refs/GRCh37.cytobands.bed.gz \
+    --sig-loci-bed ${freq_code}.${CNV}.final_segments.${output_suffix}.loci.pregenes.bed \
+    --sig-assoc-bed ${freq_code}.${CNV}.final_segments.${output_suffix}.associations.pregenes.bed \
+    --prefix ${output_suffix} \
+    ${freq_code}.${CNV}.segment_refinement.stats_input.tsv \
+    ${metacohort_sample_table}
+fi
 
 # Annotate final regions with genes & sort by coordinates
 for entity in loci associations; do
   /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
-    -o ${freq_code}.${CNV}.final_segments.$entity.bed \
-    ${freq_code}.${CNV}.final_segments.$entity.pregenes.bed \
+    -o ${freq_code}.${CNV}.final_segments.${output_suffix}.$entity.bed \
+    ${freq_code}.${CNV}.final_segments.${output_suffix}.$entity.pregenes.bed \
     ${gtf}
 done
 

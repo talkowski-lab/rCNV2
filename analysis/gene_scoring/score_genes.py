@@ -220,8 +220,9 @@ def fit_model(features, sumstats, train_genes, test_genes,
                               alpha=logit_alpha, l1_ratio=1 - l1_l2_mix, 
                               random_state=0)
         elif model == 'neuralnet':
-            classifier = MLPC(hidden_layer_sizes=(10, 5, 2), activation='logistic',
-                              solver='adam', alpha=logit_alpha, random_state=0)
+            classifier = MLPC(hidden_layer_sizes=(20, 10, 5, 2), activation='logistic', 
+                              solver='adam', early_stopping=True, alpha=logit_alpha, 
+                              random_state=0, max_iter=1000)
 
         # Fit sklearn model & predict on test set
         fitted_model = classifier.fit(train_df.drop(labels='bfdp', axis=1), 
@@ -251,54 +252,63 @@ def split_genes(genes, n_splits=10, random_seed=2020):
 
 
 def fit_model_cv(features, sumstats, all_pairs, xgenes=[], model='logit', 
-                 logit_alpha=0.1, l1_l2_mix=1, random=True):
+                 logit_alpha=0.1, l1_l2_mix=1, nested_cv=True, random=True):
     """
     Fit model with N-fold CV 
     
     """
 
-    models = []
+    if nested_cv:
 
-    # Randomly subsample genes across all_pairs for train/test sets, if specified
-    if random:
+        models = []
+
+        # Randomly subsample genes across all_pairs for train/test sets, if specified
+        if random:
+            all_chroms = [c for s in all_pairs for c in s]
+            all_genes = list(sumstats.index[(sumstats.chrom.isin(all_chroms)) & \
+                                            ~(sumstats.index.isin(xgenes))])
+            gene_splits = split_genes(all_genes)
+            for i in range(10):
+                train_splits = [s for k, s in enumerate(gene_splits) if k != i]
+                train_genes = [g for s in train_splits for g in s]
+                test_genes = gene_splits[i]
+                model_fit, test_rmse = \
+                    fit_model(features, sumstats, train_genes, test_genes, model, 
+                              logit_alpha, l1_l2_mix)
+                models.append((test_rmse, model_fit))
+
+        # Otherwise, partition train/test sets based on chromosome pairs
+        else:
+            for i in range(len(all_pairs)):
+                train_pairs = [x for k, x in enumerate(all_pairs) if k != i]
+                train_chroms = [c for s in train_pairs for c in s]
+                train_genes = list(sumstats.index[(sumstats.chrom.isin(train_chroms)) & \
+                                                  ~(sumstats.index.isin(xgenes))])
+                test_genes = list(sumstats.index[(sumstats.chrom.isin(list(all_pairs[i]))) & \
+                                                 ~(sumstats.index.isin(xgenes))])
+                model_fit, test_rmse = \
+                    fit_model(features, sumstats, train_genes, test_genes, model, 
+                              logit_alpha, l1_l2_mix)
+                models.append((test_rmse, model_fit))
+
+        best_rmse, best_model = \
+            [(r, m) for r, m in sorted(models, key=lambda x: x[0])][0]
+
+    else:
         all_chroms = [c for s in all_pairs for c in s]
         all_genes = list(sumstats.index[(sumstats.chrom.isin(all_chroms)) & \
                                         ~(sumstats.index.isin(xgenes))])
-        gene_splits = split_genes(all_genes)
-        for i in range(10):
-            train_splits = [s for k, s in enumerate(gene_splits) if k != i]
-            train_genes = [g for s in train_splits for g in s]
-            test_genes = gene_splits[i]
-            model_fit, test_rmse = \
-                fit_model(features, sumstats, train_genes, test_genes, model, 
-                          logit_alpha, l1_l2_mix)
-            models.append((test_rmse, model_fit))
-
-    # Otherwise, partition train/test sets based on chromosome pairs
-    else:
-        for i in range(len(all_pairs)):
-            train_pairs = [x for k, x in enumerate(all_pairs) if k != i]
-            train_chroms = [c for s in train_pairs for c in s]
-            train_genes = list(sumstats.index[(sumstats.chrom.isin(train_chroms)) & \
-                                              ~(sumstats.index.isin(xgenes))])
-            test_genes = list(sumstats.index[(sumstats.chrom.isin(list(all_pairs[i]))) & \
-                                             ~(sumstats.index.isin(xgenes))])
-            model_fit, test_rmse = \
-                fit_model(features, sumstats, train_genes, test_genes, model, 
-                          logit_alpha, l1_l2_mix)
-            models.append((test_rmse, model_fit))
-
-    best_rmse, best_model = \
-        [(r, m) for r, m in sorted(models, key=lambda x: x[0])][0]
+        best_model, best_rmse = fit_model(features, sumstats, all_genes, all_genes, 
+                                          model, logit_alpha, l1_l2_mix)
 
     return best_model, best_rmse
 
 
 def predict_bfdps(features, sumstats, chrompairs, xbed=None, true_pos=[], 
                   true_neg=[], model='logit', logit_alpha=0.1, l1_l2_mix=1, 
-                  random=True, quiet=False):
+                  nested_cv=True, random=True, quiet=False):
     """
-    Predicts bfdps for all genes with N-fold CV
+    Predicts bfdps for all genes with (optional) N-fold CV
     """
 
     pred_bfdps = pd.DataFrame(columns=['pred_bfdp'], index=features.index)
@@ -323,7 +333,7 @@ def predict_bfdps(features, sumstats, chrompairs, xbed=None, true_pos=[],
         # Fit model
         fitted_model, rmse = \
             fit_model_cv(features, sumstats, train_pairs, xgenes, model, 
-                         logit_alpha, l1_l2_mix, random)
+                         logit_alpha, l1_l2_mix, nested_cv, random)
 
         # Predict bfdps
         pred_df = features.loc[features.index.isin(pred_genes), :]
@@ -382,6 +392,9 @@ def main():
                         help='Regularization parameter (elastic net alpha) for ' +
                         'logit glm. 0 = L1, 1 = L2, (0, 1) = elastic net. ' +
                         '[default: L2 regularization]', default=1)
+    parser.add_argument('--no-nested-cv', action='store_true', help='Do not perform ' +
+                        ' 10-fold nested CV when predicting scores for each subset of ' +
+                        'chromosomes and instead train model on all chromosomes]')
     parser.add_argument('-o', '--outfile', default='stdout', help='Output .tsv of ' +
                         'scores per gene. [default: stdout]')
     args = parser.parse_args()
@@ -421,9 +434,10 @@ def main():
     features = load_features(args.features)
 
     # Predict bfdps for all genes
+    nested_cv = not args.no_nested_cv
     pred_bfdps = predict_bfdps(features, sumstats, chrompairs, args.blacklist,
                                true_pos, true_neg, args.model, args.logit_alpha, 
-                               args.l1_l2_mix, random=(not args.chromsplit))
+                               args.l1_l2_mix, nested_cv, random=(not args.chromsplit))
 
     # Write predicted BFDPs to outfile, along with scaled score & quantile
     pred_bfdps.to_csv(outfile, sep='\t', index=True, na_rep='NA')

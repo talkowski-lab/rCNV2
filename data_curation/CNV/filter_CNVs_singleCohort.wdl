@@ -2,7 +2,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019-2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -15,6 +15,7 @@ workflow filter_cnvs_singleCohort {
   File raw_CNVs
   File contiglist
   String rCNV_bucket
+  String rCNV_docker
 
   Array[Array[String]] contigs = read_tsv(contiglist)
 
@@ -29,7 +30,8 @@ workflow filter_cnvs_singleCohort {
         contig=contig[0],
         rCNV_bucket=rCNV_bucket,
         max_freq="0.01",
-        CNV_suffix="rCNV"
+        CNV_suffix="rCNV",
+        rCNV_docker=rCNV_docker
     }
     call filter_cnvs_singleChrom as filter_veryrare {
       input:
@@ -39,7 +41,8 @@ workflow filter_cnvs_singleCohort {
         contig=contig[0],
         rCNV_bucket=rCNV_bucket,
         max_freq="0.001",
-        CNV_suffix="vCNV"
+        CNV_suffix="vCNV",
+        rCNV_docker=rCNV_docker
     }
     call filter_cnvs_singleChrom as filter_ultrarare {
       input:
@@ -49,7 +52,8 @@ workflow filter_cnvs_singleCohort {
         contig=contig[0],
         rCNV_bucket=rCNV_bucket,
         max_freq="0.0001",
-        CNV_suffix="uCNV"
+        CNV_suffix="uCNV",
+        rCNV_docker=rCNV_docker
     }
   }
 
@@ -58,19 +62,22 @@ workflow filter_cnvs_singleCohort {
     input:
       beds=filter_rare.filtered_cnvs,
       prefix="${cohort}.rCNV",
-        output_bucket="${rCNV_bucket}/cleaned_data/cnv"
+        output_bucket="${rCNV_bucket}/cleaned_data/cnv",
+        rCNV_docker=rCNV_docker
   }
   call merge_beds as merge_veryrare {
     input:
       beds=filter_veryrare.filtered_cnvs,
       prefix="${cohort}.vCNV",
-        output_bucket="${rCNV_bucket}/cleaned_data/cnv"
+        output_bucket="${rCNV_bucket}/cleaned_data/cnv",
+        rCNV_docker=rCNV_docker
   }
   call merge_beds as merge_ultrarare {
     input:
       beds=filter_ultrarare.filtered_cnvs,
       prefix="${cohort}.uCNV",
-        output_bucket="${rCNV_bucket}/cleaned_data/cnv"
+        output_bucket="${rCNV_bucket}/cleaned_data/cnv",
+        rCNV_docker=rCNV_docker
   }
 
   output {
@@ -93,6 +100,7 @@ task filter_cnvs_singleChrom {
   String rCNV_bucket
   Float max_freq
   String CNV_suffix
+  String rCNV_docker
 
   command <<<
     # Copy all raw CNV data
@@ -132,6 +140,12 @@ task filter_cnvs_singleChrom {
     > raw_CNVs.per_cohort.txt
 
 
+    # Make list of all populations to filter for allele frequency
+    for pop in AFR AMR CSA EAS EUR MID OCN OTH SAS; do
+      echo $pop | awk -v OFS="\n" '{ print $1"_AF", $1"_NONREF_FREQ" }'
+    done > all_pop_af_fields.txt
+
+
     # Reassign location of TMPDIR to local disk, rather than boot disk
     # pybedtools can use a _ton_ of /tmp space when processing large BED files
     mkdir pbt_tmp
@@ -157,16 +171,17 @@ task filter_cnvs_singleChrom {
       --xcov 0.3 \
       --cohorts-list raw_CNVs.per_cohort.txt \
       --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
-      --vcf refs/1000Genomes_phase3.sites.vcf.gz \
       --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-      --vcf-af-fields AF,AFR_AF,AMR_AF,EAS_AF,EUR_AF,SAS_AF,OTH_AF,POPMAX_AF \
+      --vcf-with-min-sample-filter refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
+      --vcf-with-min-sample-filter refs/HGDP.hg19.sites.vcf.gz \
+      --vcf-af-fields "AF,$( paste -s -d, all_pop_af_fields.txt )" \
       --bgzip \
       ${raw_CNVs} \
       ${cohort}.${contig}.${CNV_suffix}.bed.gz
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:33e1e77e2848b056b16ef918866db9c034a789543440154b80b1fe1ef99b250e"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "4 GB"
     disks: "local-disk 200 SSD"
@@ -184,6 +199,7 @@ task merge_beds {
   Array[File] beds
   String prefix
   String output_bucket
+  String rCNV_docker
 
   command <<<
     # Simple merge
@@ -217,7 +233,7 @@ task merge_beds {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:33e1e77e2848b056b16ef918866db9c034a789543440154b80b1fe1ef99b250e"
+    docker: "${rCNV_docker}"
     preemptible: 1
   }
 

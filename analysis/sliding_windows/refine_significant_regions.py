@@ -38,14 +38,18 @@ def format_stat(x, is_phred=False, na_val=0):
             return float(x)
 
 
-def is_window_sig(primary_p, secondary_p, n_nominal, primary_p_cutoff, 
-                  secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
+def is_window_sig(primary_p, primary_q, secondary_p, n_nominal, primary_p_cutoff, 
+                  use_fdr=False, secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
                   secondary_or_nominal=True):
     """
     Checks if a window should be considered genome-wide significant
     """
 
-    if primary_p >= primary_p_cutoff:
+    if use_fdr:
+        primary_value = primary_q
+    else:
+        primary_value = primary_p
+    if primary_value >= primary_p_cutoff:
         return False
     else:
         secondary = (secondary_p < secondary_p_cutoff)
@@ -155,7 +159,7 @@ def refine(window_priors, window_info, null_variance=0.42 ** 2, cs_val=0.95,
     return refine_res, credset_coords, credset_bt, credset_windows
 
 
-def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True, 
+def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True, use_fdr=False,
                 secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
                 secondary_or_nominal=True, sig_only=False, keep_windows=None,
                 refine_secondary=False):
@@ -172,9 +176,10 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
     reader = csv.reader(csvin, delimiter='\t')
 
 
-    for chrom, start, end, n_nominal, top_cohort, case_freq, control_freq, \
-        lnOR, lnOR_lower, lnOR_upper, zscore, primary_p, secondary_lnOR, \
-        secondary_lnOR_lower, secondary_lnOR_upper, secondary_zscore, secondary_p \
+    for chrom, start, end, n_nominal, top_cohort, excluded_cohorts, case_freq, \
+        control_freq, lnOR, lnOR_lower, lnOR_upper, zscore, primary_p, primary_q, \
+        secondary_lnOR, secondary_lnOR_lower, secondary_lnOR_upper, \
+        secondary_zscore, secondary_p, secondary_q \
         in reader:
 
         # Skip header line
@@ -191,6 +196,7 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
 
         # Clean up window data
         primary_p = format_stat(primary_p, p_is_phred, 1)
+        primary_q = format_stat(primary_q, p_is_phred, 1)
         secondary_p = format_stat(secondary_p, p_is_phred, 1)
         n_nominal = int(n_nominal)
         case_freq = format_stat(case_freq)
@@ -208,14 +214,16 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
 
         # Store window association stats
         if sig_only:
-            if is_window_sig(primary_p, secondary_p, n_nominal, primary_p_cutoff,
-                           secondary_p_cutoff, n_nominal_cutoff, secondary_or_nominal):
+            if is_window_sig(primary_p, primary_q, secondary_p, n_nominal, 
+                             primary_p_cutoff, use_fdr, secondary_p_cutoff, 
+                             n_nominal_cutoff, secondary_or_nominal):
                 window_bt = pbt.BedTool('\t'.join([chrom, start, end, window]), 
                                       from_string=True)
                 window_stats = {'case_freq' : case_freq, 'control_freq' : control_freq,
                                 'lnOR' : use_lnOR, 'lnOR_lower' : use_lnOR_lower,
                                 'lnOR_upper' : use_lnOR_upper, 'zscore' : use_zscore,
-                                'primary_p' : primary_p, 'secondary_p' : secondary_p,
+                                'primary_p' : primary_p, 'primary_q' : primary_q, 
+                                'secondary_p' : secondary_p,
                                 'n_nominal' : n_nominal, 'window_bt' : window_bt}
                 stats_dict[window] = window_stats
         else:
@@ -224,7 +232,8 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
             window_stats = {'case_freq' : case_freq, 'control_freq' : control_freq,
                             'lnOR' : use_lnOR, 'lnOR_lower' : use_lnOR_lower,
                             'lnOR_upper' : use_lnOR_upper, 'zscore' : use_zscore,
-                            'primary_p' : primary_p, 'secondary_p' : secondary_p,
+                            'primary_p' : primary_p, 'primary_q' : primary_q, 
+                            'secondary_p' : secondary_p,
                             'n_nominal' : n_nominal, 'window_bt' : window_bt}
             stats_dict[window] = window_stats
 
@@ -233,7 +242,7 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
     return stats_dict
 
 
-def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True, 
+def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True, use_fdr=False,
                 secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
                 secondary_or_nominal=True, block_merge_dist=200000, 
                 block_prefix='window_block', null_variance=0.42 ** 2,
@@ -253,8 +262,9 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
 
     # First pass: parse data for significant windows only
     hpo_info['sig_windows'] = parse_stats(stats_in, primary_p_cutoff, p_is_phred, 
-                                          secondary_p_cutoff, n_nominal_cutoff, 
-                                          secondary_or_nominal, sig_only=True,
+                                          use_fdr, secondary_p_cutoff, 
+                                          n_nominal_cutoff, secondary_or_nominal, 
+                                          sig_only=True, 
                                           refine_secondary=refine_secondary)
 
     # Second pass: parse data for all windows within block_merge_dist of sig_windows
@@ -276,7 +286,7 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
 
         # Gather window stats
         hpo_info['all_windows'] = parse_stats(stats_in, primary_p_cutoff, p_is_phred, 
-                                              secondary_p_cutoff, n_nominal_cutoff, 
+                                              use_fdr, secondary_p_cutoff, n_nominal_cutoff, 
                                               secondary_or_nominal, sig_only=False,
                                               keep_windows=nearby_windows, 
                                               refine_secondary=refine_secondary)
@@ -312,10 +322,10 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
     return hpo_info
 
 
-def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
-                  secondary_or_nominal=True, block_merge_dist=200000,
-                  block_prefix='window_block', refine_secondary=False, 
-                  cs_val=0.95):
+def load_all_hpos(statslist, use_fdr=False, secondary_p_cutoff=0.05, 
+                  n_nominal_cutoff=2, secondary_or_nominal=True, 
+                  block_merge_dist=200000, block_prefix='window_block', 
+                  refine_secondary=False, cs_val=0.95):
     """
     Wrapper function to process each HPO with process_hpo()
     Returns a dict with one entry per HPO
@@ -328,7 +338,7 @@ def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2,
         for hpo, stats_in, pval, in reader:
             primary_p_cutoff = float(pval)
             hpo_data[hpo] = process_hpo(hpo, stats_in, primary_p_cutoff, 
-                                        p_is_phred=True, 
+                                        p_is_phred=True, use_fdr=use_fdr,
                                         secondary_p_cutoff=secondary_p_cutoff, 
                                         n_nominal_cutoff=n_nominal_cutoff, 
                                         secondary_or_nominal=secondary_or_nominal,
@@ -654,15 +664,19 @@ def cluster_credsets(hpo_data, block_merge_dist=200000):
     return clustered_credsets
 
 
-def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS'):
+def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS', 
+                    block_prefix=None):
     """
     Format final list of collapsed credible sets and compute pooled summary statistics
     """
 
-    if cnv == 'NS':
-        region_id_prefix = 'merged_segment'
+    if block_prefix is None:
+        if cnv == 'NS':
+            region_id_prefix = 'merged_segment'
+        else:
+            region_id_prefix = 'merged_{}_segment'.format(cnv)
     else:
-        region_id_prefix = 'merged_{}_segment'.format(cnv)
+        region_id_prefix = 'merged_{}_segment'.format(block_prefix)
 
     cols = 'chr start_min end_max region_id cnv cytoband pooled_control_freq pooled_case_freq ' + \
            'pooled_ln_or pooled_ln_or_ci_lower pooled_ln_or_ci_upper ' + \
@@ -753,12 +767,15 @@ def main():
     #                     'independent credible sets. Expects six columns: chrom, ' +
     #                     'start, end, CNV ID, CNV type, and phenotype.')
     parser.add_argument('hpos_by_cohort', help='tsv of sample sizes per HPO.')
+    parser.add_argument('--use-fdr', action='store_true', default=False,
+                        help='Evaluate FDR q-value to assess significance. ' +
+                        '[default: use uncorrected P-value]')
     parser.add_argument('--secondary-p-cutoff', help='Maximum secondary P-value to ' + 
                         'consider as significant. [default: 1]', default=1, type=float)
     parser.add_argument('--cnv', help='Indicate CNV type. [default: NS]', default='NS')
     parser.add_argument('--min-nominal', help='Minimum number of individual cohorts ' + 
                         'required to be nominally significant to consider ' +
-                        'significant. [default: 1]', default=1, type=int)
+                        'significant. [default: 0]', default=0, type=int)
     parser.add_argument('--secondary-or-nominal', dest='secondary_or_nom', 
                         help='Allow windows to meet either --secondary-p-cutoff ' +
                         'or --min-nominal, but do not require both. ' +
@@ -782,16 +799,21 @@ def main():
     parser.add_argument('--sig-assoc-bed', help='Output BED of significant ' +
                         'segment-phenotype pairs and their corresponding association ' +
                         'statistics.')
+    parser.add_argument('--prefix', help='Prefix for naming loci & associations.')
     args = parser.parse_args()
 
     # Set block prefix
+    block_prefix_components = ['segment']
+    if args.prefix is not None:
+        block_prefix_components.insert(0, args.prefix)
     if args.cnv is not None and args.cnv != 'NS':
-        block_prefix = args.cnv + '_segment'
+        block_prefix_components.insert(0, args.cnv)
     else:
-        block_prefix = 'sig_segment'
+        block_prefix_components.insert(0, 'sig')
+    block_prefix = '_'.join(block_prefix_components)
 
     # Process data per hpo
-    hpo_data = load_all_hpos(args.statslist, args.secondary_p_cutoff, 
+    hpo_data = load_all_hpos(args.statslist, args.use_fdr, args.secondary_p_cutoff, 
                              args.min_nominal, args.secondary_or_nom, 
                              args.distance, block_prefix, args.refine_secondary, 
                              args.cs_val)
@@ -834,7 +856,7 @@ def main():
     if args.sig_loci_bed is not None:
         sig_loci_bed = open(args.sig_loci_bed, 'w')
         output_loci_bed(hpo_data, final_loci, args.cytobands, sig_loci_bed, 
-                        ncase_dict, args.cnv)
+                        ncase_dict, args.cnv, block_prefix.replace('_segment', ''))
 
 
 if __name__ == '__main__':

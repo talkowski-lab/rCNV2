@@ -2,13 +2,13 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019-2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
 # Filter raw CNV data to rare, very rare, and ultra rare subsets
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:filter_cnvs_singleCohort/versions/51/plain-WDL/descriptor" as filter_single
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:filter_cnvs_singleCohort/versions/54/plain-WDL/descriptor" as filter_single
 
 
 workflow filter_CNV_data {
@@ -18,6 +18,7 @@ workflow filter_CNV_data {
   File metacohort_list
   File contiglist
   String rCNV_bucket
+  String rCNV_docker
 
   Array[Array[String]] metacohorts = read_tsv(metacohort_list)
   Array[Int] cohort_idxs = range(length(cohorts))
@@ -31,7 +32,8 @@ workflow filter_CNV_data {
         sample_size=sample_sizes[i],
         raw_CNVs=raw_CNVs[i],
         contiglist=contiglist,
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
   }
 
@@ -43,7 +45,8 @@ workflow filter_CNV_data {
         bed_idxs=filter_cohort.rCNVs_idx,
         cohorts=metacohort[1],
         output_bucket="${rCNV_bucket}/cleaned_data/cnv",
-        prefix="${metacohort[0]}.rCNV"
+        prefix="${metacohort[0]}.rCNV",
+        rCNV_docker=rCNV_docker
     }
     call combine_subsets as combine_meta_vCNVs {
       input:
@@ -51,7 +54,8 @@ workflow filter_CNV_data {
         bed_idxs=filter_cohort.vCNVs_idx,
         cohorts=metacohort[1],
         output_bucket="${rCNV_bucket}/cleaned_data/cnv",
-        prefix="${metacohort[0]}.vCNV"
+        prefix="${metacohort[0]}.vCNV",
+        rCNV_docker=rCNV_docker
     }
     call combine_subsets as combine_meta_uCNVs {
       input:
@@ -59,7 +63,8 @@ workflow filter_CNV_data {
         bed_idxs=filter_cohort.uCNVs_idx,
         cohorts=metacohort[1],
         output_bucket="${rCNV_bucket}/cleaned_data/cnv",
-        prefix="${metacohort[0]}.uCNV"
+        prefix="${metacohort[0]}.uCNV",
+        rCNV_docker=rCNV_docker
     }
   }
 
@@ -81,6 +86,7 @@ task combine_subsets {
   String cohorts
   String output_bucket
   String prefix
+  String rCNV_docker
 
   File bedlist = write_tsv(beds)
   File idxlist = write_tsv(bed_idxs)
@@ -104,7 +110,7 @@ task combine_subsets {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:33e1e77e2848b056b16ef918866db9c034a789543440154b80b1fe1ef99b250e"
+    docker: "${rCNV_docker}"
     preemptible: 1
   }
 

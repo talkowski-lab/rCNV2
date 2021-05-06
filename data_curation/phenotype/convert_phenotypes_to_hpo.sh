@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -189,22 +189,33 @@ fgrep -wf raw_phenos/UKBB.QC_pass_samples.list \
 
 # Pool all phenotypes across cohorts
 while read cohort; do
-  cat cleaned_phenos/all/${cohort}.cleaned_phenos.txt
+  pheno_file="cleaned_phenos/all/${cohort}.cleaned_phenos.txt"
+  if [ -e $pheno_file ]; then
+    cat $pheno_file
+  fi
 done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt | fgrep -v "#" ) \
 > all_phenos.merged.txt
 
 
+# Make list of counts per HPO pair for EstBB & BioVU
+echo -e "EstBB\traw_phenos/EstBB.HPO_terms_full_cooccurrence_table.tsv.gz" > hpo_pair_cohorts.inputs.tsv
+echo -e "BioVU\traw_phenos/BioVU.hpo_coocurrence_table.tsv.gz" >> hpo_pair_cohorts.inputs.tsv
+
 # Determine minimum HPO tree to use
 /opt/rCNV2/data_curation/phenotype/collapse_HPO_tree.py \
+  --hpo-pair-cohorts hpo_pair_cohorts.inputs.tsv \
   --ignore "HP:0000001" \
   --ignore "HP:0031796" \
   --ignore "HP:0031797" \
   --ignore "HP:0011008" \
+  --ignore "HP:0025303" \
+  --ignore "HP:0025142" \
+  --ignore "HP:0012823" \
   --obo hp.obo \
   --raw-counts samples_per_HPO.txt \
   --filter-log HPO_tree_filter.log \
-  --min-samples 1000 \
-  --min-diff 2000 \
+  --min-samples 3000 \
+  --min-diff 3000 \
   --outfile phenotype_groups.HPO_metadata.intermediate.txt \
   all_phenos.merged.txt
 
@@ -233,8 +244,10 @@ gsutil cp gs://rcnv_project/analysis/analysis_refs/rCNV_metacohort_list.txt ./
   --outfile HPOs_by_cohort.table.tsv \
   --meta-cohorts rCNV_metacohort_list.txt \
   --meta-out HPOs_by_metacohort.table.tsv \
-  --min-metacohorts 2 \
-  --min-per-metacohort 500 \
+  --min-metacohorts 3 \
+  --min-per-metacohort 300 \
+  --hpo-pair-cohorts hpo_pair_cohorts.inputs.tsv \
+  --pairwise-curation /opt/rCNV2/refs/hpo/manual_hpo_pair_similarity_drops.tsv \
   phenotype_groups.HPO_metadata.intermediate.txt \
   /opt/rCNV2/refs/rCNV_sample_counts.txt \
   cleaned_phenos/intermediate/
@@ -315,10 +328,26 @@ for cohort in UKBB CHOP; do
 done
 
 
+# Filter HPO coocurrence tables for EstBB & BioVU
+/opt/rCNV2/data_curation/phenotype/filter_coocurrence_table.py \
+  raw_phenos/EstBB.HPO_terms_full_cooccurrence_table.tsv.gz \
+  <( fgrep -v "#" phenotype_groups.HPO_metadata.txt | cut -f1 ) \
+  cleaned_phenos/filtered/EstBB.final_cooccurrence_table.tsv
+gzip -f cleaned_phenos/filtered/EstBB.final_cooccurrence_table.tsv
+/opt/rCNV2/data_curation/phenotype/filter_coocurrence_table.py \
+  raw_phenos/BioVU.hpo_coocurrence_table.tsv.gz \
+  <( fgrep -v "#" phenotype_groups.HPO_metadata.txt | cut -f1 ) \
+  cleaned_phenos/filtered/BioVU.final_cooccurrence_table.tsv
+gzip -f cleaned_phenos/filtered/BioVU.final_cooccurrence_table.tsv
+
+
 # Merge final phenotype lists per metacohort
 while read name cohorts; do
   for cohort in $( echo "$cohorts" | sed 's/;/\n/g' ); do
-    cat cleaned_phenos/filtered/${cohort}.cleaned_phenos.txt
+    pheno_file="cleaned_phenos/filtered/${cohort}.cleaned_phenos.txt"
+    if [ -e $pheno_file ]; then
+      cat $pheno_file
+    fi
   done \
   > cleaned_phenos/filtered/${name}.cleaned_phenos.txt
 done < rCNV_metacohort_list.txt
@@ -326,11 +355,10 @@ done < rCNV_metacohort_list.txt
 
 # Copy all final data to Google bucket (requires permissions)
 gsutil -m cp -r cleaned_phenos/* gs://rcnv_project/cleaned_data/phenotypes/
-gsutil cp samples_per_HPO.txt \
-  gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/
-gsutil cp HPO_tree_filter.log \
-  gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/
-gsutil cp phenotype_groups.HPO_metadata.txt \
+gsutil cp \
+  samples_per_HPO.txt \
+  HPO_tree_filter.log \
+  phenotype_groups.HPO_metadata.txt \
   gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/
 gsutil cp test_phenotypes.list \
   gs://rcnv_project/analysis/analysis_refs/
@@ -357,11 +385,10 @@ done < rCNV_metacohort_list.txt \
 
 
 # Copy sample counts per HPO term per cohort to Google bucket (requires permissions)
-gsutil cp HPOs_by_cohort.table.tsv \
-  gs://rcnv_project/analysis/analysis_refs/
-gsutil cp HPOs_by_metacohort.table.tsv \
-  gs://rcnv_project/analysis/analysis_refs/
-gsutil cp rCNV_metacohort_sample_counts.txt \
+gsutil cp \
+  HPOs_by_cohort.table.tsv \
+  HPOs_by_metacohort.table.tsv \
+  rCNV_metacohort_sample_counts.txt \
   gs://rcnv_project/analysis/analysis_refs/
 
 
@@ -370,6 +397,7 @@ gsutil cp rCNV_metacohort_sample_counts.txt \
   --outfile HPOs_by_cohort.table.html.tsv \
   --meta-cohorts rCNV_metacohort_list.txt \
   --meta-out HPOs_by_metacohort.table.html.tsv \
+  --hpo-pair-cohorts hpo_pair_cohorts.inputs.tsv \
   --html \
   phenotype_groups.HPO_metadata.txt \
   /opt/rCNV2/refs/rCNV_sample_counts.txt \

@@ -31,14 +31,6 @@ gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 hpo="HP:0001250"
 prefix="HP0001250"
 meta="meta2"
-# Params for NDDs
-hpo="HP:0012759"
-prefix="HP0012759"
-meta="meta1"
-# Params for UNKNOWN
-hpo="UNKNOWN"
-prefix="UNKNOWN"
-meta="meta2"
 # General params
 freq_code="rCNV"
 noncoding_filter="loose"
@@ -58,6 +50,45 @@ max_manhattan_phred_p=30
 n_pheno_perms=50
 meta_model_prefix="fe"
 i=1
+
+
+
+
+
+### Determine probe density-based conditional exclusion list
+# Test/dev parameters
+crbs_prefix="rCNV.crbs" #Note: this can be inferred in WDL as basename(crbs, ".bed.gz")
+min_probes_per_crb=10
+min_frac_controls_probe_exclusion=0.9
+metacohort_list="refs/rCNV_metacohort_list.txt"
+rCNV_bucket="gs://rcnv_project"
+freq_code="rCNV"
+
+# Download probesets (note: requires permissions)
+gsutil -m cp -r \
+  ${rCNV_bucket}/cleaned_data/control_probesets \
+  ./
+
+# Subset crb coordinates to minimal BED4
+zcat ${crbs} | cut -f1-4 | bgzip -c > crb_coords.bed.gz
+
+# Compute conditional cohort exclusion mask
+for file in control_probesets/*bed.gz; do
+  echo -e "$file\t$( basename $file | sed 's/\.bed\.gz//g' )"
+done > probeset_tracks.tsv
+/opt/rCNV2/data_curation/other/probe_based_exclusion.py \
+  --outfile ${crbs_prefix}.cohort_exclusion.bed.gz \
+  --probecounts-outfile ${crbs_prefix}.probe_counts.bed.gz \
+  --frac-pass-outfile ${crbs_prefix}.frac_passing.bed.gz \
+  --min-probes ${min_probes_per_crb} \
+  --min-frac-samples ${min_frac_controls_probe_exclusion} \
+  --keep-n-columns 4 \
+  --bgzip \
+  crb_coords.bed.gz \
+  probeset_tracks.tsv \
+  control_probesets/rCNV.control_counts_by_array.tsv \
+  <( fgrep -v mega ${metacohort_list} )
+
 
 
 # Count CNVs in cases and controls per phenotype, split by metacohort and CNV type
@@ -103,11 +134,11 @@ while read pheno hpo; do
       tabix -f "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.counts.bed.gz"
 
       # Perform burden test
-      /opt/rCNV2/analysis/noncoding/crb_burden_test.R \
+      /opt/rCNV2/analysis/generic_scripts/fisher_test_single_cohort.R \
         --pheno-table ${metacohort_sample_table} \
         --cohort-name $meta \
-        --cnv $CNV \
         --case-hpo ${hpo} \
+        --keep-n-columns 4 \
         --bgzip \
         "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.counts.bed.gz" \
         "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.stats.bed.gz"
@@ -172,11 +203,11 @@ while read pheno hpo; do
       tabix -f "$meta.${prefix}.${freq_code}.$CNV.crb_burden.counts.bed.gz"
 
       # Perform burden test
-      /opt/rCNV2/analysis/noncoding/crb_burden_test.R \
+      /opt/rCNV2/analysis/generic_scripts/fisher_test_single_cohort.R \
         --pheno-table ${metacohort_sample_table} \
         --cohort-name $meta \
-        --cnv $CNV \
         --case-hpo ${hpo} \
+        --keep-n-columns 4 \
         --bgzip \
         "$meta.${prefix}.${freq_code}.$CNV.crb_burden.counts.bed.gz" \
         "$meta.${prefix}.${freq_code}.$CNV.crb_burden.stats.bed.gz"
@@ -261,11 +292,11 @@ while read prefix hpo; do
         tabix -f "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.counts.bed.gz"
 
         # Perform burden test
-        /opt/rCNV2/analysis/noncoding/crb_burden_test.R \
+        /opt/rCNV2/analysis/generic_scripts/fisher_test_single_cohort.R \
           --pheno-table ${metacohort_sample_table} \
           --cohort-name $meta \
-          --cnv $CNV \
           --case-hpo ${hpo} \
+          --keep-n-columns 4 \
           --bgzip \
           "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.counts.bed.gz" \
           "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.stats.bed.gz"
@@ -278,9 +309,11 @@ while read prefix hpo; do
         echo -e "$meta\t$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.stats.bed.gz"
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt
-      /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
+      /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
         --model ${meta_model_prefix} \
+        --conditional-exclusion ${exclusion_bed} \
         --p-is-phred \
+        --keep-n-columns 4 \
         --spa \
         ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.perm_$i.bed
@@ -327,6 +360,9 @@ paste perm_res/*.crb_burden.meta_analysis.permuted_p_values.*.txt \
 
 
 # Run meta-analysis for each phenotype
+# Dev: copy precomputed counts (so the entire upper block doesn't have to be run)
+gsutil -m cp ${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/stats/meta*.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.stats.bed.gz ./
+exclusion_bed="rCNV.crbs.cohort_exclusion.bed.gz" #Note: this file must be generated above
 while read prefix hpo; do
 
   # Get metadata for meta-analysis
@@ -368,11 +404,13 @@ while read prefix hpo; do
       echo -e "$meta\t$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.stats.bed.gz"
     done < <( fgrep -v mega ${metacohort_list} ) \
     > ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt
-    /opt/rCNV2/analysis/noncoding/crb_meta_analysis.R \
+    /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
       --or-corplot ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.or_corplot_grid.jpg \
       --model ${meta_model_prefix} \
+      --conditional-exclusion ${exclusion_bed} \
       --p-is-phred \
       --spa \
+      --keep-n-columns 4 \
       ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt \
       ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed
     bgzip -f ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed
@@ -480,10 +518,12 @@ while read prefix hpo; do
     done < <( fgrep -v mega ${metacohort_list} ) \
     > ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.input.txt
     
-    /opt/rCNV2/analysis/noncoding/crb_meta_analysis.R \
+    /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
       --or-corplot ${prefix}.${freq_code}.$CNV.crb_burden.or_corplot_grid.jpg \
       --model ${meta_model_prefix} \
+      --conditional-exclusion ${exclusion_bed} \
       --p-is-phred \
+      --keep-n-columns 4 \
       --spa \
       ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.input.txt \
       ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed
