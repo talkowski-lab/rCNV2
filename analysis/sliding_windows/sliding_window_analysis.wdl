@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens in sliding windows, genome-wide
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/19/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/20/plain-WDL/descriptor" as scattered_perm
 
 
 workflow sliding_window_analysis {
@@ -34,6 +34,8 @@ workflow sliding_window_analysis {
   File gtf
   File contigfile
   String rCNV_bucket
+  String rCNV_docker
+  String athena_cloud_docker
   String fisher_cache_string
   String perm_cache_string
   String meta_cache_string
@@ -53,7 +55,8 @@ workflow sliding_window_analysis {
       min_frac_controls_probe_exclusion=min_frac_controls_probe_exclusion,
       metacohort_list=metacohort_list,
       rCNV_bucket=rCNV_bucket,
-      freq_code=freq_code
+      athena_cloud_docker=athena_cloud_docker,
+      freq_code="rCNV"
   }
 
   # Scatter over phenotypes
@@ -71,6 +74,7 @@ workflow sliding_window_analysis {
         p_cutoff=p_cutoff,
         max_manhattan_phred_p=max_manhattan_phred_p,
         rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
         prefix=pheno[0],
         cache_string=fisher_cache_string
     }
@@ -90,6 +94,7 @@ workflow sliding_window_analysis {
         n_pheno_perms=n_pheno_perms,
         meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
         prefix=pheno[0],
         cache_string=perm_cache_string
     }
@@ -107,6 +112,7 @@ workflow sliding_window_analysis {
         n_pheno_perms=n_pheno_perms,
         fdr_target=p_cutoff,
         rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
         dummy_completion_markers=rCNV_perm_test.completion_marker,
         fdr_table_suffix="empirical_genome_wide_pval",
         p_val_column_name="meta_phred_p"
@@ -122,6 +128,7 @@ workflow sliding_window_analysis {
         n_pheno_perms=n_pheno_perms,
         fdr_target=p_cutoff,
         rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
         dummy_completion_markers=rCNV_perm_test.completion_marker,
         fdr_table_suffix="empirical_genome_wide_pval_secondary",
         p_val_column_name="meta_phred_p_secondary"
@@ -143,6 +150,7 @@ workflow sliding_window_analysis {
         max_manhattan_phred_p=max_manhattan_phred_p,
         meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
         prefix=pheno[0],
         cache_string=meta_cache_string
     }
@@ -166,7 +174,8 @@ workflow sliding_window_analysis {
       FDR_cutoff=FDR_cutoff,
       output_suffix="strict_gw_sig",
       gtf=gtf,
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
   call refine_regions as refine_DUP_gw {
     input:
@@ -185,7 +194,8 @@ workflow sliding_window_analysis {
       FDR_cutoff=FDR_cutoff,
       output_suffix="strict_gw_sig",
       gtf=gtf,
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
   call refine_regions as refine_DEL_fdr {
     input:
@@ -204,7 +214,8 @@ workflow sliding_window_analysis {
       FDR_cutoff=FDR_cutoff,
       output_suffix="fdr",
       gtf=gtf,
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
   call refine_regions as refine_DUP_fdr {
     input:
@@ -223,7 +234,8 @@ workflow sliding_window_analysis {
       FDR_cutoff=FDR_cutoff,
       output_suffix="fdr",
       gtf=gtf,
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
 
   # Merge refined associations & regions
@@ -233,7 +245,8 @@ workflow sliding_window_analysis {
       loci_beds=[refine_DEL_gw.loci, refine_DUP_gw.loci],
       freq_code="rCNV",
       output_suffix="strict_gw_sig",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
   call merge_refined_regions as merge_fdr {
     input:
@@ -241,7 +254,8 @@ workflow sliding_window_analysis {
       loci_beds=[refine_DEL_fdr.loci, refine_DUP_fdr.loci],
       freq_code="rCNV",
       output_suffix="fdr",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
 
   # Plot summary metrics for final credible regions
@@ -251,7 +265,8 @@ workflow sliding_window_analysis {
       DEL_regions=refine_DEL_gw.loci,
       DUP_regions=refine_DUP_gw.loci,
       output_suffix="strict_gw_sig",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
   call plot_region_summary as plot_rCNV_regions_fdr {
     input:
@@ -259,7 +274,8 @@ workflow sliding_window_analysis {
       DEL_regions=refine_DEL_fdr.loci,
       DUP_regions=refine_DUP_fdr.loci,
       output_suffix="fdr",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
 
   output {
@@ -279,6 +295,7 @@ task build_exclusion_list {
   Float min_frac_controls_probe_exclusion
   File metacohort_list
   String rCNV_bucket
+  String athena_cloud_docker
   String freq_code
 
   command <<<
@@ -294,8 +311,11 @@ task build_exclusion_list {
       echo -e "$file\t$( basename $file | sed 's/\.bed\.gz//g' )"
     done > probeset_tracks.tsv
 
+    # Clone rCNV2 repo (not present in athena-cloud Docker)
+    git clone https://github.com/talkowski-lab/rCNV2.git
+
     # Build conditional exclusion list
-    /opt/rCNV2/data_curation/other/probe_based_exclusion.py \
+    rCNV2/data_curation/other/probe_based_exclusion.py \
       --outfile ${binned_genome_prefix}.cohort_exclusion.bed.gz \
       --probecounts-outfile ${binned_genome_prefix}.probe_counts.bed.gz \
       --frac-pass-outfile ${binned_genome_prefix}.frac_passing.bed.gz \
@@ -310,7 +330,7 @@ task build_exclusion_list {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
+    docker: "${athena_cloud_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -336,6 +356,7 @@ task burden_test {
   Float p_cutoff
   Int max_manhattan_phred_p
   String rCNV_bucket
+  String rCNV_docker
   String prefix
   String cache_string
 
@@ -443,7 +464,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -467,6 +488,7 @@ task calc_meta_p_cutoff {
   Int n_pheno_perms
   Float fdr_target
   String rCNV_bucket
+  String rCNV_docker
   Array[File] dummy_completion_markers #Must delocalize something or Cromwell will bypass permutation test
   String fdr_table_suffix
   String p_val_column_name
@@ -526,7 +548,7 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:20ee162d7d45e0340d374861d137f76a2bfdfa848c8f7ff295f66b4bcd1bedd9"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "32 GB"
     disks: "local-disk 275 HDD"
@@ -555,6 +577,7 @@ task meta_analysis {
   Int max_manhattan_phred_p
   String meta_model_prefix
   String rCNV_bucket
+  String rCNV_docker
   String prefix
   String cache_string
 
@@ -670,7 +693,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0ac85afb703849cd30e35656d4c3fcb34ec1e88515304f6aed71ce5bda977ee0"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -687,6 +710,7 @@ task refine_regions {
   File metacohort_list
   File metacohort_sample_table
   String rCNV_bucket
+  String rCNV_docker
   File meta_p_cutoffs_tsv
   Float meta_secondary_p_cutoff
   Int meta_nominal_cohorts_cutoff
@@ -803,7 +827,7 @@ task refine_regions {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0ac85afb703849cd30e35656d4c3fcb34ec1e88515304f6aed71ce5bda977ee0"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -818,6 +842,7 @@ task merge_refined_regions {
   String freq_code
   String output_suffix
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e 
@@ -854,7 +879,7 @@ task merge_refined_regions {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0ac85afb703849cd30e35656d4c3fcb34ec1e88515304f6aed71ce5bda977ee0"
+    docker: "${rCNV_docker}"
     preemptible: 1
     bootDiskSizeGb: "20"
   }
@@ -867,6 +892,7 @@ task plot_region_summary {
   File DUP_regions
   String output_suffix
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     /opt/rCNV2/analysis/sliding_windows/regions_summary.plot.R \
@@ -885,7 +911,7 @@ task plot_region_summary {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0ac85afb703849cd30e35656d4c3fcb34ec1e88515304f6aed71ce5bda977ee0"
+    docker: "${rCNV_docker}"
     preemptible: 1
   }
 }

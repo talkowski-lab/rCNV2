@@ -12,7 +12,7 @@
 
 
 # Launch docker image
-docker run --rm -it gcr.io/gnomad-wgs-v2-sv/rcnv
+docker run --rm -it gcr.io/gnomad-wgs-v2-sv/rcnv:latest
 
 
 # Copy all filtered CNV data, sliding windows, and other references 
@@ -31,6 +31,7 @@ gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
 
 ### Determine probe density-based conditional exclusion list
+# NOTE: This code must be run using a DIFFERENT DOCKER: us.gcr.io/broad-dsmap/athena-cloud
 # Test/dev parameters
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 binned_genome_prefix="GRCh37.200kb_bins_10kb_steps.raw" #Note: this can be inferred in WDL as basename(binned_genome, ".bed.gz")
@@ -44,6 +45,11 @@ freq_code="rCNV"
 gsutil -m cp -r \
   ${rCNV_bucket}/cleaned_data/control_probesets \
   ./
+
+# Clone rCNV2 repo (not present in athena-cloud Docker)
+cd opt && \
+git clone https://github.com/talkowski-lab/rCNV2.git && \
+cd -
 
 # Compute conditional cohort exclusion mask
 for file in control_probesets/*bed.gz; do
@@ -62,6 +68,14 @@ done > probeset_tracks.tsv
   control_probesets/rCNV.control_counts_by_array.tsv \
   <( fgrep -v mega ${metacohort_list} )
 
+# Estimate number of effective tests while requiring at least two cohorts to have
+# adequate probe density for window to be evaluated
+zcat ${binned_genome_prefix}.cohort_exclusion.bed.gz | sed 's/;/\t/g' \
+| awk -v FS="\t" -v OFS="\t" '{ if (NF<=7) print $1, $2, $3 }' \
+| fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n \
+| bedtools merge -i - \
+| awk -v FS="\t" -v binsize=200000 '{ sum+=$3-$2 }END{ print sum/binsize }'
+
 
 
 
@@ -77,8 +91,8 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
-p_cutoff=0.000003715428
-meta_p_cutoff=0.000003715428
+p_cutoff=0.000003748238
+meta_p_cutoff=0.000003748238
 meta_model_prefix="fe"
 bin_overlap=0.5
 pad_controls=50000
@@ -193,7 +207,7 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
-p_cutoff=0.000003715428
+p_cutoff=0.000003748238
 n_pheno_perms=50
 exclusion_bed=GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz #Note: this file must be generated above
 meta_model_prefix="fe"
@@ -380,8 +394,8 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
-p_cutoff=0.000003715428
-meta_p_cutoff=0.000003715428
+p_cutoff=0.000003748238
+meta_p_cutoff=0.000003748238
 meta_model_prefix="fe"
 bin_overlap=0.5
 pad_controls=50000

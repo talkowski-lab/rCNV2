@@ -4,10 +4,12 @@
 \alias{get.hpo.color}
 \title{Get HPO-based color code}
 \usage{
-get.hpo.color(hpo)
+get.hpo.color(hpo, color.by = "neuro")
 }
 \arguments{
 \item{hpo}{HPO code}
+
+\item{color.by}{indicator to color by 'neuro' or 'severity'}
 }
 \value{
 color code

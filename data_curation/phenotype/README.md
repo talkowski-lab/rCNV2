@@ -24,7 +24,7 @@ Given the variability of phenotypic detail available between different cohorts, 
 
 We used the [Human Phenotype Ontology (HPO)](https://hpo.jax.org/app/) to harmonize phenotype data across all [cohorts included in the overall CNV dataset](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/).  
 
-For each sample, we recursively matched all phenotype information available against HPO keywords, and assigned the corresponding HPO terms to each sample when a match was found.  
+For each sample, we recursively matched all phenotype information available against HPO keywords, and assigned the corresponding HPO terms to each sample when a match was found. We first searched for exact matches; if no exact matches were found, we repeated the HPO assignment process while requiring 85% term identity between each sample's phenotypic indications and any HPO keyword.  
 
 We abided by all HPO phenotype definitions with a single exception: we matched all congenital anomalies to `HP:0001197 [Abnormality of prenatal development or birth]`, despite the description for that term excluding fetal structural anomalies. We made this exception because congenital anomalies were a phenotype of particular interest in this study, and there was no clear corresponding existing HPO code for these phenotypes.
 
@@ -48,13 +48,14 @@ After assigning HPO terms to each sample, we next reduced the number of HPO term
 
 After tabulating the number of samples matching each HPO code, we retained all HPO terms with at least 3,000 samples. 
 
-We next compared shared sample memberships between all pairs of hierarchically related HPO terms:
- * If fewer than 3,000 samples differed between a pair of HPO terms, we retained the more general (i.e., higher-level) term, and excluded the more specific (i.e., lower-level) term.
- * If both terms were equally high-level and siblings (defined as reciprocally sharing at least 50% of their parent terms), we retained the term with the larger sample size.
+We next compared shared sample memberships between all pairs of related HPO terms:
+ * If the pair of samples had a Jaccard similarity > 80%, we retained the larger term and dropped the smaller term.
+ * If fewer than 3,000 samples differed between a pair of hierarchically related HPO terms, we retained the more general (i.e., higher-level) term, and excluded the more specific (i.e., lower-level) term.
+ * If both hierarchically related terms were equally high-level and siblings (defined as reciprocally sharing at least 50% of their parent terms), we retained the term with the larger sample size.
 
  Finally, to help control for batch-specific technical artifacts, we required that all HPO terms be represented with at least 300 samples in at least three different [metacohorts (described here)](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/#case-control-metacohorts).
 
-This process yielded a condensed hierarchical phenotype classification system with 52 distinct HPO terms (including healthy controls), each which had ≥3,000 samples in total, ≥300 samples from at least two different metacohorts and differed from any related HPO terms by at least 3,000 distinct samples.  
+This process yielded a condensed hierarchical phenotype classification system with 55 distinct HPO terms (including healthy controls), each which had ≥3,000 samples in total, ≥300 samples from at least three different metacohorts and differed from any related HPO terms by at least 3,000 distinct samples.  
 
 The code to perform this HPO consolidation process described above is also contained in `convert_phenotypes_to_hpo.sh`    
 
@@ -62,58 +63,61 @@ The final set of HPO terms is detailed below:
 
 | HPO Term | Description | Samples | HPO Tier | Parent Terms | Child Terms |  
 | :--- | :--- | ---: | ---: | :--- | :--- |  
-| HEALTHY_CONTROL | Unaffected control sample | 491,079 | 1 | NA | NA |  
-| HP:0000118 | Phenotypic abnormality | 388,724 | 1 | NA | HP:0100022, HP:0000924, HP:0001574, HP:0011804, HP:0001250, HP:0009831, HP:0031466, HP:0002960, HP:0004305, HP:0002597, HP:0100545, HP:0002715, HP:0012647, HP:0003077, HP:0012639, HP:0100852, HP:0002011, HP:0001367, HP:0011446, HP:0000152, HP:0002086, HP:0012638, HP:0011442, HP:0001271, HP:0009830, HP:0002634, HP:0001197, HP:0410008, HP:0001939, HP:0000708, HP:0025031, HP:0000707, HP:0012447, HP:0000752, HP:0012759, HP:0000729, HP:0003107, HP:0001370, HP:0000759, HP:0001627, HP:0000119, HP:0100754, HP:0001626, HP:0100753, HP:0012443, HP:0001997, HP:0007367, HP:0003011, HP:0033127 |  
-| HP:0000707 | Abnormality of the nervous system | 237,942 | 2 | HP:0000118 | HP:0100022, HP:0002011, HP:0009830, HP:0001250, HP:0009831, HP:0000759, HP:0031466, HP:0410008, HP:0011446, HP:0000708, HP:0004305, HP:0012447, HP:0000752, HP:0012759, HP:0100754, HP:0100753, HP:0012443, HP:0012639, HP:0000729, HP:0012638, HP:0007367, HP:0100852, HP:0011442, HP:0001271 |  
-| HP:0012638 | Abnormal nervous system physiology | 188,121 | 3 | HP:0000707, HP:0000118 | HP:0000752, HP:0100022, HP:0012759, HP:0100754, HP:0100753, HP:0001250, HP:0000729, HP:0031466, HP:0011446, HP:0000708, HP:0100852, HP:0011442, HP:0004305 |  
-| HP:0000708 | Behavioral abnormality | 126,894 | 4 | HP:0000707, HP:0012638, HP:0000118 | HP:0100753, HP:0100754, HP:0031466, HP:0100852, HP:0000752, HP:0000729 |  
-| HP:0012639 | Abnormal nervous system morphology | 66,879 | 3 | HP:0000707, HP:0000118 | HP:0002011, HP:0012447, HP:0009830, HP:0009831, HP:0000759, HP:0007367, HP:0001271, HP:0012443 |  
-| HP:0031466 | Impairment in personality functioning | 57,570 | 5 | HP:0000707, HP:0012638, HP:0000708, HP:0000118 | HP:0100852 |  
-| HP:0002715 | Abnormality of the immune system | 53,570 | 2 | HP:0000118 | HP:0002960, HP:0012647 |  
-| UNKNOWN | NA | 49,900 | 2 | HP:0000118 | NA |  
-| HP:0001939 | Abnormality of metabolism/homeostasis | 46,661 | 2 | HP:0000118 | HP:0003107, HP:0003077 |  
-| HP:0002960 | Autoimmunity | 42,000 | 4 | HP:0002715, HP:0000118 | NA |  
-| HP:0012759 | Neurodevelopmental abnormality | 39,212 | 4 | HP:0000707, HP:0012638, HP:0000118 | NA |  
-| HP:0001626 | Abnormality of the cardiovascular system | 39,186 | 2 | HP:0000118 | HP:0002597, HP:0100545, HP:0002634, HP:0001627 |  
-| HP:0002011 | Morphological central nervous system abnormality | 35,794 | 4 | HP:0012639, HP:0000707, HP:0000118 | HP:0007367, HP:0012443 |  
-| HP:0033127 | Abnormality of the musculoskeletal system | 35,066 | 2 | HP:0000118 | HP:0000924, HP:0011804, HP:0001370, HP:0001367, HP:0001997, HP:0003011 |  
-| HP:0100754 | Mania | 34,865 | 5 | HP:0000707, HP:0012638, HP:0000708, HP:0000118 | NA |  
-| HP:0000759 | Abnormal peripheral nervous system morphology | 33,106 | 4 | HP:0012639, HP:0000707, HP:0000118 | HP:0009831, HP:0001271, HP:0009830 |  
-| HP:0000924 | Abnormality of the skeletal system | 30,736 | 3 | HP:0033127, HP:0000118 | HP:0001370, HP:0001367, HP:0001997 |  
-| HP:0002597 | Abnormality of the vasculature | 29,697 | 3 | HP:0001626, HP:0000118 | HP:0002634, HP:0100545 |  
-| HP:0007367 | Atrophy/Degeneration affecting the central nervous system | 26,130 | 5 | HP:0002011, HP:0012639, HP:0000707, HP:0000118 | NA |  
-| HP:0001367 | Abnormal joint morphology | 26,099 | 5 | HP:0000924, HP:0033127, HP:0000118 | HP:0001997, HP:0001370 |  
-| HP:0003107 | Abnormal circulating cholesterol concentration | 25,452 | 5 | HP:0001939, HP:0000118 | NA |  
-| HP:0100852 | Abnormal fear/anxiety-related behavior | 25,222 | 6 | HP:0000707, HP:0012638, HP:0000708, HP:0000118, HP:0031466 | NA |  
-| HP:0100753 | Schizophrenia | 25,088 | 5 | HP:0000707, HP:0012638, HP:0000708, HP:0000118 | NA |  
-| HP:0001197 | Abnormality of prenatal development or birth | 23,367 | 2 | HP:0000118 | NA |  
-| HP:0009830 | Peripheral neuropathy | 22,525 | 5 | HP:0000759, HP:0012639, HP:0000707, HP:0000118 | HP:0009831, HP:0001271 |  
-| HP:0002634 | Arteriosclerosis | 19,640 | 8 | HP:0002597, HP:0001626, HP:0000118 | NA |  
-| HP:0100545 | Arterial stenosis | 19,338 | 8 | HP:0002597, HP:0000118, HP:0001626 | NA |  
-| HP:0001250 | Seizure | 19,280 | 4 | HP:0000707, HP:0012638, HP:0000118 | NA |  
-| HP:0000729 | Autistic behavior | 19,255 | 5 | HP:0000707, HP:0012638, HP:0000708, HP:0000118 | NA |  
-| HP:0009831 | Mononeuropathy | 18,132 | 6 | HP:0000759, HP:0012639, HP:0000707, HP:0000118, HP:0009830 | NA |  
-| HP:0003077 | Hyperlipidemia | 14,737 | 5 | HP:0001939, HP:0000118 | NA |  
-| HP:0000752 | Hyperactivity | 13,386 | 5 | HP:0000707, HP:0012638, HP:0000708, HP:0000118 | NA |  
-| HP:0100022 | Abnormality of movement | 11,400 | 4 | HP:0000707, HP:0012638, HP:0000118 | HP:0004305 |  
-| HP:0012647 | Abnormal inflammatory response | 10,687 | 4 | HP:0002715, HP:0000118 | NA |  
-| HP:0000152 | Abnormality of head or neck | 10,461 | 2 | HP:0000118 | NA |  
-| HP:0001627 | Abnormal heart morphology | 10,322 | 4 | HP:0001626, HP:0000118 | NA |  
-| HP:0001574 | Abnormality of the integument | 9,718 | 2 | HP:0000118 | NA |  
-| HP:0025031 | Abnormality of the digestive system | 8,776 | 2 | HP:0000118 | NA |  
-| HP:0001370 | Rheumatoid arthritis | 8,472 | 7 | HP:0000924, HP:0001367, HP:0033127, HP:0000118 | NA |  
-| HP:0002086 | Abnormality of the respiratory system | 7,872 | 2 | HP:0000118 | NA |  
-| HP:0003011 | Abnormality of the musculature | 7,649 | 3 | HP:0033127, HP:0000118 | HP:0011804 |  
-| HP:0001997 | Gout | 6,154 | 7 | HP:0000924, HP:0001367, HP:0033127, HP:0000118 | NA |  
-| HP:0410008 | Abnormality of the peripheral nervous system | 5,954 | 3 | HP:0000707, HP:0000118 | NA |  
-| HP:0012443 | Abnormality of brain morphology | 5,867 | 5 | HP:0002011, HP:0012639, HP:0000707, HP:0000118 | NA |  
-| HP:0000119 | Abnormality of the genitourinary system | 5,831 | 2 | HP:0000118 | NA |  
-| HP:0001271 | Polyneuropathy | 5,370 | 6 | HP:0000759, HP:0012639, HP:0000707, HP:0000118, HP:0009830 | NA |  
-| HP:0011442 | Abnormal central motor function | 4,593 | 4 | HP:0000707, HP:0012638, HP:0000118 | NA |  
-| HP:0004305 | Involuntary movements | 4,322 | 5 | HP:0100022, HP:0000707, HP:0012638, HP:0000118 | NA |  
-| HP:0011446 | Abnormality of higher mental function | 4,208 | 4 | HP:0000707, HP:0012638, HP:0000118 | NA |  
-| HP:0012447 | Abnormal myelination | 3,165 | 4 | HP:0012639, HP:0000707, HP:0000118 | NA |  
-| HP:0011804 | Abnormal muscle physiology | 3,063 | 4 | HP:0003011, HP:0033127, HP:0000118 | NA |  
+| HEALTHY_CONTROL | Unaffected control sample | 492,672 | 1 | NA | NA |  
+| HP:0000118 | Phenotypic abnormality | 452,777 | 1 | NA | HP:0009830, HP:0410008, HP:0012447, HP:0002960, HP:0000119, HP:0002086, HP:0000707, HP:0001197, HP:0100852, HP:0025033, HP:0002715, HP:0004305, HP:0007302, HP:0001939, HP:0012647, HP:0012639, HP:0011804, HP:0001574, HP:0000752, HP:0009121, HP:0031466, HP:0000152, HP:0011442, HP:0002621, HP:0001626, HP:0000759, HP:0002597, HP:0011121, HP:0000708, HP:0012759, HP:0012443, HP:0004323, HP:0001627, HP:0100753, HP:0001370, HP:0003011, HP:0007367, HP:0000271, HP:0000729, HP:0002360, HP:0011446, HP:0033127, HP:0001250, HP:0003107, HP:0001249, HP:0100022, HP:0001997, HP:0003077, HP:0001507, HP:0001367, HP:0025031, HP:0002011 |  
+| HP:0000707 | Abnormality of the nervous system | 255,273 | 2 | HP:0000118 | HP:0000708, HP:0009830, HP:0007302, HP:0007367, HP:0410008, HP:0012639, HP:0012447, HP:0000729, HP:0002360, HP:0012759, HP:0000752, HP:0012443, HP:0011446, HP:0031466, HP:0001250, HP:0100852, HP:0011442, HP:0001249, HP:0100022, HP:0100753, HP:0000759, HP:0004305, HP:0002011 |  
+| HP:0000708 | Behavioral abnormality | 135,483 | 4 | HP:0000707, HP:0000118 | HP:0000752, HP:0007302, HP:0031466, HP:0000729, HP:0002360, HP:0100852, HP:0100753 |  
+| UNKNOWN | NA | 92,268 | 2 | HP:0000118 | NA |  
+| HP:0012639 | Abnormal nervous system morphology | 68,594 | 3 | HP:0000707, HP:0000118 | HP:0012447, HP:0000759, HP:0012443, HP:0007367, HP:0002011 |  
+| HP:0031466 | Impairment in personality functioning | 58,323 | 5 | HP:0000707, HP:0000708, HP:0000118 | HP:0100852, HP:0007302 |  
+| HP:0002715 | Abnormality of the immune system | 54,057 | 2 | HP:0000118 | HP:0012647, HP:0002960 |  
+| HP:0012759 | Neurodevelopmental abnormality | 50,229 | 4 | HP:0000707, HP:0000118 | HP:0001249 |  
+| HP:0001939 | Abnormality of metabolism/homeostasis | 47,133 | 2 | HP:0000118 | HP:0003107, HP:0003077 |  
+| HP:0002960 | Autoimmunity | 42,034 | 4 | HP:0002715, HP:0000118 | NA |  
+| HP:0033127 | Abnormality of the musculoskeletal system | 41,280 | 2 | HP:0000118 | HP:0001370, HP:0003011, HP:0011804, HP:0009121, HP:0001997, HP:0001367 |  
+| HP:0001626 | Abnormality of the cardiovascular system | 40,892 | 2 | HP:0000118 | HP:0002621, HP:0001627, HP:0002597 |  
+| HP:0002011 | Morphological central nervous system abnormality | 37,800 | 4 | HP:0000707, HP:0000118, HP:0012639 | HP:0012443, HP:0007367 |  
+| HP:0007302 | Bipolar affective disorder | 34,915 | 7 | HP:0000707, HP:0031466, HP:0000708, HP:0000118 | NA |  
+| HP:0000759 | Abnormal peripheral nervous system morphology | 32,665 | 4 | HP:0000707, HP:0000118, HP:0012639 | NA |  
+| HP:0002597 | Abnormality of the vasculature | 30,260 | 3 | HP:0001626, HP:0000118 | HP:0002621 |  
+| HP:0001367 | Abnormal joint morphology | 26,200 | 5 | HP:0033127, HP:0000118 | HP:0001370, HP:0001997 |  
+| HP:0000729 | Autistic behavior | 26,199 | 5 | HP:0000707, HP:0000708, HP:0000118 | NA |  
+| HP:0007367 | Atrophy/Degeneration affecting the central nervous system | 26,163 | 5 | HP:0012639, HP:0000707, HP:0002011, HP:0000118 | NA |  
+| HP:0100852 | Abnormal fear/anxiety-related behavior | 25,856 | 6 | HP:0000707, HP:0031466, HP:0000708, HP:0000118 | NA |  
+| HP:0003107 | Abnormal circulating cholesterol concentration | 25,455 | 5 | HP:0001939, HP:0000118 | NA |  
+| HP:0100753 | Schizophrenia | 25,108 | 5 | HP:0000707, HP:0000708, HP:0000118 | NA |  
+| HP:0001197 | Abnormality of prenatal development or birth | 24,283 | 2 | HP:0000118 | NA |  
+| HP:0009830 | Peripheral neuropathy | 22,571 | 4 | HP:0000707, HP:0000118 | NA |  
+| HP:0001250 | Seizure | 21,289 | 4 | HP:0000707, HP:0000118 | NA |  
+| HP:0002621 | Atherosclerosis | 19,641 | 9 | HP:0001626, HP:0002597, HP:0000118 | NA |  
+| HP:0000152 | Abnormality of head or neck | 15,419 | 2 | HP:0000118 | HP:0000271 |  
+| HP:0000752 | Hyperactivity | 14,955 | 5 | HP:0000707, HP:0000708, HP:0000118 | NA |  
+| HP:0003077 | Hyperlipidemia | 14,744 | 5 | HP:0001939, HP:0000118 | NA |  
+| HP:0100022 | Abnormality of movement | 12,628 | 4 | HP:0000707, HP:0000118 | HP:0004305 |  
+| HP:0000271 | Abnormality of the face | 11,681 | 4 | HP:0000152, HP:0000118 | NA |  
+| HP:0001627 | Abnormal heart morphology | 11,388 | 4 | HP:0001626, HP:0000118 | NA |  
+| HP:0012647 | Abnormal inflammatory response | 10,896 | 4 | HP:0002715, HP:0000118 | NA |  
+| HP:0003011 | Abnormality of the musculature | 10,629 | 3 | HP:0033127, HP:0000118 | HP:0011804 |  
+| HP:0001574 | Abnormality of the integument | 10,544 | 2 | HP:0000118 | HP:0011121 |  
+| HP:0025031 | Abnormality of the digestive system | 10,205 | 2 | HP:0000118 | HP:0025033 |  
+| HP:0011446 | Abnormality of higher mental function | 9,885 | 4 | HP:0000707, HP:0000118 | HP:0001249 |  
+| HP:0001370 | Rheumatoid arthritis | 8,480 | 7 | HP:0033127, HP:0001367, HP:0000118 | NA |  
+| HP:0002086 | Abnormality of the respiratory system | 8,460 | 2 | HP:0000118 | NA |  
+| HP:0012443 | Abnormality of brain morphology | 7,688 | 5 | HP:0012639, HP:0000707, HP:0002011, HP:0000118 | NA |  
+| HP:0001507 | Growth abnormality | 6,857 | 2 | HP:0000118 | HP:0004323 |  
+| HP:0000119 | Abnormality of the genitourinary system | 6,768 | 2 | HP:0000118 | NA |  
+| HP:0001997 | Gout | 6,154 | 7 | HP:0033127, HP:0001367, HP:0000118 | NA |  
+| HP:0025033 | Abnormality of digestive system morphology | 6,138 | 3 | HP:0025031, HP:0000118 | NA |  
+| HP:0009121 | Abnormal axial skeleton morphology | 6,132 | 5 | HP:0033127, HP:0000118 | NA |  
+| HP:0002360 | Sleep disturbance | 6,091 | 5 | HP:0000707, HP:0000708, HP:0000118 | NA |  
+| HP:0410008 | Abnormality of the peripheral nervous system | 6,005 | 3 | HP:0000707, HP:0000118 | NA |  
+| HP:0011804 | Abnormal muscle physiology | 5,796 | 4 | HP:0033127, HP:0003011, HP:0000118 | NA |  
+| HP:0011442 | Abnormal central motor function | 5,341 | 4 | HP:0000707, HP:0000118 | NA |  
+| HP:0004305 | Involuntary movements | 4,928 | 5 | HP:0000707, HP:0100022, HP:0000118 | NA |  
+| HP:0001249 | Intellectual disability | 4,840 | 6 | HP:0000707, HP:0011446, HP:0000118, HP:0012759 | NA |  
+| HP:0004323 | Abnormality of body weight | 3,853 | 3 | HP:0000118, HP:0001507 | NA |  
+| HP:0011121 | Abnormality of skin morphology | 3,511 | 4 | HP:0000118, HP:0001574 | NA |  
+| HP:0012447 | Abnormal myelination | 3,204 | 4 | HP:0000707, HP:0000118, HP:0012639 | NA |  
 
 ### HPO terms per cohort
 
@@ -123,58 +127,61 @@ The code to generate this table is provided in `gather_hpo_per_cohort_table.py`.
 
 | HPO | description | Total | BCH | CHOP | Coe | Cooper | Epi25k | GDX | IU | PGC | SSC | SickKids | TCGA | TSAICG | UKBB | EstBB | BioVU |  
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
-| HEALTHY_CONTROL | Unaffected control sample | 491,079 | 0 | 24,161 | 11,256 | 8,329 | 8,173 | 0 | 0 | 20,277 | 0 | 0 | 8,670 | 4,093 | 375,800 | 15,659 | 14,661 |  
-| HP:0000118 | Phenotypic abnormality | 388,724 | 3,591 | 153,870 | 29,104 | 0 | 12,053 | 9,958 | 1,576 | 21,094 | 2,795 | 2,689 | 0 | 2,434 | 54,071 | 63,183 | 32,306 |  
-| HP:0000707 | Abnormality of the nervous system | 237,942 | 2,914 | 54,406 | 29,104 | 0 | 12,053 | 4,040 | 500 | 21,094 | 2,795 | 2,689 | 0 | 2,434 | 29,861 | 54,120 | 21,932 |  
-| HP:0012638 | Abnormal nervous system physiology | 188,121 | 2,845 | 28,948 | 29,104 | 0 | 12,053 | 3,846 | 426 | 21,094 | 2,795 | 2,689 | 0 | 2,434 | 16,679 | 47,625 | 17,583 |  
-| HP:0000708 | Behavioral abnormality | 126,894 | 1,228 | 26,364 | 2,000 | 0 | 0 | 741 | 305 | 21,094 | 2,795 | 2,689 | 0 | 0 | 11,895 | 41,245 | 16,538 |  
-| HP:0012639 | Abnormal nervous system morphology | 66,879 | 278 | 24,936 | 362 | 0 | 0 | 713 | 38 | 0 | 0 | 0 | 0 | 0 | 13,484 | 18,855 | 8,213 |  
-| HP:0031466 | Impairment in personality functioning | 57,570 | 410 | 1,730 | 20 | 0 | 0 | 15 | 0 | 0 | 0 | 0 | 0 | 0 | 6,297 | 35,176 | 13,922 |  
-| HP:0002715 | Abnormality of the immune system | 53,570 | 34 | 32,843 | 19 | 0 | 0 | 36 | 0 | 0 | 0 | 0 | 0 | 0 | 6,307 | 10,823 | 3,508 |  
-| UNKNOWN | NA | 49,900 | 294 | 43,603 | 0 | 0 | 0 | 4,957 | 193 | 0 | 0 | 0 | 0 | 0 | 768 | 85 | 0 |  
-| HP:0001939 | Abnormality of metabolism/homeostasis | 46,661 | 30 | 0 | 61 | 0 | 0 | 19 | 7 | 0 | 0 | 0 | 0 | 0 | 14,672 | 17,286 | 14,586 |  
-| HP:0002960 | Autoimmunity | 42,000 | 2 | 32,843 | 1 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 1,305 | 5,359 | 2,488 |  
-| HP:0012759 | Neurodevelopmental abnormality | 39,212 | 2,366 | 671 | 29,104 | 0 | 0 | 3,423 | 68 | 0 | 814 | 0 | 0 | 0 | 132 | 1,338 | 1,296 |  
-| HP:0001626 | Abnormality of the cardiovascular system | 39,186 | 218 | 21,003 | 767 | 0 | 0 | 460 | 175 | 0 | 0 | 0 | 0 | 0 | 3,935 | 4,929 | 7,699 |  
-| HP:0002011 | Morphological central nervous system abnormality | 35,794 | 272 | 24,936 | 347 | 0 | 0 | 708 | 38 | 0 | 0 | 0 | 0 | 0 | 2,428 | 2,510 | 4,555 |  
-| HP:0033127 | Abnormality of the musculoskeletal system | 35,066 | 705 | 0 | 594 | 0 | 0 | 1,779 | 123 | 0 | 0 | 0 | 0 | 0 | 8,807 | 16,488 | 6,570 |  
-| HP:0100754 | Mania | 34,865 | 323 | 38 | 13 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 4,537 | 19,541 | 10,410 |  
-| HP:0000759 | Abnormal peripheral nervous system morphology | 33,106 | 6 | 0 | 10 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 11,292 | 17,241 | 4,552 |  
-| HP:0000924 | Abnormality of the skeletal system | 30,736 | 359 | 0 | 346 | 0 | 0 | 1,300 | 89 | 0 | 0 | 0 | 0 | 0 | 8,012 | 14,956 | 5,674 |  
-| HP:0002597 | Abnormality of the vasculature | 29,697 | 17 | 14,948 | 57 | 0 | 0 | 65 | 3 | 0 | 0 | 0 | 0 | 0 | 3,581 | 4,583 | 6,443 |  
-| HP:0007367 | Atrophy/Degeneration affecting the central nervous system | 26,130 | 2 | 24,247 | 4 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 229 | 349 | 1,295 |  
-| HP:0001367 | Abnormal joint morphology | 26,099 | 3 | 0 | 2 | 0 | 0 | 10 | 0 | 0 | 0 | 0 | 0 | 0 | 7,601 | 14,034 | 4,449 |  
-| HP:0003107 | Abnormal circulating cholesterol concentration | 25,452 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 13,283 | 7,704 | 4,465 |  
-| HP:0100852 | Abnormal fear/anxiety-related behavior | 25,222 | 107 | 1,304 | 6 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 1,552 | 14,070 | 8,176 |  
-| HP:0100753 | Schizophrenia | 25,088 | 0 | 1,200 | 2 | 0 | 0 | 6 | 0 | 21,094 | 0 | 204 | 0 | 0 | 659 | 756 | 1,167 |  
-| HP:0001197 | Abnormality of prenatal development or birth | 23,367 | 387 | 6,055 | 941 | 0 | 0 | 409 | 341 | 0 | 0 | 0 | 0 | 0 | 2,655 | 5,462 | 7,117 |  
-| HP:0009830 | Peripheral neuropathy | 22,525 | 3 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 9,185 | 9,821 | 3,509 |  
-| HP:0002634 | Arteriosclerosis | 19,640 | 0 | 14,948 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 548 | 1,865 | 2,279 |  
-| HP:0100545 | Arterial stenosis | 19,338 | 0 | 14,948 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1,543 | 837 | 2,009 |  
-| HP:0001250 | Seizure | 19,280 | 539 | 1,762 | 1,806 | 0 | 10,699 | 537 | 48 | 0 | 318 | 0 | 0 | 0 | 1,814 | 1,757 | 0 |  
-| HP:0000729 | Autistic behavior | 19,255 | 853 | 11,071 | 1,704 | 0 | 0 | 641 | 248 | 0 | 2,795 | 1,836 | 0 | 0 | 16 | 91 | 0 |  
-| HP:0009831 | Mononeuropathy | 18,132 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8,594 | 8,756 | 782 |  
-| HP:0003077 | Hyperlipidemia | 14,737 | 1 | 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1,867 | 1,617 | 11,250 |  
-| HP:0000752 | Hyperactivity | 13,386 | 238 | 12,359 | 281 | 0 | 0 | 63 | 18 | 0 | 0 | 427 | 0 | 0 | 0 | 0 | 0 |  
-| HP:0100022 | Abnormality of movement | 11,400 | 103 | 35 | 37 | 0 | 0 | 21 | 2 | 0 | 0 | 0 | 0 | 2,434 | 1,645 | 4,757 | 2,366 |  
-| HP:0012647 | Abnormal inflammatory response | 10,687 | 12 | 0 | 7 | 0 | 0 | 9 | 0 | 0 | 0 | 0 | 0 | 0 | 4,093 | 5,811 | 755 |  
-| HP:0000152 | Abnormality of head or neck | 10,461 | 848 | 0 | 4,537 | 0 | 0 | 1,662 | 48 | 0 | 0 | 0 | 0 | 0 | 809 | 1,300 | 1,257 |  
-| HP:0001627 | Abnormal heart morphology | 10,322 | 202 | 6,055 | 212 | 0 | 0 | 391 | 175 | 0 | 0 | 0 | 0 | 0 | 397 | 403 | 2,487 |  
-| HP:0001574 | Abnormality of the integument | 9,718 | 22 | 0 | 28 | 0 | 0 | 124 | 1 | 0 | 0 | 0 | 0 | 0 | 1,460 | 6,647 | 1,436 |  
-| HP:0025031 | Abnormality of the digestive system | 8,776 | 93 | 1,258 | 91 | 0 | 0 | 148 | 10 | 0 | 0 | 0 | 0 | 0 | 4,438 | 1,310 | 1,428 |  
-| HP:0001370 | Rheumatoid arthritis | 8,472 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2,157 | 3,885 | 2,428 |  
-| HP:0002086 | Abnormality of the respiratory system | 7,872 | 44 | 0 | 42 | 0 | 0 | 57 | 3 | 0 | 0 | 0 | 0 | 0 | 3,182 | 3,259 | 1,285 |  
-| HP:0003011 | Abnormality of the musculature | 7,649 | 429 | 0 | 242 | 0 | 0 | 704 | 33 | 0 | 0 | 0 | 0 | 0 | 1,130 | 2,886 | 2,225 |  
+| HEALTHY_CONTROL | Unaffected control sample | 492,672 | 0 | 24,161 | 11,256 | 8,329 | 8,173 | 1,593 | 0 | 20,277 | 0 | 0 | 8,670 | 4,093 | 375,800 | 15,659 | 14,661 |  
+| HP:0000118 | Phenotypic abnormality | 452,777 | 3,591 | 153,870 | 29,104 | 0 | 12,053 | 74,011 | 1,576 | 21,094 | 2,795 | 2,689 | 0 | 2,434 | 54,071 | 63,183 | 32,306 |  
+| HP:0000707 | Abnormality of the nervous system | 255,273 | 2,921 | 54,406 | 29,104 | 0 | 12,053 | 21,343 | 521 | 21,094 | 2,795 | 2,689 | 0 | 2,434 | 29,861 | 54,120 | 21,932 |  
+| HP:0000708 | Behavioral abnormality | 135,483 | 1,233 | 26,364 | 2,000 | 0 | 0 | 9,320 | 310 | 21,094 | 2,795 | 2,689 | 0 | 0 | 11,895 | 41,245 | 16,538 |  
+| UNKNOWN | NA | 92,268 | 272 | 43,603 | 0 | 0 | 0 | 47,401 | 160 | 0 | 0 | 0 | 0 | 0 | 747 | 85 | 0 |  
+| HP:0012639 | Abnormal nervous system morphology | 68,594 | 279 | 24,936 | 355 | 0 | 0 | 2,768 | 38 | 0 | 0 | 0 | 0 | 0 | 13,150 | 18,855 | 8,213 |  
+| HP:0031466 | Impairment in personality functioning | 58,323 | 410 | 1,730 | 20 | 0 | 0 | 768 | 0 | 0 | 0 | 0 | 0 | 0 | 6,297 | 35,176 | 13,922 |  
+| HP:0002715 | Abnormality of the immune system | 54,057 | 34 | 32,843 | 19 | 0 | 0 | 504 | 0 | 0 | 0 | 0 | 0 | 0 | 6,326 | 10,823 | 3,508 |  
+| HP:0012759 | Neurodevelopmental abnormality | 50,229 | 2,366 | 671 | 29,104 | 0 | 0 | 14,429 | 79 | 0 | 814 | 0 | 0 | 0 | 132 | 1,338 | 1,296 |  
+| HP:0001939 | Abnormality of metabolism/homeostasis | 47,133 | 30 | 0 | 61 | 0 | 0 | 491 | 7 | 0 | 0 | 0 | 0 | 0 | 14,672 | 17,286 | 14,586 |  
+| HP:0002960 | Autoimmunity | 42,034 | 2 | 32,843 | 1 | 0 | 0 | 17 | 0 | 0 | 0 | 0 | 0 | 0 | 1,324 | 5,359 | 2,488 |  
+| HP:0033127 | Abnormality of the musculoskeletal system | 41,280 | 710 | 0 | 594 | 0 | 0 | 7,986 | 125 | 0 | 0 | 0 | 0 | 0 | 8,807 | 16,488 | 6,570 |  
+| HP:0001626 | Abnormality of the cardiovascular system | 40,892 | 219 | 21,003 | 767 | 0 | 0 | 2,162 | 178 | 0 | 0 | 0 | 0 | 0 | 3,935 | 4,929 | 7,699 |  
+| HP:0002011 | Morphological central nervous system abnormality | 37,800 | 274 | 24,936 | 346 | 0 | 0 | 2,713 | 38 | 0 | 0 | 0 | 0 | 0 | 2,428 | 2,510 | 4,555 |  
+| HP:0007302 | Bipolar affective disorder | 34,915 | 323 | 38 | 13 | 0 | 0 | 53 | 0 | 0 | 0 | 0 | 0 | 0 | 4,537 | 19,541 | 10,410 |  
+| HP:0000759 | Abnormal peripheral nervous system morphology | 32,665 | 3 | 0 | 3 | 0 | 0 | 42 | 0 | 0 | 0 | 0 | 0 | 0 | 10,824 | 17,241 | 4,552 |  
+| HP:0002597 | Abnormality of the vasculature | 30,260 | 18 | 14,948 | 57 | 0 | 0 | 627 | 3 | 0 | 0 | 0 | 0 | 0 | 3,581 | 4,583 | 6,443 |  
+| HP:0001367 | Abnormal joint morphology | 26,200 | 3 | 0 | 2 | 0 | 0 | 111 | 0 | 0 | 0 | 0 | 0 | 0 | 7,601 | 14,034 | 4,449 |  
+| HP:0000729 | Autistic behavior | 26,199 | 855 | 11,071 | 1,704 | 0 | 0 | 7,583 | 248 | 0 | 2,795 | 1,836 | 0 | 0 | 16 | 91 | 0 |  
+| HP:0007367 | Atrophy/Degeneration affecting the central nervous system | 26,163 | 2 | 24,247 | 4 | 0 | 0 | 37 | 0 | 0 | 0 | 0 | 0 | 0 | 229 | 349 | 1,295 |  
+| HP:0100852 | Abnormal fear/anxiety-related behavior | 25,856 | 107 | 1,304 | 6 | 0 | 0 | 641 | 0 | 0 | 0 | 0 | 0 | 0 | 1,552 | 14,070 | 8,176 |  
+| HP:0003107 | Abnormal circulating cholesterol concentration | 25,455 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 13,283 | 7,704 | 4,465 |  
+| HP:0100753 | Schizophrenia | 25,108 | 0 | 1,200 | 2 | 0 | 0 | 26 | 0 | 21,094 | 0 | 204 | 0 | 0 | 659 | 756 | 1,167 |  
+| HP:0001197 | Abnormality of prenatal development or birth | 24,283 | 387 | 6,055 | 941 | 0 | 0 | 1,323 | 343 | 0 | 0 | 0 | 0 | 0 | 2,655 | 5,462 | 7,117 |  
+| HP:0009830 | Peripheral neuropathy | 22,571 | 3 | 0 | 7 | 0 | 0 | 46 | 0 | 0 | 0 | 0 | 0 | 0 | 9,185 | 9,821 | 3,509 |  
+| HP:0001250 | Seizure | 21,289 | 539 | 1,762 | 1,806 | 0 | 10,699 | 2,544 | 50 | 0 | 318 | 0 | 0 | 0 | 1,814 | 1,757 | 0 |  
+| HP:0002621 | Atherosclerosis | 19,641 | 0 | 14,948 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 548 | 1,865 | 2,279 |  
+| HP:0000152 | Abnormality of head or neck | 15,419 | 850 | 0 | 4,537 | 0 | 0 | 6,617 | 49 | 0 | 0 | 0 | 0 | 0 | 809 | 1,300 | 1,257 |  
+| HP:0000752 | Hyperactivity | 14,955 | 239 | 12,359 | 281 | 0 | 0 | 1,631 | 18 | 0 | 0 | 427 | 0 | 0 | 0 | 0 | 0 |  
+| HP:0003077 | Hyperlipidemia | 14,744 | 1 | 0 | 1 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 1,867 | 1,617 | 11,250 |  
+| HP:0100022 | Abnormality of movement | 12,628 | 104 | 35 | 37 | 0 | 0 | 1,246 | 4 | 0 | 0 | 0 | 0 | 2,434 | 1,645 | 4,757 | 2,366 |  
+| HP:0000271 | Abnormality of the face | 11,681 | 658 | 0 | 4,378 | 0 | 0 | 4,056 | 19 | 0 | 0 | 0 | 0 | 0 | 711 | 1,050 | 809 |  
+| HP:0001627 | Abnormal heart morphology | 11,388 | 202 | 6,055 | 212 | 0 | 0 | 1,454 | 178 | 0 | 0 | 0 | 0 | 0 | 397 | 403 | 2,487 |  
+| HP:0012647 | Abnormal inflammatory response | 10,896 | 12 | 0 | 7 | 0 | 0 | 218 | 0 | 0 | 0 | 0 | 0 | 0 | 4,093 | 5,811 | 755 |  
+| HP:0003011 | Abnormality of the musculature | 10,629 | 430 | 0 | 242 | 0 | 0 | 3,683 | 33 | 0 | 0 | 0 | 0 | 0 | 1,130 | 2,886 | 2,225 |  
+| HP:0001574 | Abnormality of the integument | 10,544 | 23 | 0 | 28 | 0 | 0 | 947 | 1 | 0 | 0 | 0 | 0 | 0 | 1,462 | 6,647 | 1,436 |  
+| HP:0025031 | Abnormality of the digestive system | 10,205 | 93 | 1,258 | 91 | 0 | 0 | 1,577 | 10 | 0 | 0 | 0 | 0 | 0 | 4,438 | 1,310 | 1,428 |  
+| HP:0011446 | Abnormality of higher mental function | 9,885 | 942 | 671 | 195 | 0 | 0 | 5,944 | 46 | 0 | 814 | 0 | 0 | 0 | 176 | 553 | 544 |  
+| HP:0001370 | Rheumatoid arthritis | 8,480 | 1 | 0 | 1 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 2,157 | 3,885 | 2,428 |  
+| HP:0002086 | Abnormality of the respiratory system | 8,460 | 45 | 0 | 42 | 0 | 0 | 642 | 5 | 0 | 0 | 0 | 0 | 0 | 3,182 | 3,259 | 1,285 |  
+| HP:0012443 | Abnormality of brain morphology | 7,688 | 257 | 689 | 322 | 0 | 0 | 2,505 | 32 | 0 | 0 | 0 | 0 | 0 | 646 | 1,321 | 1,916 |  
+| HP:0001507 | Growth abnormality | 6,857 | 219 | 757 | 1,223 | 0 | 0 | 4,181 | 469 | 0 | 0 | 0 | 0 | 0 | 6 | 2 | 0 |  
+| HP:0000119 | Abnormality of the genitourinary system | 6,768 | 62 | 0 | 191 | 0 | 0 | 1,167 | 6 | 0 | 0 | 0 | 0 | 0 | 701 | 3,335 | 1,306 |  
 | HP:0001997 | Gout | 6,154 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1,101 | 3,255 | 1,798 |  
-| HP:0410008 | Abnormality of the peripheral nervous system | 5,954 | 5 | 0 | 3 | 0 | 0 | 9 | 0 | 0 | 0 | 0 | 0 | 0 | 724 | 2,052 | 3,161 |  
-| HP:0012443 | Abnormality of brain morphology | 5,867 | 255 | 689 | 323 | 0 | 0 | 685 | 32 | 0 | 0 | 0 | 0 | 0 | 646 | 1,321 | 1,916 |  
-| HP:0000119 | Abnormality of the genitourinary system | 5,831 | 59 | 0 | 191 | 0 | 0 | 234 | 5 | 0 | 0 | 0 | 0 | 0 | 701 | 3,335 | 1,306 |  
-| HP:0001271 | Polyneuropathy | 5,370 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 643 | 1,678 | 3,047 |  
-| HP:0011442 | Abnormal central motor function | 4,593 | 115 | 0 | 44 | 0 | 0 | 111 | 2 | 0 | 0 | 0 | 0 | 0 | 1,381 | 1,733 | 1,207 |  
-| HP:0004305 | Involuntary movements | 4,322 | 54 | 35 | 10 | 0 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 2,434 | 82 | 1,055 | 647 |  
-| HP:0011446 | Abnormality of higher mental function | 4,208 | 942 | 671 | 195 | 0 | 0 | 269 | 44 | 0 | 814 | 0 | 0 | 0 | 176 | 553 | 544 |  
-| HP:0012447 | Abnormal myelination | 3,165 | 3 | 0 | 3 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1,114 | 511 | 1,531 |  
-| HP:0011804 | Abnormal muscle physiology | 3,063 | 411 | 0 | 199 | 0 | 0 | 660 | 30 | 0 | 0 | 0 | 0 | 0 | 571 | 1,192 | 0 |  
+| HP:0025033 | Abnormality of digestive system morphology | 6,138 | 14 | 0 | 19 | 0 | 0 | 306 | 0 | 0 | 0 | 0 | 0 | 0 | 3,404 | 1,048 | 1,347 |  
+| HP:0009121 | Abnormal axial skeleton morphology | 6,132 | 322 | 0 | 278 | 0 | 0 | 4,118 | 38 | 0 | 0 | 0 | 0 | 0 | 215 | 610 | 551 |  
+| HP:0002360 | Sleep disturbance | 6,091 | 10 | 0 | 8 | 0 | 0 | 342 | 2 | 0 | 0 | 0 | 0 | 0 | 2,719 | 3,010 | 0 |  
+| HP:0410008 | Abnormality of the peripheral nervous system | 6,005 | 5 | 0 | 3 | 0 | 0 | 60 | 0 | 0 | 0 | 0 | 0 | 0 | 724 | 2,052 | 3,161 |  
+| HP:0011804 | Abnormal muscle physiology | 5,796 | 411 | 0 | 199 | 0 | 0 | 3,393 | 30 | 0 | 0 | 0 | 0 | 0 | 571 | 1,192 | 0 |  
+| HP:0011442 | Abnormal central motor function | 5,341 | 105 | 0 | 42 | 0 | 0 | 871 | 2 | 0 | 0 | 0 | 0 | 0 | 1,381 | 1,733 | 1,207 |  
+| HP:0004305 | Involuntary movements | 4,928 | 54 | 35 | 10 | 0 | 0 | 611 | 0 | 0 | 0 | 0 | 0 | 2,434 | 82 | 1,055 | 647 |  
+| HP:0001249 | Intellectual disability | 4,840 | 300 | 671 | 129 | 0 | 0 | 1,993 | 24 | 0 | 814 | 0 | 0 | 0 | 15 | 389 | 505 |  
+| HP:0004323 | Abnormality of body weight | 3,853 | 137 | 757 | 992 | 0 | 0 | 1,926 | 41 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |  
+| HP:0011121 | Abnormality of skin morphology | 3,511 | 15 | 0 | 19 | 0 | 0 | 577 | 1 | 0 | 0 | 0 | 0 | 0 | 374 | 1,788 | 737 |  
+| HP:0012447 | Abnormal myelination | 3,204 | 3 | 0 | 3 | 0 | 0 | 42 | 0 | 0 | 0 | 0 | 0 | 0 | 1,114 | 511 | 1,531 |  
 
 ### HPO terms per metacohort
 
@@ -182,57 +189,60 @@ The number of samples per phenotype group per cohort is outlined in the table, b
 
 The code to generate this table is provided in `gather_hpo_per_cohort_table.py`.  
 
-| HPO | description | Total | meta1 | meta2 | meta3 | meta4 | meta5 | meta6 | mega |  
-| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
-| HEALTHY_CONTROL | Unaffected control sample | 491,079 | 19,585 | 41,213 | 24,161 | 375,800 | 15,659 | 14,661 | 491,079 |  
-| HP:0000118 | Phenotypic abnormality | 388,724 | 44,229 | 41,065 | 153,870 | 54,071 | 63,183 | 32,306 | 388,724 |  
-| HP:0000707 | Abnormality of the nervous system | 237,942 | 36,558 | 41,065 | 54,406 | 29,861 | 54,120 | 21,932 | 237,942 |  
-| HP:0012638 | Abnormal nervous system physiology | 188,121 | 36,221 | 41,065 | 28,948 | 16,679 | 47,625 | 17,583 | 188,121 |  
-| HP:0000708 | Behavioral abnormality | 126,894 | 4,274 | 26,578 | 26,364 | 11,895 | 41,245 | 16,538 | 126,894 |  
-| HP:0012639 | Abnormal nervous system morphology | 66,879 | 1,391 | 0 | 24,936 | 13,484 | 18,855 | 8,213 | 66,879 |  
-| HP:0031466 | Impairment in personality functioning | 57,570 | 445 | 0 | 1,730 | 6,297 | 35,176 | 13,922 | 57,570 |  
-| HP:0002715 | Abnormality of the immune system | 53,570 | 89 | 0 | 32,843 | 6,307 | 10,823 | 3,508 | 53,570 |  
-| UNKNOWN | NA | 49,900 | 5,444 | 0 | 43,603 | 768 | 85 | 0 | 49,900 |  
-| HP:0001939 | Abnormality of metabolism/homeostasis | 46,661 | 117 | 0 | 0 | 14,672 | 17,286 | 14,586 | 46,661 |  
-| HP:0002960 | Autoimmunity | 42,000 | 5 | 0 | 32,843 | 1,305 | 5,359 | 2,488 | 42,000 |  
-| HP:0012759 | Neurodevelopmental abnormality | 39,212 | 34,961 | 814 | 671 | 132 | 1,338 | 1,296 | 39,212 |  
-| HP:0001626 | Abnormality of the cardiovascular system | 39,186 | 1,620 | 0 | 21,003 | 3,935 | 4,929 | 7,699 | 39,186 |  
-| HP:0002011 | Morphological central nervous system abnormality | 35,794 | 1,365 | 0 | 24,936 | 2,428 | 2,510 | 4,555 | 35,794 |  
-| HP:0033127 | Abnormality of the musculoskeletal system | 35,066 | 3,201 | 0 | 0 | 8,807 | 16,488 | 6,570 | 35,066 |  
-| HP:0100754 | Mania | 34,865 | 339 | 0 | 38 | 4,537 | 19,541 | 10,410 | 34,865 |  
-| HP:0000759 | Abnormal peripheral nervous system morphology | 33,106 | 21 | 0 | 0 | 11,292 | 17,241 | 4,552 | 33,106 |  
-| HP:0000924 | Abnormality of the skeletal system | 30,736 | 2,094 | 0 | 0 | 8,012 | 14,956 | 5,674 | 30,736 |  
-| HP:0002597 | Abnormality of the vasculature | 29,697 | 142 | 0 | 14,948 | 3,581 | 4,583 | 6,443 | 29,697 |  
-| HP:0007367 | Atrophy/Degeneration affecting the central nervous system | 26,130 | 10 | 0 | 24,247 | 229 | 349 | 1,295 | 26,130 |  
-| HP:0001367 | Abnormal joint morphology | 26,099 | 15 | 0 | 0 | 7,601 | 14,034 | 4,449 | 26,099 |  
-| HP:0003107 | Abnormal circulating cholesterol concentration | 25,452 | 0 | 0 | 0 | 13,283 | 7,704 | 4,465 | 25,452 |  
-| HP:0100852 | Abnormal fear/anxiety-related behavior | 25,222 | 120 | 0 | 1,304 | 1,552 | 14,070 | 8,176 | 25,222 |  
-| HP:0100753 | Schizophrenia | 25,088 | 8 | 21,298 | 1,200 | 659 | 756 | 1,167 | 25,088 |  
-| HP:0001197 | Abnormality of prenatal development or birth | 23,367 | 2,078 | 0 | 6,055 | 2,655 | 5,462 | 7,117 | 23,367 |  
-| HP:0009830 | Peripheral neuropathy | 22,525 | 10 | 0 | 0 | 9,185 | 9,821 | 3,509 | 22,525 |  
-| HP:0002634 | Arteriosclerosis | 19,640 | 0 | 0 | 14,948 | 548 | 1,865 | 2,279 | 19,640 |  
-| HP:0100545 | Arterial stenosis | 19,338 | 1 | 0 | 14,948 | 1,543 | 837 | 2,009 | 19,338 |  
-| HP:0001250 | Seizure | 19,280 | 2,930 | 11,017 | 1,762 | 1,814 | 1,757 | 0 | 19,280 |  
-| HP:0000729 | Autistic behavior | 19,255 | 3,446 | 4,631 | 11,071 | 16 | 91 | 0 | 19,255 |  
-| HP:0009831 | Mononeuropathy | 18,132 | 0 | 0 | 0 | 8,594 | 8,756 | 782 | 18,132 |  
-| HP:0003077 | Hyperlipidemia | 14,737 | 3 | 0 | 0 | 1,867 | 1,617 | 11,250 | 14,737 |  
-| HP:0000752 | Hyperactivity | 13,386 | 600 | 427 | 12,359 | 0 | 0 | 0 | 13,386 |  
-| HP:0100022 | Abnormality of movement | 11,400 | 163 | 2,434 | 35 | 1,645 | 4,757 | 2,366 | 11,400 |  
-| HP:0012647 | Abnormal inflammatory response | 10,687 | 28 | 0 | 0 | 4,093 | 5,811 | 755 | 10,687 |  
-| HP:0000152 | Abnormality of head or neck | 10,461 | 7,095 | 0 | 0 | 809 | 1,300 | 1,257 | 10,461 |  
-| HP:0001627 | Abnormal heart morphology | 10,322 | 980 | 0 | 6,055 | 397 | 403 | 2,487 | 10,322 |  
-| HP:0001574 | Abnormality of the integument | 9,718 | 175 | 0 | 0 | 1,460 | 6,647 | 1,436 | 9,718 |  
-| HP:0025031 | Abnormality of the digestive system | 8,776 | 342 | 0 | 1,258 | 4,438 | 1,310 | 1,428 | 8,776 |  
-| HP:0001370 | Rheumatoid arthritis | 8,472 | 2 | 0 | 0 | 2,157 | 3,885 | 2,428 | 8,472 |  
-| HP:0002086 | Abnormality of the respiratory system | 7,872 | 146 | 0 | 0 | 3,182 | 3,259 | 1,285 | 7,872 |  
-| HP:0003011 | Abnormality of the musculature | 7,649 | 1,408 | 0 | 0 | 1,130 | 2,886 | 2,225 | 7,649 |  
-| HP:0001997 | Gout | 6,154 | 0 | 0 | 0 | 1,101 | 3,255 | 1,798 | 6,154 |  
-| HP:0410008 | Abnormality of the peripheral nervous system | 5,954 | 17 | 0 | 0 | 724 | 2,052 | 3,161 | 5,954 |  
-| HP:0012443 | Abnormality of brain morphology | 5,867 | 1,295 | 0 | 689 | 646 | 1,321 | 1,916 | 5,867 |  
-| HP:0000119 | Abnormality of the genitourinary system | 5,831 | 489 | 0 | 0 | 701 | 3,335 | 1,306 | 5,831 |  
-| HP:0001271 | Polyneuropathy | 5,370 | 2 | 0 | 0 | 643 | 1,678 | 3,047 | 5,370 |  
-| HP:0011442 | Abnormal central motor function | 4,593 | 272 | 0 | 0 | 1,381 | 1,733 | 1,207 | 4,593 |  
-| HP:0004305 | Involuntary movements | 4,322 | 69 | 2,434 | 35 | 82 | 1,055 | 647 | 4,322 |  
-| HP:0011446 | Abnormality of higher mental function | 4,208 | 1,450 | 814 | 671 | 176 | 553 | 544 | 4,208 |  
-| HP:0012447 | Abnormal myelination | 3,165 | 9 | 0 | 0 | 1,114 | 511 | 1,531 | 3,165 |  
-| HP:0011804 | Abnormal muscle physiology | 3,063 | 1,300 | 0 | 0 | 571 | 1,192 | 0 | 3,063 |  
+| HPO | description | Total | meta1 | meta2 | meta3 | meta4 | meta5 | meta6 | meta7 | mega |  
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
+| HEALTHY_CONTROL | Unaffected control sample | 492,672 | 19,585 | 10,263 | 32,543 | 24,161 | 375,800 | 15,659 | 14,661 | 492,672 |  
+| HP:0000118 | Phenotypic abnormality | 452,777 | 29,104 | 79,178 | 41,065 | 153,870 | 54,071 | 63,183 | 32,306 | 452,777 |  
+| HP:0000707 | Abnormality of the nervous system | 255,273 | 29,104 | 24,785 | 41,065 | 54,406 | 29,861 | 54,120 | 21,932 | 255,273 |  
+| HP:0000708 | Behavioral abnormality | 135,483 | 2,000 | 10,863 | 26,578 | 26,364 | 11,895 | 41,245 | 16,538 | 135,483 |  
+| UNKNOWN | NA | 92,268 | 0 | 47,833 | 0 | 43,603 | 747 | 85 | 0 | 92,268 |  
+| HP:0012639 | Abnormal nervous system morphology | 68,594 | 355 | 3,085 | 0 | 24,936 | 13,150 | 18,855 | 8,213 | 68,594 |  
+| HP:0031466 | Impairment in personality functioning | 58,323 | 20 | 1,178 | 0 | 1,730 | 6,297 | 35,176 | 13,922 | 58,323 |  
+| HP:0002715 | Abnormality of the immune system | 54,057 | 19 | 538 | 0 | 32,843 | 6,326 | 10,823 | 3,508 | 54,057 |  
+| HP:0012759 | Neurodevelopmental abnormality | 50,229 | 29,104 | 16,874 | 814 | 671 | 132 | 1,338 | 1,296 | 50,229 |  
+| HP:0001939 | Abnormality of metabolism/homeostasis | 47,133 | 61 | 528 | 0 | 0 | 14,672 | 17,286 | 14,586 | 47,133 |  
+| HP:0002960 | Autoimmunity | 42,034 | 1 | 19 | 0 | 32,843 | 1,324 | 5,359 | 2,488 | 42,034 |  
+| HP:0033127 | Abnormality of the musculoskeletal system | 41,280 | 594 | 8,821 | 0 | 0 | 8,807 | 16,488 | 6,570 | 41,280 |  
+| HP:0001626 | Abnormality of the cardiovascular system | 40,892 | 767 | 2,559 | 0 | 21,003 | 3,935 | 4,929 | 7,699 | 40,892 |  
+| HP:0002011 | Morphological central nervous system abnormality | 37,800 | 346 | 3,025 | 0 | 24,936 | 2,428 | 2,510 | 4,555 | 37,800 |  
+| HP:0007302 | Bipolar affective disorder | 34,915 | 13 | 376 | 0 | 38 | 4,537 | 19,541 | 10,410 | 34,915 |  
+| HP:0000759 | Abnormal peripheral nervous system morphology | 32,665 | 3 | 45 | 0 | 0 | 10,824 | 17,241 | 4,552 | 32,665 |  
+| HP:0002597 | Abnormality of the vasculature | 30,260 | 57 | 648 | 0 | 14,948 | 3,581 | 4,583 | 6,443 | 30,260 |  
+| HP:0001367 | Abnormal joint morphology | 26,200 | 2 | 114 | 0 | 0 | 7,601 | 14,034 | 4,449 | 26,200 |  
+| HP:0000729 | Autistic behavior | 26,199 | 1,704 | 8,686 | 4,631 | 11,071 | 16 | 91 | 0 | 26,199 |  
+| HP:0007367 | Atrophy/Degeneration affecting the central nervous system | 26,163 | 4 | 39 | 0 | 24,247 | 229 | 349 | 1,295 | 26,163 |  
+| HP:0100852 | Abnormal fear/anxiety-related behavior | 25,856 | 6 | 748 | 0 | 1,304 | 1,552 | 14,070 | 8,176 | 25,856 |  
+| HP:0003107 | Abnormal circulating cholesterol concentration | 25,455 | 0 | 3 | 0 | 0 | 13,283 | 7,704 | 4,465 | 25,455 |  
+| HP:0100753 | Schizophrenia | 25,108 | 2 | 26 | 21,298 | 1,200 | 659 | 756 | 1,167 | 25,108 |  
+| HP:0001197 | Abnormality of prenatal development or birth | 24,283 | 941 | 2,053 | 0 | 6,055 | 2,655 | 5,462 | 7,117 | 24,283 |  
+| HP:0009830 | Peripheral neuropathy | 22,571 | 7 | 49 | 0 | 0 | 9,185 | 9,821 | 3,509 | 22,571 |  
+| HP:0001250 | Seizure | 21,289 | 1,806 | 3,133 | 11,017 | 1,762 | 1,814 | 1,757 | 0 | 21,289 |  
+| HP:0002621 | Atherosclerosis | 19,641 | 0 | 1 | 0 | 14,948 | 548 | 1,865 | 2,279 | 19,641 |  
+| HP:0000152 | Abnormality of head or neck | 15,419 | 4,537 | 7,516 | 0 | 0 | 809 | 1,300 | 1,257 | 15,419 |  
+| HP:0000752 | Hyperactivity | 14,955 | 281 | 1,888 | 427 | 12,359 | 0 | 0 | 0 | 14,955 |  
+| HP:0003077 | Hyperlipidemia | 14,744 | 1 | 9 | 0 | 0 | 1,867 | 1,617 | 11,250 | 14,744 |  
+| HP:0100022 | Abnormality of movement | 12,628 | 37 | 1,354 | 2,434 | 35 | 1,645 | 4,757 | 2,366 | 12,628 |  
+| HP:0000271 | Abnormality of the face | 11,681 | 4,378 | 4,733 | 0 | 0 | 711 | 1,050 | 809 | 11,681 |  
+| HP:0001627 | Abnormal heart morphology | 11,388 | 212 | 1,834 | 0 | 6,055 | 397 | 403 | 2,487 | 11,388 |  
+| HP:0012647 | Abnormal inflammatory response | 10,896 | 7 | 230 | 0 | 0 | 4,093 | 5,811 | 755 | 10,896 |  
+| HP:0003011 | Abnormality of the musculature | 10,629 | 242 | 4,146 | 0 | 0 | 1,130 | 2,886 | 2,225 | 10,629 |  
+| HP:0001574 | Abnormality of the integument | 10,544 | 28 | 971 | 0 | 0 | 1,462 | 6,647 | 1,436 | 10,544 |  
+| HP:0025031 | Abnormality of the digestive system | 10,205 | 91 | 1,680 | 0 | 1,258 | 4,438 | 1,310 | 1,428 | 10,205 |  
+| HP:0011446 | Abnormality of higher mental function | 9,885 | 195 | 6,932 | 814 | 671 | 176 | 553 | 544 | 9,885 |  
+| HP:0001370 | Rheumatoid arthritis | 8,480 | 1 | 9 | 0 | 0 | 2,157 | 3,885 | 2,428 | 8,480 |  
+| HP:0002086 | Abnormality of the respiratory system | 8,460 | 42 | 692 | 0 | 0 | 3,182 | 3,259 | 1,285 | 8,460 |  
+| HP:0012443 | Abnormality of brain morphology | 7,688 | 322 | 2,794 | 0 | 689 | 646 | 1,321 | 1,916 | 7,688 |  
+| HP:0001507 | Growth abnormality | 6,857 | 1,223 | 4,869 | 0 | 757 | 6 | 2 | 0 | 6,857 |  
+| HP:0000119 | Abnormality of the genitourinary system | 6,768 | 191 | 1,235 | 0 | 0 | 701 | 3,335 | 1,306 | 6,768 |  
+| HP:0001997 | Gout | 6,154 | 0 | 0 | 0 | 0 | 1,101 | 3,255 | 1,798 | 6,154 |  
+| HP:0025033 | Abnormality of digestive system morphology | 6,138 | 19 | 320 | 0 | 0 | 3,404 | 1,048 | 1,347 | 6,138 |  
+| HP:0009121 | Abnormal axial skeleton morphology | 6,132 | 278 | 4,478 | 0 | 0 | 215 | 610 | 551 | 6,132 |  
+| HP:0002360 | Sleep disturbance | 6,091 | 8 | 354 | 0 | 0 | 2,719 | 3,010 | 0 | 6,091 |  
+| HP:0410008 | Abnormality of the peripheral nervous system | 6,005 | 3 | 65 | 0 | 0 | 724 | 2,052 | 3,161 | 6,005 |  
+| HP:0011804 | Abnormal muscle physiology | 5,796 | 199 | 3,834 | 0 | 0 | 571 | 1,192 | 0 | 5,796 |  
+| HP:0011442 | Abnormal central motor function | 5,341 | 42 | 978 | 0 | 0 | 1,381 | 1,733 | 1,207 | 5,341 |  
+| HP:0004305 | Involuntary movements | 4,928 | 10 | 665 | 2,434 | 35 | 82 | 1,055 | 647 | 4,928 |  
+| HP:0001249 | Intellectual disability | 4,840 | 129 | 2,317 | 814 | 671 | 15 | 389 | 505 | 4,840 |  
+| HP:0004323 | Abnormality of body weight | 3,853 | 992 | 2,104 | 0 | 757 | 0 | 0 | 0 | 3,853 |  
+| HP:0011121 | Abnormality of skin morphology | 3,511 | 19 | 593 | 0 | 0 | 374 | 1,788 | 737 | 3,511 |  
+| HP:0012447 | Abnormal myelination | 3,204 | 3 | 45 | 0 | 0 | 1,114 | 511 | 1,531 | 3,204 |  
