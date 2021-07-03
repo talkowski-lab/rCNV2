@@ -45,7 +45,7 @@ Some datasets required manual curation prior to inclusion. Where necessary, thes
  * **CHOP**: CNVs were filtered on quality score ≥40 and CNV size ≥25kb while requiring at least 10 SNPs per CNV. After CNV filtering, samples with `LRR_SD` <0.25, >20 CNV calls, or SNP call rate <98% were excluded as outliers, as well as samples genotyped on arrays with <175k SNP probes or samples labeled as cancer or Down's Syndrome patients. Finally, we identified 19 loci with apparently platform-specific artifactual CNV pileups. CNVs covered ≥10% by any of these artifact regions were removed from the callset. Lists of CHOP-specific blacklisted loci for deletions and duplications are provided as [reference files](https://github.com/talkowski-lab/rCNV2/tree/master/refs).  
  * **Epi25k**: CNVs were filtered on ≥10 probes and ≥25kb. After CNV filtering, samples with >25 CNV calls were excluded as outliers.  
  * **EstBB**: Samples were excluded if were not included in SNP imputation, had genotype calls missing for ≥2% of sites, or belonged to two genotyping batches based on visual inspection of genotyping intensity parameters, followed by further exclusion of genotyping plates (≤24 samples per plate) that contained >3 samples with >200 CNV calls. We retained unrelated samples that had been linked to Estonian health registries and that had ≤50 raw CNV calls. We included CNVs with a quality score ≥15, were covered by ≥10 probes, and were ≥25kb in size. Finally, we pruned related samples and any samples with known malignant cancers or chromosomal disorders (e.g., Down's Syndrome or sex chromosome aneuploidies).
- * **GDX**: TBD [TODO: ADD TEXT HERE]
+ * **GDX**: All CNVs were required to be ≥20kb and <40Mb in length. Except for the minority of 9,958 samples for which additional CNV call metadata was unavailable, all CNVs were further required to not have been annotated as a suspected false positive or mosaic event, have estimated copy numbers ≤1.5 for deletions or ≥2.5 for duplications, include ≥10 probes and have P(CNV) ≤ 10<sup>-10</sup>. Following CNV call filtering, we excluded a total of 588 samples that either had >10 calls each, were identified as potential biological replicates, or had “advanced maternal age” as their indication for testing.
  * **SSC**: CNVs were filtered on pCNV ≤10<sup>-9</sup>, per recommendation of the authors.  
  * **SickKids**: CNVs were filtered on ≥25kb. After CNV filtering, samples with >80 CNV calls were excluded as outliers. Finally, we identified a single locus on chr12 that had CNVs only appearing in ADHD samples at 2.8% frequency; these CNVs were removed from the callset.  
  * **TCGA**: CNVs were filtered on ≥10 probes and ≥25kb. Deletions were required to have a mean log<sub>2</sub> intensity ≤-1 and duplications were required to have a mean log<sub>2</sub> intensity of ≥0.5849625.  
@@ -192,7 +192,7 @@ The information for this table was collected using `collect_cohort_stats.sh`, an
 
 ## Case-control "metacohorts"  
 
-For analyses, we combined CNV data from multiple cohorts into six matched groups, dubbed **metacohorts**, to control for technical differences between individual data sources and cohorts.  
+For analyses, we combined CNV data from multiple cohorts into seven matched groups, dubbed **metacohorts**, to control for technical differences between individual data sources and cohorts.  
 
 Individual cohorts were assigned to metacohorts on the basis of similarity in CNV counts across the genome, which matched expectations based on platforms and processing pipelines for each callset.  
 
@@ -202,13 +202,14 @@ For completeness, we also performed identical analyses on a pooled dataset of al
 
 | Metacohort ID | Case Source(s) | Number of Cases | Control Sources(s) | Number of Controls |  
 | :--- | :--- | ---: | :--- | ---: |  
-| `meta1` | BCH, Coe, GDX, IU | 44,229 | Coe, Cooper | 19,585 |  
-| `meta2` | Epi25k, PGC, SSC, SickKids, TSAICG | 41,065 | Epi25k, PGC, TCGA, TSAICG | 41,213 |  
-| `meta3` | CHOP | 153,870 | CHOP | 24,161 |  
-| `meta4` | UKBB | 54,071 | UKBB | 375,800 |  
-| `meta5` | EstBB | 63,183 | EstBB | 15,659 |  
-| `meta6` | BioVU | 32,306 | BioVU | 14,661 |  
-| `mega` | BCH, CHOP, Coe, Epi25k, GDX, IU, PGC, SSC, SickKids, TSAICG, UKBB, EstBB, BioVU | 388,724 | CHOP, Coe, Cooper, Epi25k, PGC, TCGA, TSAICG, UKBB, EstBB, BioVU | 491,079 |  
+| `meta1` | Coe | 29,104 | Coe, Cooper | 19,585 |  
+| `meta2` | BCH, GDX, IU | 79,178 | GDX, TCGA | 10,263 |  
+| `meta3` | Epi25k, PGC, SSC, SickKids, TSAICG | 41,065 | Epi25k, PGC, TSAICG | 32,543 |  
+| `meta4` | CHOP | 153,870 | CHOP | 24,161 |  
+| `meta5` | UKBB | 54,071 | UKBB | 375,800 |  
+| `meta6` | EstBB | 63,183 | EstBB | 15,659 |  
+| `meta7` | BioVU | 32,306 | BioVU | 14,661 |  
+| `mega` | BCH, CHOP, Coe, Epi25k, GDX, IU, PGC, SSC, SickKids, TSAICG, UKBB, EstBB, BioVU | 452,777 | CHOP, Coe, Cooper, Epi25k, PGC, TCGA, TSAICG, UKBB, EstBB, BioVU | 492,672 |  
 
 ### Metacohort rare CNV callset properties  
 

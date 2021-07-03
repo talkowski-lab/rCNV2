@@ -74,5 +74,5 @@ mtext(3, line=1, text="Metacohort composition", font=2)
 total.barplot(counts$Total)
 mtext(3, line=1, text="Total samples", font=2)
 legend("right", legend=paste("meta", 1:length(meta.colors), sep=""),
-       fill=meta.colors)
+       fill=meta.colors, cex=1.5)
 dev.off()
