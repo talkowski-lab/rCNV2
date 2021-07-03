@@ -69,7 +69,12 @@ def tally_hpo_counts(pheno_file, ignore_terms, precomp_pairs=None):
         reader = csv.reader(infile, delimiter='\t')
 
         for sample, terms in reader:
-            for term in terms.split(';'):
+            # Make sure samples with base term also have HP:0000118
+            sterms = terms.split(';')
+            if 'HP:0000001' in sterms and 'HP:0000118' not in sterms:
+                sterms.append('HP:0000118')
+
+            for term in sterms:
 
                 if ignore_terms is not None:
                     if term in ignore_terms:
