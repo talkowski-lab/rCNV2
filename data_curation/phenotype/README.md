@@ -48,7 +48,7 @@ After assigning HPO terms to each sample, we next reduced the number of HPO term
 
 After tabulating the number of samples matching each HPO code, we retained all HPO terms with at least 3,000 samples. 
 
-We next compared shared sample memberships between all pairs of related HPO terms:
+We next compared shared sample memberships between all pairs of HPO terms:
  * If the pair of samples had a Jaccard similarity > 80%, we retained the larger term and dropped the smaller term.
  * If fewer than 3,000 samples differed between a pair of hierarchically related HPO terms, we retained the more general (i.e., higher-level) term, and excluded the more specific (i.e., lower-level) term.
  * If both hierarchically related terms were equally high-level and siblings (defined as reciprocally sharing at least 50% of their parent terms), we retained the term with the larger sample size.
