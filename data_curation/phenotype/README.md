@@ -63,38 +63,38 @@ The final set of HPO terms is detailed below:
 
 | HPO Term | Description | Samples | HPO Tier | Parent Terms | Child Terms |  
 | :--- | :--- | ---: | ---: | :--- | :--- |  
-| HEALTHY_CONTROL | Unaffected control sample | 492,672 | 1 | NA | NA |  
-| HP:0000118 | Phenotypic abnormality | 452,777 | 1 | NA | HP:0009830, HP:0410008, HP:0012447, HP:0002960, HP:0000119, HP:0002086, HP:0000707, HP:0001197, HP:0100852, HP:0025033, HP:0002715, HP:0004305, HP:0007302, HP:0001939, HP:0012647, HP:0012639, HP:0011804, HP:0001574, HP:0000752, HP:0009121, HP:0031466, HP:0000152, HP:0011442, HP:0002621, HP:0001626, HP:0000759, HP:0002597, HP:0011121, HP:0000708, HP:0012759, HP:0012443, HP:0004323, HP:0001627, HP:0100753, HP:0001370, HP:0003011, HP:0007367, HP:0000271, HP:0000729, HP:0002360, HP:0011446, HP:0033127, HP:0001250, HP:0003107, HP:0001249, HP:0100022, HP:0001997, HP:0003077, HP:0001507, HP:0001367, HP:0025031, HP:0002011 |  
-| HP:0000707 | Abnormality of the nervous system | 255,273 | 2 | HP:0000118 | HP:0000708, HP:0009830, HP:0007302, HP:0007367, HP:0410008, HP:0012639, HP:0012447, HP:0000729, HP:0002360, HP:0012759, HP:0000752, HP:0012443, HP:0011446, HP:0031466, HP:0001250, HP:0100852, HP:0011442, HP:0001249, HP:0100022, HP:0100753, HP:0000759, HP:0004305, HP:0002011 |  
-| HP:0000708 | Behavioral abnormality | 135,483 | 4 | HP:0000707, HP:0000118 | HP:0000752, HP:0007302, HP:0031466, HP:0000729, HP:0002360, HP:0100852, HP:0100753 |  
+| HEALTHY_CONTROL | Unaffected control sample | 491,079 | 1 | NA | NA |  
+| HP:0000118 | Phenotypic abnormality | 452,777 | 1 | NA | HP:0002011, HP:0012443, HP:0025031, HP:0009121, HP:0003107, HP:0004323, HP:0012759, HP:0001370, HP:0001507, HP:0002715, HP:0033127, HP:0002086, HP:0031466, HP:0003077, HP:0002597, HP:0001250, HP:0025033, HP:0410008, HP:0001249, HP:0001939, HP:0000152, HP:0011442, HP:0001626, HP:0011121, HP:0000707, HP:0001197, HP:0001367, HP:0000729, HP:0011446, HP:0004305, HP:0002621, HP:0000271, HP:0000759, HP:0000752, HP:0002960, HP:0003011, HP:0007302, HP:0001627, HP:0009830, HP:0100753, HP:0012447, HP:0100022, HP:0100852, HP:0011804, HP:0002360, HP:0012639, HP:0001997, HP:0007367, HP:0012647, HP:0000119, HP:0001574, HP:0000708 |  
+| HP:0000707 | Abnormality of the nervous system | 255,273 | 2 | HP:0000118 | HP:0100852, HP:0002011, HP:0000729, HP:0012443, HP:0031466, HP:0011446, HP:0002360, HP:0004305, HP:0001250, HP:0000759, HP:0410008, HP:0012639, HP:0012759, HP:0000752, HP:0001249, HP:0007367, HP:0007302, HP:0011442, HP:0000708, HP:0009830, HP:0100753, HP:0012447, HP:0100022 |  
+| HP:0000708 | Behavioral abnormality | 135,483 | 4 | HP:0000707, HP:0000118 | HP:0007302, HP:0031466, HP:0002360, HP:0000752, HP:0100852, HP:0100753, HP:0000729 |  
 | UNKNOWN | NA | 92,268 | 2 | HP:0000118 | NA |  
-| HP:0012639 | Abnormal nervous system morphology | 68,594 | 3 | HP:0000707, HP:0000118 | HP:0012447, HP:0000759, HP:0012443, HP:0007367, HP:0002011 |  
-| HP:0031466 | Impairment in personality functioning | 58,323 | 5 | HP:0000707, HP:0000708, HP:0000118 | HP:0100852, HP:0007302 |  
-| HP:0002715 | Abnormality of the immune system | 54,057 | 2 | HP:0000118 | HP:0012647, HP:0002960 |  
+| HP:0012639 | Abnormal nervous system morphology | 68,594 | 3 | HP:0000707, HP:0000118 | HP:0002011, HP:0012443, HP:0012447, HP:0000759, HP:0007367 |  
+| HP:0031466 | Impairment in personality functioning | 58,323 | 5 | HP:0000118, HP:0000707, HP:0000708 | HP:0100852, HP:0007302 |  
+| HP:0002715 | Abnormality of the immune system | 54,057 | 2 | HP:0000118 | HP:0002960, HP:0012647 |  
 | HP:0012759 | Neurodevelopmental abnormality | 50,229 | 4 | HP:0000707, HP:0000118 | HP:0001249 |  
-| HP:0001939 | Abnormality of metabolism/homeostasis | 47,133 | 2 | HP:0000118 | HP:0003107, HP:0003077 |  
+| HP:0001939 | Abnormality of metabolism/homeostasis | 47,133 | 2 | HP:0000118 | HP:0003077, HP:0003107 |  
 | HP:0002960 | Autoimmunity | 42,034 | 4 | HP:0002715, HP:0000118 | NA |  
-| HP:0033127 | Abnormality of the musculoskeletal system | 41,280 | 2 | HP:0000118 | HP:0001370, HP:0003011, HP:0011804, HP:0009121, HP:0001997, HP:0001367 |  
-| HP:0001626 | Abnormality of the cardiovascular system | 40,892 | 2 | HP:0000118 | HP:0002621, HP:0001627, HP:0002597 |  
-| HP:0002011 | Morphological central nervous system abnormality | 37,800 | 4 | HP:0000707, HP:0000118, HP:0012639 | HP:0012443, HP:0007367 |  
-| HP:0007302 | Bipolar affective disorder | 34,915 | 7 | HP:0000707, HP:0031466, HP:0000708, HP:0000118 | NA |  
-| HP:0000759 | Abnormal peripheral nervous system morphology | 32,665 | 4 | HP:0000707, HP:0000118, HP:0012639 | NA |  
+| HP:0033127 | Abnormality of the musculoskeletal system | 41,280 | 2 | HP:0000118 | HP:0009121, HP:0001370, HP:0003011, HP:0011804, HP:0001997, HP:0001367 |  
+| HP:0001626 | Abnormality of the cardiovascular system | 40,892 | 2 | HP:0000118 | HP:0002621, HP:0002597, HP:0001627 |  
+| HP:0002011 | Morphological central nervous system abnormality | 37,800 | 4 | HP:0000707, HP:0012639, HP:0000118 | HP:0012443, HP:0007367 |  
+| HP:0007302 | Bipolar affective disorder | 34,915 | 7 | HP:0031466, HP:0000118, HP:0000707, HP:0000708 | NA |  
+| HP:0000759 | Abnormal peripheral nervous system morphology | 32,665 | 4 | HP:0000707, HP:0012639, HP:0000118 | NA |  
 | HP:0002597 | Abnormality of the vasculature | 30,260 | 3 | HP:0001626, HP:0000118 | HP:0002621 |  
-| HP:0001367 | Abnormal joint morphology | 26,200 | 5 | HP:0033127, HP:0000118 | HP:0001370, HP:0001997 |  
-| HP:0000729 | Autistic behavior | 26,199 | 5 | HP:0000707, HP:0000708, HP:0000118 | NA |  
-| HP:0007367 | Atrophy/Degeneration affecting the central nervous system | 26,163 | 5 | HP:0012639, HP:0000707, HP:0002011, HP:0000118 | NA |  
-| HP:0100852 | Abnormal fear/anxiety-related behavior | 25,856 | 6 | HP:0000707, HP:0031466, HP:0000708, HP:0000118 | NA |  
+| HP:0001367 | Abnormal joint morphology | 26,200 | 5 | HP:0033127, HP:0000118 | HP:0001997, HP:0001370 |  
+| HP:0000729 | Autistic behavior | 26,199 | 5 | HP:0000118, HP:0000707, HP:0000708 | NA |  
+| HP:0007367 | Atrophy/Degeneration affecting the central nervous system | 26,163 | 5 | HP:0012639, HP:0000118, HP:0000707, HP:0002011 | NA |  
+| HP:0100852 | Abnormal fear/anxiety-related behavior | 25,856 | 6 | HP:0031466, HP:0000118, HP:0000707, HP:0000708 | NA |  
 | HP:0003107 | Abnormal circulating cholesterol concentration | 25,455 | 5 | HP:0001939, HP:0000118 | NA |  
-| HP:0100753 | Schizophrenia | 25,108 | 5 | HP:0000707, HP:0000708, HP:0000118 | NA |  
+| HP:0100753 | Schizophrenia | 25,108 | 5 | HP:0000118, HP:0000707, HP:0000708 | NA |  
 | HP:0001197 | Abnormality of prenatal development or birth | 24,283 | 2 | HP:0000118 | NA |  
 | HP:0009830 | Peripheral neuropathy | 22,571 | 4 | HP:0000707, HP:0000118 | NA |  
 | HP:0001250 | Seizure | 21,289 | 4 | HP:0000707, HP:0000118 | NA |  
-| HP:0002621 | Atherosclerosis | 19,641 | 9 | HP:0001626, HP:0002597, HP:0000118 | NA |  
+| HP:0002621 | Atherosclerosis | 19,641 | 9 | HP:0000118, HP:0001626, HP:0002597 | NA |  
 | HP:0000152 | Abnormality of head or neck | 15,419 | 2 | HP:0000118 | HP:0000271 |  
-| HP:0000752 | Hyperactivity | 14,955 | 5 | HP:0000707, HP:0000708, HP:0000118 | NA |  
+| HP:0000752 | Hyperactivity | 14,955 | 5 | HP:0000118, HP:0000707, HP:0000708 | NA |  
 | HP:0003077 | Hyperlipidemia | 14,744 | 5 | HP:0001939, HP:0000118 | NA |  
 | HP:0100022 | Abnormality of movement | 12,628 | 4 | HP:0000707, HP:0000118 | HP:0004305 |  
-| HP:0000271 | Abnormality of the face | 11,681 | 4 | HP:0000152, HP:0000118 | NA |  
+| HP:0000271 | Abnormality of the face | 11,681 | 4 | HP:0000118, HP:0000152 | NA |  
 | HP:0001627 | Abnormal heart morphology | 11,388 | 4 | HP:0001626, HP:0000118 | NA |  
 | HP:0012647 | Abnormal inflammatory response | 10,896 | 4 | HP:0002715, HP:0000118 | NA |  
 | HP:0003011 | Abnormality of the musculature | 10,629 | 3 | HP:0033127, HP:0000118 | HP:0011804 |  
@@ -103,21 +103,21 @@ The final set of HPO terms is detailed below:
 | HP:0011446 | Abnormality of higher mental function | 9,885 | 4 | HP:0000707, HP:0000118 | HP:0001249 |  
 | HP:0001370 | Rheumatoid arthritis | 8,480 | 7 | HP:0033127, HP:0001367, HP:0000118 | NA |  
 | HP:0002086 | Abnormality of the respiratory system | 8,460 | 2 | HP:0000118 | NA |  
-| HP:0012443 | Abnormality of brain morphology | 7,688 | 5 | HP:0012639, HP:0000707, HP:0002011, HP:0000118 | NA |  
+| HP:0012443 | Abnormality of brain morphology | 7,688 | 5 | HP:0012639, HP:0000118, HP:0000707, HP:0002011 | NA |  
 | HP:0001507 | Growth abnormality | 6,857 | 2 | HP:0000118 | HP:0004323 |  
 | HP:0000119 | Abnormality of the genitourinary system | 6,768 | 2 | HP:0000118 | NA |  
 | HP:0001997 | Gout | 6,154 | 7 | HP:0033127, HP:0001367, HP:0000118 | NA |  
 | HP:0025033 | Abnormality of digestive system morphology | 6,138 | 3 | HP:0025031, HP:0000118 | NA |  
 | HP:0009121 | Abnormal axial skeleton morphology | 6,132 | 5 | HP:0033127, HP:0000118 | NA |  
-| HP:0002360 | Sleep disturbance | 6,091 | 5 | HP:0000707, HP:0000708, HP:0000118 | NA |  
+| HP:0002360 | Sleep disturbance | 6,091 | 5 | HP:0000118, HP:0000707, HP:0000708 | NA |  
 | HP:0410008 | Abnormality of the peripheral nervous system | 6,005 | 3 | HP:0000707, HP:0000118 | NA |  
 | HP:0011804 | Abnormal muscle physiology | 5,796 | 4 | HP:0033127, HP:0003011, HP:0000118 | NA |  
 | HP:0011442 | Abnormal central motor function | 5,341 | 4 | HP:0000707, HP:0000118 | NA |  
-| HP:0004305 | Involuntary movements | 4,928 | 5 | HP:0000707, HP:0100022, HP:0000118 | NA |  
-| HP:0001249 | Intellectual disability | 4,840 | 6 | HP:0000707, HP:0011446, HP:0000118, HP:0012759 | NA |  
-| HP:0004323 | Abnormality of body weight | 3,853 | 3 | HP:0000118, HP:0001507 | NA |  
+| HP:0004305 | Involuntary movements | 4,928 | 5 | HP:0100022, HP:0000118, HP:0000707 | NA |  
+| HP:0001249 | Intellectual disability | 4,840 | 6 | HP:0012759, HP:0011446, HP:0000118, HP:0000707 | NA |  
+| HP:0004323 | Abnormality of body weight | 3,853 | 3 | HP:0001507, HP:0000118 | NA |  
 | HP:0011121 | Abnormality of skin morphology | 3,511 | 4 | HP:0000118, HP:0001574 | NA |  
-| HP:0012447 | Abnormal myelination | 3,204 | 4 | HP:0000707, HP:0000118, HP:0012639 | NA |  
+| HP:0012447 | Abnormal myelination | 3,204 | 4 | HP:0000707, HP:0012639, HP:0000118 | NA |  
 
 ### HPO terms per cohort
 
@@ -127,7 +127,7 @@ The code to generate this table is provided in `gather_hpo_per_cohort_table.py`.
 
 | HPO | description | Total | BCH | CHOP | Coe | Cooper | Epi25k | GDX | IU | PGC | SSC | SickKids | TCGA | TSAICG | UKBB | EstBB | BioVU |  
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
-| HEALTHY_CONTROL | Unaffected control sample | 492,672 | 0 | 24,161 | 11,256 | 8,329 | 8,173 | 1,593 | 0 | 20,277 | 0 | 0 | 8,670 | 4,093 | 375,800 | 15,659 | 14,661 |  
+| HEALTHY_CONTROL | Unaffected control sample | 491,079 | 0 | 24,161 | 11,256 | 8,329 | 8,173 | 0 | 0 | 20,277 | 0 | 0 | 8,670 | 4,093 | 375,800 | 15,659 | 14,661 |  
 | HP:0000118 | Phenotypic abnormality | 452,777 | 3,591 | 153,870 | 29,104 | 0 | 12,053 | 74,011 | 1,576 | 21,094 | 2,795 | 2,689 | 0 | 2,434 | 54,071 | 63,183 | 32,306 |  
 | HP:0000707 | Abnormality of the nervous system | 255,273 | 2,921 | 54,406 | 29,104 | 0 | 12,053 | 21,343 | 521 | 21,094 | 2,795 | 2,689 | 0 | 2,434 | 29,861 | 54,120 | 21,932 |  
 | HP:0000708 | Behavioral abnormality | 135,483 | 1,233 | 26,364 | 2,000 | 0 | 0 | 9,320 | 310 | 21,094 | 2,795 | 2,689 | 0 | 0 | 11,895 | 41,245 | 16,538 |  
@@ -191,7 +191,7 @@ The code to generate this table is provided in `gather_hpo_per_cohort_table.py`.
 
 | HPO | description | Total | meta1 | meta2 | meta3 | meta4 | meta5 | meta6 | meta7 | mega |  
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
-| HEALTHY_CONTROL | Unaffected control sample | 492,672 | 19,585 | 10,263 | 32,543 | 24,161 | 375,800 | 15,659 | 14,661 | 492,672 |  
+| HEALTHY_CONTROL | Unaffected control sample | 491,079 | 19,585 | 8,670 | 32,543 | 24,161 | 375,800 | 15,659 | 14,661 | 491,079 |  
 | HP:0000118 | Phenotypic abnormality | 452,777 | 29,104 | 79,178 | 41,065 | 153,870 | 54,071 | 63,183 | 32,306 | 452,777 |  
 | HP:0000707 | Abnormality of the nervous system | 255,273 | 29,104 | 24,785 | 41,065 | 54,406 | 29,861 | 54,120 | 21,932 | 255,273 |  
 | HP:0000708 | Behavioral abnormality | 135,483 | 2,000 | 10,863 | 26,578 | 26,364 | 11,895 | 41,245 | 16,538 | 135,483 |  

@@ -28,6 +28,9 @@ mkdir control_probesets
 gsutil -m cp \
   gs://rcnv_project/raw_data/other/200K_GSAMD.probes.txt.gz \
   gs://rcnv_project/raw_data/other/Axiom_BioBank1-na35-bed.zip \
+  gs://rcnv_project/raw_data/other/CytoScanHD_Array-na32-3-bed.zip \
+  gs://rcnv_project/raw_data/other/GenomeDx_v5.1_086081_NoSNP.txt \
+  gs://rcnv_project/raw_data/other/031780_PrenatalSNPv1_no_SNP.txt \
   ./
 
 
@@ -42,6 +45,19 @@ unzip Axiom_BioBank1-na35-bed.zip
 fgrep -v "#" Axiom_BioBank1.na35.bed | sed '1d' | cut -f1-3 \
 | sed 's/^chr//g' | sort -Vk1,1 -k2,2n -k3,3n | uniq | bgzip -c \
 > control_probesets/ukbbaxiom.bed.gz
+# CytoScanHD
+unzip CytoScanHD_Array-na32-3-bed.zip
+sed '1d' CytoScanHD_Array.na32.3.bed | cut -f1-3 \
+| sed 's/^chr//g' | sort -Vk1,1 -k2,2n -k3,3n | uniq | bgzip -c \
+> control_probesets/affy_cyto_hd.bed.gz
+# GDX_Agilent_60k
+sed 's/^chr//g' 031780_PrenatalSNPv1_no_SNP.txt | cut -f1-3 \
+| sort -Vk1,1 -k2,2n -k3,3n | uniq | bgzip -c \
+> control_probesets/agilent_gdx_60k.bed.gz
+# GDX_Agilent_180k
+sed 's/^chr//g' GenomeDx_v5.1_086081_NoSNP.txt | cut -f1-3 \
+| sort -Vk1,1 -k2,2n -k3,3n | uniq | bgzip -c \
+> control_probesets/agilent_gdx_180k.bed.gz
 
 
 # Download & clean probesets hosted by Illumina
