@@ -84,6 +84,7 @@ while read cohort N; do
     --vcf refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
     --vcf refs/HGDP.hg19.sites.vcf.gz \
     --vcf-af-fields "AF,$( paste -s -d, all_pop_af_fields.txt )" \
+    --genome refs/GRCh37.autosomes.genome \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     rare_cnv_curated/$cohort.rCNV.bed.gz
@@ -112,6 +113,7 @@ while read cohort N; do
     --vcf refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
     --vcf refs/HGDP.hg19.sites.vcf.gz \
     --vcf-af-fields "AF,$( paste -s -d, all_pop_af_fields.txt )" \
+    --genome refs/GRCh37.autosomes.genome \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     ultrarare_cnv_curated/$cohort.vCNV.bed.gz
@@ -140,6 +142,7 @@ while read cohort N; do
     --vcf refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
     --vcf refs/HGDP.hg19.sites.vcf.gz \
     --vcf-af-fields "AF,$( paste -s -d, all_pop_af_fields.txt )" \
+    --genome refs/GRCh37.autosomes.genome \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     ultrarare_cnv_curated/$cohort.uCNV.bed.gz

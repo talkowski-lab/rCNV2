@@ -212,6 +212,7 @@ def main():
                         'entries with commas. If multiple entries are specified, ' +
                         'will take the max. Will default to AF if entry not found.',
                          default='AF', dest='af_fields')
+    parser.add_argument('-g', '--genome', help='Genome file (used for sorting).')
     parser.add_argument('-z', '--bgzip', dest='bgzip', action='store_true',
                         help='Compress output BED with bgzip.')
 
@@ -277,7 +278,10 @@ def main():
 
     # Add whitelisted CNVs back into final CNV file
     cnvs = cnvs.saveas()
-    cnvs = cnvs.cat(wcnvs, postmerge=False).sort()
+    if args.genome is not None:
+        cnvs = cnvs.cat(wcnvs, postmerge=False).sort(g=args.genome)
+    else:
+        cnvs = cnvs.cat(wcnvs, postmerge=False).sort()
 
     # Write filtered CNVs out to file
     outheader = '#chr\tstart\tend\tname\tcnv\tpheno'

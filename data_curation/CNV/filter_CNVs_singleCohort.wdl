@@ -159,6 +159,7 @@ task filter_cnvs_singleChrom {
       --vcf refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
       --vcf refs/HGDP.hg19.sites.vcf.gz \
       --vcf-af-fields "AF,$( paste -s -d, all_pop_af_fields.txt )" \
+      --genome refs/GRCh37.autosomes.genome \
       --bgzip \
       ${raw_CNVs} \
       ${cohort}.${contig}.${CNV_suffix}.bed.gz
