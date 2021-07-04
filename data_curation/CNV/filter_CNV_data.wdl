@@ -13,7 +13,6 @@ import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:filter_cnvs_singleCohort/v
 
 workflow filter_CNV_data {
   Array[String] cohorts
-  Array[Int] sample_sizes
   Array[File] raw_CNVs
   File metacohort_list
   File contiglist
@@ -29,7 +28,6 @@ workflow filter_CNV_data {
     call filter_single.filter_cnvs_singleCohort as filter_cohort {
       input:
         cohort=cohorts[i],
-        sample_size=sample_sizes[i],
         raw_CNVs=raw_CNVs[i],
         contiglist=contiglist,
         rCNV_bucket=rCNV_bucket,
