@@ -151,14 +151,14 @@ All raw CNV data was subjected to the same set of global filters:
  * Does not have substantial overlap<sup>1</sup> with a common CNV (lower bound of 95% binomial confidence interval of`AF` > 1%) in any population from WGS resolution in recent high-coverage resequencing of the Human Genome Diversity Panel ([Almarri _et al._, _Cell_ (2020)](https://pubmed.ncbi.nlm.nih.gov/32531199/))  
  * Does not have substantial overlap<sup>1</sup> with a common CNV (lower bound of 95% binomial confidence interval of`AF` > 1%) from WGS resolution in the NIH Center for Common Disease Genetics SV callset ([Abel _et al._, _Nature_ (2020)](https://www.nature.com/articles/s41586-020-2371-0))  
  * Does not have substantial overlap<sup>1</sup> with other CNVs in at least 1% of all samples within the same dataset or in any of the other array CNV datasets (compared pairwise in serial; 1% cutoff scaled adaptively to each cohort corresponding to the upper bound of the 95% binomial confidence interval of 1% frequency according to that cohort's total sample size)<sup>3</sup>
- * Not substantially covered<sup>3,4</sup> by somatically hypermutable sites (as applied in [Collins\*, Brand\*, _et al._, _Nature_ (2020)](https://www.nature.com/articles/s41586-020-2287-8))  
- * Not substantially covered<sup>3,4</sup> by segmental duplications and/or simple, low-complexity, or satellite repeats  
- * Not substantially covered<sup>3,4</sup> by N-masked regions of the hg19 reference genome assembly  
+ * Not substantially covered<sup>4</sup> by somatically hypermutable sites (as applied in [Collins\*, Brand\*, _et al._, _Nature_ (2020)](https://www.nature.com/articles/s41586-020-2287-8))<sup>3</sup>  
+ * Not substantially covered<sup>4</sup> by segmental duplications and/or simple, low-complexity, or satellite repeats<sup>3</sup>  
+ * Not substantially covered<sup>4</sup> by N-masked regions of the hg19 reference genome assembly<sup>3</sup>  
 
 #### Notes on curation  
 1. "Substantial" overlap determined based on ≥50% reciprocal overlap using BEDTools ([Quinlan & Hall, _Bioinformatics_ (2010)](https://www.ncbi.nlm.nih.gov/pubmed/20110278)). For overlap-based comparisons, both breakpoints were required to be within ±100kb, and CNV type (DEL vs. DUP) was required to match.  
 2. The version of gnomAD-SV used for this analysis (gnomAD-SV v2.1, non-neuro) included 8,342 samples without known neuropsychiatric disorders as [available from the gnomAD website](https://gnomad.broadinstitute.org/downloads/) and described in [Collins\*, Brand\*, _et al._, _Nature_ (2020)](https://www.nature.com/articles/s41586-020-2287-8)  
-3. CNVs with ≥75% reciprocal overlap versus [known genomic disorder CNV loci](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/other#genomic-disorders) reported by at least two of six established resources were excluded from this filter step.  
+3. CNVs with ≥75% reciprocal overlap versus [known genomic disorder CNV loci](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/other#genomic-disorders) reported by at least two of six established resources were exempted from this filter step.  
 4. "Substantial" coverage determined based on ≥50% coverage per BEDTools coverage ([Quinlan & Hall, _Bioinformatics_ (2010)](https://www.ncbi.nlm.nih.gov/pubmed/20110278)).
 
 ### Rare CNV callset properties
@@ -167,21 +167,21 @@ The properties of each rare CNV callset are listed below after the above filteri
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
-| BCH | 3,591 | 2,810 | 0.78 | 327.0 kb | 1:1.38 | 0 | 0 | 0 | NA | NA |  
-| CHOP | 153,870 | 84,117 | 0.55 | 191.0 kb | 1:1.02 | 24,161 | 15,773 | 0.65 | 188.0 kb | 1.04:1 |  
-| Coe | 29,104 | 18,035 | 0.62 | 263.0 kb | 1:1.14 | 11,256 | 8,401 | 0.75 | 172.0 kb | 1:1.50 |  
-| Cooper | 0 | 0 | 0 | NA | NA | 8,329 | 3,945 | 0.47 | 168.0 kb | 1.47:1 |  
-| Epi25k | 12,053 | 8,120 | 0.67 | 173.0 kb | 1.00:1 | 8,173 | 5,069 | 0.62 | 181.0 kb | 1:1.06 |  
-| GDX | 74,028 | 40,288 | 0.54 | 267.0 kb | 1:1.47 | 0 | 0 | 0 | NA | NA |  
-| IU | 1,577 | 1,502 | 0.95 | 205.0 kb | 1:1.34 | 0 | 0 | 0 | NA | NA |  
-| PGC | 21,094 | 13,337 | 0.63 | 183.0 kb | 1:1.27 | 20,277 | 12,142 | 0.6 | 178.0 kb | 1:1.25 |  
-| SSC | 2,795 | 1,962 | 0.7 | 189.0 kb | 1:1.10 | 0 | 0 | 0 | NA | NA |  
-| SickKids | 2,689 | 3,576 | 1.33 | 176.0 kb | 1:1.30 | 0 | 0 | 0 | NA | NA |  
-| TCGA | 0 | 0 | 0 | NA | NA | 8,670 | 4,454 | 0.51 | 174.0 kb | 1:2.42 |  
-| TSAICG | 2,434 | 1,478 | 0.61 | 192.0 kb | 1:1.32 | 4,093 | 2,457 | 0.6 | 181.0 kb | 1:1.33 |  
-| UKBB | 54,071 | 26,651 | 0.49 | 174.0 kb | 2.61:1 | 375,800 | 180,683 | 0.48 | 173.0 kb | 2.68:1 |  
-| EstBB | 63,183 | 30,498 | 0.48 | 183.0 kb | 1:1.05 | 15,659 | 7,609 | 0.49 | 178.0 kb | 1:1.04 |  
-| BioVU | 32,306 | 25,487 | 0.79 | 179.0 kb | 1:1.20 | 14,661 | 11,320 | 0.77 | 176.0 kb | 1:1.22 |  
+| BCH | 3,591 | 3,028 | 0.84 | 342.0 kb | 1:1.40 | 0 | 0 | 0 | NA | NA |  
+| CHOP | 153,870 | 91,922 | 0.6 | 194.0 kb | 1:1.06 | 24,161 | 17,104 | 0.71 | 189.0 kb | 1.02:1 |  
+| Coe | 29,104 | 19,650 | 0.68 | 264.0 kb | 1:1.18 | 11,256 | 9,364 | 0.83 | 177.0 kb | 1:1.56 |  
+| Cooper | 0 | 0 | 0 | NA | NA | 8,329 | 4,186 | 0.5 | 170.0 kb | 1.39:1 |  
+| Epi25k | 12,053 | 9,024 | 0.75 | 176.0 kb | 1:1.06 | 8,173 | 5,638 | 0.69 | 185.0 kb | 1:1.13 |  
+| GDX | 74,028 | 45,066 | 0.61 | 283.0 kb | 1:1.47 | 0 | 0 | 0 | NA | NA |  
+| IU | 1,577 | 1,652 | 1.05 | 209.0 kb | 1:1.34 | 0 | 0 | 0 | NA | NA |  
+| PGC | 21,094 | 14,661 | 0.7 | 190.0 kb | 1:1.34 | 20,277 | 13,273 | 0.65 | 182.0 kb | 1:1.33 |  
+| SSC | 2,795 | 2,151 | 0.77 | 195.0 kb | 1:1.15 | 0 | 0 | 0 | NA | NA |  
+| SickKids | 2,689 | 3,903 | 1.45 | 182.0 kb | 1:1.33 | 0 | 0 | 0 | NA | NA |  
+| TCGA | 0 | 0 | 0 | NA | NA | 8,670 | 4,918 | 0.57 | 182.0 kb | 1:2.56 |  
+| TSAICG | 2,434 | 1,607 | 0.66 | 198.0 kb | 1:1.31 | 4,093 | 2,663 | 0.65 | 187.0 kb | 1:1.36 |  
+| UKBB | 54,071 | 28,845 | 0.53 | 179.0 kb | 2.52:1 | 375,800 | 195,245 | 0.52 | 177.0 kb | 2.59:1 |  
+| EstBB | 63,183 | 32,992 | 0.52 | 185.0 kb | 1:1.13 | 15,659 | 8,228 | 0.53 | 181.0 kb | 1:1.12 |  
+| BioVU | 32,306 | 27,353 | 0.85 | 179.0 kb | 1:1.21 | 14,661 | 12,176 | 0.83 | 175.0 kb | 1:1.23 |  
 
 
 The information for this table was collected using `collect_cohort_stats.sh`, and is visualized below using `plot_cnv_stats_per_cohort.R`.  
@@ -215,14 +215,14 @@ For completeness, we also performed identical analyses on a pooled dataset of al
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
-| meta1 | 29,104 | 18,035 | 0.62 | 263.0 kb | 1:1.14 | 19,585 | 12,346 | 0.63 | 171.0 kb | 1:1.17 |  
-| meta2 | 79,196 | 44,600 | 0.56 | 268.0 kb | 1:1.46 | 8,670 | 4,454 | 0.51 | 174.0 kb | 1:2.42 |  
-| meta3 | 41,065 | 28,473 | 0.69 | 180.0 kb | 1:1.18 | 32,543 | 19,668 | 0.6 | 179.0 kb | 1:1.21 |  
-| meta4 | 153,870 | 84,117 | 0.55 | 191.0 kb | 1:1.02 | 24,161 | 15,773 | 0.65 | 188.0 kb | 1.04:1 |  
-| meta5 | 54,071 | 26,651 | 0.49 | 174.0 kb | 2.61:1 | 375,800 | 180,683 | 0.48 | 173.0 kb | 2.68:1 |  
-| meta6 | 63,183 | 30,498 | 0.48 | 183.0 kb | 1:1.05 | 15,659 | 7,609 | 0.49 | 178.0 kb | 1:1.04 |  
-| meta7 | 32,306 | 25,487 | 0.79 | 179.0 kb | 1:1.20 | 14,661 | 11,320 | 0.77 | 176.0 kb | 1:1.22 |  
-| mega | 452,795 | 257,861 | 0.57 | 197.0 kb | 1:1.03 | 491,079 | 251,853 | 0.51 | 174.0 kb | 1.88:1 |  
+| meta1 | 29,104 | 19,650 | 0.68 | 264.0 kb | 1:1.18 | 19,585 | 13,550 | 0.69 | 174.0 kb | 1:1.22 |  
+| meta2 | 79,196 | 49,746 | 0.63 | 283.0 kb | 1:1.46 | 8,670 | 4,918 | 0.57 | 182.0 kb | 1:2.56 |  
+| meta3 | 41,065 | 31,346 | 0.76 | 186.0 kb | 1:1.24 | 32,543 | 21,574 | 0.66 | 183.0 kb | 1:1.28 |  
+| meta4 | 153,870 | 91,922 | 0.6 | 194.0 kb | 1:1.06 | 24,161 | 17,104 | 0.71 | 189.0 kb | 1.02:1 |  
+| meta5 | 54,071 | 28,845 | 0.53 | 179.0 kb | 2.52:1 | 375,800 | 195,245 | 0.52 | 177.0 kb | 2.59:1 |  
+| meta6 | 63,183 | 32,992 | 0.52 | 185.0 kb | 1:1.13 | 15,659 | 8,228 | 0.53 | 181.0 kb | 1:1.12 |  
+| meta7 | 32,306 | 27,353 | 0.85 | 179.0 kb | 1:1.21 | 14,661 | 12,176 | 0.83 | 175.0 kb | 1:1.23 |  
+| mega | 452,795 | 281,854 | 0.62 | 202.0 kb | 1:1.07 | 491,079 | 272,795 | 0.56 | 178.0 kb | 1.81:1 |  
 
 ![Rare CNV stats](https://storage.googleapis.com/rcnv_project/public/rCNV.metacohort.stats.jpg)  
 
