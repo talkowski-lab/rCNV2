@@ -91,8 +91,8 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
-p_cutoff=0.000003748238
-meta_p_cutoff=0.000003748238
+p_cutoff=0.000003767103
+meta_p_cutoff=0.000003767103
 meta_model_prefix="fe"
 bin_overlap=0.5
 pad_controls=50000
@@ -198,8 +198,8 @@ done < refs/test_phenotypes.list
 
 # Run phenotype permutation to determine empirical FDR cutoff
 # Test/dev parameters
-hpo="HP:0001250"
-prefix="HP0001250"
+hpo="HP:0001370"
+prefix="HP0001370"
 meta="meta1"
 freq_code="rCNV"
 phenotype_list="refs/test_phenotypes.list"
@@ -207,7 +207,7 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
-p_cutoff=0.000003748238
+p_cutoff=0.000003767103
 n_pheno_perms=50
 exclusion_bed=GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz #Note: this file must be generated above
 meta_model_prefix="fe"
@@ -271,7 +271,7 @@ while read prefix hpo; do
       > shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz
       tabix -f shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz
 
-    done < ${metacohort_list}
+    done < <( fgrep -v "mega" ${metacohort_list} )
 
     # Iterate over CNV types
     for CNV in DEL DUP; do
@@ -294,7 +294,7 @@ while read prefix hpo; do
           ${binned_genome}
 
         # Perform burden test
-        /opt/rCNV2/analysis/sliding_windows/window_burden_test.R \
+        /opt/rCNV2/analysis/generic_scripts/fisher_test_single_cohort.R \
           --pheno-table ${metacohort_sample_table} \
           --cohort-name $meta \
           --case-hpo ${hpo} \
@@ -310,7 +310,7 @@ while read prefix hpo; do
         echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
-      /opt/rCNV2/analysis/sliding_windows/window_meta_analysis.R \
+      /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
         --model ${meta_model_prefix} \
         --conditional-exclusion ${exclusion_bed} \
         --p-is-phred \
@@ -394,8 +394,8 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
-p_cutoff=0.000003748238
-meta_p_cutoff=0.000003748238
+p_cutoff=0.000003767103
+meta_p_cutoff=0.000003767103
 meta_model_prefix="fe"
 bin_overlap=0.5
 pad_controls=50000

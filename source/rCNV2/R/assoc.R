@@ -355,10 +355,11 @@ sweeting.correction <- function(meta.df, cc.sum=0.01){
                                  which(apply(meta.df[, grep("case_", colnames(meta.df), fixed=T)], 1, sum)>0))
     nonzero.case.odds <- sum(meta.df$case_alt[nonzero.studies])/sum(meta.df$case_ref[nonzero.studies])
     nonzero.control.odds <- sum(meta.df$control_alt[nonzero.studies])/sum(meta.df$control_ref[nonzero.studies])
-    if(!is.nan(nonzero.case.odds) & !is.nan(nonzero.control.odds)){
+    if(!is.nan(nonzero.case.odds) & !is.nan(nonzero.control.odds) &
+       !is.infinite(nonzero.case.odds) & !is.infinite(nonzero.control.odds)){
       if(nonzero.control.odds>0){
         ohat <- nonzero.case.odds/nonzero.control.odds
-        # Otherwise, apply standard continuity correction of 0.5 to pooled estimate if no CNVs observed in controls
+        # Otherwise, apply standard continuity correction of 0.5 to pooled estimate if no CNVs observed in controls or if either case/control odds is infinite
       }else{
         nonzero.case.odds <- (sum(meta.df$case_alt[nonzero.studies])+0.5)/(sum(meta.df$case_ref[nonzero.studies])+0.5)
         nonzero.control.odds <- (sum(meta.df$control_alt[nonzero.studies])+0.5)/(sum(meta.df$control_ref[nonzero.studies])+0.5)
@@ -473,45 +474,47 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="fe",
     if(n.cnvs > 0){
       meta.df <- make.meta.df(stats.merged.sub, cohorts, 1, empirical.continuity)
       # If strictly zero case CNVs are observed, unable to estimate effect size
-      if(all(meta.df$case_alt==0)){
-        out.v <- c(rep(NA, 4), 0)
-      }else{
-        # Meta-analysis
-        if(model=="re"){
-          meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                                       measure="OR", data=meta.df, method="REML", random = ~ 1 | cohort, slab=cohort_name,
-                                       add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
-                               error=function(e){
-                                 print(paste("row", row.idx, "failed to converge. Retrying with more iterations...", sep=" "))
-                                 rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+      if(nrow(meta.df) > 0){
+        if(all(meta.df$case_alt==0)){
+          out.v <- c(rep(NA, 4), 0)
+        }else{
+          # Meta-analysis
+          if(model=="re"){
+            meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
                                          measure="OR", data=meta.df, method="REML", random = ~ 1 | cohort, slab=cohort_name,
-                                         add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
-                               })
-          out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
-                                meta.res$zval, -log10(meta.res$pval)))
-        }else if(model=="mh"){
-          meta.res <- rma.mh(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                             measure="OR", data=meta.df, slab=cohort_name,
-                             add=0, drop00=F, correct=F)
-          out.v <- as.numeric(c(meta.res$b, meta.res$ci.lb, meta.res$ci.ub,
-                                meta.res$zval, -log10(meta.res$MHp)))
-        }else if(model=="fe"){
-          meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
-                                       measure="OR", data=meta.df, method="FE", slab=cohort_name,
-                                       add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
-                               error=function(e){
-                                 print(paste("row", row.idx, "failed to converge. Retrying with more iterations...", sep=" "))
-                                 rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                                         add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
+                                 error=function(e){
+                                   print(paste("row", row.idx, "failed to converge. Retrying with more iterations...", sep=" "))
+                                   rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                                           measure="OR", data=meta.df, method="REML", random = ~ 1 | cohort, slab=cohort_name,
+                                           add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
+                                 })
+            out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
+                                  meta.res$zval, -log10(meta.res$pval)))
+          }else if(model=="mh"){
+            meta.res <- rma.mh(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                               measure="OR", data=meta.df, slab=cohort_name,
+                               add=0, drop00=F, correct=F)
+            out.v <- as.numeric(c(meta.res$b, meta.res$ci.lb, meta.res$ci.ub,
+                                  meta.res$zval, -log10(meta.res$MHp)))
+          }else if(model=="fe"){
+            meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
                                          measure="OR", data=meta.df, method="FE", slab=cohort_name,
-                                         add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
-                               })
-          out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
-                                meta.res$zval, -log10(meta.res$pval)))
-        }
-        # Force to p-values reflecting Ha : OR > 1
-        if(!is.na(out.v[1]) & !is.na(out.v[5])){
-          if(out.v[1] < 0){
-            out.v[5] <- 0
+                                         add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
+                                 error=function(e){
+                                   print(paste("row", row.idx, "failed to converge. Retrying with more iterations...", sep=" "))
+                                   rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+                                           measure="OR", data=meta.df, method="FE", slab=cohort_name,
+                                           add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
+                                 })
+            out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
+                                  meta.res$zval, -log10(meta.res$pval)))
+          }
+          # Force to p-values reflecting Ha : OR > 1
+          if(!is.na(out.v[1]) & !is.na(out.v[5])){
+            if(out.v[1] < 0){
+              out.v[5] <- 0
+            }
           }
         }
       }

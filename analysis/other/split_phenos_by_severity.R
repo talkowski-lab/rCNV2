@@ -17,14 +17,16 @@ require(optparse, quietly=T)
 
 
 # Plot lnORs with cutoff & classification
-plot.dat <- function(dat, high.hpos, low.hpos, threshold){
+plot.dat <- function(dat, high.hpos, low.hpos, threshold,
+                     point.lab.cex=0.6, point.lab.y.buf=0.01){
   # Get plot data
   colors <- sapply(dat$hpo, get.hpo.color, color.by="severity")
   ylims <- range(c(dat$lnOR_lower, dat$lnOR_upper), na.rm=T)
   y.ax.labs <- c(0, 2^(0:10))
   y.ax.at <- log(y.ax.labs)
   x.at <- (1:nrow(dat)) - 0.5
-  half.idx <- ceiling(nrow(dat)/2)
+  high.idx <- which(dat$hpo %in% high.hpos)
+  low.idx <- which(dat$hpo %in% low.hpos)
   y.buffer <- 0.035*(ylims[2]-ylims[1])
 
   # Prep plot area
@@ -52,10 +54,12 @@ plot.dat <- function(dat, high.hpos, low.hpos, threshold){
   # Add points, 95% CIs, and labels
   segments(x0=x.at, x1=x.at, y0=dat$lnOR_lower, y1=dat$lnOR_upper, col=colors, lwd=2)
   points(x=x.at, y=dat$lnOR, pch=21, bg=colors)
-  text(x=x.at[1:half.idx], y=dat$lnOR[1:half.idx], pos=4, cex=0.75,
-       labels=dat$description[1:half.idx])
-  text(x=x.at[(half.idx+1):nrow(dat)], y=dat$lnOR[(half.idx+1):nrow(dat)],
-       pos=2, cex=0.75, labels=dat$description[(half.idx+1):nrow(dat)])
+  y.buf <- point.lab.y.buf*diff(par("usr")[3:4])
+  text(x=x.at[high.idx]-0.35, y=dat$lnOR[high.idx]+y.buf, pos=4, cex=point.lab.cex,
+       labels=dat$description[high.idx], srt=35, xpd=T)
+  text(x=x.at[low.idx]+0.35, y=dat$lnOR[low.idx]-y.buf,
+       pos=2, cex=point.lab.cex, labels=dat$description[low.idx],
+       srt=35, xpd=T)
 }
 
 

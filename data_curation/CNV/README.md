@@ -203,7 +203,7 @@ For completeness, we also performed identical analyses on a pooled dataset of al
 | Metacohort ID | Case Source(s) | Number of Cases | Control Sources(s) | Number of Controls |  
 | :--- | :--- | ---: | :--- | ---: |  
 | `meta1` | Coe | 29,104 | Coe, Cooper | 19,585 |  
-| `meta2` | BCH, GDX, IU | 79,196 | GDX, TCGA | 8,670 |  
+| `meta2` | BCH, GDX, IU | 79,196 | TCGA | 8,670 |  
 | `meta3` | Epi25k, PGC, SSC, SickKids, TSAICG | 41,065 | Epi25k, PGC, TSAICG | 32,543 |  
 | `meta4` | CHOP | 153,870 | CHOP | 24,161 |  
 | `meta5` | UKBB | 54,071 | UKBB | 375,800 |  

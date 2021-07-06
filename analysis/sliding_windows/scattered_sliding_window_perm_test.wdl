@@ -124,7 +124,7 @@ task permuted_burden_test {
       > shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz
       tabix -f shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz
 
-    done < ${metacohort_list}
+    done < <( fgrep -v "mega" ${metacohort_list} )
 
     # Iterate over CNV types
     for CNV in DEL DUP; do
