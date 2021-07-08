@@ -25,6 +25,7 @@ workflow scattered_gene_burden_perm_test {
   Int n_pheno_perms
   String meta_model_prefix
   String rCNV_bucket
+  String rCNV_docker
   String prefix
   String cache_string
   # Note: passing cache_string as a WDL variable is required to manually 
@@ -49,6 +50,7 @@ workflow scattered_gene_burden_perm_test {
         meta_model_prefix=meta_model_prefix,
         perm_idx=idx,
         rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
         prefix=prefix,
         cache_string=cache_string
     }
@@ -77,6 +79,7 @@ task permuted_burden_test {
   String meta_model_prefix
   Int perm_idx
   String rCNV_bucket
+  String rCNV_docker
   String prefix
   String cache_string
 
@@ -213,7 +216,7 @@ task permuted_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:93ec0fee2b0ad415143eda627c2b3c8d2e1ef3c8ff4d3d620767637614fee5f8"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

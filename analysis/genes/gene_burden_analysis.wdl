@@ -51,6 +51,8 @@ workflow gene_burden_analysis {
   File raw_finemap_merged_no_variation_features
   File raw_finemap_merged_features
   String rCNV_bucket
+  String rCNV_docker
+  String athena_cloud_docker
   String fisher_cache_string
   String perm_cache_string
   String meta_cache_string
@@ -77,6 +79,7 @@ workflow gene_burden_analysis {
         p_cutoff=p_cutoff,
         max_manhattan_phred_p=max_manhattan_phred_p,
         rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
         prefix=pheno[0],
         cache_string=fisher_cache_string
     }
@@ -91,6 +94,7 @@ workflow gene_burden_analysis {
       min_frac_controls_probe_exclusion=min_frac_controls_probe_exclusion,
       metacohort_list=metacohort_list,
       rCNV_bucket=rCNV_bucket,
+      athena_cloud_docker=athena_cloud_docker,
       freq_code=freq_code
   }
 
@@ -114,6 +118,7 @@ workflow gene_burden_analysis {
         n_pheno_perms=n_pheno_perms,
         meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
         prefix=pheno[0],
         cache_string=perm_cache_string
     }
@@ -131,6 +136,7 @@ workflow gene_burden_analysis {
         n_pheno_perms=n_pheno_perms,
         fdr_target=p_cutoff,
         rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
         dummy_completion_markers=rCNV_perm_test.completion_marker,
         fdr_table_suffix="empirical_genome_wide_pval",
         p_val_column_name="meta_phred_p"
@@ -152,6 +158,7 @@ workflow gene_burden_analysis {
         max_manhattan_phred_p=max_manhattan_phred_p,
         meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
         prefix=pheno[0],
         cache_string=meta_cache_string
     }
@@ -180,7 +187,8 @@ workflow gene_burden_analysis {
         FDR_cutoff=FDR_cutoff,
         use_FDR="FALSE",
         output_suffix="strict_gw_sig",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     call finemap_genes as finemap_genomic_fdr {
       input:
@@ -202,7 +210,8 @@ workflow gene_burden_analysis {
         FDR_cutoff=FDR_cutoff,
         use_FDR="TRUE",
         output_suffix="fdr",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     
     # Expression features
@@ -226,7 +235,8 @@ workflow gene_burden_analysis {
         FDR_cutoff=FDR_cutoff,
         use_FDR="FALSE",
         output_suffix="strict_gw_sig",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     call finemap_genes as finemap_expression_fdr {
       input:
@@ -248,7 +258,8 @@ workflow gene_burden_analysis {
         FDR_cutoff=FDR_cutoff,
         use_FDR="TRUE",
         output_suffix="fdr",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     
     # Chromatin features
@@ -272,7 +283,8 @@ workflow gene_burden_analysis {
         FDR_cutoff=FDR_cutoff,
         use_FDR="FALSE",
         output_suffix="strict_gw_sig",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     call finemap_genes as finemap_chromatin_fdr {
       input:
@@ -294,7 +306,8 @@ workflow gene_burden_analysis {
         FDR_cutoff=FDR_cutoff,
         use_FDR="TRUE",
         output_suffix="fdr",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
 
     # Constraint features
@@ -318,7 +331,8 @@ workflow gene_burden_analysis {
         FDR_cutoff=FDR_cutoff,
         use_FDR="FALSE",
         output_suffix="strict_gw_sig",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     call finemap_genes as finemap_constraint_fdr {
       input:
@@ -340,7 +354,8 @@ workflow gene_burden_analysis {
         FDR_cutoff=FDR_cutoff,
         use_FDR="TRUE",
         output_suffix="fdr",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
 
     # Variation features
@@ -364,7 +379,8 @@ workflow gene_burden_analysis {
         FDR_cutoff=FDR_cutoff,
         use_FDR="FALSE",
         output_suffix="strict_gw_sig",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     call finemap_genes as finemap_variation_fdr {
       input:
@@ -386,7 +402,8 @@ workflow gene_burden_analysis {
         FDR_cutoff=FDR_cutoff,
         use_FDR="TRUE",
         output_suffix="fdr",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     
     # Merged features
@@ -410,7 +427,8 @@ workflow gene_burden_analysis {
         FDR_cutoff=FDR_cutoff,
         use_FDR="FALSE",
         output_suffix="strict_gw_sig",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     call finemap_genes as finemap_merged_fdr {
       input:
@@ -432,7 +450,8 @@ workflow gene_burden_analysis {
         FDR_cutoff=FDR_cutoff,
         use_FDR="TRUE",
         output_suffix="fdr",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     
     # Merged features (no variation)
@@ -456,7 +475,8 @@ workflow gene_burden_analysis {
         FDR_cutoff=FDR_cutoff,
         use_FDR="FALSE",
         output_suffix="strict_gw_sig",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     call finemap_genes as finemap_merged_no_variation_fdr {
       input:
@@ -478,7 +498,8 @@ workflow gene_burden_analysis {
         FDR_cutoff=FDR_cutoff,
         use_FDR="TRUE",
         output_suffix="fdr",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
   }
 
@@ -490,7 +511,8 @@ workflow gene_burden_analysis {
       credset_beds=finemap_merged_no_variation_gw.cred_sets_bed,
       freq_code="rCNV",
       output_suffix="strict_gw_sig",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
   call merge_finemap_res as merge_finemap_res_fdr {
     input:
@@ -499,7 +521,8 @@ workflow gene_burden_analysis {
       credset_beds=finemap_merged_no_variation_fdr.cred_sets_bed,
       freq_code="rCNV",
       output_suffix="fdr",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
 
   # Once complete, plot finemap results
@@ -518,7 +541,8 @@ workflow gene_burden_analysis {
         raw_features_merged=raw_finemap_merged_features,
         phenotype_list=phenotype_list,
         output_suffix="strict_gw_sig",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     call plot_finemap_res as plot_finemap_res_fdr {
       input:
@@ -534,7 +558,8 @@ workflow gene_burden_analysis {
         raw_features_merged=raw_finemap_merged_features,
         phenotype_list=phenotype_list,
         output_suffix="fdr",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
   }
 
@@ -564,6 +589,7 @@ task burden_test {
   Float p_cutoff
   Int max_manhattan_phred_p
   String rCNV_bucket
+  String rCNV_docker
   String prefix
   String cache_string
 
@@ -691,7 +717,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:93ec0fee2b0ad415143eda627c2b3c8d2e1ef3c8ff4d3d620767637614fee5f8"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -715,6 +741,7 @@ task build_exclusion_list {
   Float min_frac_controls_probe_exclusion
   File metacohort_list
   String rCNV_bucket
+  String athena_cloud_docker
   String freq_code
 
   command <<<
@@ -747,7 +774,7 @@ task build_exclusion_list {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
+    docker: "${athena_cloud_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -770,6 +797,7 @@ task calc_meta_p_cutoff {
   Int n_pheno_perms
   Float fdr_target
   String rCNV_bucket
+  String rCNV_docker
   Array[File] dummy_completion_markers #Must delocalize something or Cromwell will bypass permutation test
   String fdr_table_suffix
   String p_val_column_name
@@ -825,11 +853,11 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "32 GB"
-    disks: "local-disk 275 HDD"
-    bootDiskSizeGb: "40"
+    disks: "local-disk 100 HDD"
+    bootDiskSizeGb: "20"
   }
 
   output {
@@ -853,6 +881,7 @@ task meta_analysis {
   Int max_manhattan_phred_p
   String meta_model_prefix
   String rCNV_bucket
+  String rCNV_docker
   String prefix
   String cache_string
 
@@ -975,7 +1004,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2942c7386b43479d02b29506ad1f28fdcff17bdf8b279f2e233be0c4d2cd50fa"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -1004,6 +1033,7 @@ task finemap_genes {
   File gene_features
   String output_suffix
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -1130,7 +1160,7 @@ task finemap_genes {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:5289b227ad6a283da7ffff23e305bb19db8454164cbca9c9a7c5c8aa78e0463e"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -1147,6 +1177,7 @@ task merge_finemap_res {
   String freq_code
   String output_suffix
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e 
@@ -1193,7 +1224,7 @@ task merge_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:91ee6094cfae27626def40ff4557f30701cb4df99e2221991cc87a5361aaf796"
+    docker: "${rCNV_docker}"
     preemptible: 1
     bootDiskSizeGb: "20"
   }
@@ -1215,6 +1246,7 @@ task plot_finemap_res {
   File raw_features_merged
   String output_suffix
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -1394,7 +1426,7 @@ task plot_finemap_res {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:91ee6094cfae27626def40ff4557f30701cb4df99e2221991cc87a5361aaf796"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

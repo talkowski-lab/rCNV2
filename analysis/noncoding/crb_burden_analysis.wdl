@@ -31,6 +31,8 @@ workflow crb_burden_analysis {
   Float meta_secondary_p_cutoff
   Int meta_nominal_cohorts_cutoff
   String rCNV_bucket
+  String rCNV_docker
+  String athena_cloud_docker
   String fisher_cache_string
   String perm_cache_string
   String meta_cache_string
@@ -48,6 +50,7 @@ workflow crb_burden_analysis {
       min_frac_controls_probe_exclusion=min_frac_controls_probe_exclusion,
       metacohort_list=metacohort_list,
       rCNV_bucket=rCNV_bucket,
+      athena_cloud_docker=athena_cloud_docker,
       freq_code=freq_code
   }
 
@@ -69,6 +72,7 @@ workflow crb_burden_analysis {
         p_cutoff=p_cutoff,
         max_manhattan_phred_p=max_manhattan_phred_p,
         rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
         prefix=pheno[0],
         cache_string=fisher_cache_string
     }
@@ -84,6 +88,7 @@ workflow crb_burden_analysis {
         min_element_ovr=min_element_ovr,
         min_frac_all_elements=min_frac_all_elements,
         rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
         prefix=pheno[0],
         cache_string=fisher_cache_string
     }
@@ -106,6 +111,7 @@ workflow crb_burden_analysis {
         n_pheno_perms=n_pheno_perms,
         meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
         prefix=pheno[0],
         cache_string=perm_cache_string
     }
@@ -125,6 +131,7 @@ workflow crb_burden_analysis {
         n_pheno_perms=n_pheno_perms,
         fdr_target=p_cutoff,
         rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
         dummy_completion_markers=rCNV_perm_test.completion_marker,
         fdr_table_suffix="empirical_genome_wide_pval",
         p_val_column_name="meta_phred_p"
@@ -147,6 +154,7 @@ workflow crb_burden_analysis {
         max_manhattan_phred_p=max_manhattan_phred_p,
         meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
         prefix=pheno[0],
         cache_string=meta_cache_string
     }
@@ -162,6 +170,7 @@ workflow crb_burden_analysis {
         noncoding_filter=noncoding_filter,
         meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
         prefix=pheno[0],
         cache_string=meta_cache_string
     }
@@ -179,6 +188,7 @@ task build_exclusion_list {
   Float min_frac_controls_probe_exclusion
   File metacohort_list
   String rCNV_bucket
+  String athena_cloud_docker
   String freq_code
 
   command <<<
@@ -211,7 +221,7 @@ task build_exclusion_list {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
+    docker: "${athena_cloud_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -240,6 +250,7 @@ task burden_test {
   Float p_cutoff
   Int max_manhattan_phred_p
   String rCNV_bucket
+  String rCNV_docker
   String prefix
   String cache_string
 
@@ -342,7 +353,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:a486e234f2ddc9c58e7402a5e5c1600f4b02a9c57ab054402e1035dca1774050"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -368,6 +379,7 @@ task coding_burden_test {
   Float min_element_ovr
   Float min_frac_all_elements
   String rCNV_bucket
+  String rCNV_docker
   String prefix
   String cache_string
 
@@ -426,10 +438,9 @@ task coding_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:a486e234f2ddc9c58e7402a5e5c1600f4b02a9c57ab054402e1035dca1774050"
+    docker: "${rCNV_docker}"
     preemptible: 1
-    memory: "16 GB"
-    disks: "local-disk 200 HDD"
+    memory: "4 GB"
     bootDiskSizeGb: "20"
   }
 
@@ -450,6 +461,7 @@ task calc_meta_p_cutoff {
   Int n_pheno_perms
   Float fdr_target
   String rCNV_bucket
+  String rCNV_docker
   Array[File] dummy_completion_markers #Must delocalize something or Cromwell will bypass permutation test
   String fdr_table_suffix
   String p_val_column_name
@@ -505,11 +517,11 @@ task calc_meta_p_cutoff {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:a486e234f2ddc9c58e7402a5e5c1600f4b02a9c57ab054402e1035dca1774050"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "32 GB"
-    disks: "local-disk 275 HDD"
-    bootDiskSizeGb: "40"
+    disks: "local-disk 100 HDD"
+    bootDiskSizeGb: "20"
   }
 
   output {
@@ -534,6 +546,7 @@ task meta_analysis {
   Int max_manhattan_phred_p
   String meta_model_prefix
   String rCNV_bucket
+  String rCNV_docker
   String prefix
   String cache_string
 
@@ -643,7 +656,7 @@ task meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:a486e234f2ddc9c58e7402a5e5c1600f4b02a9c57ab054402e1035dca1774050"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -664,6 +677,7 @@ task coding_meta_analysis {
   String noncoding_filter
   String meta_model_prefix
   String rCNV_bucket
+  String rCNV_docker
   String prefix
   String cache_string
 
@@ -712,7 +726,7 @@ task coding_meta_analysis {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:a486e234f2ddc9c58e7402a5e5c1600f4b02a9c57ab054402e1035dca1774050"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

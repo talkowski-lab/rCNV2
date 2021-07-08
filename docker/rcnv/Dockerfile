@@ -10,8 +10,9 @@ MAINTAINER "Ryan Collins <rlcollins@g.harvard.edu>"
 # Checkout most recent branch of rCNV2 repo and pull updates
 ARG rCNV2_commit_hash="master"
 RUN cd /opt/rCNV2 && \
-	git checkout "$rCNV2_commit_hash" && \
+	git checkout master && \
 	git pull && \
+	git checkout "$rCNV2_commit_hash" && \
 	cd -
 
 # Reinstall rCNV R library

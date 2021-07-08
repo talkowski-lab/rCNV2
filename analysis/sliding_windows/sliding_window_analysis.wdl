@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens in sliding windows, genome-wide
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/20/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/21/plain-WDL/descriptor" as scattered_perm
 
 
 workflow sliding_window_analysis {
@@ -551,8 +551,8 @@ task calc_meta_p_cutoff {
     docker: "${rCNV_docker}"
     preemptible: 1
     memory: "32 GB"
-    disks: "local-disk 275 HDD"
-    bootDiskSizeGb: "40"
+    disks: "local-disk 100 HDD"
+    bootDiskSizeGb: "20"
   }
 
   output {
