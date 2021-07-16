@@ -111,5 +111,4 @@ done
 # Copy optimization data to Google bucket
 gsutil -m cp -r \
   cds_optimization_data \
-  rCNV2.hpos_by_severity.*tsv \
   gs://rcnv_project/analysis/gene_burden/

@@ -322,7 +322,7 @@ gsutil -m cp \
 
 
 # Generate gene list of all genes associated with each HPO term
-wget http://compbio.charite.de/jenkins/job/hpo.annotations/lastSuccessfulBuild/artifact/util/annotation/phenotype_to_genes.txt
+wget http://purl.obolibrary.org/obo/hp/hpoa/phenotype_to_genes.txt
 while read pheno hpo; do
   awk -v hpo=${hpo} -v FS="\t" '{ if ($1==hpo) print $4 }' \
     phenotype_to_genes.txt \
@@ -544,7 +544,7 @@ while read pheno hpo; do
     echo "$descrip (${hpo})-associated genes"
     cat $pheno.HPOdb.genes.list | wc -l | addcom
     echo "\`$pheno.HPOdb\`"
-    echo "HPO database (accessed $( date | awk '{ print $2, $NF }' )) [Köhler _et al._, _Nucleic Acids Res._, 2018](https://academic.oup.com/nar/article/47/D1/D1018/5198478)"
+    echo "HPO database (accessed $( date | awk '{ print $3, $4 }' )) [Köhler _et al._, _Nucleic Acids Res._, 2018](https://academic.oup.com/nar/article/47/D1/D1018/5198478)"
     echo "Genes linked to $hpo"
   done | paste -s \
   | sed 's/\t/\ \|\ /g' \
