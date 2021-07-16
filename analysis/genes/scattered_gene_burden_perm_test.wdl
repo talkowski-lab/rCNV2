@@ -17,7 +17,6 @@ workflow scattered_gene_burden_perm_test {
   String freq_code
   File gtf
   Int pad_controls
-  String weight_mode
   Float min_cds_ovr_del
   Float min_cds_ovr_dup
   Int max_genes_per_cnv
@@ -42,7 +41,6 @@ workflow scattered_gene_burden_perm_test {
         freq_code=freq_code,
         gtf=gtf,
         pad_controls=pad_controls,
-        weight_mode=weight_mode,
         min_cds_ovr_del=min_cds_ovr_del,
         min_cds_ovr_dup=min_cds_ovr_dup,
         max_genes_per_cnv=max_genes_per_cnv,
@@ -71,7 +69,6 @@ task permuted_burden_test {
   String freq_code
   File gtf
   Int pad_controls
-  String weight_mode
   Float min_cds_ovr_del
   Float min_cds_ovr_dup
   Int max_genes_per_cnv
@@ -162,7 +159,6 @@ task permuted_burden_test {
         # Count CNVs
         /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
           --pad-controls ${pad_controls} \
-          --weight-mode ${weight_mode} \
           --min-cds-ovr $min_cds_ovr \
           --max-genes ${max_genes_per_cnv} \
           -t $CNV \

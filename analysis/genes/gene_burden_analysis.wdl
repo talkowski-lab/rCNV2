@@ -22,7 +22,6 @@ workflow gene_burden_analysis {
   Int min_probes_per_gene
   Float min_frac_controls_probe_exclusion
   String meta_model_prefix
-  String weight_mode
   Float min_cds_ovr_del
   Float min_cds_ovr_dup
   Int max_genes_per_cnv
@@ -72,7 +71,6 @@ workflow gene_burden_analysis {
         freq_code="rCNV",
         gtf=gtf,
         pad_controls=pad_controls,
-        weight_mode=weight_mode,
         min_cds_ovr_del=min_cds_ovr_del,
         min_cds_ovr_dup=min_cds_ovr_dup,
         max_genes_per_cnv=max_genes_per_cnv,
@@ -110,7 +108,6 @@ workflow gene_burden_analysis {
         freq_code="rCNV",
         gtf=gtf,
         pad_controls=pad_controls,
-        weight_mode=weight_mode,
         min_cds_ovr_del=min_cds_ovr_del,
         min_cds_ovr_dup=min_cds_ovr_dup,
         max_genes_per_cnv=max_genes_per_cnv,
@@ -582,7 +579,6 @@ task burden_test {
   String freq_code
   File gtf
   Int pad_controls
-  String weight_mode
   Float min_cds_ovr_del
   Float min_cds_ovr_dup
   Int max_genes_per_cnv
@@ -646,7 +642,6 @@ task burden_test {
         # Count CNVs
         /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
           --pad-controls ${pad_controls} \
-          --weight-mode ${weight_mode} \
           --min-cds-ovr $min_cds_ovr \
           --max-genes ${max_genes_per_cnv} \
           -t $CNV \

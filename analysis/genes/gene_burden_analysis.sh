@@ -40,7 +40,6 @@ metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 gtf="genes/gencode.v19.canonical.gtf.gz"
 rCNV_bucket="gs://rcnv_project"
 pad_controls=0
-weight_mode="weak"
 min_cds_ovr_del=0.2
 min_cds_ovr_dup=0.8
 max_genes_per_cnv=20000
@@ -96,7 +95,6 @@ while read pheno hpo; do
       # Count CNVs
       /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
         --pad-controls ${pad_controls} \
-        --weight-mode ${weight_mode} \
         --min-cds-ovr $min_cds_ovr \
         --max-genes ${max_genes_per_cnv} \
         -t $CNV \
@@ -273,7 +271,6 @@ while read prefix hpo; do
         # Count CNVs
         /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
           --pad-controls ${pad_controls} \
-          --weight-mode ${weight_mode} \
           --min-cds-ovr $min_cds_ovr \
           --max-genes ${max_genes_per_cnv} \
           -t $CNV \
