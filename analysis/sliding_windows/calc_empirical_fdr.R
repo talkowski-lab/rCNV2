@@ -189,7 +189,10 @@ plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target,
   abline(h=phred.target, lty=2)
 
   # Add trendline
-  if(model=="exponential"){
+  if(linear.fit==T){
+    abline(h=calc.wmean(cutoff.stat.df$fdr.cutoff, sqrt(cutoff.stat.df$n.cases)),
+           lwd=3, col="red")
+  }else if(model=="exponential"){
     fit <- get.adjusted.cutoffs(cutoff.mat, tolower(stat), exclude.outliers=T)$fit
     fit.df <- data.frame("x"=round(quantile(0:par("usr")[2], probs=seq(0, 1, 0.005))))
     fit.df$y <- predict(fit, newdata=fit.df)
@@ -198,9 +201,6 @@ plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target,
     }
     if(plot.exp==T){
       lines(fit.df$x, fit.df$y, col="red", lwd=3)
-    }else if(linear.fit==T){
-      abline(h=calc.wmean(cutoff.stat.df$fdr.cutoff, sqrt(cutoff.stat.df$n.cases)),
-             lwd=3, col="red")
     }
   }
 
@@ -279,13 +279,13 @@ flat.ladder <- opts$`flat-ladder`
 plot.out <- opts$`plot`
 
 # # DEV PARAMETERS
-# pvals.in <- "~/scratch/rCNV.DEL.permuted_pval_matrix.txt.gz"
+# pvals.in <- "~/scratch/rCNV.DUP.permuted_pval_matrix.txt.gz"
 # hpos.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
 # out.prefix <- "~/scratch/meta_cutoffs.test"
-# cnvtype <- "DEL"
+# cnvtype <- "DUP"
 # max.cutoff <- 20
 # cutoff.step <- 0.05
-# fdr.target <- 0.00000385862
+# fdr.target <- 3.097318E-6
 # linear.fit <- T
 # flat.ladder <- T
 # plot.out <- "~/scratch/meta_cutoffs.test.png"

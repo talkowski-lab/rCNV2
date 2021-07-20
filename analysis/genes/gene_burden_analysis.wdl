@@ -86,7 +86,7 @@ workflow gene_burden_analysis {
   # Determine conditional cohort exclusion list based on probe density
   call build_exclusion_list {
     input:
-      genes_bed=rCNV_burden_test.stats_beds[0],
+      genes_bed=flatten(rCNV_burden_test.stats_beds)[0],
       gtf_prefix=basename(gtf, '.gtf.gz'),
       min_probes_per_gene=min_probes_per_gene,
       min_frac_controls_probe_exclusion=min_frac_controls_probe_exclusion,
@@ -740,19 +740,24 @@ task build_exclusion_list {
   command <<<
     set -euo pipefail
 
-    # Download control probesets
+    # Download probesets (note: requires permissions)
     gsutil -m cp -r \
       ${rCNV_bucket}/cleaned_data/control_probesets \
       ./
 
-    # Make inputs for conditional exclusion script
+    # Subset gene coordinates to minimal BED4
     zcat ${genes_bed} | cut -f1-4 | bgzip -c > gene_coords.bed.gz
+
+    # Make input for conditional exclusion script
     for file in control_probesets/*bed.gz; do
       echo -e "$file\t$( basename $file | sed 's/\.bed\.gz//g' )"
     done > probeset_tracks.tsv
 
+    # Clone rCNV2 repo (not present in athena-cloud Docker)
+    git clone https://github.com/talkowski-lab/rCNV2.git
+
     # Build conditional exclusion list
-    /opt/rCNV2/data_curation/other/probe_based_exclusion.py \
+    rCNV2/data_curation/other/probe_based_exclusion.py \
       --outfile ${gtf_prefix}.cohort_exclusion.bed.gz \
       --probecounts-outfile ${gtf_prefix}.probe_counts.bed.gz \
       --frac-pass-outfile ${gtf_prefix}.frac_passing.bed.gz \
