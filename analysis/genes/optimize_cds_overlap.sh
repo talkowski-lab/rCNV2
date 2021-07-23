@@ -108,6 +108,15 @@ for CNV in DEL DUP; do
 done
 
 
+# Optimize CDS cutoffs
+for CNV in DEL DUP; do
+  echo $CNV
+  /opt/rCNV2/analysis/other/optimize_min_cds.R \
+    cds_optimization_data/${CNV}.cds_optimization.meta_analysis.stats.tsv \
+    cds_optimization_data/${CNV}
+done
+
+
 # Copy optimization data to Google bucket
 gsutil -m cp -r \
   cds_optimization_data \
