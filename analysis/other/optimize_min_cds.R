@@ -18,13 +18,19 @@ require(optparse, quietly=T)
 
 
 # Compute CDS optimization data and determine optimal cutoff
-optimize.cds <- function(stats){
+optimize.cds <- function(stats, method="both"){
   # Scale primary P-value and odds ratios as a fraction of maximum possible
   stats$frac_p <- stats$meta_phred_p / max(stats$meta_phred_p, na.rm=T)
   stats$frac_or <- stats$meta_lnOR / max(stats$meta_lnOR, na.rm=T)
 
-  # Compute Euclidean distance of scaled P & OR from best possible value (1, 1)
-  stats$pareto_dist <- sqrt(((stats$frac_p-1)^2) + ((stats$frac_or-1)^2))
+  # Optimize based on value of "method"
+  if(method == "power"){
+    stats$pareto_dist <- sqrt(((stats$frac_p-1)^2))
+  }else if(method == "both"){
+    # Compute Euclidean distance of scaled P & OR from best possible value (1, 1)
+    stats$pareto_dist <- sqrt(((stats$frac_p-1)^2) + ((stats$frac_or-1)^2))
+  }
+
 
   # Prepare optimization data frame
   opt.df <- data.frame("min.cds" = stats$min_cds,
@@ -37,15 +43,15 @@ optimize.cds <- function(stats){
   cat(paste("\nOptimal cutoff: CDS >= ", 100 * opt.df$min.cds[best.idx], "%\n", sep=""))
 
   # Return data for plotting
-  return(opt.df)
+  return(list("data" = opt.df, "best.idx" = best.idx))
 }
 
 
 # Plot optimization data
-plot.opt <- function(opt.df){
+plot.opt <- function(opt.df, best.idx){
   # Get plot parameters
   min.val <- min(c(opt.df$power.frac, opt.df$or.frac), na.rm=T)
-  best.cds <- opt.df$min.cds[which(opt.df$pareto.dist == min(opt.df$pareto.dist, na.rm=T))]
+  best.cds <- opt.df$min.cds[best.idx]
 
   # Prep plot area
   par(bty="n", mar=c(2.5, 3, 1, 0.2))
@@ -76,7 +82,10 @@ plot.opt <- function(opt.df){
 
 
 # List of command-line options
-option_list <- list()
+option_list <- list(
+  make_option(c("--optimize-power"), action="store_true", default=FALSE,
+              help="Optimize strictly to maximize power [default %default]")
+)
 
 # Get command-line arguments & options
 args <- parse_args(OptionParser(usage="%prog meta.stats out.prefix",
@@ -87,20 +96,25 @@ opts <- args$options
 # Writes args & opts to vars
 meta.in <- args$args[1]
 out.prefix <- args$args[2]
+if(opts$`optimize-power`){
+  opt.method <- "power"
+}else{
+  opt.method <- "both"
+}
 
 # Load meta stats
 stats <- load.meta.stats(meta.in, keep.n.cols=1)
 
 # Compute optimization data
-opt.df <- optimize.cds(stats)
+opt.res <- optimize.cds(stats, opt.method)
 
 # Plot optimization data
 pdf(paste(out.prefix, "cds_optimization_results.pdf", sep="."),
     height=3, width=4)
-plot.opt(opt.df)
+plot.opt(opt.res$data, opt.res$best.idx)
 dev.off()
 
 # Write optimization data to .tsv
-colnames(opt.df)[1] <- paste("#", colnames(opt.df)[1], sep="")
-write.table(opt.df, paste(out.prefix, "cds_optimization_results.tsv", sep="."),
+colnames(opt.res$data)[1] <- paste("#", colnames(opt.res$data)[1], sep="")
+write.table(opt.res$data, paste(out.prefix, "cds_optimization_results.tsv", sep="."),
             col.names=T, row.names=F, sep="\t", quote=F)

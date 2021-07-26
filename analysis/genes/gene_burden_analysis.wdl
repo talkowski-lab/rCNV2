@@ -818,7 +818,8 @@ task finemap_genes {
   Float FDR_cutoff
   Float finemap_elnet_alpha
   Float finemap_elnet_l1_l2_mix
-  Int finemap_distance
+  Int finemap_cluster_distance
+  Int finemap_nonsig_distance
   Float finemap_conf_pip
   Float finemap_vconf_pip
   String finemap_output_label
@@ -833,7 +834,7 @@ task finemap_genes {
     find / -name "*gene_burden.${freq_code}.*.bonferroni_pval.hpo_cutoffs.tsv*" \
     | xargs -I {} mv {} ./
 
-    # Copy association stats & gene lists from the project Google Bucket (note: requires permissions)
+    # Copy association stats & other reference data from the project Google Bucket (note: requires permissions)
     mkdir stats
     gsutil -m cp \
       ${rCNV_bucket}/analysis/gene_burden/**.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz \
@@ -842,13 +843,19 @@ task finemap_genes {
       ${rCNV_bucket}/cleaned_data/genes/gene_lists \
       ./
     gsutil -m cp \
-      ${rCNV_bucket}/analysis/gene_scoring/gene_lists/* \
+      gs://rcnv_project/analysis/gene_scoring/gene_lists/* \
       ./gene_lists/
-
-    # Copy developmental & adult-onset phenotype gene_lists
+    gsutil -m cp \
+      ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
+      ./
     gsutil -m cp \
       ${rCNV_bucket}/analysis/analysis_refs/rCNV2.hpos_by_severity.*list \
       ./
+
+    # Make list of genes from predicted NAHR-mediated CNV regions for training exclusion
+    zcat clustered_nahr_regions.bed.gz | fgrep -v "#" \
+    | awk -v FS="\t" '{ if ($5>0) print $NF }' \
+    | sed 's/;/\n/g' | sort | uniq > nahr.genes.list
 
     # Write tsv inputs for developmental & adult-onset subgroups (to be finemapped separately)
     for subgroup in developmental adult; do
@@ -885,18 +892,20 @@ task finemap_genes {
         --fdr-q-cutoff ${FDR_cutoff} \
         --regularization-alpha ${finemap_elnet_alpha} \
         --regularization-l1-l2-mix ${finemap_elnet_l1_l2_mix} \
-        --distance ${finemap_distance} \
+        --distance ${finemap_cluster_distance} \
+        --nonsig-distance ${finemap_nonsig_distance} \
+        --training-exclusion nahr.genes.list \
         --confident-pip ${finemap_conf_pip} \
         --very-confident-pip ${finemap_vconf_pip} \
         --known-causal-gene-lists known_causal_gene_lists.$subgroup.tsv \
-        --outfile ${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.$subgroup.tsv \
-        --sig-genes-bed ${freq_code}.${CNV}.final_genes.${output_suffix}.genes.$subgroup.bed \
-        --sig-assoc-bed ${freq_code}.${CNV}.final_genes.${output_suffix}.associations.$subgroup.bed \
-        --sig-credsets-bed ${freq_code}.${CNV}.final_genes.${output_suffix}.credible_sets.$subgroup.bed \
-        --all-genes-outfile ${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.all_genes_from_blocks.$subgroup.tsv \
-        --naive-outfile ${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.naive_priors.$subgroup.tsv \
-        --genetic-outfile ${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.genetics_only.$subgroup.tsv \
-        --coeffs-out ${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.logit_coeffs.$subgroup.tsv \
+        --outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.$subgroup.tsv \
+        --sig-genes-bed ${freq_code}.${CNV}.final_genes.genes.${finemap_output_label}.$subgroup.bed \
+        --sig-assoc-bed ${freq_code}.${CNV}.final_genes.associations.${finemap_output_label}.$subgroup.bed \
+        --sig-credsets-bed ${freq_code}.${CNV}.final_genes.credible_sets.${finemap_output_label}.$subgroup.bed \
+        --all-genes-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.${finemap_output_label}.$subgroup.tsv \
+        --naive-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.$subgroup.tsv \
+        --genetic-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.$subgroup.tsv \
+        --coeffs-out ${freq_code}.${CNV}.gene_fine_mapping.logit_coeffs.${finemap_output_label}.$subgroup.tsv \
         ${freq_code}.${CNV}.gene_fine_mapping.stats_input.$subgroup.tsv \
         ${gene_features} \
         ${metacohort_sample_table}
@@ -904,44 +913,44 @@ task finemap_genes {
 
     # Merge & sort outputs for developmental & adult-onset subgroups
     mkdir finemapping_merged_outputs/
-    cat <( fgrep -v "#" ${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.developmental.tsv ) \
-        <( fgrep -v "#" ${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.adult.tsv ) \
+    cat <( fgrep -v "#" ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.developmental.tsv ) \
+        <( fgrep -v "#" ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.adult.tsv ) \
     | sort -nrk4,4 \
-    | cat <( grep -e '^#' ${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.developmental.tsv ) - \
-    > finemapping_merged_outputs/${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.tsv
-    cat <( fgrep -v "#" ${freq_code}.${CNV}.final_genes.${output_suffix}.associations.developmental.bed ) \
-        <( fgrep -v "#" ${freq_code}.${CNV}.final_genes.${output_suffix}.associations.adult.bed ) \
+    | cat <( grep -e '^#' ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.developmental.tsv ) - \
+    > finemapping_merged_outputs/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv
+    cat <( fgrep -v "#" ${freq_code}.${CNV}.final_genes.associations.${finemap_output_label}.developmental.bed ) \
+        <( fgrep -v "#" ${freq_code}.${CNV}.final_genes.associations.${finemap_output_label}.adult.bed ) \
     | sort -Vk1,1 -k2,2n -k3,3n -k4,4V -k5,5V -k6,6V \
-    | cat <( grep -e '^#' ${freq_code}.${CNV}.final_genes.${output_suffix}.associations.developmental.bed ) - \
-    > finemapping_merged_outputs/${freq_code}.${CNV}.final_genes.${output_suffix}.associations.bed
-    cat <( fgrep -v "#" ${freq_code}.${CNV}.final_genes.${output_suffix}.credible_sets.developmental.bed ) \
-        <( fgrep -v "#" ${freq_code}.${CNV}.final_genes.${output_suffix}.credible_sets.adult.bed ) \
+    | cat <( grep -e '^#' ${freq_code}.${CNV}.final_genes.associations.${finemap_output_label}.developmental.bed ) - \
+    > finemapping_merged_outputs/${freq_code}.${CNV}.final_genes.associations.${finemap_output_label}.bed
+    cat <( fgrep -v "#" ${freq_code}.${CNV}.final_genes.credible_sets.${finemap_output_label}.developmental.bed ) \
+        <( fgrep -v "#" ${freq_code}.${CNV}.final_genes.credible_sets.${finemap_output_label}.adult.bed ) \
     | sort -Vk1,1 -k2,2n -k3,3n -k4,4V -k5,5V -k6,6V \
-    | cat <( grep -e '^#' ${freq_code}.${CNV}.final_genes.${output_suffix}.credible_sets.developmental.bed ) - \
-    > finemapping_merged_outputs/${freq_code}.${CNV}.final_genes.${output_suffix}.credible_sets.bed
-    cat <( fgrep -v "#" ${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.all_genes_from_blocks.developmental.tsv ) \
-        <( fgrep -v "#" ${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.all_genes_from_blocks.adult.tsv ) \
+    | cat <( grep -e '^#' ${freq_code}.${CNV}.final_genes.credible_sets.${finemap_output_label}.developmental.bed ) - \
+    > finemapping_merged_outputs/${freq_code}.${CNV}.final_genes.credible_sets.${finemap_output_label}.bed
+    cat <( fgrep -v "#" ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.${finemap_output_label}.developmental.tsv ) \
+        <( fgrep -v "#" ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.${finemap_output_label}.adult.tsv ) \
     | sort -nrk4,4 \
-    | cat <( grep -e '^#' ${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.all_genes_from_blocks.developmental.tsv ) - \
-    > finemapping_merged_outputs/${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.all_genes_from_blocks.tsv
-    cat <( fgrep -v "#" ${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.naive_priors.developmental.tsv ) \
-        <( fgrep -v "#" ${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.naive_priors.adult.tsv ) \
+    | cat <( grep -e '^#' ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.${finemap_output_label}.developmental.tsv ) - \
+    > finemapping_merged_outputs/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.${finemap_output_label}.tsv
+    cat <( fgrep -v "#" ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.developmental.tsv ) \
+        <( fgrep -v "#" ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.adult.tsv ) \
     | sort -nrk4,4 \
-    | cat <( grep -e '^#' ${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.naive_priors.developmental.tsv ) - \
-    > finemapping_merged_outputs/${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.naive_priors.tsv
-    cat <( fgrep -v "#" ${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.genetics_only.developmental.tsv ) \
-        <( fgrep -v "#" ${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.genetics_only.adult.tsv ) \
+    | cat <( grep -e '^#' ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.developmental.tsv ) - \
+    > finemapping_merged_outputs/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.tsv
+    cat <( fgrep -v "#" ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.developmental.tsv ) \
+        <( fgrep -v "#" ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.adult.tsv ) \
     | sort -nrk4,4 \
-    | cat <( grep -e '^#' ${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.genetics_only.developmental.tsv ) - \
-    > finemapping_merged_outputs/${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.genetics_only.tsv
-    cat <( fgrep -v "#" ${freq_code}.${CNV}.final_genes.${output_suffix}.genes.developmental.bed \
+    | cat <( grep -e '^#' ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.developmental.tsv ) - \
+    > finemapping_merged_outputs/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.tsv
+    cat <( fgrep -v "#" ${freq_code}.${CNV}.final_genes.genes.${finemap_output_label}.developmental.bed \
            | awk -v OFS="\t" '{ print $0, "developmental" }' ) \
-        <( fgrep -v "#" ${freq_code}.${CNV}.final_genes.${output_suffix}.genes.adult.bed \
+        <( fgrep -v "#" ${freq_code}.${CNV}.final_genes.genes.${finemap_output_label}.adult.bed \
            | awk -v OFS="\t" '{ print $0, "adult" }' ) \
     | sort -Vk1,1 -k2,2n -k3,3n -k4,4V -k5,5V -k6,6V \
-    | cat <( grep -e "^#" ${freq_code}.${CNV}.final_genes.${output_suffix}.genes.developmental.bed \
+    | cat <( grep -e "^#" ${freq_code}.${CNV}.final_genes.genes.${finemap_output_label}.developmental.bed \
            | awk -v OFS="\t" '{ print $0, "finemapping_model" }' ) \
-    > finemapping_merged_outputs/${freq_code}.${CNV}.final_genes.${output_suffix}.genes.bed
+    > finemapping_merged_outputs/${freq_code}.${CNV}.final_genes.genes.${finemap_output_label}.bed
 
     # Copy results to output bucket
     gsutil -m cp \
@@ -953,15 +962,15 @@ task finemap_genes {
   >>>
 
   output {
-    File finemapped_output = "finemapping_merged_outputs/${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.tsv"
-    File finemapped_output_all_genes = "finemapping_merged_outputs/${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.all_genes_from_blocks.tsv"
-    File naive_output = "finemapping_merged_outputs/${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.naive_priors.tsv"
-    File genetic_output = "finemapping_merged_outputs/${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.gene_stats.genetics_only.tsv"
-    File logit_coeffs_developmental = "${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.logit_coeffs.developmental.tsv"
-    File logit_coeffs_adult = "${freq_code}.${CNV}.gene_fine_mapping.${output_suffix}.logit_coeffs.adult.tsv"
-    File sig_genes_bed = "finemapping_merged_outputs/${freq_code}.${CNV}.final_genes.${output_suffix}.genes.bed"
-    File sig_assocs_bed = "finemapping_merged_outputs/${freq_code}.${CNV}.final_genes.${output_suffix}.associations.bed"
-    File cred_sets_bed = "finemapping_merged_outputs/${freq_code}.${CNV}.final_genes.${output_suffix}.credible_sets.bed"
+    File finemapped_output = "finemapping_merged_outputs/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv"
+    File finemapped_output_all_genes = "finemapping_merged_outputs/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.${finemap_output_label}.tsv"
+    File naive_output = "finemapping_merged_outputs/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.tsv"
+    File genetic_output = "finemapping_merged_outputs/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.tsv"
+    File logit_coeffs_developmental = "${freq_code}.${CNV}.gene_fine_mapping.logit_coeffs.${finemap_output_label}.developmental.tsv"
+    File logit_coeffs_adult = "${freq_code}.${CNV}.gene_fine_mapping.logit_coeffs.${finemap_output_label}.adult.tsv"
+    File sig_genes_bed = "finemapping_merged_outputs/${freq_code}.${CNV}.final_genes.genes.${finemap_output_label}.bed"
+    File sig_assocs_bed = "finemapping_merged_outputs/${freq_code}.${CNV}.final_genes.associations.${finemap_output_label}.bed"
+    File cred_sets_bed = "finemapping_merged_outputs/${freq_code}.${CNV}.final_genes.credible_sets.${finemap_output_label}.bed"
     File completion_token = "completion.txt"
   }
 
@@ -1063,8 +1072,8 @@ task plot_finemap_res {
 
     # Make input tsvs
     for wrapper in 1; do
-      echo -e "Prior\tgrey70\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.genomic_features.tsv"
-      echo -e "Posterior\t'#264653'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.genomic_features.tsv"
+      echo -e "Prior\tgrey70\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.tsv"
+      echo -e "Posterior\t'#264653'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.tsv"
       echo -e "Genomic features\t'#331C8C'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.tsv"
       echo -e "Gene expression\t'#87C9F2'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.tsv"
       echo -e "Chromatin\t'#3DAB9C'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.chromatin_features.tsv"
@@ -1074,13 +1083,13 @@ task plot_finemap_res {
       echo -e "Full model\t'#AE3F9D'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.tsv"
     done > finemap_roc_input.tsv
     for wrapper in 1; do
-      echo -e "Genomic features\t'#331C8C'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.all_genes_from_blocks.tsv\t${raw_features_genomic}"
-      echo -e "Gene expression\t'#87C9F2'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.all_genes_from_blocks.tsv\t${raw_features_expression}"
-      echo -e "Chromatin\t'#3DAB9C'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.chromatin_features.all_genes_from_blocks.tsv\t${raw_features_chromatin}"
-      echo -e "Gene constraint\t'#027831'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.all_genes_from_blocks.tsv\t${raw_features_constraint}"
-      echo -e "Variation\t'#E0CC70'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.variation_features.all_genes_from_blocks.tsv\t${raw_features_variation}"
-      echo -e "Full (no var.)\t'#CF6576'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv\t${raw_features_merged_no_variation}"
-      echo -e "Full model\t'#AE3F9D'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.all_genes_from_blocks.tsv\t${raw_features_merged}"
+      echo -e "Genomic features\t'#331C8C'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.genomic_features.tsv\t${raw_features_genomic}"
+      echo -e "Gene expression\t'#87C9F2'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.expression_features.tsv\t${raw_features_expression}"
+      echo -e "Chromatin\t'#3DAB9C'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.chromatin_features.tsv\t${raw_features_chromatin}"
+      echo -e "Gene constraint\t'#027831'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.constraint_features.tsv\t${raw_features_constraint}"
+      echo -e "Variation\t'#E0CC70'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.variation_features.tsv\t${raw_features_variation}"
+      echo -e "Full (no var.)\t'#CF6576'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_no_variation_features.tsv\t${raw_features_merged_no_variation}"
+      echo -e "Full model\t'#AE3F9D'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_features.tsv\t${raw_features_merged}"
     done > finemap_feature_cor_input.tsv
 
     # Make all gene truth sets
@@ -1236,8 +1245,8 @@ task plot_finemap_res {
   >>>
 
   output {
-    File adult_plots_tarball = "${freq_code}_${CNV}_${output_suffix}_finemap_plots_adult.tgz"
-    File developmental_plots_tarball = "${freq_code}_${CNV}_${output_suffix}_finemap_plots_developmental.tgz"
+    File adult_plots_tarball = "${freq_code}_${CNV}_finemap_plots_adult.tgz"
+    File developmental_plots_tarball = "${freq_code}_${CNV}_finemap_plots_developmental.tgz"
   }
 
   runtime {

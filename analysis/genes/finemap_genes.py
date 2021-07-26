@@ -227,8 +227,9 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
 def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True, 
                 secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
                 secondary_or_nominal=True, fdr_q_cutoff=0.05, 
-                block_merge_dist=500000, block_prefix='gene_block', 
-                null_variance=0.42 ** 2, finemap_secondary=False):
+                block_merge_dist=1000000, nonsig_distance=1000000,
+                block_prefix='gene_block', null_variance=0.42 ** 2, 
+                finemap_secondary=False, include_non_sig=True):
     """
     Loads & processes all necessary data for a single phenotype
     Returns a dict with the following entries:
@@ -251,27 +252,32 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
 
     # Second pass: parse data for all genes within block_merge_dist of sig_genes
     if len(hpo_info['sig_genes']) > 0:
-        # Make bt of significant genes
-        sig_gene_bts = [g['gene_bt'] for g in hpo_info['sig_genes'].values()]
-        if len(sig_gene_bts) > 1:
-            sig_genes_bt = sig_gene_bts[0].cat(*sig_gene_bts[1:], postmerge=False).sort()
+        if include_non_sig:
+            # Make bt of significant genes
+            sig_gene_bts = [g['gene_bt'] for g in hpo_info['sig_genes'].values()]
+            if len(sig_gene_bts) > 1:
+                sig_genes_bt = sig_gene_bts[0].cat(*sig_gene_bts[1:], postmerge=False).sort()
+            else:
+                sig_genes_bt = sig_gene_bts[0]
+
+            # Intersect sig genes with all genes
+            all_genes_bt = pbt.BedTool(stats_in).cut(range(4)).sort()
+            nearby_genes = all_genes_bt.closest(sig_genes_bt.sort(), d=True).\
+                               filter(lambda x: int(x[8]) > -1 and \
+                                                int(x[8]) <= nonsig_distance).\
+                               saveas().to_dataframe().loc[:, 'name'].values.tolist()
+            nearby_genes = list(set(nearby_genes)) # Deduplicates
+
+            # Gather gene stats
+            hpo_info['all_genes'] = parse_stats(stats_in, primary_p_cutoff, p_is_phred, 
+                                                secondary_p_cutoff, n_nominal_cutoff, 
+                                                secondary_or_nominal, fdr_q_cutoff, 
+                                                sig_only=False, keep_genes=nearby_genes, 
+                                                finemap_secondary=finemap_secondary)
+
+        # If --no-non-significant is passed, do not include NS genes when fine-mapping
         else:
-            sig_genes_bt = sig_gene_bts[0]
-
-        # Intersect sig genes with all genes
-        all_genes_bt = pbt.BedTool(stats_in).cut(range(4)).sort()
-        nearby_genes = all_genes_bt.closest(sig_genes_bt.sort(), d=True).\
-                           filter(lambda x: int(x[8]) > -1 and \
-                                            int(x[8]) <= block_merge_dist).\
-                           saveas().to_dataframe().loc[:, 'name'].values.tolist()
-        nearby_genes = list(set(nearby_genes)) # Deduplicates
-
-        # Gather gene stats
-        hpo_info['all_genes'] = parse_stats(stats_in, primary_p_cutoff, p_is_phred, 
-                                            secondary_p_cutoff, n_nominal_cutoff, 
-                                            secondary_or_nominal, fdr_q_cutoff, 
-                                            sig_only=False, keep_genes=nearby_genes, 
-                                            finemap_secondary=finemap_secondary)
+            hpo_info['all_genes'] = hpo_info['sig_genes'].copy()
 
         # Cluster genes into blocks to be fine-mapped
         gene_bts = [g['gene_bt'] for g in hpo_info['all_genes'].values()]
@@ -296,13 +302,16 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
     else:
         hpo_info['all_genes'] = {}
 
+
+
     return hpo_info
 
 
 def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
                   secondary_or_nominal=True, fdr_q_cutoff=0.05, 
-                  block_merge_dist=500000, block_prefix='gene_block', 
-                  finemap_secondary=False):
+                  block_merge_dist=1000000, nonsig_distance=1000000, 
+                  block_prefix='gene_block', finemap_secondary=False, 
+                  include_non_sig=True):
     """
     Wrapper function to process each HPO with process_hpo()
     Returns a dict with one entry per HPO
@@ -321,8 +330,10 @@ def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2,
                                         secondary_or_nominal=secondary_or_nominal,
                                         fdr_q_cutoff=fdr_q_cutoff,
                                         block_merge_dist=block_merge_dist,
+                                        nonsig_distance=nonsig_distance,
                                         block_prefix=block_prefix,
-                                        finemap_secondary=finemap_secondary)
+                                        finemap_secondary=finemap_secondary,
+                                        include_non_sig=include_non_sig)
 
     return hpo_data
 
@@ -468,8 +479,8 @@ def rmse(pairs):
 
 
 def functional_finemap(hpo_data, gene_features_in, l1_l2_mix, logit_alpha, 
-                       cs_val=0.95, null_variance=0.42 ** 2, converge_rmse=10e-8, 
-                       quiet=False):
+                       cs_val=0.95, null_variance=0.42 ** 2, exclude_genes=None,
+                       converge_rmse=10e-8, quiet=False):
     """
     Conduct E-M optimized functional fine-mapping for all gene blocks & HPOs
     Two returns:
@@ -505,6 +516,13 @@ def functional_finemap(hpo_data, gene_features_in, l1_l2_mix, logit_alpha,
     features.iloc[:, 1:] = scale(features.iloc[:, 1:])
     features = features.loc[features.gene.isin(sig_df.gene), :]
 
+    # Load list of genes to be excluded from training, if optioned
+    if exclude_genes is not None:
+        with open(exclude_genes) as xin:
+            xgenes = list(set([g.rstrip() for g in xin.readlines()]))
+    else:
+        xgenes = []
+
     # Iterate until convergence
     coeffs = [0 for x in features.columns.tolist()[1:]]
     k = 0
@@ -514,14 +532,21 @@ def functional_finemap(hpo_data, gene_features_in, l1_l2_mix, logit_alpha,
         # Join sig_df with features for logistic regression
         logit_df = sig_df.loc[:, 'gene PIP'.split()].merge(features, how='left', 
                                                            on='gene')
+        logit_df['PIP'] = logit_df['PIP'].astype('float64')
+
+        # Drop excluded genes from training data
+        logit_df = logit_df.loc[~logit_df['gene'].isin(xgenes), :]
 
         # When fitting regression, take mean of PIPs for genes appearing multiple times
         # This can happen due to multiple HPO associations with the same gene
         logit_df = logit_df.groupby('gene').mean()
 
         # Fit logit GLM & predict new priors
-        glm = GLM(logit_df.PIP, logit_df.drop(labels='PIP', axis=1),
-                  family=families.Binomial())
+        try:
+            glm = GLM(logit_df.PIP, logit_df.drop(labels='PIP', axis=1),
+                      family=families.Binomial())
+        except:
+            import pdb; pdb.set_trace()
         if logit_alpha is None:
             logit = glm.fit()
         else:
@@ -929,6 +954,15 @@ def main():
     parser.add_argument('--distance', help='Distance to pad each significant gene ' +
                         'prior to fine-mapping. [default: 1Mb]', default=1000000, 
                         type=int)
+    parser.add_argument('--nonsig-distance', help='Distance to pad each significant ' +
+                        'gene when searching for non-sig genes to include in ' +
+                        'fine-mapping. [defaults to value of --distance]', type=int)
+    parser.add_argument('--no-non-significant', action='store_true', default=False,
+                        help='Do not include non-significant genes when fine-mapping. ' +
+                        '[default: include nearby non-sig genes]')
+    parser.add_argument('-x', '--training-exclusion', help='List of genes to exclude ' +
+                        'in the training step of the functional fine-mapping model. ' +
+                        '[default: include all genes]')
     parser.add_argument('--confident-pip', default=0.1, type=float, help='Minimum ' +
                         'PIP for classifying a gene as confidently fine-mapped. ' +
                         '[default: 0.1]')
@@ -964,6 +998,10 @@ def main():
     parser.add_argument('--prefix', help='Prefix for naming loci & credible sets.')
     args = parser.parse_args()
 
+    # Sets value of nonsig distance if not specified
+    if args.nonsig_distance is None:
+        args.nonsig_distance = args.distance
+
     # Open connections to output files
     if args.outfile in 'stdout - /dev/stdout'.split():
         outfile = stdout
@@ -976,12 +1014,12 @@ def main():
     else:
         block_prefix = '{}_{}_gene_block'.format(args.cnv, args.prefix)
 
-
     # Process data per hpo
     hpo_data = load_all_hpos(args.statslist, args.secondary_p_cutoff, 
                              args.min_nominal, args.secondary_or_nom, 
-                             args.fdr_q_cutoff, args.distance, block_prefix, 
-                             args.finemap_secondary)
+                             args.fdr_q_cutoff, args.distance, args.nonsig_distance,
+                             block_prefix, args.finemap_secondary, 
+                             not args.no_non_significant)
 
     # Estimate null variance based on:
     #   1. most significant gene from each block
@@ -1016,7 +1054,8 @@ def main():
 
     # Perform functional fine-mapping with Bayesian model averaging
     finemap_res = [functional_finemap(hpo_data, args.gene_features, args.l1_l2_mix, 
-                                      args.logit_alpha, args.cs_val, w) for w in Wsq]
+                                      args.logit_alpha, args.cs_val, w, 
+                                      args.training_exclusion) for w in Wsq]
     
     # Average models across Wsq priors and write to --outfile
     bms = [x[0] for x in finemap_res]

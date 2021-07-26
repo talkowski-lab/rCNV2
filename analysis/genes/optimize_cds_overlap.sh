@@ -112,6 +112,7 @@ done
 for CNV in DEL DUP; do
   echo $CNV
   /opt/rCNV2/analysis/other/optimize_min_cds.R \
+    --optimize-power \
     cds_optimization_data/${CNV}.cds_optimization.meta_analysis.stats.tsv \
     cds_optimization_data/${CNV}
 done
