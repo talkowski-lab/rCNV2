@@ -480,7 +480,7 @@ def rmse(pairs):
 
 def functional_finemap(hpo_data, gene_features_in, l1_l2_mix, logit_alpha, 
                        cs_val=0.95, null_variance=0.42 ** 2, exclude_genes=None,
-                       converge_rmse=10e-8, quiet=False):
+                       use_max_pip=False, converge_rmse=10e-8, quiet=False):
     """
     Conduct E-M optimized functional fine-mapping for all gene blocks & HPOs
     Two returns:
@@ -537,9 +537,12 @@ def functional_finemap(hpo_data, gene_features_in, l1_l2_mix, logit_alpha,
         # Drop excluded genes from training data
         logit_df = logit_df.loc[~logit_df['gene'].isin(xgenes), :]
 
-        # When fitting regression, take mean of PIPs for genes appearing multiple times
+        # When fitting regression, take mean (or max) of PIPs for genes appearing multiple times
         # This can happen due to multiple HPO associations with the same gene
-        logit_df = logit_df.groupby('gene').mean()
+        if use_max_pip:
+            logit_df = logit_df.groupby('gene').max()
+        else:
+            logit_df = logit_df.groupby('gene').mean()
 
         # Fit logit GLM & predict new priors
         try:
@@ -963,6 +966,9 @@ def main():
     parser.add_argument('-x', '--training-exclusion', help='List of genes to exclude ' +
                         'in the training step of the functional fine-mapping model. ' +
                         '[default: include all genes]')
+    parser.add_argument('--use-max-pip-per-gene', action='store_true', default=False,
+                        help='Use maximum PIP when training model for genes with ' + 
+                        'multiple associations [default: use mean PIP]')
     parser.add_argument('--confident-pip', default=0.1, type=float, help='Minimum ' +
                         'PIP for classifying a gene as confidently fine-mapped. ' +
                         '[default: 0.1]')
@@ -1055,7 +1061,8 @@ def main():
     # Perform functional fine-mapping with Bayesian model averaging
     finemap_res = [functional_finemap(hpo_data, args.gene_features, args.l1_l2_mix, 
                                       args.logit_alpha, args.cs_val, w, 
-                                      args.training_exclusion) for w in Wsq]
+                                      args.training_exclusion,
+                                      args.use_max_pip_per_gene) for w in Wsq]
     
     # Average models across Wsq priors and write to --outfile
     bms = [x[0] for x in finemap_res]

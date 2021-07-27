@@ -903,6 +903,7 @@ task finemap_genes {
         --distance ${finemap_cluster_distance} \
         --nonsig-distance ${finemap_nonsig_distance} \
         --training-exclusion nahr.genes.list \
+        --use-max-pip-per-gene \
         --confident-pip ${finemap_conf_pip} \
         --very-confident-pip ${finemap_vconf_pip} \
         --known-causal-gene-lists known_causal_gene_lists.$subgroup.tsv \
