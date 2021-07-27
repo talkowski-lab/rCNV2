@@ -32,7 +32,8 @@ workflow gene_burden_analysis {
   Float FDR_cutoff
   Float finemap_elnet_alpha
   Float finemap_elnet_l1_l2_mix
-  Int finemap_distance
+  Int finemap_cluster_distance
+  Int finemap_nonsig_distance
   Float finemap_conf_pip
   Float finemap_vconf_pip
   File finemap_genomic_features
@@ -177,7 +178,8 @@ workflow gene_burden_analysis {
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         finemap_elnet_alpha=finemap_elnet_alpha,
         finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
-        finemap_distance=finemap_distance,
+        finemap_cluster_distance=finemap_cluster_distance,
+        finemap_nonsig_distance=finemap_nonsig_distance,
         finemap_conf_pip=finemap_conf_pip,
         finemap_vconf_pip=finemap_vconf_pip,
         finemap_output_label="genomic_features",
@@ -200,7 +202,8 @@ workflow gene_burden_analysis {
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         finemap_elnet_alpha=finemap_elnet_alpha,
         finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
-        finemap_distance=finemap_distance,
+        finemap_cluster_distance=finemap_cluster_distance,
+        finemap_nonsig_distance=finemap_nonsig_distance,
         finemap_conf_pip=finemap_conf_pip,
         finemap_vconf_pip=finemap_vconf_pip,
         finemap_output_label="expression_features",
@@ -223,7 +226,8 @@ workflow gene_burden_analysis {
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         finemap_elnet_alpha=finemap_elnet_alpha,
         finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
-        finemap_distance=finemap_distance,
+        finemap_cluster_distance=finemap_cluster_distance,
+        finemap_nonsig_distance=finemap_nonsig_distance,
         finemap_conf_pip=finemap_conf_pip,
         finemap_vconf_pip=finemap_vconf_pip,
         finemap_output_label="chromatin_features",
@@ -246,7 +250,8 @@ workflow gene_burden_analysis {
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         finemap_elnet_alpha=finemap_elnet_alpha,
         finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
-        finemap_distance=finemap_distance,
+        finemap_cluster_distance=finemap_cluster_distance,
+        finemap_nonsig_distance=finemap_nonsig_distance,
         finemap_conf_pip=finemap_conf_pip,
         finemap_vconf_pip=finemap_vconf_pip,
         finemap_output_label="constraint_features",
@@ -269,7 +274,8 @@ workflow gene_burden_analysis {
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         finemap_elnet_alpha=finemap_elnet_alpha,
         finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
-        finemap_distance=finemap_distance,
+        finemap_cluster_distance=finemap_cluster_distance,
+        finemap_nonsig_distance=finemap_nonsig_distance,
         finemap_conf_pip=finemap_conf_pip,
         finemap_vconf_pip=finemap_vconf_pip,
         finemap_output_label="variation_features",
@@ -292,7 +298,8 @@ workflow gene_burden_analysis {
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         finemap_elnet_alpha=finemap_elnet_alpha,
         finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
-        finemap_distance=finemap_distance,
+        finemap_cluster_distance=finemap_cluster_distance,
+        finemap_nonsig_distance=finemap_nonsig_distance,
         finemap_conf_pip=finemap_conf_pip,
         finemap_vconf_pip=finemap_vconf_pip,
         finemap_output_label="merged_features",
@@ -315,7 +322,8 @@ workflow gene_burden_analysis {
         meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
         finemap_elnet_alpha=finemap_elnet_alpha,
         finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
-        finemap_distance=finemap_distance,
+        finemap_cluster_distance=finemap_cluster_distance,
+        finemap_nonsig_distance=finemap_nonsig_distance,
         finemap_conf_pip=finemap_conf_pip,
         finemap_vconf_pip=finemap_vconf_pip,
         finemap_output_label="merged_no_variation_features",
