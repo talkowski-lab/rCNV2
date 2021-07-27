@@ -480,7 +480,8 @@ def rmse(pairs):
 
 def functional_finemap(hpo_data, gene_features_in, l1_l2_mix, logit_alpha, 
                        cs_val=0.95, null_variance=0.42 ** 2, exclude_genes=None,
-                       use_max_pip=False, converge_rmse=10e-8, quiet=False):
+                       use_max_pip=False, converge_rmse=10e-8, max_iter=100, 
+                       quiet=False):
     """
     Conduct E-M optimized functional fine-mapping for all gene blocks & HPOs
     Two returns:
@@ -526,7 +527,7 @@ def functional_finemap(hpo_data, gene_features_in, l1_l2_mix, logit_alpha,
     # Iterate until convergence
     coeffs = [0 for x in features.columns.tolist()[1:]]
     k = 0
-    rmse_PIP, rmse_coeffs = 100, 100
+    rmse_PIP, rmse_coeffs, prev_rmse_PIP, prev_rmse_coeffs = 100, 100, 100, 100
     while rmse_PIP >= converge_rmse or rmse_coeffs >= converge_rmse:
         k += 1
         # Join sig_df with features for logistic regression
@@ -589,8 +590,25 @@ def functional_finemap(hpo_data, gene_features_in, l1_l2_mix, logit_alpha,
         if not quiet:
             print('  {:,}\t{:.3E}\t{:.3E}'.format(k, rmse_PIP, rmse_coeffs))
 
+        # Check for convergence above RMSE target by comparing RMSE from previous iteration to this iteration
+        d_rmse_PIP = prev_rmse_PIP - rmse_PIP
+        d_rmse_coeffs = prev_rmse_coeffs - rmse_coeffs
+
+        if d_rmse_PIP <= converge_rmse and d_rmse_coeffs < converge_rmse:
+            print('RMSE stablized above target after {:,} iterations'.format(k))
+            break
+
+        else:
+            prev_rmse_PIP = rmse_PIP
+            prev_rmse_coeffs = rmse_coeffs
+
+        # Force exit from E-M after max_iter iterations
+        if k > max_iter:
+            print('Failed to converge after {:,} iterations'.format(k))
+            break
+
     # Report completion
-    print('Converged after {:,} iterations'.format(k))
+    print('Finished after {:,} iterations'.format(k))
 
     # Save table
     if logit_alpha is None:
