@@ -582,10 +582,8 @@ meta_p_cutoffs_tsv="refs/sliding_window.rCNV.DEL.empirical_genome_wide_pval.hpo_
 meta_secondary_p_cutoff=0.05
 meta_nominal_cohorts_cutoff=2
 sig_window_pad=200000
-credset=0.99
-use_FDR="FALSE"
+credset=0.95
 FDR_cutoff=0.01
-output_suffix="strict_gw_sig"
 gtf="gencode.v19.canonical.pext_filtered.gtf.gz"
 
 
@@ -598,6 +596,7 @@ mkdir refs/
 gsutil -m cp \
   ${rCNV_bucket}/analysis/analysis_refs/* \
   ${rCNV_bucket}/refs/GRCh37.cytobands.bed.gz \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs*.bed.gz \
   refs/
 
 # Apply an initial loose mask per HPO to P<0.01 regions ±sig_window_pad 
@@ -631,57 +630,37 @@ while read prefix hpo; do
   for wrapper in 1; do
     echo "$hpo"
     echo "stats/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.subset.bed.gz"
-    if [ ${use_FDR} == "TRUE" ]; then
-      echo "${FDR_cutoff}"
-    else
-      awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' \
-        ${meta_p_cutoffs_tsv}
-    fi
+    awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' \
+      ${meta_p_cutoffs_tsv}
   done | paste -s
 done < ${phenotype_list} \
 > ${freq_code}.${CNV}.segment_refinement.stats_input.tsv
-echo "/opt/rCNV2/refs/UKBB_GD.Owen_2018.${CNV}.bed.gz" \
-> known_causal_loci_lists.${CNV}.tsv
+zcat refs/lit_GDs.*.bed.gz | fgrep -w ${CNV} | cut -f1-5 | \
+sort -Vk1,1 -k2,2n -k3,3n -k4,4V -k5,5V | bedtools merge -i - \
+> all_GDs.${CNV}.bed
+echo "all_GDs.${CNV}.bed" > known_causal_loci_lists.${CNV}.tsv
 
 # Refine significant segments
-if [ ${use_FDR} == "TRUE" ]; then
-  /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
-    --cnv ${CNV} \
-    --use-fdr \
-    --secondary-p-cutoff 1 \
-    --min-nominal 0 \
-    --secondary-or-nominal \
-    --credible-sets ${credset} \
-    --distance ${sig_window_pad} \
-    --known-causal-loci-list known_causal_loci_lists.${CNV}.tsv \
-    --cytobands refs/GRCh37.cytobands.bed.gz \
-    --sig-loci-bed ${freq_code}.${CNV}.final_segments.${output_suffix}.loci.pregenes.bed \
-    --sig-assoc-bed ${freq_code}.${CNV}.final_segments.${output_suffix}.associations.pregenes.bed \
-    --prefix ${output_suffix} \
-    ${freq_code}.${CNV}.segment_refinement.stats_input.tsv \
-    ${metacohort_sample_table}
-else
-  /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
-    --cnv ${CNV} \
-    --secondary-p-cutoff ${meta_secondary_p_cutoff} \
-    --min-nominal ${meta_nominal_cohorts_cutoff} \
-    --secondary-or-nominal \
-    --credible-sets ${credset} \
-    --distance ${sig_window_pad} \
-    --known-causal-loci-list known_causal_loci_lists.${CNV}.tsv \
-    --cytobands refs/GRCh37.cytobands.bed.gz \
-    --sig-loci-bed ${freq_code}.${CNV}.final_segments.${output_suffix}.loci.pregenes.bed \
-    --sig-assoc-bed ${freq_code}.${CNV}.final_segments.${output_suffix}.associations.pregenes.bed \
-    --prefix ${output_suffix} \
-    ${freq_code}.${CNV}.segment_refinement.stats_input.tsv \
-    ${metacohort_sample_table}
-fi
+/opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
+  --cnv ${CNV} \
+  --secondary-p-cutoff ${meta_secondary_p_cutoff} \
+  --min-nominal ${meta_nominal_cohorts_cutoff} \
+  --secondary-or-nominal \
+  --fdr-q-cutoff ${FDR_cutoff} \
+  --credible-sets ${credset} \
+  --distance ${sig_window_pad} \
+  --known-causal-loci-list known_causal_loci_lists.${CNV}.tsv \
+  --cytobands refs/GRCh37.cytobands.bed.gz \
+  --sig-loci-bed ${freq_code}.${CNV}.final_segments.loci.pregenes.bed \
+  --sig-assoc-bed ${freq_code}.${CNV}.final_segments.associations.pregenes.bed \
+  ${freq_code}.${CNV}.segment_refinement.stats_input.tsv \
+  ${metacohort_sample_table}
 
 # Annotate final regions with genes & sort by coordinates
 for entity in loci associations; do
   /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
-    -o ${freq_code}.${CNV}.final_segments.${output_suffix}.$entity.bed \
-    ${freq_code}.${CNV}.final_segments.${output_suffix}.$entity.pregenes.bed \
+    -o ${freq_code}.${CNV}.final_segments.$entity.bed \
+    ${freq_code}.${CNV}.final_segments.$entity.pregenes.bed \
     ${gtf}
 done
 
