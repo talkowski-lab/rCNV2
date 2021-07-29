@@ -87,7 +87,7 @@ To build this set of loci, we first defined pairs of [segmental duplications](ht
 1. Same chromosome
 2. Distance ≥ 100kb & ≤ 10Mb
 3. Both segmental duplications ≥ 1kb
-4. Strict homology (no indels) ≥ 95%
+4. Strict homology (no indels) ≥ 90%
 5. Direct orentation of repeats (_i.e._, same strand)
 6. Total intervening sequence has ≤30% coverage by the blacklist used [during CNV curation](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#curation-steps-rare-cnvs)  
 7. At least 100kb of intervening sequence remaining after subtracting blacklist regions

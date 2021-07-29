@@ -597,7 +597,8 @@ def output_assoc_bed(hpo_data, cyto_bed, outfile, cnv='NS'):
                                           lnor_upper, best_p)
             outline += '\t' + '\t'.join([str(n_cred), ';'.join(cred_coords), 
                                          str(cred_size)]) + '\n'
-            outfile.write(outline)
+            if sig_level != 'not_significant':
+                outfile.write(outline)
 
     outfile.close()
 
@@ -727,7 +728,8 @@ def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS
                                      str(n_members), ';'.join(sorted(members)),
                                      str(n_credints), ';'.join(credints_coords),
                                      str(credints_size)]) + '\n'
-        outfile.write(outline)
+        if best_sig_level != 'not_significant':
+            outfile.write(outline)
 
     outfile.close()
 

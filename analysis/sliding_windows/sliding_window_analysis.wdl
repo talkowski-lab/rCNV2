@@ -174,7 +174,7 @@ workflow sliding_window_analysis {
       FDR_cutoff=FDR_cutoff,
       gtf=gtf,
       rCNV_bucket=rCNV_bucket,
-      rCNV_docker=rCNV_docker
+      rCNV_docker=rCNV_docker_refine
   }
   call refine_regions as refine_DUP {
     input:

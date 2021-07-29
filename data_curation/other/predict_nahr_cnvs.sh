@@ -22,7 +22,7 @@ fi
 # 1. Same chromosome
 # 2. Distance ≥ 100kb & ≤ 10Mb
 # 3. Both segdups ≥ 1kb
-# 4. Strict homology ≥ 95%
+# 4. Strict homology ≥ 90%
 # 5. Direct orentation of repeats (i.e., same strand)
 # 6. Total intervening sequence ≤30% covered by rCNV blacklist 
 #    (including segdup/simple repeat/satellites/Nmask/somatic hypermutable)
@@ -30,7 +30,7 @@ fi
 zcat genomicSuperDups.txt.gz \
 | awk -v FS="\t" -v OFS="\t" \
   '{ if ($2==$8 && $7=="+" && $4-$3>=1000 && $10-$9>=1000 && \
-         $9-$4>=100000 && $9-$4<=10000000 && $27>=0.95) \
+         $9-$4>=100000 && $9-$4<=10000000 && $27>=0.90) \
      print $2, $4, $9, $2, $3, $4, $8, $9, $10 }' \
 | sed 's/chr//g' \
 | grep -e '^[0-9]' \
@@ -67,3 +67,8 @@ zcat genomicSuperDups.txt.gz \
 cut -f1-4,7-8 clustered_nahr_regions.w_genes.bed \
 | bgzip -c > clustered_nahr_regions.bed.gz
 
+
+# Copy to Google bucket (note: requires permissions)
+gsutil -m cp \
+  clustered_nahr_regions.bed.gz \
+  gs://rcnv_project/analysis/paper/data/large_segments/
