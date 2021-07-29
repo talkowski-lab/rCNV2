@@ -19,11 +19,10 @@ options(stringsAsFactors=F, scipen=1000)
 ### RSCRIPT BLOCK ###
 #####################
 require(optparse, quietly=T)
+require(rCNV2, quietly=T)
 
 # List of command-line options
-option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
-)
+option_list <- list()
 
 # Get command-line arguments & options
 args <- parse_args(OptionParser(usage=paste("%prog in.bed out.bed", sep=" "),
@@ -39,18 +38,11 @@ if(length(args$args) != 2){
 # Writes args & opts to vars
 pvals.in <- args$args[1]
 outfile <- args$args[2]
-rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
 # pvals.in <- "~/scratch/rCNV2_analysis_d1.DEL.meta_phred_p.all_hpos.bed.gz"
 # outfile <- "~/scratch/test_max_pval_per_window.DEL.bed"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
 # script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
 
 # Load p-value matrix
 pvals <- load.pval.matrix(pvals.in, has.coords=T, p.is.phred=T)

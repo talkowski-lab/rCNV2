@@ -144,7 +144,6 @@ task perm_prep {
     # Compress to single BED of max P per window
     for cnv in DEL DUP; do
       /opt/rCNV2/analysis/paper/scripts/large_segments/get_best_p_per_window.R \
-        --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
         meta_stats/matrices/${prefix}.$cnv.meta_phred_p.all_hpos.bed.gz \
         ${prefix}.best_meta_phred_p_per_window.$cnv.bed
       bgzip -f ${prefix}.best_meta_phred_p_per_window.$cnv.bed
