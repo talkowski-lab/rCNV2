@@ -658,6 +658,8 @@ def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS
            'n_cred_intervals cred_interval_coords cred_intervals_size'
     outfile.write('#' + '\t'.join(cols.split()) + '\n')
 
+    out_presort = {}
+
     for members in final_loci.values():
         # Get basic information for credsets in final cluster
         n_members = len(members)
@@ -679,7 +681,7 @@ def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS
         start = str(np.nanmin(credints_bt.to_dataframe().start))
         end = str(np.nanmax(credints_bt.to_dataframe().end))
         cytoband = get_cytobands(credints_bt, cyto_bed)
-        region_id = '_'.join([region_id_prefix, cytoband])
+        region_id = '_'.join([region_id_prefix, '{}', cytoband])
 
         # Summarize HPO-specific information pooled across all windows from each
         # contributing credset (note: *not* all windows for all merged cred intervals)
@@ -719,17 +721,25 @@ def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS
         else:
             best_sig_level = 'not_significant'
 
-        # Write region stats to file
-        outline = '\t'.join([chrom, start, end, region_id, cnv, best_sig_level, cytoband])
+        # Prepare to write region stats to file
+        out_front = '\t'.join([chrom, start, end])
+        out_back = '\t'.join([cnv, best_sig_level, cytoband])
         outnums_fmt = '\t{:.3E}\t{:.3E}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}'
-        outline += outnums_fmt.format(control_freq, case_freq, lnor, lnor_ci[0], 
-                                      lnor_ci[1], min_lnor, max_lnor)
-        outline += '\t' + '\t'.join([str(n_hpos), ';'.join(hpos), 
-                                     str(n_members), ';'.join(sorted(members)),
-                                     str(n_credints), ';'.join(credints_coords),
-                                     str(credints_size)]) + '\n'
+        out_back += outnums_fmt.format(control_freq, case_freq, lnor, lnor_ci[0], 
+                                       lnor_ci[1], min_lnor, max_lnor)
+        out_back += '\t' + '\t'.join([str(n_hpos), ';'.join(hpos), 
+                                      str(n_members), ';'.join(sorted(members)),
+                                      str(n_credints), ';'.join(credints_coords),
+                                      str(credints_size)]) + '\n'
         if best_sig_level != 'not_significant':
-            outfile.write(outline)
+            out_presort[(int(chrom), int(start), int(end))] = [out_front, region_id, out_back]
+
+    # Iterate over sorted blocks and write to file
+    for i, key in enumerate(sorted(out_presort.keys())):
+        outline = '\t'.join([out_presort[key][0], 
+                             out_presort[key][1].format(i+1), 
+                             out_presort[key][2]])
+        outfile.write(outline)
 
     outfile.close()
 
