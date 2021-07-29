@@ -198,8 +198,8 @@ workflow sliding_window_analysis {
   # Merge refined associations & regions
   call merge_refined_regions {
     input:
-      assoc_beds=[refine_DEL_gw.associations, refine_DUP_gw.associations],
-      loci_beds=[refine_DEL_gw.loci, refine_DUP_gw.loci],
+      assoc_beds=[refine_DEL.associations, refine_DUP.associations],
+      loci_beds=[refine_DEL.loci, refine_DUP.loci],
       freq_code="rCNV",
       rCNV_bucket=rCNV_bucket,
       rCNV_docker=rCNV_docker_refine
@@ -209,8 +209,8 @@ workflow sliding_window_analysis {
   call plot_region_summary as plot_rCNV_regions {
     input:
       freq_code="rCNV",
-      DEL_regions=refine_DEL_gw.loci,
-      DUP_regions=refine_DUP_gw.loci,
+      DEL_regions=refine_DEL.loci,
+      DUP_regions=refine_DUP.loci,
       rCNV_bucket=rCNV_bucket,
       rCNV_docker=rCNV_docker_refine
   }
