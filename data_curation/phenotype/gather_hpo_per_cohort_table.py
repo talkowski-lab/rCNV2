@@ -276,7 +276,6 @@ def main():
         counts, metacounts = metacohort_abundance_filter(counts, metacounts,
                                                          args.min_per_metacohort,
                                                          args.min_metacohorts)
-
     # Format output tables & write to file
     write_table(counts, args.hpo_metadata, outfile, args.html)
     if args.metalist is not None \

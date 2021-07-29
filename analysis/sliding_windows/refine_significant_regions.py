@@ -38,29 +38,36 @@ def format_stat(x, is_phred=False, na_val=0):
             return float(x)
 
 
-def is_window_sig(primary_p, primary_q, secondary_p, n_nominal, primary_p_cutoff, 
-                  use_fdr=False, secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
-                  secondary_or_nominal=True):
+def get_sig_label(primary_p, secondary_p, n_nominal, primary_q, primary_p_cutoff, 
+                  secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
+                  secondary_or_nominal=True, fdr_q_cutoff=0.05):
     """
-    Checks if a window should be considered genome-wide significant
+    Checks if a window should be considered exome-wide or FDR significant
     """
 
-    if use_fdr:
-        primary_value = primary_q
-    else:
-        primary_value = primary_p
-    if primary_value >= primary_p_cutoff:
-        return False
-    else:
-        secondary = (secondary_p < secondary_p_cutoff)
-        n_nom = (n_nominal >= n_nominal_cutoff)
-        if secondary_or_nominal:
-            if not any([secondary, n_nom]):
-                return False
-        elif not all([secondary, n_nom]):
-            return False
+    # Run all comparisons
+    primary_p_is_sig = (primary_p < primary_p_cutoff)
+    secondary_p_is_sig = (secondary_p < secondary_p_cutoff)
+    n_nominal_is_sig = (n_nominal >= n_nominal_cutoff)
+    fdr_q_is_sig = (primary_q < fdr_q_cutoff)
 
-    return True
+    # First consider genome-wide significance
+    if primary_p_is_sig \
+    and secondary_p_is_sig \
+    and n_nominal_is_sig:
+        return 'GWS'
+    elif primary_p_is_sig \
+    and secondary_or_nominal \
+    and (secondary_p_is_sig or n_nominal_is_sig):
+        return 'GWS'
+    
+    # Second consider FDR significance
+    elif fdr_q_is_sig:
+        return 'FDR'
+
+    # Otherwise, non-significant
+    else:
+        return 'NS'
 
 
 def ci2se(ci):
@@ -159,9 +166,10 @@ def refine(window_priors, window_info, null_variance=0.42 ** 2, cs_val=0.95,
     return refine_res, credset_coords, credset_bt, credset_windows
 
 
-def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True, use_fdr=False,
+def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True, 
                 secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
-                secondary_or_nominal=True, sig_only=False, keep_windows=None,
+                secondary_or_nominal=True, fdr_q_cutoff=0.05,
+                sig_only=False, keep_windows=None,
                 refine_secondary=False):
     """
     Parse all association stats for a single phenotype
@@ -199,6 +207,17 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True, use_fdr=False,
         primary_q = format_stat(primary_q, p_is_phred, 1)
         secondary_p = format_stat(secondary_p, p_is_phred, 1)
         n_nominal = int(n_nominal)
+        sig_label = get_sig_label(primary_p, secondary_p, n_nominal, primary_q, 
+                                  primary_p_cutoff, secondary_p_cutoff, 
+                                  n_nominal_cutoff, secondary_or_nominal, 
+                                  fdr_q_cutoff)
+        gw_sig = False
+        fdr_sig = False
+        if sig_label == 'GWS':
+            gw_sig = True
+            fdr_sig = True
+        elif sig_label == 'FDR':
+            fdr_sig = True
         case_freq = format_stat(case_freq)
         control_freq = format_stat(control_freq)
         if refine_secondary:
@@ -211,30 +230,24 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True, use_fdr=False,
             use_lnOR_lower = format_stat(lnOR_lower)
             use_lnOR_upper = format_stat(lnOR_upper)
             use_zscore = format_stat(zscore)
+        window_stats = {'case_freq' : case_freq, 'control_freq' : control_freq,
+                        'lnOR' : use_lnOR, 'lnOR_lower' : use_lnOR_lower,
+                        'lnOR_upper' : use_lnOR_upper, 'zscore' : use_zscore,
+                        'primary_p' : primary_p, 'primary_q' : primary_q, 
+                        'secondary_p' : secondary_p, 'n_nominal' : n_nominal, 
+                        'gw_sig' : gw_sig, 'fdr_sig' : fdr_sig}
 
         # Store window association stats
         if sig_only:
-            if is_window_sig(primary_p, primary_q, secondary_p, n_nominal, 
-                             primary_p_cutoff, use_fdr, secondary_p_cutoff, 
-                             n_nominal_cutoff, secondary_or_nominal):
+            if sig_label in 'GWS FDR'.split():
                 window_bt = pbt.BedTool('\t'.join([chrom, start, end, window]), 
                                       from_string=True)
-                window_stats = {'case_freq' : case_freq, 'control_freq' : control_freq,
-                                'lnOR' : use_lnOR, 'lnOR_lower' : use_lnOR_lower,
-                                'lnOR_upper' : use_lnOR_upper, 'zscore' : use_zscore,
-                                'primary_p' : primary_p, 'primary_q' : primary_q, 
-                                'secondary_p' : secondary_p,
-                                'n_nominal' : n_nominal, 'window_bt' : window_bt}
+                window_stats['window_bt'] = window_bt
                 stats_dict[window] = window_stats
         else:
             window_bt = pbt.BedTool('\t'.join([chrom, start, end, window]), 
                                   from_string=True)
-            window_stats = {'case_freq' : case_freq, 'control_freq' : control_freq,
-                            'lnOR' : use_lnOR, 'lnOR_lower' : use_lnOR_lower,
-                            'lnOR_upper' : use_lnOR_upper, 'zscore' : use_zscore,
-                            'primary_p' : primary_p, 'primary_q' : primary_q, 
-                            'secondary_p' : secondary_p,
-                            'n_nominal' : n_nominal, 'window_bt' : window_bt}
+            window_stats['window_bt'] = window_bt
             stats_dict[window] = window_stats
 
     csvin.close()
@@ -242,11 +255,11 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True, use_fdr=False,
     return stats_dict
 
 
-def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True, use_fdr=False,
+def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True, 
                 secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
-                secondary_or_nominal=True, block_merge_dist=200000, 
-                block_prefix='window_block', null_variance=0.42 ** 2,
-                refine_secondary=False, cs_val=0.95):
+                secondary_or_nominal=True, fdr_q_cutoff=0.05, 
+                block_merge_dist=200000, block_prefix='window_block', 
+                null_variance=0.42 ** 2, refine_secondary=False, cs_val=0.95):
     """
     Loads & processes all necessary data for a single phenotype
     Returns a dict with the following entries:
@@ -262,8 +275,8 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True, use_fdr=False,
 
     # First pass: parse data for significant windows only
     hpo_info['sig_windows'] = parse_stats(stats_in, primary_p_cutoff, p_is_phred, 
-                                          use_fdr, secondary_p_cutoff, 
-                                          n_nominal_cutoff, secondary_or_nominal, 
+                                          secondary_p_cutoff, n_nominal_cutoff, 
+                                          secondary_or_nominal, fdr_q_cutoff,
                                           sig_only=True, 
                                           refine_secondary=refine_secondary)
 
@@ -286,8 +299,9 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True, use_fdr=False,
 
         # Gather window stats
         hpo_info['all_windows'] = parse_stats(stats_in, primary_p_cutoff, p_is_phred, 
-                                              use_fdr, secondary_p_cutoff, n_nominal_cutoff, 
-                                              secondary_or_nominal, sig_only=False,
+                                              secondary_p_cutoff, n_nominal_cutoff, 
+                                              secondary_or_nominal, fdr_q_cutoff,
+                                              sig_only=False,
                                               keep_windows=nearby_windows, 
                                               refine_secondary=refine_secondary)
 
@@ -322,8 +336,8 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True, use_fdr=False,
     return hpo_info
 
 
-def load_all_hpos(statslist, use_fdr=False, secondary_p_cutoff=0.05, 
-                  n_nominal_cutoff=2, secondary_or_nominal=True, 
+def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
+                  secondary_or_nominal=True, fdr_q_cutoff=0.05,
                   block_merge_dist=200000, block_prefix='window_block', 
                   refine_secondary=False, cs_val=0.95):
     """
@@ -338,10 +352,11 @@ def load_all_hpos(statslist, use_fdr=False, secondary_p_cutoff=0.05,
         for hpo, stats_in, pval, in reader:
             primary_p_cutoff = float(pval)
             hpo_data[hpo] = process_hpo(hpo, stats_in, primary_p_cutoff, 
-                                        p_is_phred=True, use_fdr=use_fdr,
+                                        p_is_phred=True, 
                                         secondary_p_cutoff=secondary_p_cutoff, 
                                         n_nominal_cutoff=n_nominal_cutoff, 
                                         secondary_or_nominal=secondary_or_nominal,
+                                        fdr_q_cutoff=fdr_q_cutoff,
                                         block_merge_dist=block_merge_dist,
                                         block_prefix=block_prefix,
                                         refine_secondary=refine_secondary,
@@ -455,66 +470,21 @@ def update_refine(hpo_data, Wsq, cs_val=0.95, block_merge_dist=200000):
             # Recompute credible set based on BMA PIPs
             credset_coords, credset_bt, credset_windows = make_cs(refine_res, cs_val)
 
+            # Determine maximum significance level of any window in credible set
+            if any([hpo_data[hpo]['all_windows'][wid]['gw_sig'] for wid in credset_windows]):
+                credset_max_sig = 'genome_wide'
+            elif any([hpo_data[hpo]['all_windows'][wid]['fdr_sig'] for wid in credset_windows]):
+                credset_max_sig = 'FDR'
+            else:
+                credset_max_sig = 'not_significant'
+
             hpo_data[hpo]['blocks'][block_id] = {'refine_res' : refine_res,
                                                  'credset_coords' : credset_coords,
                                                  'credset_bt' : credset_bt,
-                                                 'credset_windows' : credset_windows}
+                                                 'credset_windows' : credset_windows,
+                                                 'credset_max_sig' : credset_max_sig}
 
     return hpo_data
-
-
-# def ci_jaccard(intervals, cnv_bed, hpo):
-#     """
-#     Compute jaccard statistic of CNVs overlapping all pairs of intervals
-#     """
-
-#     interval_ids = ['_'.join([x.chrom, str(x.start), str(x.end)]) for x in intervals]
-
-#     cnv_int = intervals.intersect(cnv_bed, wa=True, wb=True).\
-#         filter(lambda x: hpo in x[-1].split(';')).saveas()
-
-#     # Build dict of CNV IDs overlapping each CS
-#     interval_cnvs = {}
-#     for x in intervals:
-#         iid = '_'.join([x.chrom, str(x.start), str(x.end)])
-#         xbt = pbt.BedTool('\t'.join([x.chrom, str(x.start), str(x.end)]), from_string=True)
-#         cnv_ids = set([f[-3] for f in xbt.intersect(cnv_int, f=1.0, wb=True)])
-#         interval_cnvs[iid] = cnv_ids
-
-#     # Compute jaccard statistic for each possible pair of intervals
-#     jaccards = []
-#     for ix in range(len(intervals)):
-#         for jx in range(1, len(intervals)):
-#             if ix >= jx:
-#                 idi = interval_ids[ix]
-#                 idj = interval_ids[jx]
-#                 cnvs_i = interval_cnvs[idi]
-#                 cnvs_j = interval_cnvs[idj]
-#                 numerator = len(cnvs_i & cnvs_j)
-#                 denominator = len(cnvs_i | cnvs_j)
-#                 jaccards.append((idi, idj, numerator / denominator, ))
-
-#     return jaccards
-
-
-# def split_ind_credsets(hpo_data, cnv_bed, min_jaccard=0.2):
-#     """
-#     Test all credible sets for CNV covariance, and split those with overlap < min_jaccard
-#     """
-
-#     for hpo, hdat in hpo_data.items():
-#         old_bids = list(hdat['blocks'].keys())
-#         for old_bid in old_bids:
-#             old_bdat = hdat['blocks'][old_bid]
-
-#             # Only evaluate blocks with multiple credible intervals
-#             if len(old_bdat['credset_coords']) == 1:
-#                 continue
-
-#             # Compute jaccard statistic for all pairs of credible intervals
-#             jaccards = ci_jaccard(old_bdat['credset_bt'], cnv_bed, hpo)
-
-#             import pdb; pdb.set_trace()
 
 
 def get_cytobands(bt, cyto_bed):
@@ -579,7 +549,8 @@ def output_assoc_bed(hpo_data, cyto_bed, outfile, cnv='NS'):
     Format final list of credible sets with summary statistics
     """
     
-    cols = 'chr start_min end_max credible_set_id cnv hpo cytoband mean_control_freq mean_case_freq ' + \
+    cols = 'chr start_min end_max credible_set_id cnv hpo sig_level ' + \
+           'cytoband mean_control_freq mean_case_freq ' + \
            'pooled_ln_or pooled_ln_or_ci_lower pooled_ln_or_ci_upper ' + \
            'best_pvalue n_cred_intervals cred_interval_coords cred_intervals_size'
     outfile.write('#' + '\t'.join(cols.split()) + '\n')
@@ -598,6 +569,7 @@ def output_assoc_bed(hpo_data, cyto_bed, outfile, cnv='NS'):
             control_freq = np.nanmean([wdat[w]['control_freq'] for w in windows])
             case_freq = np.nanmean([wdat[w]['case_freq'] for w in windows])
             cytoband = get_cytobands(binfo['credset_bt'], cyto_bed)
+            sig_level = binfo['credset_max_sig']
 
             # Get pooled effect size as inverse-variance weighted mean of all windows
             n_windows = len(windows)
@@ -619,7 +591,7 @@ def output_assoc_bed(hpo_data, cyto_bed, outfile, cnv='NS'):
                 best_p = norm.sf(best_z)
 
             # Write credset stats to file
-            outline = '\t'.join([chrom, start, end, block_id, cnv, hpo, cytoband])
+            outline = '\t'.join([chrom, start, end, block_id, cnv, hpo, sig_level, cytoband])
             outnums_fmt = '\t{:.3E}\t{:.3E}\t{:.3}\t{:.3}\t{:.3}\t{:.3E}'
             outline += outnums_fmt.format(control_freq, case_freq, lnor, lnor_lower, 
                                           lnor_upper, best_p)
@@ -678,7 +650,8 @@ def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS
     else:
         region_id_prefix = 'merged_{}_segment'.format(block_prefix)
 
-    cols = 'chr start_min end_max region_id cnv cytoband pooled_control_freq pooled_case_freq ' + \
+    cols = 'chr start_min end_max region_id cnv best_sig_level cytoband ' + \
+           'pooled_control_freq pooled_case_freq ' + \
            'pooled_ln_or pooled_ln_or_ci_lower pooled_ln_or_ci_upper ' + \
            'min_ln_or max_ln_or n_hpos hpos n_constituent_assocs constituent_assocs ' + \
            'n_cred_intervals cred_interval_coords cred_intervals_size'
@@ -736,9 +709,17 @@ def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS
         lnor, lnor_ci = \
             iv_mean(list(lnor_means.values()), 
                     [ci2se(tuple(ci)) ** 2 for ci in lnor_cis.values()])
+        # Get best significance level from any window
+        sig_levels = [hpo_data[hpo]['blocks'][bid]['credset_max_sig'] for bid, hpo in hpo_dict.items()]
+        if 'genome_wide' in sig_levels:
+            best_sig_level = 'genome_wide'
+        elif 'FDR' in sig_levels:
+            best_sig_level = 'FDR'
+        else:
+            best_sig_level = 'not_significant'
 
         # Write region stats to file
-        outline = '\t'.join([chrom, start, end, region_id, cnv, cytoband])
+        outline = '\t'.join([chrom, start, end, region_id, cnv, best_sig_level, cytoband])
         outnums_fmt = '\t{:.3E}\t{:.3E}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}'
         outline += outnums_fmt.format(control_freq, case_freq, lnor, lnor_ci[0], 
                                       lnor_ci[1], min_lnor, max_lnor)
@@ -763,13 +744,7 @@ def main():
     parser.add_argument('statslist', help='tsv of metadata per phenotype. Three ' +
                         'required columns: HPO, path to meta-analysis stats, ' +
                         'and primary P-value cutoff.')
-    # parser.add_argument('cnv_bed', help='BED file of all CNVs. Used to decouple ' +
-    #                     'independent credible sets. Expects six columns: chrom, ' +
-    #                     'start, end, CNV ID, CNV type, and phenotype.')
     parser.add_argument('hpos_by_cohort', help='tsv of sample sizes per HPO.')
-    parser.add_argument('--use-fdr', action='store_true', default=False,
-                        help='Evaluate FDR q-value to assess significance. ' +
-                        '[default: use uncorrected P-value]')
     parser.add_argument('--secondary-p-cutoff', help='Maximum secondary P-value to ' + 
                         'consider as significant. [default: 1]', default=1, type=float)
     parser.add_argument('--cnv', help='Indicate CNV type. [default: NS]', default='NS')
@@ -780,6 +755,9 @@ def main():
                         help='Allow windows to meet either --secondary-p-cutoff ' +
                         'or --min-nominal, but do not require both. ' +
                         '[default: require both]', default=False, action='store_true')
+    parser.add_argument('--fdr-q-cutoff', help='Maximum FDR Q-value to ' + 
+                        'consider as FDR significant. [default: 0.05]', 
+                        default=0.05, type=float)
     parser.add_argument('--credible-sets', dest='cs_val', type=float, default=0.95,
                         help='Credible set value. [default: 0.95]')
     parser.add_argument('--distance', help='Distance to pad each significant window ' +
@@ -813,10 +791,10 @@ def main():
     block_prefix = '_'.join(block_prefix_components)
 
     # Process data per hpo
-    hpo_data = load_all_hpos(args.statslist, args.use_fdr, args.secondary_p_cutoff, 
+    hpo_data = load_all_hpos(args.statslist, args.secondary_p_cutoff, 
                              args.min_nominal, args.secondary_or_nom, 
-                             args.distance, block_prefix, args.refine_secondary, 
-                             args.cs_val)
+                             args.fdr_q_cutoff, args.distance, block_prefix, 
+                             args.refine_secondary, args.cs_val)
 
     # Estimate null variance based on:
     #   1. all significant windows
@@ -831,9 +809,6 @@ def main():
 
     # Update original refinement results with BMA of re-estimated null variances
     hpo_data = update_refine(hpo_data, Wsq, args.cs_val, args.distance)
-
-    # # Test all final credible sets for covariance, and split independent pairs
-    # hpo_data = split_ind_credsets(hpo_data, args.cnv_bed, min_jaccard=0.2)
 
     # Rename all blocks according to cytobands of credible sets, if optioned
     if args.cytobands is not None:

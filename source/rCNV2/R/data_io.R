@@ -41,6 +41,31 @@ read.assoc.stats.single <- function(stats.in, prefix, p.is.phred, keep.n.cols=3)
 }
 
 
+#' Load meta-analysis association statistics
+#'
+#' Load association statistics from a meta-analysis
+#'
+#' @param stats.in path to input BED file with association statistics
+#' @param keep.n.cols number of columns from original BED format to retain
+#'
+#' @return data frame of formatted association stats
+#'
+#' @export
+load.meta.stats <- function(stats.in, p.is.phred, keep.n.cols=3){
+  # Read data & subset to necessary columns
+  stats <- read.table(stats.in, header=T, sep="\t", comment.char="", check.names=F)
+  colnames(stats)[1] <- gsub("#", "", colnames(stats)[1], fixed=T)
+  mandatory.cols.idx <- which(colnames(stats) == "n_nominal_cohorts"):ncol(stats)
+  if(keep.n.cols < 1){
+    cols.to.keep <- colnames(stats)[mandatory.cols.idx]
+  }else{
+    cols.to.keep <- colnames(stats)[unique(sort(c(1:keep.n.cols, mandatory.cols.idx)))]
+  }
+  stats <- stats[, which(colnames(stats) %in% cols.to.keep)]
+  return(stats)
+}
+
+
 #' Load P-value matrix
 #'
 #' Loads a precomputed matrix of P-values

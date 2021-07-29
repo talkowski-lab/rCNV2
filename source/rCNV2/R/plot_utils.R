@@ -16,18 +16,34 @@
 #' Return hex color code for phenotype by HPO
 #'
 #' @param hpo HPO code
+#' @param color.by indicator to color by 'neuro' or 'severity'
 #'
 #' @return color code
 #'
 #' @export
-get.hpo.color <- function(hpo){
-  # TODO: automatically load pheno.colors from constants.R within this function
-  if(hpo %in% neuro.hpos){
-    pheno.colors[which(names(pheno.colors) == "neuro")]
-  }else if(hpo %in% somatic.hpos){
-    pheno.colors[which(names(pheno.colors) == "somatic")]
+get.hpo.color <- function(hpo, color.by="neuro"){
+  # Ensure rCNV2 constants are loaded
+  load.rcnv.env()
+
+  # Color differently based on "color.by"
+  if(color.by == "neuro"){
+    if(hpo %in% neuro.hpos){
+      pheno.colors[which(names(pheno.colors) == "neuro")]
+    }else if(hpo %in% somatic.hpos){
+      pheno.colors[which(names(pheno.colors) == "somatic")]
+    }else{
+      pheno.colors[which(names(pheno.colors) == "all")]
+    }
+  }else if(color.by == "severity"){
+    if(hpo %in% developmental.hpos){
+      severity.colors[which(names(severity.colors) == "developmental")]
+    }else if(hpo %in% adult.hpos){
+      severity.colors[which(names(severity.colors) == "adult")]
+    }else{
+      severity.colors[which(names(severity.colors) == "all")]
+    }
   }else{
-    pheno.colors[which(names(pheno.colors) == "all")]
+    stop(paste("get.hpo.color does not recognize color.by =", color.by))
   }
 }
 

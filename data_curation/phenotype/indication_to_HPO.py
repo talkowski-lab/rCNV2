@@ -18,6 +18,7 @@ import re
 import networkx
 import obonet
 import csv
+from rapidfuzz import fuzz
 import argparse
 from sys import stdout
 
@@ -158,15 +159,27 @@ def parse_indications(indications, split_keys):
     return split_ind
 
 
-def match_indication(indication, hpo_dict):
+def match_indication(indication, hpo_dict, fuzzy=False, min_similarity=0.85, 
+                     min_fuzzy_len=10):
     """
     Match a single indication to HPO dictionary, and return a nonredundant list
     of all matching terms and superterms
     """
 
+    # First check if indication is non-informative
+    skip_terms = 'NO_CLINICAL_INFORMATION_PROVIDED UNKNOWN NOT_INDICATED ' + \
+                 'NOT_SPECIFIED NOT_PROVIDED NONE_PROVIDED'
+    if indication in skip_terms.split():
+        return []
+
+    # Otherwise, try to match into HPO
     query = clean_pheno(indication)
 
-    raw_matches = [hp for key, hp in hpo_dict.items() if query == key]
+    if fuzzy:
+        raw_matches = [hp for key, hp in hpo_dict.items() \
+                       if fuzz.token_sort_ratio(query, key) / 100 >= min_similarity]
+    else:
+        raw_matches = [hp for key, hp in hpo_dict.items() if query == key]
 
     raw_matches = set([hp for sublist in raw_matches for hp in sublist])
 
@@ -175,7 +188,8 @@ def match_indication(indication, hpo_dict):
     return matches
 
 
-def parse_phenotypes(phenos, outfile, hpo_dict, default):
+def parse_phenotypes(phenos, outfile, hpo_dict, default, 
+                     control_term='HEALTHY_CONTROL'):
     """
     Master function to parse a list of samples and phenotypes, and write 
     the converted HPO terms to output file
@@ -187,22 +201,40 @@ def parse_phenotypes(phenos, outfile, hpo_dict, default):
 
         reader = csv.reader(infile, delimiter='\t')
 
+        # DEV NOTE: this could be sped up by passing through the input file,
+        # running phenotype conversion for each _unique_ indication, then
+        # mapping those precomputed conversions onto each sample in a second pass
+        # through the file
         for sample, indications in reader:
 
             matches = []
 
-            for indication in parse_indications(indications, split_keys):
-                raw_matches = match_indication(indication, hpo_dict)
-                if raw_matches is not None:
-                    for match in raw_matches:
-                        if match not in matches:
-                            matches.append(match)
+            # First check if term matches healthy control
+            if indications == 'HEALTHY_CONTROL':
+                matches.append(control_term)
 
-            # if eligible_terms is not None and len(matches) > 0:
-            #     matches = [t for t in matches if t in eligible_terms]
+            # Otherwise, try to find HPO matches
+            else:
 
-            if len(matches) == 0:
-                matches = [default]
+                # First pass: try to find any exact matches (much faster)
+                for indication in parse_indications(indications, split_keys):
+                    raw_matches = match_indication(indication, hpo_dict)
+                    if raw_matches is not None:
+                        for match in raw_matches:
+                            if match not in matches:
+                                matches.append(match)
+
+                # If no exact matches are found, retry with fuzzy matching
+                if len(matches) == 0:
+                    for indication in parse_indications(indications, split_keys):
+                        raw_matches = match_indication(indication, hpo_dict, fuzzy=True)
+                        if raw_matches is not None:
+                            for match in raw_matches:
+                                if match not in matches:
+                                    matches.append(match)
+
+                if len(matches) == 0:
+                    matches = [default]
 
             matches.sort()
 

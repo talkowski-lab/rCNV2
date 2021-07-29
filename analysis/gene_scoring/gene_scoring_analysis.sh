@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -45,7 +45,6 @@ gtf_index="genes/gencode.v19.canonical.gtf.gz.tbi"
 contig=18
 pad_controls=0
 max_cnv_size=300000000
-weight_mode="weak"
 min_cds_ovr_del=0.8
 min_cds_ovr_dup=0.8
 max_genes_per_cnv=24
@@ -251,7 +250,6 @@ for contig in $( seq 1 22 ); do
       # Count CNVs
       /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
         --max-cnv-size ${max_cnv_size} \
-        --weight-mode ${weight_mode} \
         --min-cds-ovr $min_cds_ovr \
         --max-genes ${max_genes_per_cnv} \
         -t $CNV \

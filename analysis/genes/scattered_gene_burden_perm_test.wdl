@@ -17,7 +17,6 @@ workflow scattered_gene_burden_perm_test {
   String freq_code
   File gtf
   Int pad_controls
-  String weight_mode
   Float min_cds_ovr_del
   Float min_cds_ovr_dup
   Int max_genes_per_cnv
@@ -25,6 +24,7 @@ workflow scattered_gene_burden_perm_test {
   Int n_pheno_perms
   String meta_model_prefix
   String rCNV_bucket
+  String rCNV_docker
   String prefix
   String cache_string
   # Note: passing cache_string as a WDL variable is required to manually 
@@ -41,7 +41,6 @@ workflow scattered_gene_burden_perm_test {
         freq_code=freq_code,
         gtf=gtf,
         pad_controls=pad_controls,
-        weight_mode=weight_mode,
         min_cds_ovr_del=min_cds_ovr_del,
         min_cds_ovr_dup=min_cds_ovr_dup,
         max_genes_per_cnv=max_genes_per_cnv,
@@ -49,6 +48,7 @@ workflow scattered_gene_burden_perm_test {
         meta_model_prefix=meta_model_prefix,
         perm_idx=idx,
         rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
         prefix=prefix,
         cache_string=cache_string
     }
@@ -69,7 +69,6 @@ task permuted_burden_test {
   String freq_code
   File gtf
   Int pad_controls
-  String weight_mode
   Float min_cds_ovr_del
   Float min_cds_ovr_dup
   Int max_genes_per_cnv
@@ -77,6 +76,7 @@ task permuted_burden_test {
   String meta_model_prefix
   Int perm_idx
   String rCNV_bucket
+  String rCNV_docker
   String prefix
   String cache_string
 
@@ -159,7 +159,6 @@ task permuted_burden_test {
         # Count CNVs
         /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
           --pad-controls ${pad_controls} \
-          --weight-mode ${weight_mode} \
           --min-cds-ovr $min_cds_ovr \
           --max-genes ${max_genes_per_cnv} \
           -t $CNV \
@@ -213,7 +212,7 @@ task permuted_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:93ec0fee2b0ad415143eda627c2b3c8d2e1ef3c8ff4d3d620767637614fee5f8"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

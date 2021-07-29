@@ -12,6 +12,7 @@
 
 
 options(scipen=100000, stringsAsFactors=F)
+require(rCNV2)
 
 
 #################
@@ -63,11 +64,16 @@ calc.feature.cors <- function(stats, features, logit=F){
 }
 
 # Load a list of finemap stats and calculate feature coefficients
-load.stats <- function(statslist.in){
+load.stats <- function(statslist.in, subgroup="all"){
   statslist <- read.table(statslist.in, header=F, sep="\t")
   colnames(statslist) <- c("name", "color", "path", "features")
   stats <- lapply(1:nrow(statslist), function(i){
     stats <- load.stats.single(statslist$path[i])
+    if(subgroup == "developmental"){
+      stats <- stats[which(stats$HPO %in% developmental.hpos), ]
+    }else if(subgroup == "adult"){
+      stats <- stats[which(stats$HPO %in% adult.hpos), ]
+    }
     features <- load.features.single(stats, statslist$features[i])
     rhos <- calc.feature.cors(stats, features, logit=F)
     betas <- calc.feature.cors(stats, features, logit=T)
@@ -97,7 +103,7 @@ plot.feat.cors <- function(data, top.N=10, logit=F, center.buffer=6){
   new.order <- order(vals)
   vals <- vals[new.order]
   labs <- labs[new.order]
-  
+
   # Set parameters
   n.pos.feats <- min(c(length(which(vals>0)), top.N))
   pos.idx <- tail(1:length(vals), n.pos.feats)
@@ -105,17 +111,17 @@ plot.feat.cors <- function(data, top.N=10, logit=F, center.buffer=6){
   neg.idx <- head(1:length(vals), n.neg.feats)
   n.feats <- n.pos.feats + n.neg.feats
   valmax <- max(abs(vals), na.rm=T)
-  
+
   par(mfrow=c(1, 2), bty="n")
-  
+
   # Left panel — negative features
   par(mar=c(0.5, 1, 4, center.buffer))
   plot(x=c(-valmax, 0), y=c(0, n.feats), type="n",
        xaxt="n", yaxt="n", xlab="", ylab="")
   abline(v=axTicks(3), col="gray90")
   if(n.neg.feats > 0){
-    rect(xleft=vals[neg.idx], xright=0, 
-         ybottom=(1:n.neg.feats)-0.85, ytop=(1:n.neg.feats)-0.15, 
+    rect(xleft=vals[neg.idx], xright=0,
+         ybottom=(1:n.neg.feats)-0.85, ytop=(1:n.neg.feats)-0.15,
          col=data$color)
     axis(4, at=(1:n.neg.feats)-0.5, las=2, line=-0.9, tick=F,
          labels=labs[neg.idx])
@@ -126,16 +132,16 @@ plot.feat.cors <- function(data, top.N=10, logit=F, center.buffer=6){
   }else{
     mtext(3, text="Spearman's Rho", line=2.5)
   }
-  
+
   # Right panel — positive features
   par(mar=c(0.5, center.buffer, 4, 1))
   plot(x=c(0, valmax), y=c(0, n.feats), type="n",
        xaxt="n", yaxt="n", xlab="", ylab="")
   abline(v=axTicks(3), col="gray90")
   if(n.pos.feats > 0){
-    rect(xleft=vals[pos.idx], xright=0, 
-         ybottom=(1:n.pos.feats)-0.85+n.neg.feats, 
-         ytop=(1:n.pos.feats)-0.15+n.neg.feats, 
+    rect(xleft=vals[pos.idx], xright=0,
+         ybottom=(1:n.pos.feats)-0.85+n.neg.feats,
+         ytop=(1:n.pos.feats)-0.15+n.neg.feats,
          col=data$color)
     axis(2, at=(1:n.pos.feats)-0.5+n.neg.feats, las=2, line=-0.9, tick=F,
          labels=labs[pos.idx])
@@ -158,23 +164,25 @@ require(optparse, quietly=T)
 option_list <- list()
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage="%prog finemap_res.tsv features.tsv out.prefix",
+args <- parse_args(OptionParser(usage="%prog inputs.tsv subgroup out.prefix",
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Checks for appropriate positional arguments
-if(length(args$args) != 2){
-  stop("Three positional arguments: inputs.tsv and out_prefix\n")
+if(length(args$args) != 3){
+  stop("Three positional arguments: inputs.tsv, subgroup, and out_prefix\n")
 }
 
 # Writes args & opts to vars
 statslist.in <- args$args[1]
-out.prefix <- args$args[2]
+pheno.group <- args$args[2]
+out.prefix <- args$args[3]
 
 # # DEV PARAMTERS
 # setwd("~/scratch/")
 # statslist.in <- "finemap_feature_cor_input.tsv"
+# pheno.group <- "developmental"
 # out.prefix <- "finemap_features"
 
 # Load stats & features, and calculate rhos/betas

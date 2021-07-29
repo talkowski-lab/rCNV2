@@ -42,9 +42,17 @@ gzip -f HPO_dict.tsv
 gsutil cp HPO_dict.tsv.gz gs://rcnv_project/refs/
 
 
-# Convert BCH, GDX, Coe, SSC, and IU phenotypes
-for cohort in BCH GDX Coe SSC Epi25k IU; do
-  /opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
+# Pool old and new GeneDx phenotypes into single file
+cat raw_phenos/GDX_2013.raw_phenos.txt \
+    raw_phenos/GDX_2021.raw_phenos.txt \
+| sort -Vk1,1 -k2,2V \
+> raw_phenos/GDX.raw_phenos.txt
+
+
+# Convert BCH, GDX, Coe, SSC, and IU phenotypes (no post-hoc QC necessary)
+for cohort in BCH GDX Coe SSC IU; do
+  echo -e "Starting $cohort"
+  time /opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
     --obo hp.obo \
     -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
     -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
@@ -59,61 +67,45 @@ yes "HEALTHY_CONTROL" \
 >> cleaned_phenos/all/Coe.cleaned_phenos.txt
 
 
-# Convert SickKids phenotypes
-/opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
-  --obo hp.obo \
-  -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
-  -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
-  --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
-  -o cleaned_phenos/all/SickKids.cleaned_phenos.preQC.txt \
-  raw_phenos/SickKids.raw_phenos.txt
-fgrep -wf raw_phenos/SickKids.QC_pass_samples.list \
-  cleaned_phenos/all/SickKids.cleaned_phenos.preQC.txt \
-> cleaned_phenos/all/SickKids.cleaned_phenos.txt
-
-
-# Convert Epi25k case/control phenotypes
-fgrep -wv HEALTHY_CONTROL raw_phenos/Epi25k.raw_phenos.txt \
-| /opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
+# Convert SickKids and Epi25k (post-hoc QC required)
+for cohort in SickKids Epi25k CHOP; do
+  echo -e "Starting $cohort"
+  time /opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
     --obo hp.obo \
     -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
     -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
     --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
-    -o cleaned_phenos/all/Epi25k.cleaned_phenos.preQC.txt \
-    /dev/stdin
-fgrep -w HEALTHY_CONTROL raw_phenos/Epi25k.raw_phenos.txt \
->> cleaned_phenos/all/Epi25k.cleaned_phenos.preQC.txt
-fgrep -wf raw_phenos/Epi25k.QC_pass_samples.list \
-  cleaned_phenos/all/Epi25k.cleaned_phenos.preQC.txt \
-> cleaned_phenos/all/Epi25k.cleaned_phenos.txt
-
-
-# Convert CHOP phenotypes
-/opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
-  --obo hp.obo \
-  -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
-  -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
-  --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
-  -o cleaned_phenos/all/CHOP.cleaned_phenos.preQC.txt \
-  raw_phenos/CHOP.raw_phenos.txt
-fgrep -wf raw_phenos/CHOP.QC_pass_samples.list \
-  cleaned_phenos/all/CHOP.cleaned_phenos.preQC.txt \
-> cleaned_phenos/all/CHOP.cleaned_phenos.txt
+    -o cleaned_phenos/all/${cohort}.cleaned_phenos.preQC.txt \
+    raw_phenos/${cohort}.raw_phenos.txt
+  fgrep -wf raw_phenos/${cohort}.QC_pass_samples.list \
+    cleaned_phenos/all/${cohort}.cleaned_phenos.preQC.txt \
+  > cleaned_phenos/all/${cohort}.cleaned_phenos.txt
+done
 
 
 # Prep conversion table for cohorts with uniform phenotypes (TSAICG, PGC)
-cut -f2 raw_phenos/CHOP.raw_phenos.txt \
-| sort \
-| uniq \
-| awk -v OFS="\t" '{ print $1, $1 }' \
+cut -f2 raw_phenos/CHOP.raw_phenos.txt | sort | uniq \
+| awk -v OFS="\t" '{ if ($1=="") $1="UNKNOWN"; print $1, $1 }' \
 > CHOP.raw_phenos.conversion_input.txt
-/opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
+time /opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
   --obo hp.obo \
   -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
   -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
   --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
   -o CHOP.raw_phenos.conversion_table.txt \
   CHOP.raw_phenos.conversion_input.txt
+
+
+# Convert CHOP phenotypes
+awk -v FS="\t" -v OFS="\t" '{ if ($2=="") $2="UNKNOWN"; print $1, $2 }' \
+  raw_phenos/CHOP.raw_phenos.txt \
+| sort -Vk2,2 \
+| join -1 2 -2 1 -t $'\t' - <( sort -Vk1,1 CHOP.raw_phenos.conversion_table.txt ) \
+| cut -f2-3 | sort -Vk1,1 \
+> cleaned_phenos/all/CHOP.cleaned_phenos.preQC.txt
+fgrep -wf raw_phenos/CHOP.QC_pass_samples.list \
+  cleaned_phenos/all/CHOP.cleaned_phenos.preQC.txt \
+> cleaned_phenos/all/CHOP.cleaned_phenos.txt
 
 
 # Make dummy phenotype files for TSAICG
@@ -157,7 +149,7 @@ done
 
 
 # Convert UKBB ICD-10 codes to indications
-/opt/rCNV2/data_curation/phenotype/icd10_to_indication.py \
+time /opt/rCNV2/data_curation/phenotype/icd10_to_indication.py \
   --whitelist-terms /opt/rCNV2/refs/icd10/UKBB_ICD_term_whitelist.txt \
   --blacklist-terms /opt/rCNV2/refs/icd10/UKBB_ICD_term_blacklist.txt \
   --blacklist-samples /opt/rCNV2/refs/icd10/UKBB_ICD_sample_blacklist.txt \
@@ -175,13 +167,20 @@ gsutil cp UKBB.phenotype_blacklisted_samples.txt \
 
 
 # Convert UKBB indications
-/opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
+cut -f2 raw_phenos/UKBB.raw_phenos.txt | sort | uniq \
+| awk -v OFS="\t" '{ print $1, $1 }' \
+> UKBB.raw_phenos.conversion_input.txt
+time /opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
   --obo hp.obo \
   -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
   -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
   --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
-  -o cleaned_phenos/all/UKBB.cleaned_phenos.preQC.txt \
-  raw_phenos/UKBB.raw_phenos.txt
+  -o UKBB.raw_phenos.conversion_table.txt \
+  UKBB.raw_phenos.conversion_input.txt
+sort -Vk2,2 raw_phenos/UKBB.raw_phenos.txt \
+| join -1 2 -2 1 -t $'\t' - <( sort -Vk1,1 UKBB.raw_phenos.conversion_table.txt ) \
+| cut -f2-3 | sort -Vk1,1 \
+> cleaned_phenos/all/UKBB.cleaned_phenos.preQC.txt
 fgrep -wf raw_phenos/UKBB.QC_pass_samples.list \
   cleaned_phenos/all/UKBB.cleaned_phenos.preQC.txt \
 > cleaned_phenos/all/UKBB.cleaned_phenos.txt
@@ -201,6 +200,7 @@ done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt | fgrep -v "#" ) \
 echo -e "EstBB\traw_phenos/EstBB.HPO_terms_full_cooccurrence_table.tsv.gz" > hpo_pair_cohorts.inputs.tsv
 echo -e "BioVU\traw_phenos/BioVU.hpo_coocurrence_table.tsv.gz" >> hpo_pair_cohorts.inputs.tsv
 
+
 # Determine minimum HPO tree to use
 /opt/rCNV2/data_curation/phenotype/collapse_HPO_tree.py \
   --hpo-pair-cohorts hpo_pair_cohorts.inputs.tsv \
@@ -216,6 +216,7 @@ echo -e "BioVU\traw_phenos/BioVU.hpo_coocurrence_table.tsv.gz" >> hpo_pair_cohor
   --filter-log HPO_tree_filter.log \
   --min-samples 3000 \
   --min-diff 3000 \
+  --max-jac 0.8 \
   --outfile phenotype_groups.HPO_metadata.intermediate.txt \
   all_phenos.merged.txt
 
@@ -238,7 +239,7 @@ done
 
 
 # Get summary table of HPO counts per cohort & metacohort
-# Only keep HPO terms with at least 500 cases from two or more metacohorts
+# Only keep HPO terms with at least 300 cases from three or more metacohorts
 gsutil cp gs://rcnv_project/analysis/analysis_refs/rCNV_metacohort_list.txt ./
 /opt/rCNV2/data_curation/phenotype/gather_hpo_per_cohort_table.py \
   --outfile HPOs_by_cohort.table.tsv \

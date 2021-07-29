@@ -13,14 +13,16 @@ Filter an input CNV BED file
 import argparse
 from sys import stdin, stdout
 from os import path
-import pybedtools
+import pybedtools as pbt
 import pysam
 from math import ceil
+from statsmodels.stats.proportion import proportion_confint
 import subprocess
 import csv
 
 
-def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
+def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000, 
+                use_upper_binom=True):
     """
     Compare two sets of CNVs, and retain those in set A that have fewer than
     a maximum specified number of hits in set B
@@ -65,6 +67,13 @@ def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
 
     # Get list of CNVs to keep based on freq in xbed
     cutoff = ceil(maxFreq * nsamp)
+    # If optioned, set a more conservative cutoff equal to the upper bound of the
+    # 95% binomial confidence interval corresponding to maxFreq at nsamp samples
+    if use_upper_binom:
+        try:
+            cutoff = ceil(proportion_confint(count=cutoff, nobs=nsamp,  alpha=0.05)[1] * nsamp)
+        except:
+            import pdb; pdb.set_trace()
     def _remove_fails(feature, hits, cutoff):
         fname = str(feature[3])
         if hits.get(fname, 0) <= cutoff:
@@ -73,8 +82,7 @@ def freq_filter(cnvsA, cnvsB, nsamp, maxFreq=0.01, ro=0.5, dist=50000):
     return cnvsA.filter(_remove_fails, hits, cutoff)
 
 
-def read_vcf(vcfin, maxfreq, af_fields='AF', singleton_min_samples=200, 
-             apply_min_samples_filter=False):
+def read_vcf(vcfin, maxfreq, af_fields='AF', use_lower_binom=True):
     """
     Reads a SV sites vcf and converts it to a BedTool
     """
@@ -86,8 +94,7 @@ def read_vcf(vcfin, maxfreq, af_fields='AF', singleton_min_samples=200,
     if 'AF' not in af_fields:
         af_fields.append('AF')
 
-    def _filter_vcf(vcf, maxfreq, singleton_min_samples=200, 
-                    apply_min_samples_filter=False):
+    def _filter_vcf(vcf, maxfreq, use_lower_binom=True):
         vcf_str = ''
 
         for record in vcf:
@@ -99,48 +106,39 @@ def read_vcf(vcfin, maxfreq, af_fields='AF', singleton_min_samples=200,
             and record.filter.keys() != ['MULTIALLELIC']:
                 continue
 
-            def _scrape_afs(record, af_fields, singleton_min_samples=200, 
-                            apply_min_samples_filter=False):
+            def _scrape_afs(record, af_fields, use_lower_binom=True):
                 afs = []
                 for field in af_fields:
+
+                    # Collect raw AF
                     if field not in record.info.keys():
                         continue
-
-                    # Check if number of samples >= singleton_min_samples
-                    if apply_min_samples_filter:
-                        if 'CN_NONREF_FREQ' in field:
-                            n_samps = record.info[field.replace('NONREF_FREQ', 'NUMBER')]
-                        else:
-                            if field == 'AF':
-                                n_samps = record.info['N_BI_GENOS']
-                            else:
-                                n_samps = record.info[field.replace('_AF', '_N_BI_GENOS')]
-                        if n_samps < singleton_min_samples:
-                            # If population is too small, make sure variant is not observed in a single sample
-                            if 'CN_NONREF_FREQ' in field:
-                                n_carriers = record.info[field.replace('NONREF_FREQ', 'NONREF_COUNT')]
-                            else:
-                                if field == 'AF':
-                                    n_carriers = n_samps - record.info['N_HOMREF']
-                                else:
-                                    n_carriers = n_samps - record.info[field.replace('_AF', '_N_HOMREF')]
-                            if n_carriers == 1:
-                                continue
-
-                    # If variant passes singleton check, proceed with AF computation
-                    if field in record.info.keys():
-                        af = record.info[field]
                     else:
-                        continue
+                        af = record.info[field]
+
                     if isinstance(af, tuple):
                         if len(af) > 1:
                             af = sum([f for a, f in zip(list(record.alts), list(af)) if a != '<CN=2>'])
                         else:
                             af = af[0]
+
+                    # If optioned, compute lower bound of 95% binomial confidence 
+                    # interval and report that as AF (more conservative / handles
+                    # small sample sizes better)
+                    if use_lower_binom:
+                        if 'CN_NONREF_FREQ' in field:
+                            n_samps = record.info[field.replace('NONREF_FREQ', 'NUMBER')]
+                        else:
+                            if field == 'AF':
+                                n_samps = record.info['AN']
+                            else:
+                                n_samps = record.info[field.replace('_AF', '_AN')]
+                        af = proportion_confint(count=ceil(af * n_samps), nobs=n_samps,  alpha=0.05)[0]
+
                     afs.append(af)
                 return afs
 
-            afs = _scrape_afs(record, af_fields, singleton_min_samples, apply_min_samples_filter)
+            afs = _scrape_afs(record, af_fields, use_lower_binom)
             if len(afs) > 0:
                 if max(afs) <= maxfreq:
                     continue
@@ -153,9 +151,9 @@ def read_vcf(vcfin, maxfreq, af_fields='AF', singleton_min_samples=200,
 
             vcf_str = vcf_str + fstr
 
-        return pybedtools.BedTool(vcf_str, from_string=True)
+        return pbt.BedTool(vcf_str, from_string=True)
 
-    gbed = _filter_vcf(vcf, maxfreq, singleton_min_samples, apply_min_samples_filter)
+    gbed = _filter_vcf(vcf, maxfreq, use_lower_binom)
 
     return gbed
 
@@ -175,8 +173,6 @@ def main():
                         '[50kb]', default=50000)
     parser.add_argument('--maxsize', type=int, help='Maximum CNV size. ' +
                         '[10Mb]', default=10000000)
-    parser.add_argument('-N', '--nsamp', type=int, help='Number of samples ' +
-                        'represented in input BED.')
     parser.add_argument('--maxfreq', type=float, help='Maximum CNV ' + 
                         'frequency. [default: 0.01]', default=0.01)
     parser.add_argument('--recipoverlap', type=float, help='Reciprocal overlap ' + 
@@ -187,6 +183,13 @@ def main():
                         'between breakpoints to consider two CNVs matching. ' +
                         '[default: 50kb]',
                         default=50000)
+    parser.add_argument('-w', '--whitelist', action='append', help='BED file ' +
+                        'containing regions to exclude from blacklisting and ' +
+                        'cross-cohort frequency-based filtering. May be specified ' +
+                        'multiple times.')
+    parser.add_argument('--wrecip', type=float, help='Minimum reciprocal overlap ' + 
+                        'vs. any whitelist interval to automatically include a CNV. ' +
+                        '[default: 0.75]', default=0.75)
     parser.add_argument('-x', '--blacklist', action='append', help='BED file ' +
                         'containing regions to blacklist based on CNV coverage. ' +
                         'May be specified multiple times.')
@@ -209,14 +212,7 @@ def main():
                         'entries with commas. If multiple entries are specified, ' +
                         'will take the max. Will default to AF if entry not found.',
                          default='AF', dest='af_fields')
-    parser.add_argument('--vcf-with-min-sample-filter', action='append', 
-                        help='SV VCFs to use for frequency filtering while also ' + 
-                        'applying --vcf-min-samples-for-singleton. May be ' +
-                        'specified multiple times.')
-    parser.add_argument('--vcf-min-samples-for-singletons', dest='singleton_min_samples', 
-                        type=int, help='Minimum number of samples for singleton ' +
-                        '(AC=1) variants from --vcf-with-min-sample-filter inputs ' +
-                        'to be considered for filtering [default: 200]', default=200)
+    parser.add_argument('-g', '--genome', help='Genome file (used for sorting).')
     parser.add_argument('-z', '--bgzip', dest='bgzip', action='store_true',
                         help='Compress output BED with bgzip.')
 
@@ -224,9 +220,9 @@ def main():
 
     # Read input bed
     if args.inbed in 'stdin -'.split():
-        cnvs = pybedtools.BedTool(stdin)
+        cnvs = pbt.BedTool(stdin)
     else:
-        cnvs = pybedtools.BedTool(args.inbed)
+        cnvs = pbt.BedTool(args.inbed)
 
     # Restrict to a subset of chromosomes, or autosomes if not specified
     if args.chr is None:
@@ -235,13 +231,26 @@ def main():
         chroms = args.chr.split(',')
     cnvs = cnvs.filter(lambda x: x.chrom in chroms)
 
-    # # Loose restriction on CNV minimum size prior to self-intersect
-    # # (It is impossible to attain target RO with CNVs smaller than 
-    # #  args.recipoverlap * args.minsize)
-    # cnvs = cnvs.filter(lambda x: x.stop - x.start >= (args.recipoverlap * args.minsize) )
-
     # Restrict on size
     cnvs = cnvs.filter(lambda x: len(x) >= args.minsize and len(x) <= args.maxsize)
+
+    # Restrict on VCFs 
+    if args.vcf is not None:
+        for vcfpath in args.vcf:
+            vbed = read_vcf(vcfpath, args.maxfreq, args.af_fields)
+            cnvs = freq_filter(cnvs, vbed, 0, maxFreq=args.maxfreq, 
+                               ro=args.recipoverlap, dist=args.dist,
+                               use_upper_binom=False)
+
+    # Extract CNVs overlapping whitelist and hold them out from all subsequent filtering
+    if args.whitelist is not None:
+        wbt = pbt.BedTool(args.whitelist[0]).cut(range(3))
+        if len(args.whitelist) > 1:
+            for inbed in args.whitelist[1:]:
+                wbt = wbt.cat(pbt.BedTool(inbed).cut(range(3)), postmerge=False)
+        cnvs = cnvs.saveas()
+        wcnvs = cnvs.intersect(wbt, r=True, f=args.wrecip, wa=True, u=True).saveas()
+        cnvs = cnvs.intersect(wbt, r=True, f=args.wrecip, wa=True, v=True)
 
     # Restrict on blacklist coverage
     if args.blacklist is not None:
@@ -249,34 +258,13 @@ def main():
             if float(feature[-1]) <= xcov:
                 return feature
         for blpath in args.blacklist:
-            bl = pybedtools.BedTool(blpath)
+            bl = pbt.BedTool(blpath)
             cnvs = cnvs.coverage(bl).filter(_bl_filter, args.xcov).cut(range(0, 6))
-
-    # Restrict on VCFs 
-    if args.vcf is not None:
-        for vcfpath in args.vcf:
-            vbed = read_vcf(vcfpath, args.maxfreq, args.af_fields, 
-                            args.singleton_min_samples)
-            cnvs = freq_filter(cnvs, vbed, 0, maxFreq=args.maxfreq, 
-                               ro=args.recipoverlap, dist=args.dist)
-    if args.vcf_with_min_sample_filter is not None:
-        for vcfpath in args.vcf_with_min_sample_filter:
-            vbed = read_vcf(vcfpath, args.maxfreq, args.af_fields, 
-                            args.singleton_min_samples,
-                            apply_min_samples_filter=True)
-            cnvs = freq_filter(cnvs, vbed, 0, maxFreq=args.maxfreq, 
-                               ro=args.recipoverlap, dist=args.dist)
-
-    # # Restrict on self-intersection
-    # if args.nsamp is not None:
-    #     cnvs = freq_filter(cnvs, cnvs, args.nsamp, maxFreq=args.maxfreq, 
-    #                        ro=args.recipoverlap, dist=args.dist)
 
     # Restrict on frequency filtering vs each cohort, one at a time
     if args.cohorts_list is not None:
         with open(args.cohorts_list) as fin:
-            clist = csv.reader(fin, delimiter='\t')
-            for name, N, bcnv_path in clist:
+            for name, N, bcnv_path in csv.reader(fin, delimiter='\t'):
                 cnvs = freq_filter(cnvs, bcnv_path, int(N),
                            maxFreq=args.maxfreq, ro=args.recipoverlap, 
                            dist=args.dist)
@@ -287,6 +275,13 @@ def main():
         cnvs = freq_filter(cnvs, args.allcohorts, args.allcohorts_nsamp,
                            maxFreq=args.maxfreq, ro=args.recipoverlap, 
                            dist=args.dist)
+
+    # Add whitelisted CNVs back into final CNV file
+    cnvs = cnvs.saveas()
+    if args.genome is not None:
+        cnvs = cnvs.cat(wcnvs, postmerge=False).sort(g=args.genome)
+    else:
+        cnvs = cnvs.cat(wcnvs, postmerge=False).sort()
 
     # Write filtered CNVs out to file
     outheader = '#chr\tstart\tend\tname\tcnv\tpheno'

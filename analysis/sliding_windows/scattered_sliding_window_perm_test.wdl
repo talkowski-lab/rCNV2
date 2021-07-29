@@ -22,6 +22,7 @@ workflow scattered_sliding_window_perm_test {
   Int n_pheno_perms
   String meta_model_prefix
   String rCNV_bucket
+  String rCNV_docker
   String prefix
   String cache_string
   # Note: passing cache_string as a WDL variable is required to manually 
@@ -42,7 +43,8 @@ workflow scattered_sliding_window_perm_test {
 	      p_cutoff=p_cutoff,
         meta_model_prefix=meta_model_prefix,
 	      perm_idx=idx,
-	      rCNV_bucket=rCNV_bucket,
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
 	      prefix=prefix,
         cache_string=cache_string
 	  }
@@ -68,6 +70,7 @@ task permuted_burden_test {
   String meta_model_prefix
   Int perm_idx
   String rCNV_bucket
+  String rCNV_docker
   String prefix
   String cache_string
 
@@ -121,7 +124,7 @@ task permuted_burden_test {
       > shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz
       tabix -f shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz
 
-    done < ${metacohort_list}
+    done < <( fgrep -v "mega" ${metacohort_list} )
 
     # Iterate over CNV types
     for CNV in DEL DUP; do
@@ -180,7 +183,7 @@ task permuted_burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:db7a75beada57d8e2649ce132581f675eb47207de489c3f6ac7f3452c51ddb6e"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

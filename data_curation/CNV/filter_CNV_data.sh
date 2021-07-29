@@ -24,6 +24,7 @@ docker run --rm -it gcr.io/gnomad-wgs-v2-sv/rcnv
 gcloud auth login
 gsutil -m cp -r gs://rcnv_project/raw_data/cnv ./
 gsutil -m cp -r gs://rcnv_project/refs ./
+gsutil -m cp gs://analysis/paper/data/large_segments/lit_GDs.*.bed.gz ./refs/
 
 
 
@@ -41,15 +42,6 @@ for bed in cnv/*raw.bed.gz; do
   echo -e "\n\n"
 done
 
-
-# # Make master BED file of all raw CNV data
-# zcat cnv/*bed.gz \
-# | fgrep -v "#" \
-# | sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
-# | bgzip -c \
-# > all_raw_cnvs.bed.gz
-# allcohorts_nsamp=$( fgrep -v "#" /opt/rCNV2/refs/rCNV_sample_counts.txt \
-#                     | awk '{ sum+=$2 }END{ print sum }' )
 
 # Make master list of all raw CNV data per cohort
 while read cohort N; do
@@ -76,20 +68,23 @@ while read cohort N; do
   /opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
     --minsize 100000 \
     --maxsize 20000000 \
-    --nsamp $N \
     --maxfreq 0.01 \
     --recipoverlap 0.5 \
     --dist 100000 \
+    --whitelist refs/lit_GDs.hc.bed.gz \
+    --whitelist refs/lit_GDs.mc.bed.gz \
+    --wrecip 0.75 \
     --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
     --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
     --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
-    --xcov 0.3 \
+    --xcov 0.5 \
     --cohorts-list raw_CNVs.per_cohort.txt \
     --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
     --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-    --vcf-with-min-sample-filter refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
-    --vcf-with-min-sample-filter refs/HGDP.hg19.sites.vcf.gz \
+    --vcf refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
+    --vcf refs/HGDP.hg19.sites.vcf.gz \
     --vcf-af-fields "AF,$( paste -s -d, all_pop_af_fields.txt )" \
+    --genome refs/GRCh37.autosomes.genome \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     rare_cnv_curated/$cohort.rCNV.bed.gz
@@ -102,20 +97,23 @@ while read cohort N; do
   /opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
     --minsize 100000 \
     --maxsize 20000000 \
-    --nsamp $N \
     --maxfreq 0.001 \
     --recipoverlap 0.5 \
     --dist 100000 \
+    --whitelist refs/lit_GDs.hc.bed.gz \
+    --whitelist refs/lit_GDs.mc.bed.gz \
+    --wrecip 0.75 \
     --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
     --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
     --blacklist refs/GRCh37.Nmask.bed.gz \
-    --xcov 0.3 \
+    --xcov 0.5 \
     --cohorts-list raw_CNVs.per_cohort.txt \
     --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
     --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-    --vcf-with-min-sample-filter refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
-    --vcf-with-min-sample-filter refs/HGDP.hg19.sites.vcf.gz \
+    --vcf refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
+    --vcf refs/HGDP.hg19.sites.vcf.gz \
     --vcf-af-fields "AF,$( paste -s -d, all_pop_af_fields.txt )" \
+    --genome refs/GRCh37.autosomes.genome \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     ultrarare_cnv_curated/$cohort.vCNV.bed.gz
@@ -128,20 +126,23 @@ while read cohort N; do
   /opt/rCNV2/data_curation/CNV/filter_cnv_bed.py \
     --minsize 100000 \
     --maxsize 20000000 \
-    --nsamp $N \
     --maxfreq 0.0001 \
     --recipoverlap 0.5 \
     --dist 100000 \
+    --whitelist refs/lit_GDs.hc.bed.gz \
+    --whitelist refs/lit_GDs.mc.bed.gz \
+    --wrecip 0.75 \
     --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
     --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
     --blacklist refs/GRCh37.Nmask.bed.gz \
-    --xcov 0.3 \
+    --xcov 0.5 \
     --cohorts-list raw_CNVs.per_cohort.txt \
     --vcf refs/gnomad_v2.1_sv.nonneuro.sites.vcf.gz \
     --vcf refs/CCDG_Abel_bioRxiv.sites.vcf.gz \
-    --vcf-with-min-sample-filter refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
-    --vcf-with-min-sample-filter refs/HGDP.hg19.sites.vcf.gz \
+    --vcf refs/1000Genomes_HGSV_highCov.sites.vcf.gz \
+    --vcf refs/HGDP.hg19.sites.vcf.gz \
     --vcf-af-fields "AF,$( paste -s -d, all_pop_af_fields.txt )" \
+    --genome refs/GRCh37.autosomes.genome \
     --bgzip \
     cnv/$cohort.raw.bed.gz \
     ultrarare_cnv_curated/$cohort.uCNV.bed.gz

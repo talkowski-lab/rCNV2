@@ -191,6 +191,12 @@ def overlap_cnvs_exons(cnvbt, exonbt, cds_dict, weight_mode, min_cds_ovr, max_ge
     for cnvid in cnv_cds_sums.keys():
         if len(cnv_weights[cnvid]) > 0:
             wsum = sum(cnv_weights[cnvid].values())
+
+            # Skip to next CNV if no weighting is specified
+            if weight_mode is None:
+                continue
+
+            # Otherwise, weight genes by CDS overlap
             if weight_mode == 'weak' \
             or wsum < 1:
                 cnv_weights[cnvid] = {gene: w / wsum for gene, w 
@@ -298,13 +304,16 @@ def make_output_table(outbed, txbt, genes, cds_dict, control_counts,
 
 
 def write_annotated_cnvs(cnvbt, cnvs_out, case_cnv_weights, control_cnv_weights, 
-                         control_hpo='HEALTHY_CONTROL'):
+                         control_hpo='HEALTHY_CONTROL', annotate_cds=False, 
+                         max_float=6):
     """
     Format & write BED file of CNVs annotated with gene overlaps
     """
 
     # Write header to output file
     hcols = '#chr start end cnvid cnv phenos ngenes total_weight genes'
+    if annotate_cds:
+        hcols += ' cds_per_gene'
     cnvs_out.write('\t'.join(hcols.split()) + '\n')
 
     for cnv in cnvbt:
@@ -316,8 +325,12 @@ def write_annotated_cnvs(cnvbt, cnvs_out, case_cnv_weights, control_cnv_weights,
         hits = cnv_dict.get(cnvid, {})
         ngenes = len(hits.keys())
         sumweight = np.nansum(list(hits.values()))
-        genes = ';'.join(sorted(hits.keys()))
+        sorted_genes = sorted(hits.keys())
+        genes = ';'.join(sorted_genes)
         outfields = cnv.fields + [str(ngenes), str(sumweight), genes]
+        if annotate_cds:
+            sorted_cds = [str(round(hits[g], max_float)) for g in sorted_genes]
+            outfields.append(';'.join(sorted_cds))
         cnvs_out.write('\t'.join(outfields) + '\n')
 
 
@@ -336,8 +349,8 @@ def main():
                         'breakpoints. [default: 0]',
                         type=float, default=0)
     parser.add_argument('--weight-mode', help='Specify behavior for distributing ' +
-                        'weight for multi-gene CNVs. [default: "weak"]',
-                        choices=['weak', 'strong', 'bayesian'], default='weak')
+                        'weight for multi-gene CNVs. [default: no weighting]',
+                        choices=['weak', 'strong', 'bayesian'], default=None)
     parser.add_argument('--min-cds-ovr', help='Minimum coding sequence overlap ' +
                         'to consider a CNV gene-overlapping. [default: 0.2]',
                         type=float, default=0.2)
@@ -368,6 +381,8 @@ def main():
                         '[default: stdout]')
     parser.add_argument('--cnvs-out', help='Path to output BED file for CNVs ' + 
                         'annotated with genes disrupted.')
+    parser.add_argument('--annotate-cds-per-gene', default=False, action='store_true',
+                        help='Append CDS overlapped per gene to CNV BED output file.')
     parser.add_argument('-z', '--bgzip', dest='bgzip', action='store_true',
                         help='Compress output BED with bgzip.')
     parser.add_argument('--bgzip-cnvs-out', dest='bgzip_cnvs_out', action='store_true', 
@@ -448,7 +463,8 @@ def main():
             bgzip_cnvs_out = args.bgzip_cnvs_out
         cnvs_out = open(cnvs_outpath, 'w')
         write_annotated_cnvs(cnvbt, cnvs_out, case_cnv_weights, 
-                             control_cnv_weights, args.control_hpo)
+                             control_cnv_weights, args.control_hpo,
+                             args.annotate_cds_per_gene)
         if bgzip_cnvs_out:
             subprocess.run(['bgzip', '-f', cnvs_outpath])
 

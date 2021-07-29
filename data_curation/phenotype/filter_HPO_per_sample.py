@@ -15,7 +15,8 @@ import argparse
 from sys import stdout
 
 
-def filter_phenotypes(phenos, pass_terms, outfile):
+def filter_phenotypes(phenos, pass_terms, outfile, 
+                      default_terms=["HP:0000118", "UNKNOWN"]):
     """
     Read sample-HPO pairings from file, and filter HPO terms
     """
@@ -26,6 +27,8 @@ def filter_phenotypes(phenos, pass_terms, outfile):
 
         for sample, terms in reader:
             keep_terms = [t for t in terms.split(';') if t in pass_terms]
+            if len(keep_terms) == 0:
+                keep_terms += default_terms
             outfile.write('{0}\t{1}\n'.format(sample, ';'.join(keep_terms)))
 
 

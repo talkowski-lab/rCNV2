@@ -69,7 +69,12 @@ def tally_hpo_counts(pheno_file, ignore_terms, precomp_pairs=None):
         reader = csv.reader(infile, delimiter='\t')
 
         for sample, terms in reader:
-            for term in terms.split(';'):
+            # Make sure samples with base term also have HP:0000118
+            sterms = terms.split(';')
+            if 'HP:0000001' in sterms and 'HP:0000118' not in sterms:
+                sterms.append('HP:0000118')
+
+            for term in sterms:
 
                 if ignore_terms is not None:
                     if term in ignore_terms:
@@ -129,6 +134,77 @@ def prune_small_terms(hpo_counts, min_samples):
             filtered_counts[term] = count
 
     return filtered_counts
+
+
+def pair_all_terms(terms):
+    """
+    Make a list of tuples for all combinations of terms
+    """
+
+    all_term_pairs = []
+
+    for a in range(len(terms)):
+        termA = terms[a]
+
+        for b in range(len(terms)):
+            termB = terms[b]
+            
+            if a >= b:
+                continue
+
+            else:
+                pair = tuple(sorted([termA, termB]))
+                all_term_pairs.append(pair)
+
+    return all_term_pairs
+
+
+def prune_jaccard_terms(hpo_counts, pairwise_counts, hpo_g, max_jac, filter_log):
+    """
+    Prune all terms (related or not) based on Jaccard index of samples shared
+    between each pair of terms
+    """
+
+    dropped_terms = []
+
+    for termA, termB in pairwise_counts.keys():
+
+        if termA in dropped_terms or termB in dropped_terms:
+            continue
+
+        if termA == termB:
+            continue
+
+        countA = hpo_counts.get(termA, 0)
+        countB = hpo_counts.get(termB, 0)
+
+        if (termA, termB) in pairwise_counts.keys():
+            countAB = pairwise_counts.get((termA, termB), 0)
+        else:
+            countAB = pairwise_counts.get((termB, termA), 0)
+
+        jac = countAB / (countA + countB - countAB)
+
+        if jac > max_jac:
+            if countA >= countB:
+                hpo_counts.pop(termB)
+                dropped_terms.append(termB)
+                write_prune_log(filter_log, termA, termB,
+                                hpo_g.nodes(data=True)[termA]['name'],
+                                hpo_g.nodes(data=True)[termB]['name'],
+                                '{3} and {2} have Jaccard similarity of ' + \
+                                str(round(jac, 2)) + ' and {2} is larger.')
+            else:
+                hpo_counts.pop(termA)
+                dropped_terms.append(termA)
+                write_prune_log(filter_log, termB, termA,
+                                hpo_g.nodes(data=True)[termB]['name'],
+                                hpo_g.nodes(data=True)[termA]['name'],
+                                '{3} and {2} have Jaccard similarity of ' + \
+                                str(round(jac, 2)) + ' and {2} is larger.')
+
+    return hpo_counts
+            
 
 
 def calc_term_overlap(termsA, termsB):
@@ -296,23 +372,20 @@ def prune_related_terms(hpo_counts, related_terms, pairwise_counts, hpo_g,
 
     terms_to_prune = []
 
-    if filter_log is not None:
-        f_log = open(filter_log, 'w')
-
     for termA, termB in related_terms:
 
         if termA in terms_to_prune:
             if filter_log is not None:
                 msg = 'Skipping candidate pair "{0}" ({1}) & "{2}" ({3}): ' + \
                       '{1} has already been pruned.\n'
-                f_log.write(msg.format(hpo_g.nodes(data=True)[termA]['name'], termA, 
+                filter_log.write(msg.format(hpo_g.nodes(data=True)[termA]['name'], termA, 
                                        hpo_g.nodes(data=True)[termB]['name'], termB))
             continue
         if termB in terms_to_prune:
             if filter_log is not None:
                 msg = 'Skipping candidate pair "{0}" ({1}) & "{2}" ({3}): ' + \
                       '{3} has already been pruned.\n'
-                f_log.write(msg.format(hpo_g.nodes(data=True)[termA]['name'], termA, 
+                filter_log.write(msg.format(hpo_g.nodes(data=True)[termA]['name'], termA, 
                                        hpo_g.nodes(data=True)[termB]['name'], termB))
             continue
 
@@ -335,14 +408,14 @@ def prune_related_terms(hpo_counts, related_terms, pairwise_counts, hpo_g,
         if levelA < levelB:
             terms_to_prune.append(termB)
             if filter_log is not None:
-                write_prune_log(f_log, termA, termB,
+                write_prune_log(filter_log, termA, termB,
                                 hpo_g.nodes(data=True)[termA]['name'],
                                 hpo_g.nodes(data=True)[termB]['name'],
                                 '{3} is higher-order term than {2}')
         elif levelA > levelB:
             terms_to_prune.append(termA)
             if filter_log is not None:
-                write_prune_log(f_log, termB, termA,
+                write_prune_log(filter_log, termB, termA,
                                 hpo_g.nodes(data=True)[termB]['name'],
                                 hpo_g.nodes(data=True)[termA]['name'],
                                 '{2} is higher-order term than {3}')
@@ -350,7 +423,7 @@ def prune_related_terms(hpo_counts, related_terms, pairwise_counts, hpo_g,
             if countA >= countB:
                 terms_to_prune.append(termB)
                 if filter_log is not None:
-                    write_prune_log(f_log, termA, termB,
+                    write_prune_log(filter_log, termA, termB,
                                     hpo_g.nodes(data=True)[termA]['name'],
                                     hpo_g.nodes(data=True)[termB]['name'],
                                     'both terms are same order, but {2} has ' + \
@@ -358,7 +431,7 @@ def prune_related_terms(hpo_counts, related_terms, pairwise_counts, hpo_g,
             else:
                 terms_to_prune.append(termA)
                 if filter_log is not None:
-                    write_prune_log(f_log, termB, termA,
+                    write_prune_log(filter_log, termB, termA,
                                     hpo_g.nodes(data=True)[termB]['name'],
                                     hpo_g.nodes(data=True)[termA]['name'],
                                     'both terms are same order, but {2} has ' + \
@@ -475,6 +548,10 @@ def main():
                         'must differ between HPO terms before pruning one or ' +
                         'the other. [default: 1,000]', default=1000, type=int, 
                         metavar='int')
+    parser.add_argument('--max-jac', help='Maximum Jaccard index for samples ' +
+                        'belonging to any two HPO terms before pruning one or ' +
+                        'the other. [default: 0.8]', default=0.8, type=float, 
+                        metavar='float')
     args = parser.parse_args()
 
     # Open connection to obo
@@ -485,6 +562,12 @@ def main():
         outfile = stdout
     else:
         outfile = open(args.outfile, 'w')
+
+    # Open connection to filter log, if optioned
+    if args.filter_log is not None:
+        filter_log = open(args.filter_log, 'w')
+    else:
+        filter_log = None
 
     # Load counts from cohorts with precomputed HPO pairs, if any
     if args.hpo_pair_cohorts is not None:
@@ -502,14 +585,19 @@ def main():
     # Prune HPO terms based on minimum number of samples
     hpo_counts = prune_small_terms(hpo_counts, args.min_samples)
 
-    # Prune HPO terms based on relatedness and sample overlap
+    # Prune HPO terms based on Jaccard index
+    all_term_pairs = pair_all_terms(list(hpo_counts.keys()))
+    pairwise_counts = count_overlapping_samples(all_term_pairs, args.phenos, 
+                                                precomp_pairs)
+    hpo_counts = prune_jaccard_terms(hpo_counts, pairwise_counts, hpo_g,
+                                     args.max_jac, filter_log)
+
+    # Prune HPO terms based on relatedness and raw sample overlap
     related_terms = get_related_terms(hpo_counts, hpo_g)
     related_terms = filter_related_term_list(hpo_counts, related_terms, 
                                              args.min_diff)
-    pairwise_counts = count_overlapping_samples(related_terms, args.phenos, 
-                                                precomp_pairs)
     hpo_counts = prune_related_terms(hpo_counts, related_terms, pairwise_counts, 
-                                     hpo_g, args.min_diff, args.filter_log)
+                                     hpo_g, args.min_diff, filter_log)
 
     # Format & write final list of pruned HPO terms for analysis
     write_final_hpo_list(hpo_counts, hpo_g, outfile)

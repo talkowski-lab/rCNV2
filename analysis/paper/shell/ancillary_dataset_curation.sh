@@ -35,9 +35,9 @@ gsutil -m cp -r \
 
 
 # Download & reformat DDD de novo mutation table
-wget https://www.biorxiv.org/content/biorxiv/early/2020/04/01/797787/DC4/embed/media-4.txt
+wget https://static-content.springer.com/esm/art%3A10.1038%2Fs41586-020-2832-5/MediaObjects/41586_2020_2832_MOESM3_ESM.txt
 /opt/rCNV2/data_curation/other/curate_ddd_dnms.py \
-  --dnm-tsv media-4.txt \
+  --dnm-tsv 41586_2020_2832_MOESM3_ESM.txt \
   --genes gencode.v19.canonical.pext_filtered.genes.list \
   -o ddd_dnm_counts.tsv.gz \
   -z

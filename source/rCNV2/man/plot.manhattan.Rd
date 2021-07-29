@@ -11,10 +11,14 @@
   highlight.color = "#4EE69A",
   highlight.name = "Highlighted Loci",
   mark.highlights = FALSE,
+  colors = c("gray15", "gray70"),
+  cutoff.color = "#D01C8B",
   lab.prefix = NULL,
   ymax = NULL,
   reflection = F,
-  label.cex = 1
+  pt.cex = 0.2,
+  label.cex = 1,
+  y.ax.cex = 0.75
 )
 }
 \arguments{
@@ -30,13 +34,21 @@
 
 \item{mark.highlights}{boolean indicated to mark highlighted regions with small arrows [default: FALSE]}
 
+\item{colors}{vector of colors to assign sequentially to all chromosomes}
+
+\item{cutoff.color}{color to use for P-value cutoff line}
+
 \item{lab.prefix}{prefix to prepend to various labels}
 
 \item{ymax}{maximum Y-value to plot [default: same as smallest P-value]}
 
 \item{reflection}{boolean indicator to invert plot (useful for Miami plots)}
 
+\item{pt.cex}{scaling factor for points [default: 0.2]}
+
 \item{label.cex}{scaling factor for label text}
+
+\item{y.ax.cex}{scaling factor for labels on Y-axis [default: 0.75]}
 }
 \value{
 None

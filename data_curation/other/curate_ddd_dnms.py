@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2020 Ryan L. Collins <rlcollins@g.harvard.edu> 
+# Copyright (c) 2020-Present Ryan L. Collins <rlcollins@g.harvard.edu> 
 # and the Talkowski Laboratory
 # Distributed under terms of the MIT license.
 
 """
 Curates de novo mutations from DDD supplemental table
-Expects: https://www.biorxiv.org/content/biorxiv/early/2020/04/01/797787/DC4/embed/media-4.txt
+Expects: https://static-content.springer.com/esm/art%3A10.1038%2Fs41586-020-2832-5/MediaObjects/41586_2020_2832_MOESM3_ESM.txt
 """
 
 
@@ -30,7 +30,7 @@ def main():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--dnm-tsv', help='tsv of de novo mutations from Kaplanis ' +
-                        'et al., bioRxiv, 2020. Required.', required=True)
+                        'et al., Nature, 2020. Required.', required=True)
     parser.add_argument('--genes', help='list of gene symbols to consider. Required.',
                         required=True)
     parser.add_argument('-o', '--outfile', help='Path to output tsv file. [default: ' +

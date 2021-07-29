@@ -12,19 +12,23 @@
 
 
 # Launch docker image
-docker run --rm -it gcr.io/gnomad-wgs-v2-sv/rcnv
+docker run --rm -it gcr.io/gnomad-wgs-v2-sv/rcnv:latest
 gcloud auth login
 
 
 # Copy all filtered CNV data and other references from the project Google Bucket (note: requires permissions)
 mkdir cleaned_cnv/
 gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
+mkdir phenos/
+gsutil -m cp -r \
+  gs://rcnv_project/cleaned_data/phenotypes/filtered/* \
+  phenos/
 mkdir refs/
 gsutil -m cp -r \
   gs://rcnv_project/refs/GRCh37.*.bed.gz \
   gs://rcnv_project/analysis/analysis_refs/* \
   gs://rcnv_project/cleaned_data/genes/gene_lists \
-  gs://rcnv_project/refs/HPO_dict.tsv.gz \
+  gs://rcnv_project/cleaned_data/phenotypes/hpo_logs_metadata/phenotype_groups.HPO_metadata.txt \
   refs/
 
 
@@ -123,8 +127,39 @@ done < refs/test_phenotypes.list | sort -nrk4,4 \
 /opt/rCNV2/analysis/other/split_phenos_by_severity.R \
   --out-prefix rCNV2.hpos_by_severity \
   --threshold 2 \
-  constrained_gene_del_stats.all_hpos.tsv \
-  refs/HPO_dict.tsv.gz
+  --use-lower \
+  constrained_gene_del_stats.all_hpos.tsv
 
 
+# Get counts of cases per metacohort matching at least one vs. zero developmental terms
+for file in pheno_inputs.tsv precomp_pairs.tsv; do
+  if [ -e $file ]; then rm $file; fi
+done
+while read meta cohorts; do
+  if [ -e "phenos/${cohorts}.final_cooccurrence_table.tsv.gz" ]; then
+    echo -e "${meta}\tphenos/${cohorts}.final_cooccurrence_table.tsv.gz" >> precomp_pairs.tsv
+  else
+    echo -e "${meta}\tphenos/${meta}.cleaned_phenos.txt" >> pheno_inputs.tsv
+  fi
+done < <( fgrep -v mega refs/rCNV_metacohort_list.txt )
+/opt/rCNV2/data_curation/phenotype/count_samples_by_pheno_list.py \
+  --hpo-pair-cohorts precomp_pairs.tsv \
+  --hpo-tier-metadata refs/phenotype_groups.HPO_metadata.txt \
+  --outfile rCNV2.hpos_by_severity.developmental.counts.tsv \
+  pheno_inputs.tsv \
+  rCNV2.hpos_by_severity.developmental.list
+/opt/rCNV2/data_curation/phenotype/count_samples_by_pheno_list.py \
+  --hpo-pair-cohorts precomp_pairs.tsv \
+  --invert \
+  --hpo-tier-metadata refs/phenotype_groups.HPO_metadata.txt \
+  --outfile rCNV2.hpos_by_severity.adult.counts.tsv \
+  pheno_inputs.tsv \
+  rCNV2.hpos_by_severity.developmental.list
+
+
+# Copy phenotype classifications to Google bucket
+gsutil -m cp \
+  rCNV2.hpos_by_severity.*list \
+  rCNV2.hpos_by_severity.*tsv \
+  gs://rcnv_project/analysis/analysis_refs/
 

@@ -22,6 +22,7 @@
 #'
 #' @return data frame with three columns: chromosome, position, and P-value
 #'
+#' @export load.manhattan.stats
 #' @export
 load.manhattan.stats <- function(stats.in, p.col.name="p", p.is.phred=F, min.p=10^-100){
   stats <- read.table(stats.in, header=T, comment.char="", sep="\t")
@@ -66,10 +67,14 @@ load.manhattan.stats <- function(stats.in, p.col.name="p", p.is.phred=F, min.p=1
 #' @param highlight.color color to use for highlighted points
 #' @param highlight.name label for highlighted points
 #' @param mark.highlights boolean indicated to mark highlighted regions with small arrows \[default: FALSE\]
+#' @param colors vector of colors to assign sequentially to all chromosomes
+#' @param cutoff.color color to use for P-value cutoff line
 #' @param lab.prefix prefix to prepend to various labels
 #' @param ymax maximum Y-value to plot \[default: same as smallest P-value\]
 #' @param reflection boolean indicator to invert plot (useful for Miami plots)
+#' @param pt.cex scaling factor for points \[default: 0.2\]
 #' @param label.cex scaling factor for label text
+#' @param y.ax.cex scaling factor for labels on Y-axis \[default: 0.75\]
 #'
 #' @return None
 #'
@@ -79,11 +84,11 @@ plot.manhattan <- function(df, cutoff=1e-08, highlights=NULL,
                            highlight.color="#4EE69A",
                            highlight.name="Highlighted Loci",
                            mark.highlights=FALSE,
+                           colors=c("gray15", "gray70"),
+                           cutoff.color="#D01C8B",
                            lab.prefix=NULL,
                            ymax=NULL, reflection=F,
-                           label.cex=1){
-  colors <- c("gray15", "gray70")
-
+                           pt.cex=0.2, label.cex=1, y.ax.cex=0.75){
   contigs <- unique(df[, 1])
   contigs <- contigs[which(!(is.na(contigs)))]
 
@@ -91,12 +96,12 @@ plot.manhattan <- function(df, cutoff=1e-08, highlights=NULL,
     return(c(chr, 0, max(df[which(df[, 1] == chr), 2])))
   })))
   indexes$sum <- cumsum(indexes[, 3])
-  indexes$bg <- rep(colors[1:2], ceiling(nrow(indexes)/2))[1:nrow(indexes)]
+  indexes$bg <- colors
   indexes[, 2:4] <- apply(indexes[, 2:4], 2, as.numeric)
 
   df.plot <- as.data.frame(t(apply(df, 1, function(row){
-    contig.idx <- which(indexes[, 1]==as.numeric(row[1]))
-    return(c(row[1],
+    contig.idx <- which(indexes[, 1]==row[1])
+    return(c(as.character(row[1]),
              as.numeric(row[2]) + indexes[contig.idx, 4] - indexes[contig.idx, 3],
              as.numeric(row[3]),
              indexes[contig.idx, 5]))
@@ -172,10 +177,10 @@ plot.manhattan <- function(df, cutoff=1e-08, highlights=NULL,
     df.plot$color[hits] <- highlight.color
   }
 
-  abline(h=log.cutoff, col="#D01C8B", lty=2)
+  abline(h=log.cutoff, col=cutoff.color, lty=2)
 
   points(df.plot[, 2], df.plot[, 5],
-         cex=0.2, pch=19,
+         cex=pt.cex, pch=19,
          col=as.character(df.plot[, 4]))
 
   if(!is.null(highlights)){
@@ -219,12 +224,12 @@ plot.manhattan <- function(df, cutoff=1e-08, highlights=NULL,
   }
   axis(2, at=y.at, labels=NA, tck=-0.02)
   axis(2, at=y.at, tick=F, line=-0.5, labels=abs(y.at),
-       cex.axis=0.75, las=2)
+       cex.axis=y.ax.cex, las=2)
   if(!is.null(lab.prefix)){
-    mtext(2, text=bquote(-log[10](italic(p)) ~ .(lab.prefix)),
+    mtext(2, text=bquote(-log[10](italic(P)) ~ .(lab.prefix)),
           line=1.5, cex=label.cex)
   }else{
-    mtext(2, text=bquote(-log[10](italic(p))),
+    mtext(2, text=bquote(-log[10](italic(P))),
           line=1.5, cex=label.cex)
   }
 }

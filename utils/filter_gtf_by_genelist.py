@@ -14,7 +14,7 @@ import pybedtools as pbt
 import argparse
 from sys import stdout
 from os import path
-from athena.utils.misc import bgzip
+import subprocess
         
 
 def main():
@@ -59,7 +59,7 @@ def main():
     if args.outgtf is not None \
     and args.outgtf not in 'stdout -'.split() \
     and args.bgzip:
-        bgzip(outgtf_path)
+        subprocess.run(['bgzip', '-f', outgtf_path])
 
 
 if __name__ == '__main__':

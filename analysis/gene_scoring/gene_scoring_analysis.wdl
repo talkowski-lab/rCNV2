@@ -19,7 +19,6 @@ workflow gene_burden_analysis {
   File gtf_idx
   Int pad_controls
   Int max_cnv_size
-  String weight_mode
   Float min_cds_ovr_del
   Float min_cds_ovr_dup
   Int max_genes_per_cnv
@@ -57,7 +56,6 @@ workflow gene_burden_analysis {
         gtf=gtf,
         gtf_idx=gtf_idx,
         pad_controls=pad_controls,
-        weight_mode=weight_mode,
         min_cds_ovr_del=min_cds_ovr_del,
         min_cds_ovr_dup=min_cds_ovr_dup,
         rCNV_bucket=rCNV_bucket
@@ -76,7 +74,6 @@ workflow gene_burden_analysis {
         gtf_idx=gtf_idx,
         pad_controls=pad_controls,
         max_cnv_size=max_cnv_size,
-        weight_mode=weight_mode,
         min_cds_ovr_del=min_cds_ovr_del,
         min_cds_ovr_dup=min_cds_ovr_dup,
         max_genes_per_cnv=max_genes_per_cnv,
@@ -213,7 +210,6 @@ task get_annotated_cnvs {
   File gtf
   File gtf_idx
   Int pad_controls
-  String weight_mode
   Float min_cds_ovr_del
   Float min_cds_ovr_dup
   String rCNV_bucket
@@ -259,7 +255,6 @@ task get_annotated_cnvs {
         # Count CNVs
         /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
           --max-cnv-size 300000000 \
-          --weight-mode ${weight_mode} \
           --min-cds-ovr $min_cds_ovr \
           --max-genes 25000 \
           -t $CNV \
@@ -305,7 +300,6 @@ task burden_test {
   File gtf_idx
   Int pad_controls
   Int max_cnv_size
-  String weight_mode
   Float min_cds_ovr_del
   Float min_cds_ovr_dup
   Int max_genes_per_cnv
@@ -353,7 +347,6 @@ task burden_test {
         # Count CNVs
         /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
           --max-cnv-size ${max_cnv_size} \
-          --weight-mode ${weight_mode} \
           --min-cds-ovr $min_cds_ovr \
           --max-genes ${max_genes_per_cnv} \
           -t $CNV \

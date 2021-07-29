@@ -25,6 +25,8 @@ These datasets were accessed as follows:
 | Affymetrix Human Mapping 500K | `affy_500k` | UCSC Genome Browser (table `snpArrayAffy250Nsp` combined with table `snpArrayAffy250Sty`) |  
 | Affymetrix Genome-Wide Human SNP Array 5.0 | `affy_5.0` | UCSC Genome Browser (table `snpArrayAffy5`) |  
 | Affymetrix Genome-Wide Human SNP Array 5.0 | `affy_6.0` | UCSC Genome Browser (table `snpArrayAffy6`) |  
+| Affymetrix CytoScan HD Array | `affy_cyto_hd` | Downloaded from ThermoFisher website ([link](https://www.thermofisher.com/order/catalog/product/901835#/901835)) |  
+| Agilent Custom 180k SNP Array | `agilent_gdx_180k` | Provided by GeneDx, Inc. |  
 | Illumina Human Hap 300 | `illumina_300k` | UCSC Genome Browser (table `snpArrayIllumina300`) |  
 | Illumina Human Hap 550 | `illumina_550k` | UCSC Genome Browser (table `snpArrayIllumina550`) |  
 | Illumina Human610-Quad | `illumina_610k_quad` | Downloaded from Illumina website ([link](https://support.illumina.com/content/dam/illumina-support/documents/downloads/productfiles/human610/human610-quadv1_h.zip)) |  

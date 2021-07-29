@@ -43,7 +43,8 @@ awk -v OFS="\t" '{ print $0, "/raw_cnv/"$1".raw.bed.gz" }' \
 
 
 # Iterate over frequency classes
-for freq in rCNV vCNV uCNV; do
+# for freq in rCNV vCNV uCNV; do
+for freq in rCNV; do
   # Collect and plot filtered CNV data per cohort
   awk -v OFS="\t" -v freq=${freq} \
     '{ print $0, "/cleaned_cnv/"$1"."freq".bed.gz" }' \
