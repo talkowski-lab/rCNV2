@@ -18,7 +18,7 @@ gcloud auth login
 
 # Set global parameters
 export rCNV_bucket="gs://rcnv_project"
-export prefix="rCNV2_analysis_d1"
+export prefix="rCNV2_analysis_d2"
 
 
 # Localize all analysis refs, sliding window meta-analysis stats, and large segment results
@@ -51,7 +51,7 @@ gsutil -m cp -r \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists \
   ./
 gsutil -m cp \
-  ${rCNV_bucket}/analysis/paper/data/hpo/rCNV2_analysis_d1.hpo_jaccard_matrix.tsv \
+  ${rCNV_bucket}/analysis/paper/data/hpo/rCNV2_analysis_d2.hpo_jaccard_matrix.tsv \
   ./
 
 
@@ -148,7 +148,7 @@ cat \
   --common-dels combined_common_cnvs.DEL.$af_suffix.bed.gz \
   --common-dups combined_common_cnvs.DUP.$af_suffix.bed.gz \
   --common-cnv-cov 0.5 \
-  --hpo-jaccard-matrix rCNV2_analysis_d1.hpo_jaccard_matrix.tsv \
+  --hpo-jaccard-matrix rCNV2_analysis_d2.hpo_jaccard_matrix.tsv \
   --min-jaccard-sum 1.0 \
   --genelists genelists_to_annotate.tsv \
   --hpo-genelists hpo_genelists.tsv \

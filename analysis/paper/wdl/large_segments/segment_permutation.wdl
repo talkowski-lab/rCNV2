@@ -16,6 +16,7 @@ workflow segment_permutation {
   Int perms_per_shard
   String perm_prefix
   String rCNV_bucket
+  String rCNV_docker
 
   call perm_prep {
     input:
@@ -24,6 +25,7 @@ workflow segment_permutation {
       total_n_perms=total_n_perms,
       perms_per_shard=perms_per_shard,
       rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker,
       prefix=perm_prefix
   }
 
@@ -37,7 +39,8 @@ workflow segment_permutation {
         del_max_p_bed=perm_prep.del_max_p_bed,
         dup_max_p_bed=perm_prep.dup_max_p_bed,
         perm_prefix="${perm_prefix}.starting_seed_${seed}",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     call perm_shard_litGDs {
       input:
@@ -48,7 +51,8 @@ workflow segment_permutation {
         del_max_p_bed=perm_prep.del_max_p_bed,
         dup_max_p_bed=perm_prep.dup_max_p_bed,
         perm_prefix="${perm_prefix}.lit_GDs.starting_seed_${seed}",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
   }
 
@@ -56,13 +60,15 @@ workflow segment_permutation {
     input:
       perm_tables=perm_shard.perm_table,
       perm_prefix="${perm_prefix}.${total_n_perms}_permuted_segments",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
   call merge_perms as merge_lit_gds {
     input:
       perm_tables=perm_shard_litGDs.perm_table,
       perm_prefix="${perm_prefix}.lit_GDs.${total_n_perms}_permuted_segments",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
 }
 
@@ -74,6 +80,7 @@ task perm_prep {
   Int total_n_perms
   Int perms_per_shard
   String rCNV_bucket
+  String rCNV_docker
   String prefix
 
   command <<<
@@ -139,7 +146,7 @@ task perm_prep {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:d6161740758077f03f799184022a4751324fe828db2ccfbbadb5d2197fb69893"
+    docker: "${rCNV_docker}"
     preemptible: 1
   }
 
@@ -163,6 +170,7 @@ task perm_shard {
   File dup_max_p_bed
   String perm_prefix
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -247,7 +255,7 @@ task perm_shard {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:cd1132eddf558c156999b20cbc65289e4bc175402205696874b8221dc947caf3"
+    docker: "${rCNV_docker}"
     preemptible: 1
   }
 
@@ -267,6 +275,7 @@ task perm_shard_litGDs {
   File dup_max_p_bed
   String perm_prefix
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -376,7 +385,7 @@ task perm_shard_litGDs {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:cd1132eddf558c156999b20cbc65289e4bc175402205696874b8221dc947caf3"
+    docker: "${rCNV_docker}"
     preemptible: 1
   }
 
@@ -391,6 +400,7 @@ task merge_perms {
   Array[File] perm_tables
   String perm_prefix
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -427,7 +437,7 @@ task merge_perms {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:cd1132eddf558c156999b20cbc65289e4bc175402205696874b8221dc947caf3"
+    docker: "${rCNV_docker}"
     preemptible: 1
     disks: "local-disk 200 SSD"
   }

@@ -59,7 +59,7 @@ For this purpose, we integrated lists of GDs from the following publications and
 | Resource | Deletion GDs | Duplication GDs | Citation |  
 | :--- | ---: | ---: | --- |  
 | DECIPHER CNV Syndromes | 40 | 14 | [Firth _et al._, _Am. H. Hum. Genet._ (2009)](http://dx.doi.org/10.1016/j.ajhg.2009.03.010) |  
-| ClinGen Pathogenic CNV Regions\* | 43\* | 26\*  | [Riggs _et al._, _Clin. Genet._ (2012)](https://www.ncbi.nlm.nih.gov/pubmed/22097934) |  
+| ClinGen Pathogenic CNV Regions\* | 48\* | 31\*  | [Riggs _et al._, _Clin. Genet._ (2012)](https://www.ncbi.nlm.nih.gov/pubmed/22097934) |  
 | UK BioBank | 24 | 30 | [Owen _et al._, _BMC Genomics_ (2018)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6278042/) |  
 | Girirajan _et al._ | 39 | 33 | [Girirajan _et al._, _New Engl. J. Med._ (2012)](https://www.nejm.org/doi/full/10.1056/NEJMoa1200395) |  
 | Dittwald _et al._ | 48 | 18 | [Dittwald _et al._, _Genome Res._ (2013)](https://www.ncbi.nlm.nih.gov/pubmed/23657883) |  
@@ -72,6 +72,8 @@ From these existing datasets, we curated three distinct GD lists for the analyse
 1. **High-confidence GDs**: regions covered by at least four sources.  
 2. **Medium-confidence GDs**: regions covered by two or three sources.  
 3. **Low-confidence GDs**: regions covered by only one source  
+
+Each confidence level was created sequentially (_i.e._, we first curated high-confidence GDs, then medium-confidence, then low-confidence). In each iteration, we excluded GDs from each of the six original sources that had any greater than 20% overlap versus a consensus GD in a higher confidence tier.  
 
 After overlapping reported GDs from the sources above, we trimmed overlapping segmental duplications overlapping the boundaries of the GD interval.  
 
