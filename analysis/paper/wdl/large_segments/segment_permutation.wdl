@@ -86,8 +86,14 @@ task perm_prep {
   command <<<
     set -e
 
-    # Make whitelist
-    bedtools merge -i ${binned_genome} | bgzip -c > whitelist.bed.gz
+    # Make whitelist after removing untestable bins (those with <2 cohorts for meta-analysis)
+    gsutil -m cp \
+      ${rCNV_bucket}/analysis/analysis_refs/*.cohort_exclusion.bed.gz \
+      ./
+    zcat *.cohort_exclusion.bed.gz | sed 's/;/\t/g' \
+    | awk -v FS="\t" -v OFS="\t" '{ if (NF<=7) print $1, $2, $3 }' \
+    | fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n \
+    | bedtools merge -i - | bgzip -c > whitelist.bed.gz
 
     # Invert whitelist as explicit blacklist (pybedtools has some unusual shuffle behavior)
     gsutil -m cat ${rCNV_bucket}/refs/GRCh37.autosomes.genome \
@@ -182,6 +188,7 @@ task perm_shard {
       ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
       ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
       ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
+      ${rCNV_bucket}/analysis/paper/data/misc/redin_bca_breakpoints.bed.gz \
       ${rCNV_bucket}/analysis/analysis_refs/test_phenotypes.list \
       refs/
     gsutil -m cp \
@@ -205,7 +212,7 @@ task perm_shard {
       --first-seed ${seed} \
       --outfile ${perm_prefix}.bed.gz \
       --bgzip \
-      <( zcat rCNV.final_segments.loci.bed.gz | cut -f1-5,19 )
+      <( zcat rCNV.final_segments.loci.bed.gz | cut -f1-5,20 )
 
     # Annotate with genes
     /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
@@ -247,6 +254,7 @@ task perm_shard {
       --mc-gds refs/lit_GDs.mc.bed.gz \
       --lc-gds refs/lit_GDs.lc.bed.gz \
       --nahr-cnvs clustered_nahr_regions.reformatted.bed.gz \
+      --bca-tsv refs/redin_bca_breakpoints.bed.gz \
       --meta-sumstats ${perm_prefix}.final_segments.loci.all_sumstats.tsv \
       --outfile ${perm_prefix}.master_segments.bed.gz \
       --gd-recip "10e-10" \
@@ -287,6 +295,7 @@ task perm_shard_litGDs {
       ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
       ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
       ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
+      ${rCNV_bucket}/analysis/paper/data/misc/redin_bca_breakpoints.bed.gz \
       ${rCNV_bucket}/analysis/analysis_refs/test_phenotypes.list \
       refs/
     gsutil -m cp \
@@ -373,6 +382,7 @@ task perm_shard_litGDs {
       --mc-gds ${perm_prefix}.MC.bed.gz \
       --lc-gds ${perm_prefix}.LC.bed.gz \
       --nahr-cnvs clustered_nahr_regions.reformatted.bed.gz \
+      --bca-tsv refs/redin_bca_breakpoints.bed.gz \
       --meta-sumstats ${perm_prefix}.permuted_gds.all_sumstats.tsv \
       --outfile ${perm_prefix}.master_segments.w_dummy.bed.gz \
       --gd-recip "10e-10" \

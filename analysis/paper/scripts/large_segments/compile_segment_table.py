@@ -23,7 +23,7 @@ import argparse
 from os.path import splitext
 from sys import stdout
 import csv
-from athena.utils import bgzip
+import subprocess
 
 
 def read_bed_as_df(bed, output_hpos=False):
@@ -41,19 +41,24 @@ def read_bed_as_df(bed, output_hpos=False):
         hpo_df.index = df['region_id']
         hpo_dict = {r : h.split(';') for r, h in hpo_df.to_dict().items()}
 
+    # Add dummy column for significance level if not already present
+    if 'best_sig_level' not in df.columns:
+        df['best_sig_level'] = 'not_significant'
+
     # Subset columns of interest
-    keep_cols = 'cred_interval_coords cred_intervals_size n_genes genes'.split()
+    keep_cols = 'best_sig_level cred_interval_coords cred_intervals_size n_genes genes'.split()
     df = pd.concat([df.iloc[:, :5], df.loc[:, df.columns.isin(keep_cols)]], axis=1)
 
     # Rename columns
     old_cnames = list(df.columns)
     df.rename(columns={old_cnames[0] : 'chr',
-                      old_cnames[1] : 'start',
-                      old_cnames[2] : 'end',
-                      old_cnames[3] : 'region_id',
-                      old_cnames[4] : 'cnv',
-                      'cred_interval_coords' : 'coords',
-                      'cred_intervals_size' : 'size'}, 
+                       old_cnames[1] : 'start',
+                       old_cnames[2] : 'end',
+                       old_cnames[3] : 'region_id',
+                       old_cnames[4] : 'cnv',
+                       'best_sig_level' : 'sig_level',
+                       'cred_interval_coords' : 'coords',
+                       'cred_intervals_size' : 'size'}, 
               inplace=True)
 
     # Add interval coordinates and size (if not optioned)
@@ -62,7 +67,7 @@ def read_bed_as_df(bed, output_hpos=False):
     if 'size' not in df.columns:
         df['size'] = df.end - df.start
 
-    cols_ordered = 'chr start end region_id cnv coords size n_genes genes'.split()
+    cols_ordered = 'chr start end region_id cnv sig_level coords size n_genes genes'.split()
     if output_hpos:
         return df.loc[:, cols_ordered], hpo_dict
     else:
@@ -207,7 +212,7 @@ def annotate_hpo_genes(df, loci_hpos, hpo_genes):
     return df
 
 
-def count_dnms(df, dnm_path, col_prefix, mu_df=None):
+def count_dnms(df, dnm_path, col_prefix, mu_df=None, xgenes=None):
     """
     Annotate segments based on sum of observed de novo coding mutations
     """
@@ -215,6 +220,10 @@ def count_dnms(df, dnm_path, col_prefix, mu_df=None):
     # Load DNMs
     dnms = pd.read_csv(dnm_path, sep='\t').\
               rename(columns={'#gene' : 'gene'})
+
+    # Drop excluded genes, if optioned
+    if xgenes is not None:
+        dnms = dnms.loc[~dnms.gene.isin(xgenes), :]
 
     def _sum_dnms(genes_str, dnms, key, include=None):
         if include is not None:
@@ -231,6 +240,8 @@ def count_dnms(df, dnm_path, col_prefix, mu_df=None):
             = pd.DataFrame(df.genes).apply(_sum_dnms, axis=1, raw=True, dnms=dnms, key=csq)
         if mu_df is not None:
             mu_df_x = mu_df.copy(deep=True)
+            if xgenes is not None:
+                mu_df_x = mu_df_x.loc[~mu_df_x.gene.isin(xgenes), :]
             n_dnms = df['_'.join([col_prefix, 'dnm', csq])].sum()
             mu_df_x['mu_' + csq] = mu_df_x['mu_' + csq] * n_dnms
             genes_with_mus = mu_df_x.dropna()['gene'].tolist()
@@ -247,6 +258,26 @@ def count_dnms(df, dnm_path, col_prefix, mu_df=None):
                 = (expected).round(decimals=6)
 
     return df
+
+
+def count_bcas(all_df, bca_tsv):
+    """
+    Count number of BCA carriers with a breakpoint in each region
+    """
+
+    # Convert CNV loci to pbt.BedTool and intersect with bca_tsv
+    bca_hits = {i : set() for i in all_df.region_id.tolist()}
+    all_bt = pbt.BedTool.from_dataframe(all_df.iloc[:, :4])
+    for hit in all_bt.intersect(bca_tsv, wa=True, wb=True):
+        bca_hits[hit.name].add(hit[-1])
+
+    # Count number of unique BCA carriers per region
+    bca_k = {i : len(bca_hits[i]) for i in bca_hits.keys()}
+
+    # Map counts onto all_df
+    all_df['Redin_BCAs'] = all_df['region_id'].map(bca_k)
+
+    return all_df
 
 
 def annotate_expression(all_df, gtex_in, min_expression=1):
@@ -385,6 +416,9 @@ def main():
     parser.add_argument('--snv-mus', help='Tsv of snv mutation rates per gene. ' +
                         'Four columns expected: gene, and relative mutation rates ' +
                         'for lof, missense, and synonymous mutations.')
+    parser.add_argument('--bca-tsv', help='Tsv of BCA breakpoint coordinates ' +
+                        'from Redin et al. Four columns expected: chrom, start, ' +
+                        'end, and sample ID.')
     parser.add_argument('--gtex-matrix', help='Tsv gene X tissue expression levels ' +
                         'from GTEx. Will be used for various expression-based ' +
                         'gene annotations.')
@@ -460,7 +494,10 @@ def main():
     benign_dup_ids = overlap_common_cnvs(all_bt, args.common_dups, "DUP", args.common_cnv_cov)
 
     # Annotate merged df
-    all_df['gw_sig'] = pd.get_dummies(all_df.region_id.isin(loci_ids), drop_first=True)
+    all_df['any_sig'] = all_df.sig_level.isin(['genome_wide', 'FDR']).astype(int)
+    all_df['gw_sig'] = all_df.sig_level.isin(['genome_wide']).astype(int)
+    all_df['fdr_sig'] = all_df.sig_level.isin(['FDR']).astype(int)
+    all_df.drop(columns='sig_level', inplace=True)
     all_df['hc_gd'] = pd.get_dummies(all_df.region_id.isin(set(hc_gd_ids + all_ids_in_hc_gd)), 
                                      drop_first=True)
     all_df['mc_gd'] = pd.get_dummies(all_df.region_id.isin(set(mc_gd_ids + all_ids_in_mc_gd)), 
@@ -512,8 +549,14 @@ def main():
         else:
             mu_df = None
         with open(args.dnm_tsvs) as dnm_ins:
-            for study, dnm_path in csv.reader(dnm_ins, delimiter='\t'):
+            for study, dnm_path, xgene_list in csv.reader(dnm_ins, delimiter='\t'):
                 all_df = count_dnms(all_df, dnm_path, study, mu_df)
+                xgenes = [g.rstrip() for g in open(xgene_list).readlines()]
+                all_df = count_dnms(all_df, dnm_path, study + '_noSig', mu_df, xgenes)
+
+    # TODO: annotate with breakpoints from Redin et al., if optioned
+    if args.bca_tsv is not None:
+        all_df = count_bcas(all_df, args.bca_tsv)
 
     # Annotate with various expression-based metrics
     if args.gtex_matrix is not None:
@@ -537,7 +580,7 @@ def main():
     outfile.close()
     if args.outfile not in '- stdout'.split():
         if args.bgzip:
-            bgzip(outfile_path)
+            subprocess.run(['bgzip', '-f', outfile_path])
 
 
 if __name__ == '__main__':

@@ -68,6 +68,13 @@ done > probeset_tracks.tsv
   control_probesets/rCNV.control_counts_by_array.tsv \
   <( fgrep -v mega ${metacohort_list} )
 
+# Copy to Google bucket for storage
+gsutil -m cp \
+  ${binned_genome_prefix}.cohort_exclusion.bed.gz \
+  ${binned_genome_prefix}.probe_counts.bed.gz \
+  ${binned_genome_prefix}.frac_passing.bed.gz \
+  ${rCNV_bucket}/analysis/analysis_refs/
+
 # Estimate number of effective tests while requiring at least two cohorts to have
 # adequate probe density for window to be evaluated
 zcat ${binned_genome_prefix}.cohort_exclusion.bed.gz | sed 's/;/\t/g' \

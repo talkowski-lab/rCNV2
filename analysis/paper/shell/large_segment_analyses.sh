@@ -30,6 +30,8 @@ gsutil -m cp \
   ${rCNV_bucket}/refs/GRCh37.autosomes.genome \
   ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
   ${rCNV_bucket}/analysis/paper/data/misc/*_dnm_counts*tsv.gz \
+  ${rCNV_bucket}/analysis/paper/data/misc/*.gw_sig.genes.list \
+  ${rCNV_bucket}/analysis/paper/data/misc/redin_bca_breakpoints.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/misc/gene_mutation_rates.tsv.gz \
   ${rCNV_bucket}/cleaned_data/genes/annotations/gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
   refs/
@@ -130,9 +132,9 @@ while read nocolon hpo; do
 done < refs/test_phenotypes.list \
 > hpo_genelists.tsv
 cat << EOF > dnm_counts_to_annotate.tsv
-ASC${TAB}refs/asc_dnm_counts.tsv.gz
-ASC_unaffected${TAB}refs/asc_dnm_counts.unaffecteds.tsv.gz
-DDD${TAB}refs/ddd_dnm_counts.tsv.gz
+ASC${TAB}refs/asc_dnm_counts.tsv.gz${TAB}refs/ASC_2020.gw_sig.genes.list
+ASC_unaffected${TAB}refs/asc_dnm_counts.unaffecteds.tsv.gz${TAB}refs/ASC_2020.gw_sig.genes.list
+DDD${TAB}refs/ddd_dnm_counts.tsv.gz${TAB}refs/DDD_2020.gw_sig.genes.list
 EOF
 cat \
   <( zcat ${prefix}.final_segments.loci.all_sumstats.tsv.gz ) \
@@ -154,18 +156,21 @@ cat \
   --hpo-genelists hpo_genelists.tsv \
   --dnm-tsvs dnm_counts_to_annotate.tsv \
   --snv-mus refs/gene_mutation_rates.tsv.gz \
+  --bca-tsv refs/redin_bca_breakpoints.bed.gz \
   --gtex-matrix refs/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
   --meta-sumstats pooled_sumstats.tsv \
   --neuro-hpos refs/neuro_hpos.list \
   --gd-recip "10e-10" \
   --nahr-recip 0.25 \
   --bgzip
-# Polish NAHR labels following manual review (note: requires refs/${prefix}.correct_NAHR_labels.tsv)
-/opt/rCNV2/analysis/paper/scripts/large_segments/polish_nahr_labels.R \
-  ${prefix}.master_segments.pre_nahr_polishing.bed.gz \
-  refs/${prefix}.correct_nahr_labels.tsv \
-  ${prefix}.master_segments.bed
-bgzip -f ${prefix}.master_segments.bed
+# TODO: UPDATE THIS
+# # Polish NAHR labels following manual review (note: requires refs/${prefix}.correct_NAHR_labels.tsv)
+# /opt/rCNV2/analysis/paper/scripts/large_segments/polish_nahr_labels.R \
+#   ${prefix}.master_segments.pre_nahr_polishing.bed.gz \
+#   refs/${prefix}.correct_nahr_labels.tsv \
+#   ${prefix}.master_segments.bed
+# bgzip -f ${prefix}.master_segments.bed
+mv ${prefix}.master_segments.pre_nahr_polishing.bed.gz ${prefix}.master_segments.bed.gz
 gsutil -m cp \
   ${prefix}.master_segments.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/

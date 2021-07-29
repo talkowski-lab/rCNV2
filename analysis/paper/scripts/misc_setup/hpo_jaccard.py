@@ -10,16 +10,56 @@ Compute Jaccard similarity index for all pairs of HPOs
 """
 
 
+import gzip
+import csv
 import numpy as np
 import pandas as pd
-import csv
 from collections import Counter
 from itertools import chain, product
 import argparse
 from sys import stdout
 
 
-def count_samples(hpos, samples_tsv):
+def load_precomp_pairs_single_cohort(pairs_tsv_in):
+    """
+    Load precomputed HPO pairs for a single cohorts, if optioned
+    Returns a dict of sample counts keyed on sorted HPO term pairs
+    """
+
+    counts = {}
+
+    if pairs_tsv_in.endswith('.gz'):
+        fin = gzip.open(pairs_tsv_in, 'rt')
+    else:
+        fin = open(pairs_tsv_in)
+
+    for term1, term2, n1, n2, n12 in csv.reader(fin, delimiter='\t'):
+
+        if term1.startswith('#'):
+            continue
+
+        pair_key = tuple(sorted((term1, term2)))
+        if pair_key not in counts.keys():
+            counts[pair_key] = int(n12)
+
+    return counts
+
+
+def load_precomp_pairs(hpo_pair_cohorts_tsv):
+    """
+    Wraps load_precomp_pairs_single_cohort() for all cohorts in --hpo-pair-cohorts
+    """
+
+    precomp_pairs = {}
+
+    with open(hpo_pair_cohorts_tsv) as fin:
+        for cohort, tsv_path in csv.reader(fin, delimiter='\t'):
+            precomp_pairs[cohort] = load_precomp_pairs_single_cohort(tsv_path)
+
+    return precomp_pairs
+
+
+def count_samples(hpos, samples_tsv, precomp_pairs=None):
     """
     Count raw sample overlap for all pairs of HPOs
     """
@@ -42,6 +82,17 @@ def count_samples(hpos, samples_tsv):
     for hpoA in hpos:
         for hpoB in hpos:
             counts.loc[hpoA, hpoB] = counts_dict[(hpoA, hpoB)]
+
+    # Add sample counts from precomputed pairs, if optioned
+    if precomp_pairs is not None:
+        for cohort, pairs in precomp_pairs.items():
+            for hpair, n in pairs.items():
+                hpoA = hpair[0]
+                hpoB = hpair[1]
+                if hpoA in hpos and hpoB in hpos:
+                    counts.loc[hpoA, hpoB] += n
+                    if hpoA != hpoB:
+                        counts.loc[hpoB, hpoA] += n
 
     return counts
 
@@ -82,6 +133,9 @@ def main():
     parser.add_argument('hpos', help='tsv of HPOs (assumes HPOs in last column if ' +
                         'multiple columns provided).')
     parser.add_argument('samples', help='Two-column tsv of sample ID & HPOs.')
+    parser.add_argument('--hpo-pair-cohorts', help='Two-column .tsv of cohort ' +
+                        'name and path to pairwise HPO counts for cohorts where ' +
+                        'necessary')
     parser.add_argument('--jaccardfile', default='stdout', help='Output tsv of ' +
                         'reordered phenotypes. [default: stdout]')
     parser.add_argument('--countsfile', help='Optional tsv output of raw ' +
@@ -103,8 +157,14 @@ def main():
     # Read HPOs
     hpos = [x.rstrip().split('\t')[-1] for x in open(args.hpos).readlines()]
 
+    # Load counts from cohorts with precomputed HPO pairs, if any
+    if args.hpo_pair_cohorts is not None:
+        precomp_pairs = load_precomp_pairs(args.hpo_pair_cohorts)
+    else:
+        precomp_pairs = None
+
     # Read sample phenotypes and count raw overlaps 
-    counts = count_samples(hpos, args.samples)
+    counts = count_samples(hpos, args.samples, precomp_pairs)
 
     # Normalize counts to compute Jaccard indexes and asymmetric sample overlaps
     jaccards = compute_jaccards(counts, hpos)
