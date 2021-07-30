@@ -133,6 +133,7 @@ color.points.by.density <- function(x, y, palette=NULL){
   plot.df[order(plot.df$dens), ]
 }
 
+
 #' Density-colored scatterplot
 #'
 #' Generate a 2D scatterplot colored by local density

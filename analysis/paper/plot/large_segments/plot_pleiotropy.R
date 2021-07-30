@@ -77,7 +77,7 @@ parmar <- c(2.3, 3.0, 1.5, 0.5)
 # Plot pleiotropy vs region size
 pdf(paste(out.prefix, "pleiotropy_vs_size.pdf", sep="."),
     height=2.25, width=2)
-gw.swarm(gw,
+segs.swarm(gw,
          x.bool=gw$n_hpos > 1,
          y=log10(gw$size),
          cnv.split=F,
@@ -96,7 +96,7 @@ dev.off()
 # Plot pleiotropy vs. number of genes & gene density
 pdf(paste(out.prefix, "pleiotropy_vs_genes.pdf", sep="."),
     height=2.25, width=2)
-gw.swarm(gw,
+segs.swarm(gw,
          x.bool=gw$n_hpos > 1,
          y=gw$n_genes,
          cnv.split=F,
@@ -111,7 +111,7 @@ dev.off()
 # Note: this plot is formatted differently because of placement in main figure
 pdf(paste(out.prefix, "pleiotropy_vs_gene_density.pdf", sep="."),
     height=2.3, width=1.8)
-gw.swarm(gw,
+segs.swarm(gw,
          x.bool=gw$n_hpos > 1,
          y=100000 * gw$n_genes / gw$size,
          cnv.split=F,
@@ -131,7 +131,7 @@ dev.off()
 # Plot pleiotropy vs. constrained genes & gene density
 pdf(paste(out.prefix, "pleiotropy_vs_constrained_genes.pdf", sep="."),
     height=2.25, width=2)
-gw.swarm(gw,
+segs.swarm(gw,
          x.bool=gw$n_hpos > 1,
          y=gw$n_gnomAD_constrained_genes,
          cnv.split=F,
@@ -146,7 +146,7 @@ dev.off()
 # Note: this plot is formatted differently because of placement in main figure
 pdf(paste(out.prefix, "pleiotropy_vs_constrained_gene_density.pdf", sep="."),
     height=2.3, width=1.8)
-gw.swarm(gw,
+segs.swarm(gw,
          x.bool=gw$n_hpos > 1,
          y=1000000 * gw$n_gnomAD_constrained_genes / gw$size,
          cnv.split=F,
@@ -165,7 +165,7 @@ dev.off()
 # Plot pleiotropy vs. OMIM genes & gene density
 pdf(paste(out.prefix, "pleiotropy_vs_OMIM_genes.pdf", sep="."),
     height=2.25, width=2)
-gw.swarm(gw,
+segs.swarm(gw,
          x.bool=gw$n_hpos > 1,
          y=gw$n_OMIM_genes,
          cnv.split=F,
@@ -179,7 +179,7 @@ gw.swarm(gw,
 dev.off()
 pdf(paste(out.prefix, "pleiotropy_vs_OMIM_gene_density.pdf", sep="."),
     height=2.25, width=2)
-gw.swarm(gw,
+segs.swarm(gw,
          x.bool=gw$n_hpos > 1,
          y=1000000 * gw$n_OMIM_genes / gw$size,
          cnv.split=F,
@@ -196,7 +196,7 @@ dev.off()
 # Plot pleiotropy vs. mechanism
 pdf(paste(out.prefix, "pleiotropy_vs_mechanism.pdf", sep="."),
     height=2.25, width=2.5)
-gw.swarm(gw, x.bool=gw$nahr, y=gw$n_hpos, add.pvalue=T, cnv.split=F,
+segs.swarm(gw, x.bool=gw$nahr, y=gw$n_hpos, add.pvalue=T, cnv.split=F,
          x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.y.axis=T,
          ytitle="Associated HPOs", pt.cex=0.75,
          parmar=c(1.2, 3, 1.5, 0))
@@ -205,7 +205,7 @@ dev.off()
 # Plot pleiotropy vs. average gene expression
 pdf(paste(out.prefix, "pleiotropy_vs_gene_expression.pdf", sep="."),
     height=2.25, width=2)
-gw.swarm(gw,
+segs.swarm(gw,
          x.bool=gw$n_hpos > 1,
          y=gw$gene_expression_harmonic_mean,
          cnv.split=F,
@@ -221,7 +221,7 @@ dev.off()
 # Plot pleiotropy vs. proportion of ubiquitously expressed genes
 pdf(paste(out.prefix, "pleiotropy_vs_prop_ubi_expressed.pdf", sep="."),
     height=2.25, width=2)
-gw.swarm(gw,
+segs.swarm(gw,
          x.bool=gw$n_hpos > 1,
          y=gw$prop_ubiquitously_expressed,
          cnv.split=F,

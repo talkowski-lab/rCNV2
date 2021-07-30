@@ -228,6 +228,7 @@ task annotate_shard {
     gsutil -m cp \
       ${rCNV_bucket}/analysis/analysis_refs/test_phenotypes.list \
       ${rCNV_bucket}/analysis/paper/data/misc/*_dnm_counts*tsv.gz \
+      ${rCNV_bucket}/analysis/paper/data/misc/*.gw_sig.genes.list \
       ${rCNV_bucket}/analysis/paper/data/misc/gene_mutation_rates.tsv.gz \
       ${rCNV_bucket}/cleaned_data/genes/annotations/gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
       refs/
@@ -235,7 +236,7 @@ task annotate_shard {
       ${rCNV_bucket}/results/segment_association/* \
       ./
 
-    # Build necessary inputs
+    # Build gene list input
     echo -e "gnomAD_constrained\tgene_lists/gnomad.v2.1.1.lof_constrained.genes.list" > genelists_to_annotate.tsv
     echo -e "gnomAD_tolerant\tgene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list" >> genelists_to_annotate.tsv
     echo -e "CLinGen_HI\tgene_lists/ClinGen.hmc_haploinsufficient.genes.list" >> genelists_to_annotate.tsv
@@ -243,16 +244,20 @@ task annotate_shard {
     echo -e "DECIPHER_LoF\tgene_lists/DDG2P.hmc_lof.genes.list" >> genelists_to_annotate.tsv
     echo -e "DECIPHER_GoF\tgene_lists/DDG2P.hmc_gof.genes.list" >> genelists_to_annotate.tsv
     echo -e "OMIM\tgene_lists/HP0000118.HPOdb.genes.list" >> genelists_to_annotate.tsv
-    echo -e "ASC\trefs/asc_dnm_counts.tsv.gz" > dnm_counts_to_annotate.tsv
-    echo -e "ASC_unaffected\trefs/asc_dnm_counts.unaffecteds.tsv.gz" >> dnm_counts_to_annotate.tsv
-    echo -e "DDD\trefs/ddd_dnm_counts.tsv.gz" >> dnm_counts_to_annotate.tsv
+
+    # Build DNM input
+    echo -e "ASC\trefs/asc_dnm_counts.tsv.gz\trefs/ASC_2020.gw_sig.genes.list" > dnm_counts_to_annotate.tsv
+    echo -e "ASC_unaffected\trefs/asc_dnm_counts.unaffecteds.tsv.gz\trefs/ASC_2020.gw_sig.genes.list" >> dnm_counts_to_annotate.tsv
+    echo -e "DDD\trefs/ddd_dnm_counts.tsv.gz\trefs/DDD_2020.gw_sig.genes.list" >> dnm_counts_to_annotate.tsv
+
+    # Build HPO-matched gene lists
     while read nocolon hpo; do
       echo -e "$hpo\tgene_lists/$nocolon.HPOdb.genes.list"
     done < refs/test_phenotypes.list \
     > hpo_genelists.tsv
     zcat rCNV.final_segments.loci.bed.gz \
     | grep -ve '^#' \
-    | awk -v FS="\t" -v OFS="\t" '{ print $4, $15 }' \
+    | awk -v FS="\t" -v OFS="\t" '{ print $4, $16 }' \
     > segment_hpos.tsv
 
     # Annotate permuted table

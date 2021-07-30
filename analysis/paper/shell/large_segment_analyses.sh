@@ -182,7 +182,6 @@ if [ -e basic_distribs ]; then
 fi
 mkdir basic_distribs
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_basic_segment_distribs.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   --gw-sig $del_cutoff \
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
@@ -193,9 +192,9 @@ mkdir basic_distribs
   ${prefix}.master_segments.bed.gz \
   basic_distribs/${prefix}
 # Get range of effect sizes across all g-w sig associations
-zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f10 | sort -nk1,1 | head -n1
-zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f10 | sort -nk1,1 | tail -n1
-zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f10 \
+zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f11 | sort -nk1,1 | head -n1
+zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f11 | sort -nk1,1 | tail -n1
+zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f11 \
 | awk '{ sum+=$1 }END{ print sum/NR }'
 
 

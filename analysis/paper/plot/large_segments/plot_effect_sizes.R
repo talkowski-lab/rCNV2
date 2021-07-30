@@ -72,7 +72,7 @@ gw <- merge.loci.segs(loci, segs)
 # Plot effect size vs control frequency
 pdf(paste(out.prefix, "lnOR_vs_control_freq.pdf", sep="."),
     height=2.25, width=2.25)
-gw.scatter(gw, 
+segs.scatter(gw, 
            x=-log10(gw$pooled_control_freq), 
            y=gw$pooled_ln_or,
            xlims=c(2, max(-log10(gw$pooled_control_freq))),
@@ -87,7 +87,7 @@ dev.off()
 # Plot effect size vs case frequency
 pdf(paste(out.prefix, "lnOR_vs_case_freq.pdf", sep="."),
     height=2.25, width=2.25)
-gw.scatter(gw, 
+segs.scatter(gw, 
            x=-log10(gw$pooled_case_freq), 
            y=gw$pooled_ln_or,
            xlims=c(2, max(-log10(gw$pooled_case_freq))),
@@ -102,7 +102,7 @@ dev.off()
 # Plot effect size vs segment size
 pdf(paste(out.prefix, "lnOR_vs_size.pdf", sep="."),
     height=2.25, width=2.25)
-gw.scatter(gw, 
+segs.scatter(gw, 
            x=log10(gw$size), 
            y=gw$pooled_ln_or,
            xlims=c(5, 7),
@@ -117,7 +117,7 @@ dev.off()
 # Plot effect size vs number of genes & gene density
 pdf(paste(out.prefix, "lnOR_vs_genes.pdf", sep="."),
     height=2.25, width=2.25)
-gw.scatter(gw, 
+segs.scatter(gw, 
            x=gw$n_genes, 
            y=gw$pooled_ln_or,
            ylims=c(0, max(gw$pooled_ln_or)),
@@ -126,7 +126,7 @@ gw.scatter(gw,
 dev.off()
 pdf(paste(out.prefix, "lnOR_vs_gene_density.pdf", sep="."),
     height=2.25, width=2.25)
-gw.scatter(gw, 
+segs.scatter(gw, 
            x=100000 * gw$n_genes / gw$size, 
            y=gw$pooled_ln_or,
            ylims=c(0, max(gw$pooled_ln_or)),
@@ -137,7 +137,7 @@ dev.off()
 # Plot effect size vs number of genes & gene density
 pdf(paste(out.prefix, "lnOR_vs_constrained_genes.pdf", sep="."),
     height=2.25, width=2.25)
-gw.scatter(gw, 
+segs.scatter(gw, 
            x=gw$n_gnomAD_constrained_genes, 
            y=gw$pooled_ln_or,
            ylims=c(0, max(gw$pooled_ln_or)),
@@ -146,7 +146,7 @@ gw.scatter(gw,
 dev.off()
 pdf(paste(out.prefix, "lnOR_vs_constrained_gene_density.pdf", sep="."),
     height=2.25, width=2.25)
-gw.scatter(gw, 
+segs.scatter(gw, 
            x=1000000 * gw$n_gnomAD_constrained_genes / gw$size, 
            y=gw$pooled_ln_or,
            ylims=c(0, max(gw$pooled_ln_or)),
@@ -157,7 +157,7 @@ dev.off()
 # Plot effect size vs number of genes & gene density
 pdf(paste(out.prefix, "lnOR_vs_OMIM_genes.pdf", sep="."),
     height=2.25, width=2.25)
-gw.scatter(gw, 
+segs.scatter(gw, 
            x=gw$n_OMIM_genes, 
            y=gw$pooled_ln_or,
            ylims=c(0, max(gw$pooled_ln_or)),
@@ -166,7 +166,7 @@ gw.scatter(gw,
 dev.off()
 pdf(paste(out.prefix, "lnOR_vs_OMIM_gene_density.pdf", sep="."),
     height=2.25, width=2.25)
-gw.scatter(gw, 
+segs.scatter(gw, 
            x=1000000 * gw$n_OMIM_genes / gw$size, 
            y=gw$pooled_ln_or,
            ylims=c(0, max(gw$pooled_ln_or)),
@@ -177,7 +177,7 @@ dev.off()
 # Plot effect size vs mechanism
 pdf(paste(out.prefix, "lnOR_vs_NAHR.pdf", sep="."),
     height=2.25, width=2.5)
-gw.swarm(gw, 
+segs.swarm(gw, 
          x.bool=gw$nahr, 
          y=gw$pooled_ln_or,
          ylims=c(0, max(gw$pooled_ln_or)),
@@ -187,7 +187,7 @@ gw.swarm(gw,
 dev.off()
 pdf(paste(out.prefix, "lnOR_vs_NAHR.all_nomsig_segs.pdf", sep="."),
     height=2.25, width=2.5)
-gw.swarm(segs, 
+segs.swarm(segs, 
          x.bool=segs$nahr, 
          y=segs$meta_best_lnor,
          add.pvalue = T, violin = T,

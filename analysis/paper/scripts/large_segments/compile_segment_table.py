@@ -411,8 +411,9 @@ def main():
                         'annotate. Will match on segment HPO. Two columns ' +
                         'expected: HPO, and path to genelist.')
     parser.add_argument('--dnm-tsvs', help='Tsv of de novo mutation counts ' +
-                        ' to annotate. Two columns expected: study prefix, and ' +
-                        'path to tsv with dnm counts.')
+                        ' to annotate. Three columns expected: study prefix, ' +
+                        'path to tsv with dnm counts, and path to list of exome-' +
+                        'wide significant genes from that study.')
     parser.add_argument('--snv-mus', help='Tsv of snv mutation rates per gene. ' +
                         'Four columns expected: gene, and relative mutation rates ' +
                         'for lof, missense, and synonymous mutations.')

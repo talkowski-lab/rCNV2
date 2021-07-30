@@ -82,8 +82,9 @@ def main():
     parser.add_argument('--segment-hpos', help='tsv of segment ids and semicolon-' +
                         'delimited list of associated HPOs.')
     parser.add_argument('--dnm-tsvs', help='Tsv of de novo mutation counts ' +
-                        ' to annotate. Two columns expected: study prefix, and ' +
-                        'path to tsv with dnm counts.')
+                        ' to annotate. Three columns expected: study prefix, ' +
+                        'path to tsv with dnm counts, and path to list of exome-' +
+                        'wide significant genes from that study.')
     parser.add_argument('--snv-mus', help='Tsv of snv mutation rates per gene. ' +
                         'Four columns expected: gene, and relative mutation rates ' +
                         'for lof, missense, and synonymous mutations.')
@@ -150,12 +151,14 @@ def main():
     if args.dnm_tsvs is not None:
         dnms = {}
         mus = {}
+        xgenes = {}
         with open(args.dnm_tsvs) as dnm_in:
             reader = csv.reader(dnm_in, delimiter='\t')
-            for study, dnm_path in reader:
+            for study, dnm_path, xgene_list in reader:
                 dnm_df = pd.read_csv(dnm_path, sep='\t').\
                             rename(columns={'#gene' : 'gene'})
                 dnms[study] = dnm_df
+                xgenes[study] = list(set([g.rstrip() for g in open(xgene_list).readlines()]))
                 if mu_df is not None:
                     mus[study] = mu_df.copy(deep=True)
                 for csq in dnm_csqs:
@@ -165,6 +168,12 @@ def main():
                         mus[study]['mu_' + csq] = mus[study]['mu_' + csq] * n_dnms
                         header_cols += ['_'.join([study, 'dnm', csq, 'obs_wMu']),
                                         '_'.join([study, 'dnm', csq, 'exp_wMu'])]
+                for csq in dnm_csqs:
+                    header_cols.append('_'.join([study, 'noSig', 'dnm', csq]))
+                    if mu_df is not None:
+                        header_cols += ['_'.join([study, 'noSig', 'dnm', csq, 'obs_wMu']),
+                                        '_'.join([study, 'noSig', 'dnm', csq, 'exp_wMu'])]
+
 
     # Preprocess GTEx expression matrix, if optioned
     if args.gtex_matrix is not None:
@@ -201,6 +210,7 @@ def main():
         if args.dnm_tsvs is not None:
             for study in dnms.keys():
                 dnm_df = dnms[study]
+                # First annotate without excluding exome-wide significant genes from each study
                 for csq in dnm_csqs:
                     outvals.append(dnm_df.loc[dnm_df.gene.isin(genes), csq].sum())
                     if mu_df is not None:
@@ -208,6 +218,15 @@ def main():
                         genes_with_mus = mu_df.dropna()['gene'].tolist()
                         obs = dnm_df.loc[dnm_df.gene.isin(genes) & dnm_df.gene.isin(genes_with_mus), csq].sum()
                         exp = mu_df_x.loc[mu_df_x.gene.isin(genes) & mu_df_x.gene.isin(genes_with_mus), 'mu_' + csq].sum()
+                        outvals += [obs, round(exp, 6)]
+                # Annotate again after holding out exome-wide significant genes from each study
+                for csq in dnm_csqs:
+                    genes_x = [g for g in genes if g not in xgenes[study]]
+                    outvals.append(dnm_df.loc[dnm_df.gene.isin(genes_x), csq].sum())
+                    if mu_df is not None:
+                        mu_df_x2 = mu_df_x.loc[~mu_df_x.gene.isin(xgenes[study]), :]
+                        obs = dnm_df.loc[dnm_df.gene.isin(genes_x) & dnm_df.gene.isin(genes_with_mus), csq].sum()
+                        exp = mu_df_x2.loc[mu_df_x2.gene.isin(genes_x) & mu_df_x2.gene.isin(genes_with_mus), 'mu_' + csq].sum()
                         outvals += [obs, round(exp, 6)]
 
         # Annotate with expression-based features, if optioned
