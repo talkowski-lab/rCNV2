@@ -559,7 +559,8 @@ plot.viohist <- function(perm.dat.vals, bins, y.at, width=0.8,
 #' @export
 plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
                            subset_to_regions=NULL, n.bins=100, min.bins=10,
-                           x.title=NULL, x.title.line=1.2, xlims=NULL, xmin=NULL, xmax=NULL,
+                           x.title=NULL, x.title.line=1.2, x.title.cex=1,
+                           xlims=NULL, xmin=NULL, xmax=NULL,
                            diamond.pch=23, diamond.cex=1.25, parmar=c(2.25, 2, 0.5, 0.5)){
   # Get plot data
   if(!is.null(subset_to_regions)){
@@ -653,7 +654,7 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
   sapply(1:length(axTicks(1)), function(i){
     axis(1, at=axTicks(1)[i], labels=prettyNum(axTicks(1)[i], big.mark=","), line=-0.65, tick=F)
   })
-  mtext(1, text=x.title, line=x.title.line)
+  mtext(1, text=x.title, line=x.title.line, cex=x.title.cex)
 }
 
 
@@ -667,6 +668,7 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
 #' @param union.perms list of permutation results for all combined segments
 #' @param feature name of feature to evaluate
 #' @param measure statistic to evaluate \[default: mean\]
+#' @param subset_to_regions vector of region IDs to include \[default: include all regions\]
 #' @param norm normalize values before plotting \[default: FALSE\]
 #' @param n.bins ideal number of bins for histograms \[default: 100\]
 #' @param min.bins minimum number of bins \[default: 10\]
@@ -685,29 +687,40 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
 #' @export plot.seg.perms.multi
 #' @export
 plot.seg.perms.multi <- function(segs, gw.perms, lit.perms, union.perms,
-                                 feature, measure,
+                                 feature, measure, subset_to_regions=NULL,
                                  norm=F, n.bins=100, min.bins=10,
                                  x.title=NULL, xlims=NULL, xmin=NULL, xmax=NULL, max.x.ticks=5,
-                                 inner.axis.cex=0.9, diamond.cex=1.25,
+                                 outer.axis.cex=1, inner.axis.cex=0.85, diamond.cex=1.25,
                                  parmar=c(2.25, 6, 0.5, 0.5)){
   # Get ID subsets
-  all.gw.ids <- segs$region_id[which(segs$gw_sig)]
-  all.gd.ids <- segs$region_id[which(segs$any_gd)]
-  gd.nonsig.ids <- setdiff(all.gd.ids, all.gw.ids)
-  union.ids <- segs$region_id[which(segs$gw_sig | segs$any_gd)]
+  if(is.null(subset_to_regions)){
+    subset_to_regions <- segs$region_id
+  }
+  all.sig.ids <- intersect(subset_to_regions, segs$region_id[which(segs$any_sig)])
+  all.gw.ids <- intersect(subset_to_regions, segs$region_id[which(segs$gw_sig)])
+  all.fdr.ids <- intersect(subset_to_regions, segs$region_id[which(segs$fdr_sig)])
+  all.gd.ids <- intersect(subset_to_regions, segs$region_id[which(segs$any_gd)])
+  gd.nonsig.ids <- intersect(subset_to_regions, setdiff(all.gd.ids, all.sig.ids))
+  union.ids <- intersect(subset_to_regions, segs$region_id[which(segs$gw_sig | segs$any_gd)])
 
   # Get permutation plot data
   perm.dat <- list("union"=perm.summary(union.perms, feature=feature, measure=measure,
                                         subset_to_regions=union.ids),
-                   "gw"=perm.summary(gw.perms, feature=feature, measure=measure),
+                   "gw"=perm.summary(gw.perms, feature=feature, measure=measure,
+                                     subset_to_regions=all.gw.ids),
+                   "fdr"=perm.summary(gw.perms, feature=feature, measure=measure,
+                                     subset_to_regions=all.fdr.ids),
                    "gd.nonsig"=perm.summary(lit.perms, feature=feature, measure=measure,
                                             subset_to_regions=gd.nonsig.ids))
+  n.cats <- length(perm.dat)
 
   # Get observed plot data, and convert boolean valueas back to numeric, if needed
   segs.dat <- list("union"=calc.segs.dat(segs, feature, measure,
                                          subset_to_regions=union.ids),
                    "gw"=calc.segs.dat(segs, feature, measure,
                                       subset_to_regions=all.gw.ids),
+                   "fdr"=calc.segs.dat(segs, feature, measure,
+                                      subset_to_regions=all.fdr.ids),
                    "gd.nonsig"=calc.segs.dat(segs, feature, measure,
                                              subset_to_regions=gd.nonsig.ids))
   # Normalize data, if optioned
@@ -716,7 +729,7 @@ plot.seg.perms.multi <- function(segs, gw.perms, lit.perms, union.perms,
   if(norm==T){
     perm.means <- lapply(perm.dat, function(df){apply(df, 2, mean, na.rm=T)})
     perm.sds <- lapply(perm.dat, function(df){apply(df, 2, sd, na.rm=T)})
-    for(i in 1:3){
+    for(i in 1:n.cats){
       for(j in 1:3){
         perm.dat[[i]][, j] <- (perm.dat[[i]][, j] - perm.means[[i]][j]) / perm.sds[[i]][j]
         segs.dat[[i]][j] <- (segs.dat[[i]][j] - perm.means[[i]][j]) / perm.sds[[i]][j]
@@ -751,30 +764,28 @@ plot.seg.perms.multi <- function(segs, gw.perms, lit.perms, union.perms,
 
   # Gather more misc data for plotting
   perm.means <- lapply(perm.dat, function(df){apply(df, 2, mean, na.rm=T)})
-  perm.pvals <- lapply(1:3, function(i){
+  perm.pvals <- lapply(1:n.cats, function(i){
     sapply(1:3, function(j){calc.perm.p(perm.vals=perm.dat[[i]][, j], obs.val=segs.dat[[i]][j])})
   })
-  vio.colors <- rep(bluewhite, 3)
-  vio.borders <- rep(blueblack, 3)
-  # vio.colors <- c(purplewhite, redwhite, bluewhite)
-  # vio.borders <- c(purpleblack, redblack, blueblack)
+  vio.colors <- rep(bluewhite, n.cats)
+  vio.borders <- rep(blueblack, n.cats)
   row.colors <- c(cnv.colors[c(3, 1:2)])
   row.borders <- rep("black", 3)
   # row.borders <- c(purpleblack, redblack, blueblack)
   outer.row.labels <- c("All\nCNV", "DEL", "DUP")
-  inner.row.labels <- c("All Segs.", "GW-Sig.", "Only from\nLiterature")
+  inner.row.labels <- c("All Segs.", "GW Sig.", "FDR Sig.", "Lit. Only")
   stats.cex <- 0.85
-  obs.pch <- c(23, 22, 21)
+  obs.pch <- c(23, 22, 23, 21)
 
   # Prep global plot area
   par(bty="n", mar=parmar)
-  plot(NA, xlim=xlims, ylim=c(10, 0), type="n",
+  plot(NA, xlim=xlims, ylim=c(13, 0), type="n",
        xaxt="n", yaxt="n", xlab="", ylab="")
 
   # Add viohists
-  sapply(1:3, function(i){
+  sapply(1:n.cats, function(i){
     sapply(1:3, function(j){
-      y.at <- (3*j)-(3-i)-0.5+(0.5*(j-1))
+      y.at <- (n.cats*j)-(n.cats-i)-0.5+(0.5*(j-1))
       plot.viohist(perm.dat[[i]][, j], bins, y.at,
                    color=vio.colors[j], border=vio.borders[j],
                    y.title=inner.row.labels[i], diamond.cex=diamond.cex, obs.val=segs.dat[[i]][j],
@@ -805,12 +816,12 @@ plot.seg.perms.multi <- function(segs, gw.perms, lit.perms, union.perms,
   })
   mtext(1, text=x.title, line=1.3)
   sapply(1:3, function(i){
-    ax.at <- ((3*i)+(0.5*(i-1)))-c(2.9, 0.1)
+    ax.at <- ((n.cats*i)+(0.5*(i-1)))-c(n.cats-0.1, 0.1)
     axis(2, at=ax.at, tck=0, labels=NA, col=blueblack, line=4)
-    axis(2, at=mean(ax.at), tick=F, line=3.25, las=2, labels=outer.row.labels[i], cex.axis=inner.axis.cex)
+    axis(2, at=mean(ax.at), tick=F, line=3.25, las=2, labels=outer.row.labels[i], cex.axis=outer.axis.cex)
   })
   segments(x0=rep(par("usr")[1], 2), x1=rep(par("usr")[2], 2),
-           y0=c(3.25, 6.75), y1=c(3.25, 6.75),
+           y0=c(4.25, 8.75), y1=c(4.25, 8.75),
            col=bluewhite, lend="round")
 }
 
@@ -858,14 +869,19 @@ plot.all.perm.res <- function(segs, gw.perms, lit.perms,
                               parmar.single=c(2.25, 2, 0.5, 0.5),
                               pdf.dims.multi=c(2.2, 4.8),
                               parmar.multi=c(2.25, 6, 0.5, 0.5)){
-  # Get ID subsets
+  # Restrict segments to subset of regions, if optioned
   if(is.null(subset_to_regions)){
     subset_to_regions <- segs$region_id
   }
+  segs <- segs[which(segs$region_id %in% subset_to_regions), ]
+
+  # Get ID subsets
+  all.sig.ids <- intersect(subset_to_regions, segs$region_id[which(segs$any_sig)])
   all.gw.ids <- intersect(subset_to_regions, segs$region_id[which(segs$gw_sig)])
+  all.fdr.ids <- intersect(subset_to_regions, segs$region_id[which(segs$fdr_sig)])
   all.gd.ids <- intersect(subset_to_regions, segs$region_id[which(segs$any_gd)])
-  gd.nonsig.ids <- intersect(subset_to_regions, setdiff(all.gd.ids, all.gw.ids))
-  union.ids <- intersect(subset_to_regions, segs$region_id[which(segs$gw_sig | segs$any_gd)])
+  gd.nonsig.ids <- intersect(subset_to_regions, setdiff(all.gd.ids, all.sig.ids))
+  union.ids <- intersect(subset_to_regions, segs$region_id[which(segs$any_sig | segs$any_gd)])
 
   # Merge perm results
   union.perms <- lapply(1:length(gw.perms), function(i){
@@ -890,15 +906,37 @@ plot.all.perm.res <- function(segs, gw.perms, lit.perms,
                  parmar=parmar.single)
   dev.off()
 
+  # Plot gw + FDR alone
+  cat("Genome-wide + FDR significant:\n")
+  pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".gw_plus_fdr.pdf", sep=""),
+      height=pdf.dims.single[1], width=pdf.dims.single[2])
+  plot.seg.perms(segs, gw.perms, feature=feature, measure=measure,
+                 subset_to_regions=all.sig.ids,
+                 n.bins=n.bins.single, min.bins=min.bins, norm=norm,
+                 x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
+                 diamond.pch=23, parmar=parmar.single)
+  dev.off()
+
   # Plot gw-sig alone
   cat("Genome-wide significant alone:\n")
-  pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".all_gw_sig.pdf", sep=""),
+  pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".gw_sig.pdf", sep=""),
       height=pdf.dims.single[1], width=pdf.dims.single[2])
   plot.seg.perms(segs, gw.perms, feature=feature, measure=measure,
                  subset_to_regions=all.gw.ids,
                  n.bins=n.bins.single, min.bins=min.bins, norm=norm,
                  x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
                  diamond.pch=22, parmar=parmar.single)
+  dev.off()
+
+  # Plot FDR-sig alone
+  cat("FDR significant alone:\n")
+  pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".fdr_sig.pdf", sep=""),
+      height=pdf.dims.single[1], width=pdf.dims.single[2])
+  plot.seg.perms(segs, gw.perms, feature=feature, measure=measure,
+                 subset_to_regions=all.fdr.ids,
+                 n.bins=n.bins.single, min.bins=min.bins, norm=norm,
+                 x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
+                 diamond.pch=23, parmar=parmar.single)
   dev.off()
 
   # Plot lit GDs alone
@@ -913,8 +951,8 @@ plot.all.perm.res <- function(segs, gw.perms, lit.perms,
   dev.off()
 
   # Plot non-significant lit GDs alone
-  cat("Non-significant literature GDs alone:\n")
-  pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".nonsig_lit_gds.pdf", sep=""),
+  cat("Literature GDs below genome-wide or FDR significance:\n")
+  pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".lit_gds_nogw_noFDR.pdf", sep=""),
       height=pdf.dims.single[1], width=pdf.dims.single[2])
   plot.seg.perms(segs, lit.perms, feature=feature, measure=measure,
                  subset_to_regions=gd.nonsig.ids,
@@ -927,7 +965,7 @@ plot.all.perm.res <- function(segs, gw.perms, lit.perms,
   pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".multipanel.pdf", sep=""),
       height=pdf.dims.multi[1], width=pdf.dims.multi[2])
   plot.seg.perms.multi(segs, gw.perms, lit.perms, union.perms,
-                       feature, measure,
+                       feature, measure, subset_to_regions=subset_to_regions,
                        n.bins=n.bins.multi, min.bins=min.bins, norm=norm.multi,
                        x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
                        diamond.cex=1, parmar=parmar.multi)

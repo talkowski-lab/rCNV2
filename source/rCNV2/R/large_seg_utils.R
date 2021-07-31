@@ -78,7 +78,7 @@ load.segment.table <- function(segs.in){
 
   # Convert boolean dummy columns to logicals
   boolcol.idxs <- which(colnames(segs) %in% c("any_sig", "gw_sig", "fdr_sig",
-                                              "nom_sig", "nom_neuro",
+                                              "nom_sig", "nom_neuro", "nom_dev",
                                               "hc_gd", "mc_gd", "lc_gd", "any_gd",
                                               "pathogenic", "benign", "nahr",
                                               "pleiotropic"))
@@ -89,6 +89,7 @@ load.segment.table <- function(segs.in){
   segs$gnomAD_constrained_prop <- segs$n_gnomAD_constrained_genes / segs$n_genes
   segs$prop_ubiquitously_expressed <- segs$n_ubiquitously_expressed_genes / segs$n_genes
   segs <- normalize.dnms(segs)
+  segs <- normalize.dnms(segs, dnm.cohorts=c("DDD_noSig", "ASC_noSig", "ASC_unaffected_noSig"))
 
   # Add formatted sizes
   segs$formatted_size <- paste(prettyNum(round(segs$size/1000, 0), big.mark=","), "kb", sep=" ")
@@ -119,10 +120,11 @@ load.segment.table <- function(segs.in){
 
 #' Get list of neuro-associated loci
 #'
-#' Compile master list of neuro-associated loci (using gw-sig for gw-sig loci and nominal for lit-based loci)
+#' Compile master list of neuro-associated loci
 #'
 #' @param loci locus association dataframe (imported with [load.loci()])
 #' @param segs segment dataframe (imported with [load.segment.table()])
+#' @param sig.only only return genome-wide or FDR significant segments \[default: FALSE\]
 #'
 #' @return vector
 #'
@@ -130,10 +132,71 @@ load.segment.table <- function(segs.in){
 #'
 #' @export get.neuro.region_ids
 #' @export
-get.neuro.region_ids <- function(loci, segs){
-  gw.hits <- loci$region_id[which(sapply(loci$hpos, function(hpos){any(hpos %in% neuro.hpos)}))]
-  lit.hits <- segs$region_id[which(segs$any_gd & segs$nom_neuro & !segs$gw_sig)]
-  sort(unique(c(gw.hits, lit.hits)))
+get.neuro.region_ids <- function(loci, segs, sig.only=FALSE){
+  sig.hits <- loci$region_id[which(sapply(loci$hpos, function(hpos){any(hpos %in% neuro.hpos)}))]
+  lit.hits <- segs$region_id[which(segs$any_gd & segs$nom_neuro & !segs$any_sig)]
+  if(sig.only){
+    sort(unique(sig.hits))
+  }else{
+    sort(unique(c(sig.hits, lit.hits)))
+  }
+}
+
+
+#' Get list of developmental or adult loci
+#'
+#' Compile master list of loci associated with developmental or adult phenotypes
+#'
+#' @param loci locus association dataframe (imported with [load.loci()])
+#' @param segs segment dataframe (imported with [load.segment.table()])
+#' @param adult return loci only associated with adult phenotypes \[default: FALSE\]
+#' @param sig.only only return genome-wide or FDR significant segments \[default: FALSE\]
+#'
+#' @return vector
+#'
+#' @seealso [load.loci()], [load.segment.table()]
+#'
+#' @export get.developmental.region_ids
+#' @export
+get.developmental.region_ids <- function(loci, segs, adult=FALSE, sig.only=FALSE){
+  if(adult){
+    sig.hits <- loci$region_id[which(sapply(loci$hpos, function(hpos){!any(hpos %in% developmental.hpos)}))]
+    lit.hits <- segs$region_id[which(segs$any_gd & !segs$nom_dev & !segs$any_sig)]
+  }else{
+    sig.hits <- loci$region_id[which(sapply(loci$hpos, function(hpos){any(hpos %in% developmental.hpos)}))]
+    lit.hits <- segs$region_id[which(segs$any_gd & segs$nom_dev & !segs$any_sig)]
+  }
+  if(sig.only){
+    sort(unique(sig.hits))
+  }else{
+    sort(unique(c(sig.hits, lit.hits)))
+  }
+}
+
+
+#' Get list of neurodevelopmental loci
+#'
+#' Compile master list of loci associated with the intersection of neurological and developmental phenotypes
+#'
+#' @param loci locus association dataframe (imported with [load.loci()])
+#' @param segs segment dataframe (imported with [load.segment.table()])
+#' @param sig.only only return genome-wide or FDR significant segments \[default: FALSE\]
+#'
+#' @return vector
+#'
+#' @seealso [load.loci()], [load.segment.table()]
+#'
+#' @export get.ndd.region_ids
+#' @export
+get.ndd.region_ids <- function(loci, segs, sig.only=FALSE){
+  ndd.hpos <- intersect(developmental.hpos, neuro.hpos)
+  sig.hits <- loci$region_id[which(sapply(loci$hpos, function(hpos){any(hpos %in% ndd.hpos)}))]
+  lit.hits <- segs$region_id[which(segs$any_gd & segs$nom_dev & segs$nom_neuro & !segs$any_sig)]
+  if(sig.only){
+    sort(unique(sig.hits))
+  }else{
+    sort(unique(c(sig.hits, lit.hits)))
+  }
 }
 
 

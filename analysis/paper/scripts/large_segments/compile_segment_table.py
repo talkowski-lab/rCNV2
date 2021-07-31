@@ -325,14 +325,16 @@ def annotate_expression(all_df, gtex_in, min_expression=1):
     return all_df
 
 
-def annotate_meta_sumstats(all_df, sumstats_in, add_nom_neuro=False, neuro_hpos=None):
+def annotate_meta_sumstats(all_df, sumstats_in, add_nom_neuro=False, neuro_hpos=None,
+                           add_nom_dev=False, dev_hpos=None):
     """
     Annotate segments with sumstats for best phenotype association while matching on CNV type
     Adds the following columns to all_df:
         1. meta_best_p: top P-value for any phenotype
         2. nom_sig: dummy indicator if the region is nominally significant in at least one phenotype
         3. nom_neuro [optional]: dummy indicator if the region is nominally significant in at least one neurological phenotype
-        4. meta_best_lnor: lnOR estimate for phenotype corresponding to meta_best_p
+        4. nom_dev [optional]: dummy indicator if the region is nominally significant in at least one developmental phenotype
+        5. meta_best_lnor: lnOR estimate for phenotype corresponding to meta_best_p
     """
 
     # Load sumstats
@@ -344,6 +346,7 @@ def annotate_meta_sumstats(all_df, sumstats_in, add_nom_neuro=False, neuro_hpos=
     best_ps = []
     nomsig = []
     nomneuro = []
+    nomdev = []
     best_lnORs = []
     for rid, cnv in all_df.loc[:, 'region_id cnv'.split()].itertuples(index=False, name=None):
         pvals = ss.loc[(ss.region_id == rid) & (ss.cnv == cnv), 'pvalue']
@@ -363,16 +366,27 @@ def annotate_meta_sumstats(all_df, sumstats_in, add_nom_neuro=False, neuro_hpos=
                     nomneuro.append(1)
                 else:
                     nomneuro.append(0)
+            if add_nom_dev:
+                nom_hpos = ss.loc[(ss.region_id == rid) & (ss.cnv == cnv) & (ss.pvalue >= -log10(0.05)), 'hpo']
+                nom_dev_hpos = [h for h in nom_hpos.tolist() if h in dev_hpos]
+                if len(nom_dev_hpos) > 0:
+                    nomdev.append(1)
+                else:
+                    nomdev.append(0)
+
         else:
             best_ps.append(NaN)
             nomsig.append(0)
             best_lnORs.append(NaN)
             nomneuro.append(0)
+            nomdev.append(0)
 
     all_df['meta_best_p'] = best_ps
     all_df['nom_sig'] = nomsig
     if add_nom_neuro:
         all_df['nom_neuro'] = nomneuro
+    if add_nom_dev:
+        all_df['nom_dev'] = nomdev
     all_df['meta_best_lnor'] = best_lnORs
 
     return all_df
@@ -426,6 +440,7 @@ def main():
     parser.add_argument('--meta-sumstats', help='Tsv of meta-analysis summary statistics ' +
                         'per phenotype per region. Computed with calc_all_seg_stats.py')
     parser.add_argument('--neuro-hpos', help='List of neurological HPOs.')
+    parser.add_argument('--dev-hpos', help='List of developmental HPOs.')
     parser.add_argument('--min-expression', default=1, help='Minimum expression ' +
                         'level (in unscaled TPM) to consider a gene as "expressed". ' +
                         '[default: 1]')
@@ -571,8 +586,15 @@ def main():
         else:
             add_nom_neuro = False
             neuro_hpos = None
+        if args.dev_hpos is not None:
+            add_nom_dev = True
+            dev_hpos = [x.rstrip() for x in open(args.dev_hpos).readlines()]
+        else:
+            add_nom_dev = False
+            dev_hpos = None
         all_df = annotate_meta_sumstats(all_df, args.meta_sumstats,
-                                        add_nom_neuro, neuro_hpos)
+                                        add_nom_neuro, neuro_hpos,
+                                        add_nom_dev, dev_hpos)
 
     # Sort & write out merged BED
     all_df.sort_values(by='chr start end cnv region_id'.split(), inplace=True)

@@ -11,6 +11,7 @@
   union.perms,
   feature,
   measure,
+  subset_to_regions = NULL,
   norm = F,
   n.bins = 100,
   min.bins = 10,
@@ -19,7 +20,8 @@
   xmin = NULL,
   xmax = NULL,
   max.x.ticks = 5,
-  inner.axis.cex = 0.9,
+  outer.axis.cex = 1,
+  inner.axis.cex = 0.85,
   diamond.cex = 1.25,
   parmar = c(2.25, 6, 0.5, 0.5)
 )
@@ -36,6 +38,8 @@
 \item{feature}{name of feature to evaluate}
 
 \item{measure}{statistic to evaluate [default: mean]}
+
+\item{subset_to_regions}{vector of region IDs to include [default: include all regions]}
 
 \item{norm}{normalize values before plotting [default: FALSE]}
 

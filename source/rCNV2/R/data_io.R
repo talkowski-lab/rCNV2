@@ -172,3 +172,22 @@ load.gene.feature.metadata <- function(feature.metadata.in){
   return(meta)
 }
 
+
+#' Load gene list
+#'
+#' Loads a single list of genes from a flat text file
+#'
+#' @param path path to gene list
+#'
+#' @return character vector of gene symbols
+#'
+#' @export load.genelist
+#' @export
+load.genelist <- function(path){
+  if(!is.null(path)){
+    sort(unique(as.character(read.table(path, header=F)[, 1])))
+  }else{
+    NULL
+  }
+}
+

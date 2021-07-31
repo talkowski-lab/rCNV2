@@ -160,6 +160,7 @@ cat \
   --gtex-matrix refs/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
   --meta-sumstats pooled_sumstats.tsv \
   --neuro-hpos refs/neuro_hpos.list \
+  --dev-hpos refs/rCNV2.hpos_by_severity.developmental.list \
   --gd-recip "10e-10" \
   --nahr-recip 0.25 \
   --bgzip
@@ -187,7 +188,6 @@ mkdir basic_distribs
   ${prefix}.master_segments.bed.gz \
   basic_distribs/${prefix}
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_seg_attributes_vs_ngenes.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   basic_distribs/${prefix}
@@ -202,7 +202,7 @@ zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f11 \
 # Note: in practice, this is parallelized in the cloud using segment_permutation.wdl
 # The code to execute these permutation tests is contained elsewhere
 # Copy results of segment permutation tests (note: requires permissions)
-n_seg_perms=100000
+n_seg_perms=10000
 gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/permutations/${prefix}*${n_seg_perms}_permuted_segments.bed.gz \
   ./
@@ -216,7 +216,6 @@ if [ -e perm_test_plots ]; then
 fi
 mkdir perm_test_plots
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_segment_permutations.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   --constrained-genes gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
@@ -230,7 +229,7 @@ mkdir perm_test_plots
 # Note: in practice, this is parallelized in the cloud using segment_permutation_bygene.wdl
 # The code to execute these permutation tests is contained elsewhere
 # Copy results of segment permutation tests (note: requires permissions)
-n_seg_perms=100000
+n_seg_perms=10000
 gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/permutations/${prefix}*${n_seg_perms}_permuted_segments_bygene.tsv.gz \
   ./
@@ -243,7 +242,6 @@ if ! [ -e perm_test_plots ]; then
   mkdir perm_test_plots
 fi
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_segment_bygene_perms.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   ${prefix}.${n_seg_perms}_permuted_segments_bygene.tsv.gz \

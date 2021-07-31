@@ -15,6 +15,7 @@
   min.bins = 10,
   x.title = NULL,
   x.title.line = 1.2,
+  x.title.cex = 1,
   xlims = NULL,
   xmin = NULL,
   xmax = NULL,
