@@ -84,7 +84,7 @@ loci <- load.loci(loci.in)
 segs.all <- load.segment.table(segs.in)
 
 # Subset to segments nominally significant for at least one phenotype
-segs <- segs[which(segs$nom_sig), ]
+segs <- segs.all[which(segs.all$nom_sig), ]
 nomsig.ids <- segs$region_id
 
 # Merge loci & segment data for genome-wide or FDR significant sites only
@@ -162,7 +162,7 @@ plot.all.perm.res(segs, perms, lit.perms,
                   feature="n_gnomAD_constrained_genes", measure="frac.any",
                   outdir, prefix, norm=F, norm.multi=F,
                   n.bins.single=15, n.bins.multi=30,
-                  xmax=100, x.title="Pct. w/Constrained Gene",
+                  x.title="Pct. w/Constrained Gene",
                   pdf.dims.single=c(2.2, 2.4),
                   parmar.single=c(2.25, 2, 0, 2),
                   pdf.dims.multi=c(4, 3.5),
@@ -172,7 +172,7 @@ plot.all.perm.res(segs, perms, lit.perms, subset_to_regions=dev.region_ids,
                   feature="n_gnomAD_constrained_genes", measure="frac.any",
                   outdir, paste(prefix, "dev_only", sep="."), norm=F, norm.multi=F,
                   n.bins.single=15, n.bins.multi=30,
-                  xmax=100, x.title="Pct. w/Constrained Gene",
+                  x.title="Pct. w/Constrained Gene",
                   pdf.dims.single=c(2.2, 2.4),
                   parmar.single=c(2.25, 2, 0, 2),
                   pdf.dims.multi=c(4, 3.5),
@@ -182,7 +182,7 @@ plot.all.perm.res(segs, perms, lit.perms, subset_to_regions=NDD.region_ids,
                   feature="n_gnomAD_constrained_genes", measure="frac.any",
                   outdir, paste(prefix, "NDD_only", sep="."), norm=F, norm.multi=F,
                   n.bins.single=15, n.bins.multi=30,
-                  xmax=100, x.title="Pct. w/Constrained Gene",
+                  x.title="Pct. w/Constrained Gene",
                   pdf.dims.single=c(2.2, 2.4),
                   parmar.single=c(2.25, 2, 0, 2),
                   pdf.dims.multi=c(4, 3.5),
@@ -194,6 +194,26 @@ print("Mean constrained genes per segment:")
 plot.all.perm.res(segs, perms, lit.perms,
                   feature="n_gnomAD_constrained_genes", measure="mean",
                   outdir, prefix, norm=F, norm.multi=F,
+                  n.bins.single=30, n.bins.multi=50,
+                  x.title="Mean Constrained Genes",
+                  pdf.dims.single=c(2.2, 2.4),
+                  parmar.single=c(2.25, 2, 0, 1.2),
+                  pdf.dims.multi=c(4, 3.5),
+                  parmar.multi=c(2.25, 6.25, 0, 1.75))
+print("Mean constrained genes per DEVELOPMENTAL segment:")
+plot.all.perm.res(segs, perms, lit.perms, subset_to_regions=dev.region_ids,
+                  feature="n_gnomAD_constrained_genes", measure="mean",
+                  outdir, paste(prefix, "dev_only", sep="."), norm=F, norm.multi=F,
+                  n.bins.single=30, n.bins.multi=50,
+                  x.title="Mean Constrained Genes",
+                  pdf.dims.single=c(2.2, 2.4),
+                  parmar.single=c(2.25, 2, 0, 1.2),
+                  pdf.dims.multi=c(4, 3.5),
+                  parmar.multi=c(2.25, 6.25, 0, 1.75))
+print("Mean constrained genes per NDD segment:")
+plot.all.perm.res(segs, perms, lit.perms, subset_to_regions=NDD.region_ids,
+                  feature="n_gnomAD_constrained_genes", measure="mean",
+                  outdir, paste(prefix, "NDD_only", sep="."), norm=F, norm.multi=F,
                   n.bins.single=30, n.bins.multi=50,
                   x.title="Mean Constrained Genes",
                   pdf.dims.single=c(2.2, 2.4),
@@ -216,17 +236,67 @@ plot.all.perm.res(segs, perms, lit.perms,
 
 
 # Mean excess number of de novo PTVs & missense per gene in ASC & DDD
-# When restricting gw-sig to neuro-associated loci
+# Note: these analyses restricted to developmental & NDD loci only
 sapply(c("ASC", "DDD", "ASC_unaffected"), function(cohort){
   sapply(1:length(csqs), function(ci){
     csq <- csqs[ci]
     csq.abbrev <- names(csqs)[ci]
-    print(paste(cohort, csq.abbrev, "DNMs per gene vs. expected:"))
+    print(paste(cohort, csq.abbrev, "DNMs per gene vs. expected for DEVELOPMENTAL segments:"))
     plot.all.perm.res(segs, perms, lit.perms,
                       feature=paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_"),
                       measure="mean",
-                      outdir, paste(prefix, "gw_neuro_plus_lit", sep="."),
-                      subset_to_regions=neuro.region_ids,
+                      outdir, paste(prefix, "dev_only", sep="."),
+                      subset_to_regions=dev.region_ids,
+                      norm=F, norm.multi=F,
+                      n.bins.single=100, n.bins.multi=100, min.bins=100,
+                      x.title=bquote("Excess" ~ italic("De Novo") ~ .(csq.abbrev) ~ "/ Gene"),
+                      pdf.dims.single=c(2.2, 2.4),
+                      parmar.single=c(2.25, 2, 0, 1.2),
+                      pdf.dims.multi=c(4, 3.5),
+                      parmar.multi=c(2.25, 6.05, 0, 2.3))
+    print(paste(cohort, csq.abbrev, "DNMs per gene vs. expected for NDD segments:"))
+    plot.all.perm.res(segs, perms, lit.perms,
+                      feature=paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_"),
+                      measure="mean",
+                      outdir, paste(prefix, "NDD_only", sep="."),
+                      subset_to_regions=NDD.region_ids,
+                      norm=F, norm.multi=F,
+                      n.bins.single=100, n.bins.multi=100, min.bins=100,
+                      x.title=bquote("Excess" ~ italic("De Novo") ~ .(csq.abbrev) ~ "/ Gene"),
+                      pdf.dims.single=c(2.2, 2.4),
+                      parmar.single=c(2.25, 2, 0, 1.2),
+                      pdf.dims.multi=c(4, 3.5),
+                      parmar.multi=c(2.25, 6.05, 0, 2.3))
+  })
+})
+
+
+# Mean excess number of de novo PTVs & missense per gene in ASC & DDD
+# AFTER removing exome-wide significant genes from their original publications
+# Note: these analyses restricted to developmental & NDD loci only
+sapply(c("ASC_noSig", "DDD_noSig", "ASC_unaffected_noSig"), function(cohort){
+  sapply(1:length(csqs), function(ci){
+    csq <- csqs[ci]
+    csq.abbrev <- names(csqs)[ci]
+    print(paste(cohort, csq.abbrev, "DNMs per gene vs. expected for DEVELOPMENTAL segments (significant genes REMOVED):"))
+    plot.all.perm.res(segs, perms, lit.perms,
+                      feature=paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_"),
+                      measure="mean",
+                      outdir, paste(prefix, "dev_only", sep="."),
+                      subset_to_regions=dev.region_ids,
+                      norm=F, norm.multi=F,
+                      n.bins.single=100, n.bins.multi=100, min.bins=100,
+                      x.title=bquote("Excess" ~ italic("De Novo") ~ .(csq.abbrev) ~ "/ Gene"),
+                      pdf.dims.single=c(2.2, 2.4),
+                      parmar.single=c(2.25, 2, 0, 1.2),
+                      pdf.dims.multi=c(4, 3.5),
+                      parmar.multi=c(2.25, 6.05, 0, 2.3))
+    print(paste(cohort, csq.abbrev, "DNMs per gene vs. expected for NDD segments  (significant genes REMOVED):"))
+    plot.all.perm.res(segs, perms, lit.perms,
+                      feature=paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_"),
+                      measure="mean",
+                      outdir, paste(prefix, "NDD_only", sep="."),
+                      subset_to_regions=NDD.region_ids,
                       norm=F, norm.multi=F,
                       n.bins.single=100, n.bins.multi=100, min.bins=100,
                       x.title=bquote("Excess" ~ italic("De Novo") ~ .(csq.abbrev) ~ "/ Gene"),

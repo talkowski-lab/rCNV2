@@ -905,6 +905,7 @@ task finemap_genes {
         --min-nominal ${meta_nominal_cohorts_cutoff} \
         --secondary-or-nominal \
         --fdr-q-cutoff ${FDR_cutoff} \
+        --secondary-for-fdr \
         --regularization-alpha ${finemap_elnet_alpha} \
         --regularization-l1-l2-mix ${finemap_elnet_l1_l2_mix} \
         --distance ${finemap_cluster_distance} \

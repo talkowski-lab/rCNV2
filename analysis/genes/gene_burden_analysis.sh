@@ -550,13 +550,13 @@ metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 meta_p_cutoffs_tsv="refs/gene_burden.rCNV.DEL.bonferroni_pval.hpo_cutoffs.tsv"
 meta_secondary_p_cutoff=0.05
 meta_nominal_cohorts_cutoff=2
-FDR_cutoff=0.01
+FDR_cutoff=0.05
 gene_features="refs/gencode.v19.canonical.pext_filtered.all_features.no_variation.eigenfeatures.bed.gz"
 finemap_output_label="all_features"
-finemap_elnet_alpha=0.01
-finemap_elnet_l1_l2_mix=0.5
+finemap_elnet_alpha=0.05
+finemap_elnet_l1_l2_mix=0.75
 finemap_cluster_distance=1000000
-finemap_nonsig_distance=100000
+finemap_nonsig_distance=200000
 finemap_conf_pip=0.15
 finemap_vconf_pip=0.85
 
@@ -615,6 +615,7 @@ for subgroup in developmental adult; do
     --min-nominal ${meta_nominal_cohorts_cutoff} \
     --secondary-or-nominal \
     --fdr-q-cutoff ${FDR_cutoff} \
+    --secondary-for-fdr \
     --regularization-alpha ${finemap_elnet_alpha} \
     --regularization-l1-l2-mix ${finemap_elnet_l1_l2_mix} \
     --distance ${finemap_cluster_distance} \

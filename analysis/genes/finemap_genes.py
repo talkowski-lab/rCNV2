@@ -41,7 +41,8 @@ def format_stat(x, is_phred=False, na_val=0):
 
 def get_sig_label(primary_p, secondary_p, n_nominal, primary_q, primary_p_cutoff, 
                   secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
-                  secondary_or_nominal=True, fdr_q_cutoff=0.05):
+                  secondary_or_nominal=True, fdr_q_cutoff=0.05,
+                  secondary_for_fdr=False):
     """
     Checks if a gene should be considered exome-wide or FDR significant
     """
@@ -52,24 +53,27 @@ def get_sig_label(primary_p, secondary_p, n_nominal, primary_q, primary_p_cutoff
     n_nominal_is_sig = (n_nominal >= n_nominal_cutoff)
     fdr_q_is_sig = (primary_q < fdr_q_cutoff)
 
+    # Determine secondary criteria
+    if secondary_p_is_sig and n_nominal_is_sig:
+        secondary_is_sig = True
+    elif secondary_or_nominal and (secondary_p_is_sig or n_nominal_is_sig):
+        secondary_is_sig = True
+    else:
+        secondary_is_sig = False
+
     # First consider exome-wide significance
-    if primary_p_is_sig \
-    and secondary_p_is_sig \
-    and n_nominal_is_sig:
-        return 'EWS'
-    elif primary_p_is_sig \
-    and secondary_or_nominal \
-    and (secondary_p_is_sig or n_nominal_is_sig):
+    if primary_p_is_sig and secondary_is_sig:
         return 'EWS'
     
     # Second consider FDR significance
-    elif fdr_q_is_sig:
+    elif fdr_q_is_sig and secondary_for_fdr and secondary_is_sig:
+        return 'FDR'
+    elif fdr_q_is_sig and not secondary_for_fdr:
         return 'FDR'
 
     # Otherwise, non-significant
     else:
         return 'NS'
-
 
 def ci2se(ci):
     """
@@ -138,7 +142,8 @@ def finemap(gene_priors, gene_info, null_variance=0.42 ** 2):
 def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True, 
                 secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
                 secondary_or_nominal=True, fdr_q_cutoff=0.05, 
-                sig_only=False, keep_genes=None, finemap_secondary=False):
+                secondary_for_fdr=False, sig_only=False, keep_genes=None, 
+                finemap_secondary=False):
     """
     Input: csv.reader of meta-analysis association stats
     Output: dict of gene stats (either sig_only or all genes in reader)
@@ -175,7 +180,7 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
         sig_label = get_sig_label(primary_p, secondary_p, n_nominal, primary_q, 
                                   primary_p_cutoff, secondary_p_cutoff, 
                                   n_nominal_cutoff, secondary_or_nominal, 
-                                  fdr_q_cutoff)
+                                  fdr_q_cutoff, secondary_for_fdr)
         ew_sig = False
         fdr_sig = False
         if sig_label == 'EWS':
@@ -227,9 +232,10 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
 def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True, 
                 secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
                 secondary_or_nominal=True, fdr_q_cutoff=0.05, 
-                block_merge_dist=1000000, nonsig_distance=1000000,
-                block_prefix='gene_block', null_variance=0.42 ** 2, 
-                finemap_secondary=False, include_non_sig=True):
+                secondary_for_fdr=False, block_merge_dist=1000000, 
+                nonsig_distance=1000000, block_prefix='gene_block', 
+                null_variance=0.42 ** 2, finemap_secondary=False, 
+                include_non_sig=True):
     """
     Loads & processes all necessary data for a single phenotype
     Returns a dict with the following entries:
@@ -247,7 +253,7 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
     hpo_info['sig_genes'] = parse_stats(stats_in, primary_p_cutoff, p_is_phred, 
                                         secondary_p_cutoff, n_nominal_cutoff, 
                                         secondary_or_nominal, fdr_q_cutoff, 
-                                        sig_only=True, 
+                                        secondary_for_fdr, sig_only=True, 
                                         finemap_secondary=finemap_secondary)
 
     # Second pass: parse data for all genes within block_merge_dist of sig_genes
@@ -272,7 +278,8 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
             hpo_info['all_genes'] = parse_stats(stats_in, primary_p_cutoff, p_is_phred, 
                                                 secondary_p_cutoff, n_nominal_cutoff, 
                                                 secondary_or_nominal, fdr_q_cutoff, 
-                                                sig_only=False, keep_genes=nearby_genes, 
+                                                secondary_for_fdr, sig_only=False, 
+                                                keep_genes=nearby_genes, 
                                                 finemap_secondary=finemap_secondary)
 
         # If --no-non-significant is passed, do not include NS genes when fine-mapping
@@ -309,9 +316,9 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
 
 def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
                   secondary_or_nominal=True, fdr_q_cutoff=0.05, 
-                  block_merge_dist=1000000, nonsig_distance=1000000, 
-                  block_prefix='gene_block', finemap_secondary=False, 
-                  include_non_sig=True):
+                  secondary_for_fdr=False, block_merge_dist=1000000, 
+                  nonsig_distance=1000000, block_prefix='gene_block', 
+                  finemap_secondary=False, include_non_sig=True):
     """
     Wrapper function to process each HPO with process_hpo()
     Returns a dict with one entry per HPO
@@ -329,6 +336,7 @@ def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2,
                                         n_nominal_cutoff=n_nominal_cutoff, 
                                         secondary_or_nominal=secondary_or_nominal,
                                         fdr_q_cutoff=fdr_q_cutoff,
+                                        secondary_for_fdr=secondary_for_fdr,
                                         block_merge_dist=block_merge_dist,
                                         nonsig_distance=nonsig_distance,
                                         block_prefix=block_prefix,
@@ -963,6 +971,10 @@ def main():
     parser.add_argument('--fdr-q-cutoff', help='Maximum FDR Q-value to ' + 
                         'consider as FDR significant. [default: 0.05]', 
                         default=0.05, type=float)
+    parser.add_argument('--secondary-for-fdr', action='store_true', 
+                        default=False, help='Apply sample secondary and/or min. ' +
+                        'nominal criteria when evaluating FDR significance. ' +
+                        '[default: apply no secondary criteria to FDR genes]')
     parser.add_argument('--credible-sets', dest='cs_val', type=float, default=0.95,
                         help='Credible set value. [default: 0.95]')
     parser.add_argument('--regularization-alpha', dest='logit_alpha', type=float,
@@ -1041,7 +1053,8 @@ def main():
     # Process data per hpo
     hpo_data = load_all_hpos(args.statslist, args.secondary_p_cutoff, 
                              args.min_nominal, args.secondary_or_nom, 
-                             args.fdr_q_cutoff, args.distance, args.nonsig_distance,
+                             args.fdr_q_cutoff, args.secondary_for_fdr,
+                             args.distance, args.nonsig_distance,
                              block_prefix, args.finemap_secondary, 
                              not args.no_non_significant)
 

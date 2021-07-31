@@ -939,17 +939,6 @@ plot.all.perm.res <- function(segs, gw.perms, lit.perms,
                  diamond.pch=23, parmar=parmar.single)
   dev.off()
 
-  # Plot lit GDs alone
-  cat("All literature GDs alone:\n")
-  pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".all_gds.pdf", sep=""),
-      height=pdf.dims.single[1], width=pdf.dims.single[2])
-  plot.seg.perms(segs, lit.perms, feature=feature, measure=measure,
-                 subset_to_regions=all.gd.ids,
-                 n.bins=n.bins.single, min.bins=min.bins, norm=norm,
-                 x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
-                 diamond.pch=21, parmar=parmar.single)
-  dev.off()
-
   # Plot non-significant lit GDs alone
   cat("Literature GDs below genome-wide or FDR significance:\n")
   pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".lit_gds_nogw_noFDR.pdf", sep=""),
