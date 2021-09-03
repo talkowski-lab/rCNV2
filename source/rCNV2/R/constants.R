@@ -178,7 +178,7 @@ load.rcnv.env <- function(load.strings=TRUE, load.colors=TRUE, load.scales=TRUE)
     lof.color <- "#9D1309"
     mis.color <- "#FF6103"
     syn.color <- "#AAAAAA"
-    cohort.color.pal <- colorRampPalette(c("#0A5180", "#1174B9", "#51ACE8", "#A3D3F2"))(6)
+    cohort.color.pal <- colorRampPalette(c("#0A5180", "#1174B9", "#51ACE8", "#A3D3F2"))(7)
 
     # Define constants
     constants <- list(
@@ -222,7 +222,8 @@ load.rcnv.env <- function(load.strings=TRUE, load.colors=TRUE, load.scales=TRUE)
                         "meta3" = cohort.color.pal[3],
                         "meta4" = cohort.color.pal[4],
                         "meta5" = cohort.color.pal[5],
-                        "meta6" = cohort.color.pal[6]),
+                        "meta6" = cohort.color.pal[6],
+                        "meta7" = cohort.color.pal[7]),
       pheno.colors = c("all" = "#808080",
                        "neuro" = "#F462B9",
                        "somatic" = "#245B2B"),

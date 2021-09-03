@@ -183,6 +183,7 @@ done < <( fgrep -v mega refs/rCNV_metacohort_list.txt )
 for CNV in DEL DUP; do
   /opt/rCNV2/analysis/noncoding/plot_reg_disruption_dist.R \
     --cnv $CNV \
+    --prefix All \
     /reg_scoring_wCoding/reg_scoring_wCoding_results \
     /rCNV2.all_$CNV
 done

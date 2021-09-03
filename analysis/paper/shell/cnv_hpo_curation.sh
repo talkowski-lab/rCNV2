@@ -53,6 +53,7 @@ echo -e "BioVU\tphenos/BioVU.final_cooccurrence_table.tsv.gz" >> precomp_pairs.t
 
 
 # Reorder HPO terms based on hierarchical clustering (for ordering in plots)
+# TODO: COULD CONSIDER ADDING DEV/ADULT TO THIS SPLIT
 /opt/rCNV2/analysis/paper/scripts/misc_setup/reorder_hpo_terms.py \
   --outfile ${prefix}.reordered_hpos.txt \
   refs/phenotype_groups.HPO_metadata.txt \
@@ -69,6 +70,7 @@ gsutil -m cp \
 
 
 # Plot summary figure of HPOs
+# TODO: UPDATE THIS
 /opt/rCNV2/analysis/paper/plot/misc/plot_hpo_summary.R \
   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   ${prefix}.reordered_hpos.txt \
@@ -99,7 +101,6 @@ awk -v OFS="\t" '{ print $0, "cnvs/"$1".rCNV.bed.gz" }' \
 # Plot panels for summary figure of CNV filtering pipeline
 /opt/rCNV2/analysis/paper/plot/misc/plot_cnv_filtering_summary.R \
   --control-hpo ${control_hpo} \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   raw_cnv.input.tsv \
   raw_cnv.stats.tsv \
   rCNV.input.tsv \
