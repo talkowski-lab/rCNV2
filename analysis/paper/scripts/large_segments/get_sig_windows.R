@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -21,13 +21,14 @@ options(stringsAsFactors=F, scipen=1000)
 load.sumstats <- function(sumstats.in){
   sumstats <- read.table(sumstats.in, header=T, sep="\t", comment.char="", check.names=F)
   colnames(sumstats)[1] <- gsub("#", "", colnames(sumstats)[1], fixed=T)
-  keep.cols <- c("chr", "start", "end", "n_nominal_cohorts", "meta_phred_p", "meta_phred_p_secondary")
+  keep.cols <- c("chr", "start", "end", "n_nominal_cohorts", "meta_phred_p", "meta_phred_p_secondary", "meta_phred_fdr_q")
   sumstats[, which(colnames(sumstats) %in% keep.cols)]
 }
 
 # Filter summary stats based on P-value cutoffs
-filter.sumstats <- function(sumstats, primary.cutoff=6, secondary.cutoff=-log10(0.05), 
-                            min.nominal=2, secondary.or.nominal=FALSE){
+filter.sumstats <- function(sumstats, primary.cutoff=6, secondary.cutoff=-log10(0.05),
+                            min.nominal=2, secondary.or.nominal=FALSE,
+                            fdr.cutoff=NULL){
   primary.hits <- which(sumstats$meta_phred_p >= primary.cutoff)
   secondary.hits <- which(sumstats$meta_phred_p_secondary >= secondary.cutoff)
   nominal.hits <- which(sumstats$n_nominal_cohorts >= min.nominal)
@@ -35,6 +36,10 @@ filter.sumstats <- function(sumstats, primary.cutoff=6, secondary.cutoff=-log10(
     hits <- intersect(primary.hits, unique(c(secondary.hits, nominal.hits)))
   }else{
     hits <- intersect(primary.hits, intersect(secondary.hits, nominal.hits))
+  }
+  if(!is.null(fdr.cutoff)){
+    fdr.hits <- which(sumstats$meta_phred_fdr_q >= fdr.cutoff)
+    hits <- unique(sort(c(hits, fdr.hits)))
   }
   sumstats[hits, ]
 }
@@ -44,13 +49,15 @@ filter.sumstats <- function(sumstats, primary.cutoff=6, secondary.cutoff=-log10(
 ### RSCRIPT BLOCK ###
 #####################
 require(optparse, quietly=T)
+require(rCNV2, quietly=T)
 
 # List of command-line options
 option_list <- list(
   make_option(c("--primary-p-cutoff"), default=10e-6, help="Significant primary P-value cutoff."),
   make_option(c("--secondary-p-cutoff"), default=0.05, help="Significant secondary P-value cutoff."),
   make_option(c("--min-nominal"), default=2, help="Minimum number of nominally significant individual cohorts."),
-  make_option(c("--secondary-or-nominal"), action="store_true", help="Require either secondary P cutoff and/or min nominal.")
+  make_option(c("--secondary-or-nominal"), action="store_true", help="Require either secondary P cutoff and/or min nominal."),
+  make_option(c("--fdr-q-cutoff", help="Supplement with FDR Q-value cutoff. [default: do not consider FDR]"))
 )
 
 # Get command-line arguments & options
@@ -71,6 +78,7 @@ primary.cutoff <- -log10(as.numeric(opts$`primary-p-cutoff`))
 secondary.cutoff <- -log10(as.numeric(opts$`secondary-p-cutoff`))
 min.nominal <- as.numeric(opts$`min-nominal`)
 secondary.or.nominal <- opts$`secondary-or-nominal`
+fdr.cutoff <- -log10(as.numeric(opts$`fdr-q-cutoff`))
 
 # # DEV PARAMETERS
 # sumstats.in <- "~/scratch/HP0012759.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz"
@@ -79,13 +87,15 @@ secondary.or.nominal <- opts$`secondary-or-nominal`
 # secondary.cutoff <- -log10(0.05)
 # min.nominal <- 2
 # secondary.or.nominal <- T
+# fdr.cutoff <- -log10(0.01)
 
 # Load summary stats
 sumstats <- load.sumstats(sumstats.in)
 
 # Filter sumstats
-sumstats.filtered <- filter.sumstats(sumstats, primary.cutoff, secondary.cutoff, 
-                                     min.nominal, secondary.or.nominal)
+sumstats.filtered <- filter.sumstats(sumstats, primary.cutoff, secondary.cutoff,
+                                     min.nominal, secondary.or.nominal,
+                                     fdr.cutoff)
 
 # Write output bed
 colnames(sumstats.filtered)[1] <- paste("#", colnames(sumstats.filtered)[1], sep="")

@@ -4,12 +4,25 @@
 \alias{saddlepoint.adj}
 \title{Z-score saddlepoint approximation}
 \usage{
-saddlepoint.adj(zscores, phred = T)
+saddlepoint.adj(
+  zscores,
+  winsorize = 1,
+  winsorize.left.tail = F,
+  phred = T,
+ 
+    min.p = 0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001
+)
 }
 \arguments{
 \item{zscores}{numeric vector of Z-scores}
 
+\item{winsorize}{width of quantile intervals to Winsorize [default: 1, i.e., no Winsorization]}
+
+\item{winsorize.left.tail}{boolean indicator to apply Winsorization to left tail of distribution [default: FALSE]}
+
 \item{phred}{boolean indicator of whether to -log10-scale adjusted P-values}
+
+\item{min.p}{smallest P-value to report (P-values smaller than this will be rounded up) [default: 1e-300]}
 }
 \value{
 numeric vector of adjusted P-values

@@ -438,9 +438,9 @@ while read prefix hpo; do
              | awk -v FS="\t" '{ print $2 }' )
   title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
   DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                  sliding_window.${freq_code}.DEL.empirical_genome_wide_pval.hpo_cutoffs.tsv )
+                  sliding_window.${freq_code}.DEL.bonferroni_pval.hpo_cutoffs.tsv )
   DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                  sliding_window.${freq_code}.DEL.empirical_genome_wide_pval.hpo_cutoffs.tsv )
+                  sliding_window.${freq_code}.DEL.bonferroni_pval.hpo_cutoffs.tsv )
 
   # Run meta-analysis for each CNV type
   for CNV in DEL DUP; do

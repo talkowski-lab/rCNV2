@@ -337,12 +337,17 @@ plot.qq <- function(stats, cutoff=NULL, highlights=NULL,
       }
     }
 
-    if(is.null(ymax)){
-      ymax <- max(max(-log10(p[which(!(is.infinite(p)))])), -log10(cutoff) + 2)
-    }
-
     if(is.null(cutoff)){
       cutoff <- 0.05/length(p)
+    }
+
+    if(is.null(ymax)){
+      maxp <- max(-log10(p[which(!(is.infinite(-log10(p))))]))
+      if(is.null(cutoff)){
+        ymax <- maxp
+      }else{
+        ymax <- max(maxp, -log10(cutoff) + 2)
+      }
     }
 
     expected <- -log10(expected)

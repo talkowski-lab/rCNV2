@@ -30,6 +30,9 @@ meta(
 after dropping most significant individual cohort [default: TRUE]}
 
 \item{keep.n.cols}{number of columns from original BED format to retain}
+
+\item{winsorize}{Winzorization interval for saddlepoint adjustment
+(see \code{\link[=saddlepoint.adj]{saddlepoint.adj()}}) [default: 1, i.e., no Winsorization]}
 }
 \value{
 data frame of meta-analysis summary statistics

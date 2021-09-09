@@ -70,9 +70,7 @@ gsutil -m cp \
 
 
 # Plot summary figure of HPOs
-# TODO: UPDATE THIS
 /opt/rCNV2/analysis/paper/plot/misc/plot_hpo_summary.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   ${prefix}.reordered_hpos.txt \
   refs/phenotype_groups.HPO_metadata.txt \
   refs/HPOs_by_metacohort.table.tsv \

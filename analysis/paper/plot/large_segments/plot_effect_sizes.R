@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -17,14 +17,12 @@ options(stringsAsFactors=F, scipen=1000)
 #####################
 ### RSCRIPT BLOCK ###
 #####################
+require(rCNV2, quietly=T)
 require(optparse, quietly=T)
-require(funr, quietly=T)
 require(MASS, quietly=T)
 
 # List of command-line options
-option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
-)
+option_list <- list()
 
 # Get command-line arguments & options
 args <- parse_args(OptionParser(usage=paste("%prog loci.bed segs.tsv out_prefix", sep=" "),
@@ -41,42 +39,36 @@ if(length(args$args) != 3){
 loci.in <- args$args[1]
 segs.in <- args$args[2]
 out.prefix <- args$args[3]
-rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
 # loci.in <- "~/scratch/rCNV.final_segments.loci.bed.gz"
-# segs.in <- "~/scratch/rCNV2_analysis_d1.master_segments.bed.gz"
+# segs.in <- "~/scratch/rCNV2_analysis_d2.master_segments.bed.gz"
 # out.prefix <- "~/scratch/test_effect_sizes"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
-
-# Source common functions
-script.dir <- funr::get_script_path()
-source(paste(script.dir, "common_functions.R", sep="/"))
 
 # Load loci & segment table
 loci <- load.loci(loci.in)
 segs <- load.segment.table(segs.in)
 
 # Restrict to segments nominally significant in at least one phenotype
-segs <- segs[which(segs$nom_sig), ]
+segs.all <- segs[which(segs$any_gd | segs$any_sig), ]
+segs <- segs.all[which(segs.all$nom_sig), ]
 
-# Merge loci & segment data for genome-wide significant sites only
-gw <- merge.loci.segs(loci, segs)
+# Merge loci & segment data for genome-wide/FDR significant sites only
+segs.sig <- merge.loci.segs(loci, segs[which(segs$any_sig), ])
+
+# Get list of developmental and gw-sig loci
+dev.region_ids <- get.developmental.region_ids(loci, segs)
+gw.region_ids <- segs$region_id[which(segs$gw_sig)]
 
 # Plot effect size vs control frequency
-pdf(paste(out.prefix, "lnOR_vs_control_freq.pdf", sep="."),
+pdf(paste(out.prefix, "gw_plus_FDR.lnOR_vs_control_freq.pdf", sep="."),
     height=2.25, width=2.25)
-segs.scatter(gw, 
-           x=-log10(gw$pooled_control_freq), 
-           y=gw$pooled_ln_or,
-           xlims=c(2, max(-log10(gw$pooled_control_freq))),
-           ylims=c(0, max(gw$pooled_ln_or)),
+segs.scatter(segs.sig,
+           x=-log10(segs.sig$pooled_control_freq),
+           y=segs.sig$pooled_ln_or,
+           pt.cex=0.6,
+           xlims=c(2, max(-log10(segs.sig$pooled_control_freq))),
+           ylims=c(0, max(segs.sig$pooled_ln_or)),
            xtitle=expression(-italic("log")[10] * "(Control Freq.)"),
            x.at=log10(logscale.major),
            x.labs=paste("10 ^", -log10(logscale.major)),
@@ -85,13 +77,14 @@ segs.scatter(gw,
 dev.off()
 
 # Plot effect size vs case frequency
-pdf(paste(out.prefix, "lnOR_vs_case_freq.pdf", sep="."),
+pdf(paste(out.prefix, "gw_plus_FDR.lnOR_vs_case_freq.pdf", sep="."),
     height=2.25, width=2.25)
-segs.scatter(gw, 
-           x=-log10(gw$pooled_case_freq), 
-           y=gw$pooled_ln_or,
-           xlims=c(2, max(-log10(gw$pooled_case_freq))),
-           ylims=c(0, max(gw$pooled_ln_or)),
+segs.scatter(segs.sig,
+           x=-log10(segs.sig$pooled_case_freq),
+           y=segs.sig$pooled_ln_or,
+           pt.cex=0.6,
+           xlims=c(2, max(-log10(segs.sig$pooled_case_freq))),
+           ylims=c(0, max(segs.sig$pooled_ln_or)),
            xtitle=expression(-italic("log")[10] * "(Case Freq.)"),
            x.at=log10(logscale.major),
            x.labs=paste("10 ^", -log10(logscale.major)),
@@ -100,100 +93,225 @@ segs.scatter(gw,
 dev.off()
 
 # Plot effect size vs segment size
-pdf(paste(out.prefix, "lnOR_vs_size.pdf", sep="."),
+pdf(paste(out.prefix, "gw_plus_FDR.lnOR_vs_size.pdf", sep="."),
     height=2.25, width=2.25)
-segs.scatter(gw, 
-           x=log10(gw$size), 
-           y=gw$pooled_ln_or,
+segs.scatter(segs.sig,
+           x=log10(segs.sig$size),
+           y=segs.sig$max_ln_or,
+           pt.cex=0.6,
            xlims=c(5, 7),
-           ylims=c(0, max(gw$pooled_ln_or)),
+           ylims=c(0, max(segs.sig$max_ln_or)),
            xtitle=expression(italic("log")[10] * "(Size)"),
            x.at=log10(logscale.major.bp),
            x.labs.at=log10(logscale.major.bp),
            x.labs=logscale.major.bp.labels,
-           ytitle=expression("Effect Size" ~ (italic("ln") * " OR")))
+           ytitle=expression("Max Effect Size" ~ (italic("ln") * " OR")),
+           x.title.line=1.5,
+           y.title.line=1.25,
+           parmar=c(2.5, 2.5, 0.8, 0.8))
+dev.off()
+pdf(paste(out.prefix, "gw_plus_FDR.lnOR_vs_size.dev_only.pdf", sep="."),
+    height=2.25, width=2.25)
+segs.scatter(segs.sig,
+             x=log10(segs.sig$size),
+             y=segs.sig$max_ln_or,
+             subset_to_regions=dev.region_ids,
+             pt.cex=0.6,
+             xlims=c(5, 7),
+             ylims=c(0, max(segs.sig$max_ln_or)),
+             xtitle=expression(italic("log")[10] * "(Size)"),
+             x.at=log10(logscale.major.bp),
+             x.labs.at=log10(logscale.major.bp),
+             x.labs=logscale.major.bp.labels,
+             ytitle=expression("Max Effect Size" ~ (italic("ln") * " OR")),
+             x.title.line=1.5,
+             y.title.line=1.25,
+             parmar=c(2.5, 2.5, 0.8, 0.8))
 dev.off()
 
 # Plot effect size vs number of genes & gene density
-pdf(paste(out.prefix, "lnOR_vs_genes.pdf", sep="."),
+pdf(paste(out.prefix, "gw_plus_FDR.lnOR_vs_genes.pdf", sep="."),
     height=2.25, width=2.25)
-segs.scatter(gw, 
-           x=gw$n_genes, 
-           y=gw$pooled_ln_or,
-           ylims=c(0, max(gw$pooled_ln_or)),
+segs.scatter(segs.sig,
+           x=segs.sig$n_genes,
+           y=segs.sig$max_ln_or,
+           pt.cex=0.6,
+           ylims=c(0, max(segs.sig$max_ln_or)),
            xtitle="Genes Overlapped",
-           ytitle=expression("Effect Size" ~ (italic("ln") * " OR")))
+           ytitle=expression("Max Effect Size" ~ (italic("ln") * " OR")),
+           x.title.line=1.5,
+           y.title.line=1.25,
+           parmar=c(2.5, 2.5, 0.8, 0.8))
 dev.off()
-pdf(paste(out.prefix, "lnOR_vs_gene_density.pdf", sep="."),
+pdf(paste(out.prefix, "gw_plus_FDR.lnOR_vs_gene_density.pdf", sep="."),
     height=2.25, width=2.25)
-segs.scatter(gw, 
-           x=100000 * gw$n_genes / gw$size, 
-           y=gw$pooled_ln_or,
-           ylims=c(0, max(gw$pooled_ln_or)),
+segs.scatter(segs.sig,
+           x=100000 * segs.sig$n_genes / segs.sig$size,
+           y=segs.sig$max_ln_or,
+           pt.cex=0.6,
+           ylims=c(0, max(segs.sig$max_ln_or)),
            xtitle="Genes per 100kb",
-           ytitle=expression("Effect Size" ~ (italic("ln") * " OR")))
+           ytitle=expression("Max Effect Size" ~ (italic("ln") * " OR")),
+           x.title.line=1.5,
+           y.title.line=1.25,
+           parmar=c(2.5, 2.5, 0.8, 0.8))
+dev.off()
+pdf(paste(out.prefix, "gw_plus_FDR.lnOR_vs_gene_density.dev_only.pdf", sep="."),
+    height=2.25, width=2.25)
+segs.scatter(segs.sig,
+             x=100000 * segs.sig$n_genes / segs.sig$size,
+             y=segs.sig$max_ln_or,
+             pt.cex=0.6,
+             subset_to_regions=dev.region_ids,
+             ylims=c(0, max(segs.sig$max_ln_or)),
+             xtitle="Genes per 100kb",
+             ytitle=expression("Max Effect Size" ~ (italic("ln") * " OR")),
+             x.title.line=1.5,
+             y.title.line=1.25,
+             parmar=c(2.5, 2.5, 0.8, 0.8))
 dev.off()
 
-# Plot effect size vs number of genes & gene density
-pdf(paste(out.prefix, "lnOR_vs_constrained_genes.pdf", sep="."),
+# Plot effect size vs number of constrained genes & gene density
+pdf(paste(out.prefix, "gw_plus_FDR.lnOR_vs_constrained_genes.pdf", sep="."),
     height=2.25, width=2.25)
-segs.scatter(gw, 
-           x=gw$n_gnomAD_constrained_genes, 
-           y=gw$pooled_ln_or,
-           ylims=c(0, max(gw$pooled_ln_or)),
-           xtitle="LoF Constrained Genes",
-           ytitle=expression("Effect Size" ~ (italic("ln") * " OR")))
+segs.scatter(segs.sig,
+             x=segs.sig$n_gnomAD_constrained_genes,
+             y=segs.sig$max_ln_or,
+             pt.cex=0.6,
+             ylims=c(0, max(segs.sig$max_ln_or)),
+             xtitle="LoF Constrained Genes",
+             ytitle=expression("Max Effect Size" ~ (italic("ln") * " OR")),
+             x.title.line=1.5,
+             y.title.line=1.25,
+             parmar=c(2.5, 2.5, 0.8, 0.8))
 dev.off()
-pdf(paste(out.prefix, "lnOR_vs_constrained_gene_density.pdf", sep="."),
+pdf(paste(out.prefix, "gw_plus_FDR.lnOR_vs_constrained_genes.dev_only.pdf", sep="."),
     height=2.25, width=2.25)
-segs.scatter(gw, 
-           x=1000000 * gw$n_gnomAD_constrained_genes / gw$size, 
-           y=gw$pooled_ln_or,
-           ylims=c(0, max(gw$pooled_ln_or)),
-           xtitle="Constr. Genes per 1Mb",
-           ytitle=expression("Effect Size" ~ (italic("ln") * " OR")))
+segs.scatter(segs.sig,
+             x=segs.sig$n_gnomAD_constrained_genes,
+             y=segs.sig$max_ln_or,
+             subset_to_regions=dev.region_ids,
+             pt.cex=0.6,
+             ylims=c(0, max(segs.sig$max_ln_or)),
+             xtitle="LoF Constrained Genes",
+             ytitle=expression("Max Effect Size" ~ (italic("ln") * " OR")),
+             x.title.line=1.5,
+             y.title.line=1.25,
+             parmar=c(2.5, 2.5, 0.8, 0.8))
+dev.off()
+pdf(paste(out.prefix, "gw_plus_fdr.lnOR_vs_any_constrained.pdf", sep="."),
+    height=2.25, width=2)
+segs.swarm(segs.sig,
+           x.bool=segs.sig$n_gnomAD_constrained_genes>0,
+           y=segs.sig$max_ln_or,
+           pt.cex=0.4,
+           add.pvalue=TRUE,
+           violin=TRUE,
+           xtitle="Constrained Genes",
+           x.labs=c("0", "1+"),
+           ytitle=expression("Max Effect Size" ~ (italic("ln") * " OR")),
+           y.title.line=1.15,
+           parmar=c(2.3, 2.5, 2.5, 0.5))
+dev.off()
+pdf(paste(out.prefix, "gw_plus_fdr.lnOR_vs_any_constrained.dev_only.pdf", sep="."),
+    height=2.25, width=2)
+segs.swarm(segs.sig,
+           x.bool=segs.sig$n_gnomAD_constrained_genes>0,
+           y=segs.sig$max_ln_or,
+           subset_to_regions=dev.region_ids,
+           pt.cex=0.4,
+           add.pvalue=TRUE,
+           violin=TRUE,
+           xtitle="Constrained Genes",
+           x.labs=c("0", "1+"),
+           ytitle=expression("Max Effect Size" ~ (italic("ln") * " OR")),
+           y.title.line=1.15,
+           parmar=c(2.3, 2.5, 2.5, 0.5))
+dev.off()
+pdf(paste(out.prefix, "gw_only.lnOR_vs_any_constrained.pdf", sep="."),
+    height=2.25, width=2)
+segs.swarm(segs.sig,
+           x.bool=segs.sig$n_gnomAD_constrained_genes>0,
+           y=segs.sig$max_ln_or,
+           subset_to_regions=gw.region_ids,
+           pt.cex=0.5,
+           add.pvalue=TRUE,
+           violin=TRUE,
+           xtitle="Constrained Genes",
+           x.labs=c("0", "1+"),
+           ytitle=expression("Max Effect Size" ~ (italic("ln") * " OR")),
+           y.title.line=1.15,
+           parmar=c(2.3, 2.5, 2.5, 0.5))
+dev.off()
+pdf(paste(out.prefix, "gw_plus_FDR.lnOR_vs_constrained_gene_density.pdf", sep="."),
+    height=2.25, width=2.25)
+segs.scatter(segs.sig,
+             x=100000 * segs.sig$n_gnomAD_constrained_genes / segs.sig$size,
+             y=segs.sig$max_ln_or,
+             pt.cex=0.6,
+             ylims=c(0, max(segs.sig$max_ln_or)),
+             xtitle="Constrained per 100kb",
+             ytitle=expression("Max Effect Size" ~ (italic("ln") * " OR")),
+             x.title.line=1.5,
+             y.title.line=1.25,
+             parmar=c(2.5, 2.5, 0.8, 0.8))
+dev.off()
+pdf(paste(out.prefix, "gw_plus_FDR.lnOR_vs_constrained_gene_density.dev_only.pdf", sep="."),
+    height=2.25, width=2.25)
+segs.scatter(segs.sig,
+             x=100000 * segs.sig$n_gnomAD_constrained_genes / segs.sig$size,
+             y=segs.sig$max_ln_or,
+             pt.cex=0.6,
+             subset_to_regions=dev.region_ids,
+             ylims=c(0, max(segs.sig$max_ln_or)),
+             xtitle="Constrained per 100kb",
+             ytitle=expression("Max Effect Size" ~ (italic("ln") * " OR")),
+             x.title.line=1.5,
+             y.title.line=1.25,
+             parmar=c(2.5, 2.5, 0.8, 0.8))
 dev.off()
 
-# Plot effect size vs number of genes & gene density
-pdf(paste(out.prefix, "lnOR_vs_OMIM_genes.pdf", sep="."),
+# Plot effect size vs number of OMIM genes & gene density
+pdf(paste(out.prefix, "gw_plus_FDR.lnOR_vs_OMIM_genes.pdf", sep="."),
     height=2.25, width=2.25)
-segs.scatter(gw, 
-           x=gw$n_OMIM_genes, 
-           y=gw$pooled_ln_or,
-           ylims=c(0, max(gw$pooled_ln_or)),
+segs.scatter(segs.sig,
+           x=segs.sig$n_OMIM_genes,
+           y=segs.sig$max_ln_or,
+           pt.cex=0.6,
+           ylims=c(0, max(segs.sig$max_ln_or)),
            xtitle="OMIM Genes",
-           ytitle=expression("Effect Size" ~ (italic("ln") * " OR")))
+           ytitle=expression("Max Effect Size" ~ (italic("ln") * " OR")),
+           x.title.line=1.5,
+           y.title.line=1.25,
+           parmar=c(2.5, 2.5, 0.8, 0.8))
 dev.off()
-pdf(paste(out.prefix, "lnOR_vs_OMIM_gene_density.pdf", sep="."),
+pdf(paste(out.prefix, "gw_plus_FDR.lnOR_vs_OMIM_gene_density.pdf", sep="."),
     height=2.25, width=2.25)
-segs.scatter(gw, 
-           x=1000000 * gw$n_OMIM_genes / gw$size, 
-           y=gw$pooled_ln_or,
-           ylims=c(0, max(gw$pooled_ln_or)),
+segs.scatter(segs.sig,
+           x=1000000 * segs.sig$n_OMIM_genes / segs.sig$size,
+           y=segs.sig$max_ln_or,
+           pt.cex=0.6,
+           ylims=c(0, max(segs.sig$max_ln_or)),
            xtitle="OMIM Genes per 1Mb",
-           ytitle=expression("Effect Size" ~ (italic("ln") * " OR")))
+           ytitle=expression("Max Effect Size" ~ (italic("ln") * " OR")),
+           x.title.line=1.5,
+           y.title.line=1.25,
+           parmar=c(2.5, 2.5, 0.8, 0.8))
 dev.off()
 
 # Plot effect size vs mechanism
-pdf(paste(out.prefix, "lnOR_vs_NAHR.pdf", sep="."),
-    height=2.25, width=2.5)
-segs.swarm(gw, 
-         x.bool=gw$nahr, 
-         y=gw$pooled_ln_or,
-         ylims=c(0, max(gw$pooled_ln_or)),
+pdf(paste(out.prefix, "gw_plus_FDR.lnOR_vs_NAHR.pdf", sep="."),
+    height=2.25, width=2.35)
+segs.swarm(segs.sig,
+         x.bool=segs.sig$nahr,
+         y=segs.sig$max_ln_or,
+         pt.cex=0.4,
+         add.pvalue=TRUE,
+         violin=TRUE,
+         ylims=c(0, max(segs.sig$max_ln_or)),
          x.labs=c("Nonrecurrent", "NAHR"),
          xtitle="Mechanism",
-         ytitle=expression("Effect Size" ~ (italic("ln") * " OR")))
-dev.off()
-pdf(paste(out.prefix, "lnOR_vs_NAHR.all_nomsig_segs.pdf", sep="."),
-    height=2.25, width=2.5)
-segs.swarm(segs, 
-         x.bool=segs$nahr, 
-         y=segs$meta_best_lnor,
-         add.pvalue = T, violin = T,
-         ylims=c(0, max(segs$meta_best_lnor)),
-         x.labs=c("Nonrecurrent", "NAHR"),
-         xtitle="Mechanism", 
-         ytitle=expression("Effect Size" ~ (italic("ln") * " OR")),
-         pt.cex=0.7, parmar=c(2.3, 3, 2.5, 0.5))
+         ytitle=expression("Max Effect Size" ~ (italic("ln") * " OR")),
+         y.title.line=1.15,
+         parmar=c(2.3, 2.5, 2.5, 0.1))
 dev.off()

@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -28,7 +28,13 @@ load.hpos <- function(hpos.in){
 load.fdrs <- function(fdrs.in){
   fdrs <- read.table(fdrs.in, header=T, sep="\t", comment.char="", check.names=F)
   colnames(fdrs) <- sapply(colnames(fdrs), function(x){unlist(strsplit(x, split=".", fixed=T))[1]})
-  fdrs <- as.data.frame(apply(fdrs, 2, function(vals){-log10(as.numeric(vals))}))
+  fdrs <- as.data.frame(apply(fdrs, 2, function(vals){
+    vals <- -log10(as.numeric(vals))
+    if(any(is.infinite(vals))){
+      vals[which(is.infinite(vals))] <- NA
+    }
+    return(vals)
+  }))
   return(fdrs)
 }
 
@@ -59,7 +65,7 @@ plot.fdrs <- function(fdrs, hpos, cnv, fdr.target,
     plot.bty <- "n"
     grid.col <- NA
   }
-  
+
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=xlims, ylim=ylims,
@@ -68,7 +74,7 @@ plot.fdrs <- function(fdrs, hpos, cnv, fdr.target,
        ybottom=par("usr")[3], ytop=par("usr")[4],
        bty=plot.bty, border=plot.border, col=plot.bg)
   abline(h=axTicks(2), v=log10(logscale.major), col=grid.col)
-  
+
   # Add points
   sapply(hpos[, 1], function(hpo){
     n <- log10(hpos$n[which(hpos$hpo==hpo)])
@@ -76,25 +82,25 @@ plot.fdrs <- function(fdrs, hpos, cnv, fdr.target,
     points(x=rep(n, nrow(fdrs)), y=fdrs[, hpo.idx],
            pch=19, cex=0.2, col=control.cnv.colors[cnv])
   })
-  
+
   # Add boxes for medians
   sapply(hpos[, 1], function(hpo){
     n <- log10(hpos$n[which(hpos$hpo==hpo)])
     hpo.idx <- which(colnames(fdrs)==hpo)
-    points(x=n, y=medians[hpo.idx], pch=22, 
+    points(x=n, y=medians[hpo.idx], pch=22,
            bg=cnv.colors[cnv], col=cnv.blacks[cnv])
   })
-  
+
   # Add line for Bonferroni
   abline(h=fdr.target, col=blueblack, lty=2, lwd=1.5)
-  
+
   # Add X-axis
   axis(1, at=log10(logscale.minor), tck=-0.015, col=blueblack, labels=NA)
   axis(1, at=log10(logscale.major), tck=-0.03, col=blueblack, labels=NA)
   axis(1, at=log10(c(1000, 10000, 100000, 1000000)), tick=F, line=-0.75,
        labels=c("1", "10", "100", "1,000"))
   mtext(1, text="Cases (Thousands)", line=1.1)
-  
+
   # Add Y-axis
   axis(2, at=c(-10e10, 10e10), labels=NA, col=blueblack, tck=0)
   axis(2, tck=-0.03, col=blueblack, labels=NA)
@@ -106,12 +112,11 @@ plot.fdrs <- function(fdrs, hpos, cnv, fdr.target,
 #####################
 ### RSCRIPT BLOCK ###
 #####################
+require(rCNV2, quietly=T)
 require(optparse, quietly=T)
-require(funr, quietly=T)
 
 # List of command-line options
 option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced."),
   make_option(c("--fdr-target"), type="numeric", default=10e-8,
               help="FDR target [default %default]")
 )
@@ -131,25 +136,13 @@ dup.fdrs.in <- args$args[2]
 hpos.in <- args$args[3]
 out.prefix <- args$args[4]
 fdr.target <- -log10(opts$`fdr-target`)
-rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
-# del.fdrs.in <- "~/scratch/rCNV2_analysis_d1.rCNV.DEL.sliding_window.meta_analysis.stats.permuted_fdrs.tsv.gz"
-# dup.fdrs.in <- "~/scratch/rCNV2_analysis_d1.rCNV.DUP.sliding_window.meta_analysis.stats.permuted_fdrs.tsv.gz"
+# del.fdrs.in <- "~/scratch/rCNV2_analysis_d2.rCNV.DEL.sliding_window.meta_analysis.stats.permuted_fdrs.tsv.gz"
+# dup.fdrs.in <- "~/scratch/rCNV2_analysis_d2.rCNV.DUP.sliding_window.meta_analysis.stats.permuted_fdrs.tsv.gz"
 # hpos.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
 # out.prefix <- "~/scratch/sliding_windows_meta_fdr_perm_test"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-# fdr.target <- -log10(0.000003715428)
-# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
-
-# Source common functions
-script.dir <- funr::get_script_path()
-source(paste(script.dir, "common_functions.R", sep="/"))
+# fdr.target <- -log10(3.767103E-6)
 
 # Load sample size info
 hpos <- load.hpos(hpos.in)

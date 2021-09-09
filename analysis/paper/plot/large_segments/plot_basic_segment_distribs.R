@@ -59,7 +59,6 @@ segs <- segs.all[which(segs.all$nom_sig), ]
 # Merge loci & segment data for genome-wide/FDR significant sites only
 segs.sig <- merge.loci.segs(loci, segs[which(segs$any_sig), ])
 
-
 # Swarmplot of segment size
 pdf(paste(out.prefix, "gw_vs_FDR.segment_size_distribs.pdf", sep="."),
     height=2.25, width=2.75)

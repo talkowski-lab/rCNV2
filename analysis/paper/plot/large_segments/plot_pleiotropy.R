@@ -19,14 +19,12 @@ options(stringsAsFactors=F, scipen=1000)
 #####################
 ### RSCRIPT BLOCK ###
 #####################
+require(rCNV2, quietly=T)
 require(optparse, quietly=T)
-require(funr, quietly=T)
 require(MASS, quietly=T)
 
 # List of command-line options
-option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
-)
+option_list <- list()
 
 # Get command-line arguments & options
 args <- parse_args(OptionParser(usage=paste("%prog loci.bed segs.tsv out_prefix", sep=" "),
@@ -43,194 +41,332 @@ if(length(args$args) != 3){
 loci.in <- args$args[1]
 segs.in <- args$args[2]
 out.prefix <- args$args[3]
-rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
 # loci.in <- "~/scratch/rCNV.final_segments.loci.bed.gz"
-# segs.in <- "~/scratch/rCNV2_analysis_d1.master_segments.bed.gz"
-# out.prefix <- "~/scratch/test_effect_sizes"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
-
-# Source common functions
-script.dir <- funr::get_script_path()
-source(paste(script.dir, "common_functions.R", sep="/"))
+# segs.in <- "~/scratch/rCNV2_analysis_d2.master_segments.bed.gz"
+# out.prefix <- "~/scratch/test_pleiotropy"
 
 # Load loci & segment table
 loci <- load.loci(loci.in)
 segs <- load.segment.table(segs.in)
 
 # Restrict to segments nominally significant in at least one phenotype
-segs <- segs[which(segs$nom_sig), ]
+segs.all <- segs[which(segs$any_gd | segs$any_sig), ]
+segs <- segs.all[which(segs.all$nom_sig), ]
 
-# Merge loci & segment data for genome-wide significant sites only
-gw <- merge.loci.segs(loci, segs)
+# Merge loci & segment data for genome-wide/FDR significant sites only
+segs.sig <- merge.loci.segs(loci, segs[which(segs$any_sig), ])
+
+# Get list of gw-sig loci
+gw.region_ids <- segs$region_id[which(segs$gw_sig)]
 
 # Set global plotting values
-parmar <- c(2.3, 3.0, 1.5, 0.5)
+parmar <- c(2.3, 3.0, 1.6, 0.5)
 
 # Plot pleiotropy vs region size
-pdf(paste(out.prefix, "pleiotropy_vs_size.pdf", sep="."),
-    height=2.25, width=2)
-segs.swarm(gw,
-         x.bool=gw$n_hpos > 1,
-         y=log10(gw$size),
+pdf(paste(out.prefix, "gw_plus_FDR.pleiotropy_vs_size.pdf", sep="."),
+    height=2.25, width=2.25)
+segs.swarm(segs.sig,
+         x.bool=segs.sig$n_hpos > 1,
+         y=log10(segs.sig$size),
+         pt.cex=0.4,
          cnv.split=F,
          violin=T,
          add.pvalue=T,
          alternative="less",
          xtitle="Associated Phenos.",
-         x.labs=c("One", "Multiple"), 
-         y.at=log10(logscale.minor), 
-         y.labs=logscale.demi.bp.labels, 
+         x.labs=c("One", "Multiple"),
+         y.at=log10(logscale.minor),
+         y.labs=logscale.demi.bp.labels,
          y.labs.at=log10(logscale.demi.bp),
          ytitle=expression(italic("log")[10] * "(Size)"),
-         parmar=parmar)
+         y.title.line=2.7,
+         parmar=c(2.3, 4.0, 1.6, 0.5))
+dev.off()
+pdf(paste(out.prefix, "gw_plus_FDR.pleiotropy_vs_size.cnv_split.pdf", sep="."),
+    height=2.25, width=2.5)
+segs.swarm(segs.sig,
+           x.bool=segs.sig$n_hpos > 1,
+           y=log10(segs.sig$size),
+           pt.cex=0.4,
+           cnv.split=T,
+           violin=T,
+           add.pvalue=T,
+           alternative="less",
+           xtitle="Associated Phenos.",
+           x.labs=c("One", "Multiple"),
+           y.at=log10(logscale.minor),
+           y.labs=logscale.demi.bp.labels,
+           y.labs.at=log10(logscale.demi.bp),
+           ytitle=expression(italic("log")[10] * "(Size)"),
+           y.title.line=2.7,
+           parmar=c(2.3, 4.0, 2.6, 0.5))
+dev.off()
+pdf(paste(out.prefix, "gw_only.pleiotropy_vs_size.pdf", sep="."),
+    height=2.25, width=2.25)
+segs.swarm(segs.sig,
+           x.bool=segs.sig$n_hpos > 1,
+           y=log10(segs.sig$size),
+           subset_to_regions=gw.region_ids,
+           pt.cex=0.5,
+           cnv.split=F,
+           violin=T,
+           add.pvalue=T,
+           alternative="less",
+           xtitle="Associated Phenos.",
+           x.labs=c("One", "Multiple"),
+           y.at=log10(logscale.minor),
+           y.labs=logscale.demi.bp.labels,
+           y.labs.at=log10(logscale.demi.bp),
+           ytitle=expression(italic("log")[10] * "(Size)"),
+           y.title.line=2.7,
+           parmar=c(2.3, 4.0, 1.6, 0.5))
 dev.off()
 
-# Plot pleiotropy vs. number of genes & gene density
-pdf(paste(out.prefix, "pleiotropy_vs_genes.pdf", sep="."),
+# Plot pleiotropy vs. number of genes
+pdf(paste(out.prefix, "gw_plus_FDR.pleiotropy_vs_genes.pdf", sep="."),
     height=2.25, width=2)
-segs.swarm(gw,
-         x.bool=gw$n_hpos > 1,
-         y=gw$n_genes,
+segs.swarm(segs.sig,
+         x.bool=segs.sig$n_hpos > 1,
+         y=segs.sig$n_genes,
+         pt.cex=0.4,
          cnv.split=F,
          violin=T,
          add.pvalue=T,
          alternative="less",
          xtitle="Associated Phenos.",
-         x.labs=c("One", "Multiple"), 
+         x.labs=c("One", "Multiple"),
          ytitle="Genes Overlapped",
          parmar=parmar)
 dev.off()
-# Note: this plot is formatted differently because of placement in main figure
-pdf(paste(out.prefix, "pleiotropy_vs_gene_density.pdf", sep="."),
-    height=2.3, width=1.8)
-segs.swarm(gw,
-         x.bool=gw$n_hpos > 1,
-         y=100000 * gw$n_genes / gw$size,
-         cnv.split=F,
-         violin=T,
-         pt.cex=0.85,
-         add.pvalue=T,
-         print.fold=T,
-         alternative="less",
-         xtitle="",
-         x.labs=c("One", "Multiple"), 
-         ytitle="Genes per 100kb",
-         y.at=seq(0, 8, 2),
-         y.title.line=1.25,
-         parmar=c(2.3, 2.3, 1.5, 0.5))
+pdf(paste(out.prefix, "gw_plus_FDR.pleiotropy_vs_genes.cnv_split.pdf", sep="."),
+    height=2.25, width=2.25)
+segs.swarm(segs.sig,
+           x.bool=segs.sig$n_hpos > 1,
+           y=segs.sig$n_genes,
+           pt.cex=0.4,
+           cnv.split=T,
+           violin=T,
+           add.pvalue=T,
+           alternative="less",
+           xtitle="Associated Phenos.",
+           x.labs=c("One", "Multiple"),
+           ytitle="Genes Overlapped",
+           parmar=c(2.3, 3.0, 2.6, 0.5))
 dev.off()
 
-# Plot pleiotropy vs. constrained genes & gene density
-pdf(paste(out.prefix, "pleiotropy_vs_constrained_genes.pdf", sep="."),
-    height=2.25, width=2)
-segs.swarm(gw,
-         x.bool=gw$n_hpos > 1,
-         y=gw$n_gnomAD_constrained_genes,
-         cnv.split=F,
-         violin=T,
-         add.pvalue=T,
-         alternative="less",
-         xtitle="Associated Phenos.",
-         x.labs=c("One", "Multiple"), 
-         ytitle="Constrained Genes",
-         parmar=parmar)
+# Plot pleiotropy vs. gene density
+pdf(paste(out.prefix, "gw_plus_FDR.pleiotropy_vs_gene_density.pdf", sep="."),
+    height=2.25, width=1.9)
+segs.swarm(segs.sig,
+           x.bool=segs.sig$n_hpos > 1,
+           y=100000 * segs.sig$n_genes / segs.sig$size,
+           pt.cex=0.4,
+           cnv.split=F,
+           violin=T,
+           add.pvalue=T,
+           alternative="less",
+           xtitle="Associated Phenos.",
+           x.labs=c("One", "Multiple"),
+           ytitle="Genes per 100kb",
+           y.title.line=1.25,
+           y.at=seq(0, 8, 2),
+           parmar=c(2.3, 2.5, 1.6, 0.3))
 dev.off()
-# Note: this plot is formatted differently because of placement in main figure
-pdf(paste(out.prefix, "pleiotropy_vs_constrained_gene_density.pdf", sep="."),
-    height=2.3, width=1.8)
-segs.swarm(gw,
-         x.bool=gw$n_hpos > 1,
-         y=1000000 * gw$n_gnomAD_constrained_genes / gw$size,
-         cnv.split=F,
-         violin=T,
-         pt.cex=0.85,
-         add.pvalue=T,
-         print.fold=T,
-         alternative="less",
-         xtitle="",
-         x.labs=c("One", "Multiple"), 
-         ytitle="Genes per 1Mb",
-         y.title.line=1.35,
-         parmar=c(2.3, 2.3, 1.5, 0.5))
+pdf(paste(out.prefix, "gw_plus_FDR.pleiotropy_vs_gene_density.cnv_split.pdf", sep="."),
+    height=2.25, width=2.25)
+segs.swarm(segs.sig,
+           x.bool=segs.sig$n_hpos > 1,
+           y=100000 * segs.sig$n_genes / segs.sig$size,
+           pt.cex=0.4,
+           cnv.split=T,
+           violin=T,
+           add.pvalue=T,
+           alternative="less",
+           xtitle="Associated Phenos.",
+           x.labs=c("One", "Multiple"),
+           ytitle="Genes per 100kb",
+           y.title.line=1.25,
+           y.at=seq(0, 8, 2),
+           parmar=c(2.3, 2.5, 2.6, 0))
 dev.off()
 
-# Plot pleiotropy vs. OMIM genes & gene density
-pdf(paste(out.prefix, "pleiotropy_vs_OMIM_genes.pdf", sep="."),
+# Plot pleiotropy vs. number of constrained genes
+pdf(paste(out.prefix, "gw_plus_FDR.pleiotropy_vs_constrained_genes.pdf", sep="."),
     height=2.25, width=2)
-segs.swarm(gw,
-         x.bool=gw$n_hpos > 1,
-         y=gw$n_OMIM_genes,
-         cnv.split=F,
-         violin=T,
-         add.pvalue=T,
-         alternative="less",
-         xtitle="Associated Phenos.",
-         x.labs=c("One", "Multiple"), 
-         ytitle="OMIM Genes",
-         parmar=parmar)
+segs.swarm(segs.sig,
+           x.bool=segs.sig$n_hpos > 1,
+           y=segs.sig$n_gnomAD_constrained_genes,
+           pt.cex=0.4,
+           cnv.split=F,
+           violin=T,
+           add.pvalue=T,
+           alternative="less",
+           xtitle="Associated Phenos.",
+           x.labs=c("One", "Multiple"),
+           ytitle="Constrained Genes",
+           parmar=parmar)
 dev.off()
-pdf(paste(out.prefix, "pleiotropy_vs_OMIM_gene_density.pdf", sep="."),
+pdf(paste(out.prefix, "gw_plus_FDR.pleiotropy_vs_constrained_genes.cnv_split.pdf", sep="."),
+    height=2.25, width=2.25)
+segs.swarm(segs.sig,
+           x.bool=segs.sig$n_hpos > 1,
+           y=segs.sig$n_gnomAD_constrained_genes,
+           pt.cex=0.4,
+           cnv.split=T,
+           violin=T,
+           add.pvalue=T,
+           alternative="less",
+           xtitle="Associated Phenos.",
+           x.labs=c("One", "Multiple"),
+           ytitle="Constrained Genes",
+           parmar=c(2.3, 3.0, 2.6, 0.5))
+dev.off()
+
+# Plot pleiotropy vs. constrained gene density
+pdf(paste(out.prefix, "gw_plus_FDR.pleiotropy_vs_constrained_gene_density.pdf", sep="."),
+    height=2.25, width=1.9)
+segs.swarm(segs.sig,
+           x.bool=segs.sig$n_hpos > 1,
+           y=1000000 * segs.sig$n_gnomAD_constrained_genes / segs.sig$size,
+           pt.cex=0.4,
+           cnv.split=F,
+           violin=T,
+           add.pvalue=T,
+           alternative="less",
+           xtitle="Associated Phenos.",
+           x.labs=c("One", "Multiple"),
+           ytitle="Constr. Genes per 1Mb",
+           y.title.line=1.5,
+           y.at=seq(0, 16, 4),
+           parmar=c(2.3, 2.5, 1.6, 0.3))
+dev.off()
+pdf(paste(out.prefix, "gw_plus_FDR.pleiotropy_vs_constrained_gene_density.cnv_split.pdf", sep="."),
+    height=2.25, width=2.25)
+segs.swarm(segs.sig,
+           x.bool=segs.sig$n_hpos > 1,
+           y=1000000 * segs.sig$n_gnomAD_constrained_genes / segs.sig$size,
+           pt.cex=0.4,
+           cnv.split=T,
+           violin=T,
+           add.pvalue=T,
+           alternative="less",
+           xtitle="Associated Phenos.",
+           x.labs=c("One", "Multiple"),
+           ytitle="Constr. Genes per 100kb",
+           y.title.line=1.5,
+           y.at=seq(0, 16, 4),
+           parmar=c(2.3, 2.5, 2.6, 0))
+dev.off()
+
+# Plot pleiotropy vs. number of OMIM genes
+pdf(paste(out.prefix, "gw_plus_FDR.pleiotropy_vs_OMIM_genes.pdf", sep="."),
     height=2.25, width=2)
-segs.swarm(gw,
-         x.bool=gw$n_hpos > 1,
-         y=1000000 * gw$n_OMIM_genes / gw$size,
-         cnv.split=F,
-         violin=T,
-         add.pvalue=T,
-         print.fold=T,
-         alternative="less",
-         xtitle="Associated Phenos.",
-         x.labs=c("One", "Multiple"), 
-         ytitle="OMIM Genes per 1Mb",
-         parmar=parmar)
+segs.swarm(segs.sig,
+           x.bool=segs.sig$n_hpos > 1,
+           y=segs.sig$n_OMIM_genes,
+           pt.cex=0.4,
+           cnv.split=F,
+           violin=T,
+           add.pvalue=T,
+           alternative="less",
+           xtitle="Associated Phenos.",
+           x.labs=c("One", "Multiple"),
+           ytitle="OMIM Genes",
+           parmar=parmar)
+dev.off()
+pdf(paste(out.prefix, "gw_plus_FDR.pleiotropy_vs_OMIM_genes.cnv_split.pdf", sep="."),
+    height=2.25, width=2.25)
+segs.swarm(segs.sig,
+           x.bool=segs.sig$n_hpos > 1,
+           y=segs.sig$n_OMIM_genes,
+           pt.cex=0.4,
+           cnv.split=T,
+           violin=T,
+           add.pvalue=T,
+           alternative="less",
+           xtitle="Associated Phenos.",
+           x.labs=c("One", "Multiple"),
+           ytitle="OMIM Genes",
+           parmar=c(2.3, 3.0, 2.6, 0.5))
+dev.off()
+
+# Plot pleiotropy vs. OMIM gene density
+pdf(paste(out.prefix, "gw_plus_FDR.pleiotropy_vs_OMIM_gene_density.pdf", sep="."),
+    height=2.25, width=1.9)
+segs.swarm(segs.sig,
+           x.bool=segs.sig$n_hpos > 1,
+           y=100000 * segs.sig$n_OMIM_genes / segs.sig$size,
+           pt.cex=0.4,
+           cnv.split=F,
+           violin=T,
+           add.pvalue=T,
+           alternative="less",
+           xtitle="Associated Phenos.",
+           x.labs=c("One", "Multiple"),
+           ytitle="OMIM Genes per 1Mb",
+           y.title.line=1.5,
+           y.at=seq(0, 2, 0.5),
+           parmar=c(2.3, 2.5, 1.6, 0.3))
+dev.off()
+pdf(paste(out.prefix, "gw_plus_FDR.pleiotropy_vs_OMIM_gene_density.cnv_split.pdf", sep="."),
+    height=2.25, width=2.25)
+segs.swarm(segs.sig,
+           x.bool=segs.sig$n_hpos > 1,
+           y=100000 * segs.sig$n_OMIM_genes / segs.sig$size,
+           pt.cex=0.4,
+           cnv.split=T,
+           violin=T,
+           add.pvalue=T,
+           alternative="less",
+           xtitle="Associated Phenos.",
+           x.labs=c("One", "Multiple"),
+           ytitle="OMIM Genes per 100kb",
+           y.title.line=1.6,
+           y.at=seq(0, 2, 0.5),
+           parmar=c(2.3, 2.5, 2.6, 0))
 dev.off()
 
 # Plot pleiotropy vs. mechanism
-pdf(paste(out.prefix, "pleiotropy_vs_mechanism.pdf", sep="."),
+pdf(paste(out.prefix, "gw_plus_FDR.pleiotropy_vs_mechanism.pdf", sep="."),
     height=2.25, width=2.5)
-segs.swarm(gw, x.bool=gw$nahr, y=gw$n_hpos, add.pvalue=T, cnv.split=F,
+segs.swarm(segs.sig, x.bool=segs.sig$nahr, y=segs.sig$n_hpos, add.pvalue=T, cnv.split=F,
          x.labs=c("Nonrecurrent", "NAHR"), violin=T, add.y.axis=T,
-         ytitle="Associated HPOs", pt.cex=0.75,
-         parmar=c(1.2, 3, 1.5, 0))
+         ytitle="Associated HPOs", pt.cex=0.5,
+         parmar=c(1.2, 3, 1.6, 0))
 dev.off()
 
 # Plot pleiotropy vs. average gene expression
-pdf(paste(out.prefix, "pleiotropy_vs_gene_expression.pdf", sep="."),
+pdf(paste(out.prefix, "gw_plus_FDR.pleiotropy_vs_gene_expression.pdf", sep="."),
     height=2.25, width=2)
-segs.swarm(gw,
-         x.bool=gw$n_hpos > 1,
-         y=gw$gene_expression_harmonic_mean,
+segs.swarm(segs.sig,
+         x.bool=segs.sig$n_hpos > 1,
+         y=segs.sig$gene_expression_harmonic_mean,
+         pt.cex=0.4,
          cnv.split=F,
          violin=T,
          add.pvalue=T,
          alternative="two.sided",
          xtitle="Associated Phenos.",
-         x.labs=c("One", "Multiple"), 
+         x.labs=c("One", "Multiple"),
          ytitle="Avg. Gene Expression",
          parmar=parmar)
 dev.off()
 
 # Plot pleiotropy vs. proportion of ubiquitously expressed genes
-pdf(paste(out.prefix, "pleiotropy_vs_prop_ubi_expressed.pdf", sep="."),
+pdf(paste(out.prefix, "gw_plus_FDR.pleiotropy_vs_prop_ubi_expressed.pdf", sep="."),
     height=2.25, width=2)
-segs.swarm(gw,
-         x.bool=gw$n_hpos > 1,
-         y=gw$prop_ubiquitously_expressed,
+segs.swarm(segs.sig,
+         x.bool=segs.sig$n_hpos > 1,
+         y=segs.sig$prop_ubiquitously_expressed,
+         pt.cex=0.4,
          cnv.split=F,
          violin=T,
          add.pvalue=T,
          alternative="two.sided",
          xtitle="Associated Phenos.",
-         x.labs=c("One", "Multiple"), 
+         x.labs=c("One", "Multiple"),
          ytitle="Prop. Ubiquitously Expr.",
          parmar=parmar)
 dev.off()
-
