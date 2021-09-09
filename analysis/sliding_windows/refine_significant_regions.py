@@ -40,7 +40,8 @@ def format_stat(x, is_phred=False, na_val=0):
 
 def get_sig_label(primary_p, secondary_p, n_nominal, primary_q, primary_p_cutoff, 
                   secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
-                  secondary_or_nominal=True, fdr_q_cutoff=0.05):
+                  secondary_or_nominal=True, fdr_q_cutoff=0.05,
+                  secondary_for_fdr=False):
     """
     Checks if a window should be considered exome-wide or FDR significant
     """
@@ -51,18 +52,22 @@ def get_sig_label(primary_p, secondary_p, n_nominal, primary_q, primary_p_cutoff
     n_nominal_is_sig = (n_nominal >= n_nominal_cutoff)
     fdr_q_is_sig = (primary_q < fdr_q_cutoff)
 
+    # Determine secondary criteria
+    if secondary_p_is_sig and n_nominal_is_sig:
+        secondary_is_sig = True
+    elif secondary_or_nominal and (secondary_p_is_sig or n_nominal_is_sig):
+        secondary_is_sig = True
+    else:
+        secondary_is_sig = False
+
     # First consider genome-wide significance
-    if primary_p_is_sig \
-    and secondary_p_is_sig \
-    and n_nominal_is_sig:
-        return 'GWS'
-    elif primary_p_is_sig \
-    and secondary_or_nominal \
-    and (secondary_p_is_sig or n_nominal_is_sig):
+    if primary_p_is_sig and secondary_is_sig:
         return 'GWS'
     
     # Second consider FDR significance
-    elif fdr_q_is_sig:
+    elif fdr_q_is_sig and secondary_for_fdr and secondary_is_sig:
+        return 'FDR'
+    elif fdr_q_is_sig and not secondary_for_fdr:
         return 'FDR'
 
     # Otherwise, non-significant
@@ -169,7 +174,7 @@ def refine(window_priors, window_info, null_variance=0.42 ** 2, cs_val=0.95,
 def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True, 
                 secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
                 secondary_or_nominal=True, fdr_q_cutoff=0.05,
-                sig_only=False, keep_windows=None,
+                secondary_for_fdr=False, sig_only=False, keep_windows=None,
                 refine_secondary=False):
     """
     Parse all association stats for a single phenotype
@@ -210,7 +215,7 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
         sig_label = get_sig_label(primary_p, secondary_p, n_nominal, primary_q, 
                                   primary_p_cutoff, secondary_p_cutoff, 
                                   n_nominal_cutoff, secondary_or_nominal, 
-                                  fdr_q_cutoff)
+                                  fdr_q_cutoff, secondary_for_fdr)
         gw_sig = False
         fdr_sig = False
         if sig_label == 'GWS':
@@ -258,8 +263,9 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
 def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True, 
                 secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
                 secondary_or_nominal=True, fdr_q_cutoff=0.05, 
-                block_merge_dist=200000, block_prefix='window_block', 
-                null_variance=0.42 ** 2, refine_secondary=False, cs_val=0.95):
+                secondary_for_fdr=False, block_merge_dist=200000, 
+                block_prefix='window_block', null_variance=0.42 ** 2, 
+                refine_secondary=False, cs_val=0.95):
     """
     Loads & processes all necessary data for a single phenotype
     Returns a dict with the following entries:
@@ -277,7 +283,7 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
     hpo_info['sig_windows'] = parse_stats(stats_in, primary_p_cutoff, p_is_phred, 
                                           secondary_p_cutoff, n_nominal_cutoff, 
                                           secondary_or_nominal, fdr_q_cutoff,
-                                          sig_only=True, 
+                                          secondary_for_fdr, sig_only=True, 
                                           refine_secondary=refine_secondary)
 
     # Second pass: parse data for all windows within block_merge_dist of sig_windows
@@ -301,7 +307,7 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
         hpo_info['all_windows'] = parse_stats(stats_in, primary_p_cutoff, p_is_phred, 
                                               secondary_p_cutoff, n_nominal_cutoff, 
                                               secondary_or_nominal, fdr_q_cutoff,
-                                              sig_only=False,
+                                              secondary_for_fdr, sig_only=False,
                                               keep_windows=nearby_windows, 
                                               refine_secondary=refine_secondary)
 
@@ -337,9 +343,10 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
 
 
 def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
-                  secondary_or_nominal=True, fdr_q_cutoff=0.05,
-                  block_merge_dist=200000, block_prefix='window_block', 
-                  refine_secondary=False, cs_val=0.95):
+                  secondary_or_nominal=True, fdr_q_cutoff=0.05, 
+                  secondary_for_fdr=False, block_merge_dist=200000, 
+                  block_prefix='window_block', refine_secondary=False, 
+                  cs_val=0.95):
     """
     Wrapper function to process each HPO with process_hpo()
     Returns a dict with one entry per HPO
@@ -357,6 +364,7 @@ def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2,
                                         n_nominal_cutoff=n_nominal_cutoff, 
                                         secondary_or_nominal=secondary_or_nominal,
                                         fdr_q_cutoff=fdr_q_cutoff,
+                                        secondary_for_fdr=secondary_for_fdr,
                                         block_merge_dist=block_merge_dist,
                                         block_prefix=block_prefix,
                                         refine_secondary=refine_secondary,
@@ -597,7 +605,8 @@ def output_assoc_bed(hpo_data, cyto_bed, outfile, cnv='NS'):
                                           lnor_upper, best_p)
             outline += '\t' + '\t'.join([str(n_cred), ';'.join(cred_coords), 
                                          str(cred_size)]) + '\n'
-            outfile.write(outline)
+            if sig_level != 'not_significant':
+                outfile.write(outline)
 
     outfile.close()
 
@@ -657,6 +666,8 @@ def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS
            'n_cred_intervals cred_interval_coords cred_intervals_size'
     outfile.write('#' + '\t'.join(cols.split()) + '\n')
 
+    out_presort = {}
+
     for members in final_loci.values():
         # Get basic information for credsets in final cluster
         n_members = len(members)
@@ -678,7 +689,7 @@ def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS
         start = str(np.nanmin(credints_bt.to_dataframe().start))
         end = str(np.nanmax(credints_bt.to_dataframe().end))
         cytoband = get_cytobands(credints_bt, cyto_bed)
-        region_id = '_'.join([region_id_prefix, cytoband])
+        region_id = '_'.join([region_id_prefix, '{}', cytoband])
 
         # Summarize HPO-specific information pooled across all windows from each
         # contributing credset (note: *not* all windows for all merged cred intervals)
@@ -718,15 +729,24 @@ def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS
         else:
             best_sig_level = 'not_significant'
 
-        # Write region stats to file
-        outline = '\t'.join([chrom, start, end, region_id, cnv, best_sig_level, cytoband])
+        # Prepare to write region stats to file
+        out_front = '\t'.join([chrom, start, end])
+        out_back = '\t'.join([cnv, best_sig_level, cytoband])
         outnums_fmt = '\t{:.3E}\t{:.3E}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}'
-        outline += outnums_fmt.format(control_freq, case_freq, lnor, lnor_ci[0], 
-                                      lnor_ci[1], min_lnor, max_lnor)
-        outline += '\t' + '\t'.join([str(n_hpos), ';'.join(hpos), 
-                                     str(n_members), ';'.join(sorted(members)),
-                                     str(n_credints), ';'.join(credints_coords),
-                                     str(credints_size)]) + '\n'
+        out_back += outnums_fmt.format(control_freq, case_freq, lnor, lnor_ci[0], 
+                                       lnor_ci[1], min_lnor, max_lnor)
+        out_back += '\t' + '\t'.join([str(n_hpos), ';'.join(hpos), 
+                                      str(n_members), ';'.join(sorted(members)),
+                                      str(n_credints), ';'.join(credints_coords),
+                                      str(credints_size)]) + '\n'
+        if best_sig_level != 'not_significant':
+            out_presort[(int(chrom), int(start), int(end))] = [out_front, region_id, out_back]
+
+    # Iterate over sorted blocks and write to file
+    for i, key in enumerate(sorted(out_presort.keys())):
+        outline = '\t'.join([out_presort[key][0], 
+                             out_presort[key][1].format(i+1), 
+                             out_presort[key][2]])
         outfile.write(outline)
 
     outfile.close()
@@ -758,6 +778,10 @@ def main():
     parser.add_argument('--fdr-q-cutoff', help='Maximum FDR Q-value to ' + 
                         'consider as FDR significant. [default: 0.05]', 
                         default=0.05, type=float)
+    parser.add_argument('--secondary-for-fdr', action='store_true', 
+                        default=False, help='Apply sample secondary and/or min. ' +
+                        'nominal criteria when evaluating FDR significance. ' +
+                        '[default: apply no secondary criteria to FDR segments]')
     parser.add_argument('--credible-sets', dest='cs_val', type=float, default=0.95,
                         help='Credible set value. [default: 0.95]')
     parser.add_argument('--distance', help='Distance to pad each significant window ' +
@@ -793,7 +817,8 @@ def main():
     # Process data per hpo
     hpo_data = load_all_hpos(args.statslist, args.secondary_p_cutoff, 
                              args.min_nominal, args.secondary_or_nom, 
-                             args.fdr_q_cutoff, args.distance, block_prefix, 
+                             args.fdr_q_cutoff, args.secondary_for_fdr,
+                             args.distance, block_prefix, 
                              args.refine_secondary, args.cs_val)
 
     # Estimate null variance based on:

@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -23,14 +23,14 @@ quantile.split <- function(segs, feature, breaks=NULL, break.names=NULL, probs=s
   ngenes <- segs$n_genes
   if(is.null(breaks)){
     breaks <- floor(quantile(ngenes, probs=probs, na.rm=T))
-    breaks[length(breaks)] <- breaks[length(breaks)] + 1 
+    breaks[length(breaks)] <- breaks[length(breaks)] + 1
   }
   if(is.null(break.names)){
     break.names <- sapply(2:length(breaks), function(i){
       paste(breaks[i-1], breaks[i], sep="-")
     })
   }
-  
+
   res <- lapply(c("DEL", "DUP"), function(cnv){
     cnv.vals <- vals[which(segs$cnv == cnv)]
     cnv.ngenes <- ngenes[which(segs$cnv == cnv)]
@@ -41,7 +41,7 @@ quantile.split <- function(segs, feature, breaks=NULL, break.names=NULL, probs=s
     return(cnv.res)
   })
   names(res) <- c("DEL", "DUP")
-  
+
   return(res)
 }
 
@@ -51,7 +51,7 @@ constrained.obs_exp.test <- function(segs){
     n_genes <- segs$n_genes[i]
     exp <- segs$constrained_expected[i]
     obs <- segs$n_gnomAD_constrained_genes[i]
-    chisq.mat <- matrix(c(n_genes - exp, n_genes - obs, exp, obs), 
+    chisq.mat <- matrix(c(n_genes - exp, n_genes - obs, exp, obs),
                         byrow=T, nrow=2)
     if(n_genes > 0){
       chisq.test(chisq.mat)$p.value
@@ -67,8 +67,8 @@ constrained.obs_exp.test <- function(segs){
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Plot values vs # of genes
-scatter.vsGenes <- function(segs, feature, pt.cex=0.75, fit=NULL, rollmean.span=1,
-                            xlims=NULL, ylims=NULL, y.title=NULL, 
+scatter.vsGenes <- function(segs, feature, pt.cex=0.6, fit=NULL, rollmean.span=1,
+                            xlims=NULL, ylims=NULL, y.title=NULL,
                             y.title.line=2, y.pct=FALSE,
                             horiz.line=NULL, legend.pos=NULL, blue.bg=TRUE,
                             parmar=c(2.5, 3, 0.5, 0.5)){
@@ -93,7 +93,7 @@ scatter.vsGenes <- function(segs, feature, pt.cex=0.75, fit=NULL, rollmean.span=
     plot.bty <- "n"
     grid.col <- NA
   }
-  
+
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=xlims, ylim=ylims,
@@ -105,17 +105,17 @@ scatter.vsGenes <- function(segs, feature, pt.cex=0.75, fit=NULL, rollmean.span=
   if(!is.null(horiz.line)){
     abline(h=horiz.line, lty=2, col=blueblack)
   }
-  
+
   # Add points
   points(ngenes, vals,
-         pch=segs$pt.pch, cex=pt.cex, 
+         pch=segs$pt.pch, cex=pt.cex,
          bg=segs$pt.bg, col=segs$pt.border)
-  
+
   # Fit trendlines for DEL and DUP, if optioned
   if(!is.null(fit)){
     if(fit == "exp"){
       lapply(c("DEL", "DUP"), function(cnv){
-        fit.model <- fit.exp.decay(x=ngenes[which(segs$cnv==cnv)], 
+        fit.model <- fit.exp.decay(x=ngenes[which(segs$cnv==cnv)],
                                  y=vals[which(segs$cnv==cnv)])
         fit.df <- data.frame("x"=seq(par("usr")[1], par("usr")[2], length.out=500))
         fit.df$y <- predict(fit.model, newdata=fit.df)
@@ -131,7 +131,7 @@ scatter.vsGenes <- function(segs, feature, pt.cex=0.75, fit=NULL, rollmean.span=
       })
     }
   }
-  
+
   # Add axes
   axis(1, at=c(-10e10, 10e10), col=blueblack, labels=NA)
   axis(1, labels=NA, tck=-0.03, col=blueblack)
@@ -148,7 +148,7 @@ scatter.vsGenes <- function(segs, feature, pt.cex=0.75, fit=NULL, rollmean.span=
   }
   axis(2, at=axTicks(2), labels=y.labs, tick=F, las=2, line=-0.65)
   mtext(2, line=y.title.line, text=y.title)
-  
+
   # Add legend, if optioned
   if(!is.null(legend.pos)){
     legend(legend.pos, legend=c("DEL", "DUP", "GW-Sig.", "Literature"),
@@ -163,13 +163,11 @@ scatter.vsGenes <- function(segs, feature, pt.cex=0.75, fit=NULL, rollmean.span=
 ### RSCRIPT BLOCK ###
 #####################
 require(optparse, quietly=T)
-require(funr, quietly=T)
 require(MASS, quietly=T)
+require(rCNV2, quietly=T)
 
 # List of command-line options
-option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
-)
+option_list <- list()
 
 # Get command-line arguments & options
 args <- parse_args(OptionParser(usage=paste("%prog loci.bed segs.tsv out_prefix", sep=" "),
@@ -186,82 +184,117 @@ if(length(args$args) != 3){
 loci.in <- args$args[1]
 segs.in <- args$args[2]
 out.prefix <- args$args[3]
-rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
 # loci.in <- "~/scratch/rCNV.final_segments.loci.bed.gz"
-# segs.in <- "~/scratch/rCNV2_analysis_d1.master_segments.bed.gz"
+# segs.in <- "~/scratch/rCNV2_analysis_d2.master_segments.bed.gz"
 # out.prefix <- "~/scratch/test_effect_sizes"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
-
-# Source common functions
-script.dir <- funr::get_script_path()
-source(paste(script.dir, "common_functions.R", sep="/"))
 
 # Load loci & segment tables
 loci <- load.loci(loci.in)
 segs <- load.segment.table(segs.in)
 
-# Subset to nominally significant segments
+# Subset to nominally significant segments from discovery + literature
 segs <- segs[which(segs$nom_sig), ]
 
 # Set expected values of constrained genes
 prop_constrained.genome_avg <- 3036/18641
 segs$constrained_expected <- segs$n_genes * prop_constrained.genome_avg
 
-# Get list of neuro loci plus lit GDs
+# Further subset to GW/FDR significant segments
+segs.sig <- segs[which(segs$any_sig), ]
+
+# Get list of neuro loci (sig + lit GDs)
 neuro.plus.lit.ids <- get.neuro.region_ids(loci, segs)
 neuro.segs <- segs[which(segs$region_id %in% neuro.plus.lit.ids), ]
 
+# Get list of developmental loci (sig + lit GDs)
+dev.plus.lit.ids <- get.developmental.region_ids(loci, segs)
+dev.segs <- segs[which(segs$region_id %in% dev.plus.lit.ids), ]
+
+# Get list of NDD loci (sig + lit GDs)
+NDD.plus.lit.ids <- get.ndd.region_ids(loci, segs)
+NDD.segs <- segs[which(segs$region_id %in% NDD.plus.lit.ids), ]
+
 # Plot proportion of constrained genes vs. # of genes
-pdf(paste(out.prefix, "prop_constrained_vs_ngenes.pdf", sep="."),
+pdf(paste(out.prefix, "prop_constrained_vs_ngenes.all_phenos.pdf", sep="."),
     height=2.4, width=2.7)
 scatter.vsGenes(segs, feature="gnomAD_constrained_prop", y.title="Constrained Genes",
-                y.pct=T, pt.cex=0.85, blue.bg=FALSE,
+                y.pct=T, pt.cex=0.6, blue.bg=FALSE,
                 horiz.line=prop_constrained.genome_avg,
                 y.title.line=2.3, parmar=c(2.45, 3.25, 0.5, 0.5))
-# axis(4, at=prop_constrained.genome_avg, tck=-0.03, col=blueblack, labels=NA)
-# axis(4, at=prop_constrained.genome_avg, tick=F, line=-0.9, las=2,
-#      labels=c("Genome\naverage"), col.axis=blueblack, font=3, cex=0.8)
+dev.off()
+pdf(paste(out.prefix, "prop_constrained_vs_ngenes.developmental_only.pdf", sep="."),
+    height=2.4, width=2.7)
+scatter.vsGenes(dev.segs, feature="gnomAD_constrained_prop", y.title="Constrained Genes",
+                y.pct=T, pt.cex=0.6, blue.bg=FALSE,
+                horiz.line=prop_constrained.genome_avg,
+                y.title.line=2.3, parmar=c(2.45, 3.25, 0.5, 0.5))
 dev.off()
 
-# NOTE: all DNM enrichment plots restricted to neuro-associated regions
+# NOTE: all DNM enrichment plots restricted to NDD-associated regions
 
 # Plot average enrichment of ASC DNMs vs. # of genes
 pdf(paste(out.prefix, "ASC_dnPTVs_vs_ngenes.pdf", sep="."),
     height=2.2, width=2.3)
-scatter.vsGenes(neuro.segs, feature="ASC_dnm_lof_norm_excess_per_gene", 
+scatter.vsGenes(NDD.segs, feature="ASC_dnm_lof_norm_excess_per_gene",
                 y.title=bquote("Excess" ~ italic("dn") * "PTVs / Gene"),
-                y.pct=F, pt.cex=0.85, horiz.line=0, blue.bg=FALSE,
+                y.pct=F, pt.cex=0.6, horiz.line=0, blue.bg=FALSE,
                 y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
 dev.off()
 pdf(paste(out.prefix, "ASC_dnMis_vs_ngenes.pdf", sep="."),
     height=2.2, width=2.3)
-scatter.vsGenes(neuro.segs, feature="ASC_dnm_mis_norm_excess_per_gene", 
+scatter.vsGenes(NDD.segs, feature="ASC_dnm_mis_norm_excess_per_gene",
                 y.title=bquote("Excess" ~ italic("dn") * "Mis. / Gene"),
-                y.pct=F, pt.cex=0.85, horiz.line=0, blue.bg=FALSE,
+                y.pct=F, pt.cex=0.6, horiz.line=0, blue.bg=FALSE,
+                y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
+dev.off()
+
+# Plot average enrichment of ASC DNMs vs. # of genes after holding out gw-sig genes from ASC
+pdf(paste(out.prefix, "ASC_dnPTVs_vs_ngenes.no_gwSig_genes.pdf", sep="."),
+    height=2.2, width=2.3)
+scatter.vsGenes(NDD.segs, feature="ASC_noSig_dnm_lof_norm_excess_per_gene",
+                y.title=bquote("Excess" ~ italic("dn") * "PTVs / Gene"),
+                y.pct=F, pt.cex=0.6, horiz.line=0, blue.bg=FALSE,
+                y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
+dev.off()
+pdf(paste(out.prefix, "ASC_dnMis_vs_ngenes.no_gwSig_genes.pdf", sep="."),
+    height=2.2, width=2.3)
+scatter.vsGenes(NDD.segs, feature="ASC_noSig_dnm_mis_norm_excess_per_gene",
+                y.title=bquote("Excess" ~ italic("dn") * "Mis. / Gene"),
+                y.pct=F, pt.cex=0.6, horiz.line=0, blue.bg=FALSE,
                 y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
 dev.off()
 
 # Plot average enrichment of DDD DNMs vs. # of genes
 pdf(paste(out.prefix, "DDD_dnPTVs_vs_ngenes.pdf", sep="."),
     height=2.2, width=2.3)
-scatter.vsGenes(neuro.segs, feature="DDD_dnm_lof_norm_excess_per_gene", 
+scatter.vsGenes(NDD.segs, feature="DDD_dnm_lof_norm_excess_per_gene",
                 y.title=bquote("Excess" ~ italic("dn") * "PTVs / Gene"),
-                y.pct=F, pt.cex=0.85, horiz.line=0, blue.bg=FALSE,
+                y.pct=F, pt.cex=0.6, horiz.line=0, blue.bg=FALSE,
                 y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
 dev.off()
 pdf(paste(out.prefix, "DDD_dnMis_vs_ngenes.pdf", sep="."),
     height=2.2, width=2.3)
-scatter.vsGenes(neuro.segs, feature="DDD_dnm_mis_norm_excess_per_gene", 
+scatter.vsGenes(NDD.segs, feature="DDD_dnm_mis_norm_excess_per_gene",
                 y.title=bquote("Excess" ~ italic("dn") * "Mis. / Gene"),
-                y.pct=F, pt.cex=0.85, horiz.line=0, blue.bg=FALSE,
+                y.pct=F, pt.cex=0.6, horiz.line=0, blue.bg=FALSE,
+                y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
+dev.off()
+
+# Plot average enrichment of DDD DNMs vs. # of genes after holding out gw-sig genes from DDD
+pdf(paste(out.prefix, "DDD_dnPTVs_vs_ngenes.no_gwSig_genes.pdf", sep="."),
+    height=2.2, width=2.3)
+scatter.vsGenes(NDD.segs, feature="DDD_noSig_dnm_lof_norm_excess_per_gene",
+                y.title=bquote("Excess" ~ italic("dn") * "PTVs / Gene"),
+                y.pct=F, pt.cex=0.6, horiz.line=0, blue.bg=FALSE,
+                y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
+dev.off()
+pdf(paste(out.prefix, "DDD_dnMis_vs_ngenes.no_gwSig_genes.pdf", sep="."),
+    height=2.2, width=2.3)
+scatter.vsGenes(NDD.segs, feature="DDD_noSig_dnm_mis_norm_excess_per_gene",
+                y.title=bquote("Excess" ~ italic("dn") * "Mis. / Gene"),
+                y.pct=F, pt.cex=0.6, horiz.line=0, blue.bg=FALSE,
                 y.title.line=1.75, parmar=c(2.5, 2.75, 0.5, 0.5))
 dev.off()
 
@@ -269,8 +302,9 @@ dev.off()
 constrained.max <- max(segs$constrained_expected, segs$n_gnomAD_constrained_genes)
 pdf(paste(out.prefix, "constrained_genes_obs_vs_exp.pdf", sep="."),
     height=2.4, width=2.4)
-segs.scatter(segs, segs$constrained_expected, segs$n_gnomAD_constrained_genes, 
+segs.scatter(segs, segs$constrained_expected, segs$n_gnomAD_constrained_genes,
              xlims=c(0, constrained.max), ylims=c(0, constrained.max),
              xtitle="Constrained (Expected)", ytitle="Constrained (Observed)",
-             pt.cex=0.9)
+             pt.cex=0.6, blue.bg=FALSE)
 dev.off()
+

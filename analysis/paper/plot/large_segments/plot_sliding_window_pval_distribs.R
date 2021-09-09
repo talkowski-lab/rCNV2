@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -38,7 +38,7 @@ mini.qq <- function (del, dup, hpo, ymax=NULL, blue.bg=TRUE,
                      parmar=c(1.85, 1.85, 1, 1)){
   # Reformat HPO
   nocolon <- gsub(":", "", hpo, fixed=T)
-  
+
   # Get plotting data
   p.del <- as.numeric(del$pvals[, which(colnames(del$pvals) == paste(nocolon, "DEL", sep="_"))])
   exp.del <- as.numeric(del$expected)
@@ -50,7 +50,7 @@ mini.qq <- function (del, dup, hpo, ymax=NULL, blue.bg=TRUE,
                                       "obs" = -log10(sort.int(p.dup, decreasing=T, na.last=F))))
   xmax <- max(plot.dat$DEL$exp, plot.dat$DUP$exp, na.rm=T)
   if(is.null(ymax)){
-    ymax <- max(max(plot.dat$DEL[which(!is.infinite(plot.dat$DEL$obs)), ], na.rm=T), 
+    ymax <- max(max(plot.dat$DEL[which(!is.infinite(plot.dat$DEL$obs)), ], na.rm=T),
                 max(plot.dat$DUP[which(!is.infinite(plot.dat$DUP$obs)), ], na.rm=T))
   }
   if(blue.bg==TRUE){
@@ -62,7 +62,7 @@ mini.qq <- function (del, dup, hpo, ymax=NULL, blue.bg=TRUE,
     plot.border <- NA
     plot.bty <- "n"
   }
-  
+
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=c(0, xmax), ylim=c(0, ymax),
@@ -78,7 +78,7 @@ mini.qq <- function (del, dup, hpo, ymax=NULL, blue.bg=TRUE,
   # Add points
   points(plot.dat$DUP, pch=19, cex=pt.cex, col=cnv.colors[2])
   points(plot.dat$DEL, pch=19, cex=pt.cex, col=cnv.colors[1])
-  
+
   # Add title & axes
   mtext(3, line=0.1, text=hpo, cex=title.cex, font=2)
   axis(1, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
@@ -96,8 +96,8 @@ mini.qq <- function (del, dup, hpo, ymax=NULL, blue.bg=TRUE,
 }
 
 # Horizontal dotplot of lambdas
-plot.lambdas <- function(del, dup, hpos,
-                         parmar=c(0.25, 10, 2.5, 0.25)){
+plot.lambdas <- function(del, dup, hpos, hpo.cex=0.75,
+                         parmar=c(0.25, 10, 2.5, 10)){
   # Get plot data
   plot.dat <- as.data.frame(t(sapply(hpos, function(hpo){
     nocolon <- gsub(":", "", hpo, fixed=T)
@@ -108,9 +108,12 @@ plot.lambdas <- function(del, dup, hpos,
   plot.dat[, 3:4] <- apply(plot.dat[, 3:4], 2, as.numeric)
   colnames(plot.dat) <- c("hpo", "abbrev", "del", "dup")
   plot.dat <- plot.dat[order(apply(plot.dat[, 3:4], 1, min, na.rm=T)), ]
-  xlims <- range(plot.dat[, 3:4], na.rm=T)
+  max.x.diff <- max(abs(1-plot.dat[, 3:4]), na.rm=T)
+  xlims <- c(1-max.x.diff, 1+max.x.diff)
   y.at <- (1:nrow(plot.dat)) - 0.5
-  
+  y.evens <- seq(1, nrow(plot.dat), 2)
+  y.odds <- seq(2, nrow(plot.dat), 2)
+
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=xlims, ylim=c(nrow(plot.dat), 0),
@@ -119,24 +122,29 @@ plot.lambdas <- function(del, dup, hpos,
        ybottom=y.at-0.35, ytop=y.at+0.35, border=NA, bty="n", col=bluewhite)
   # abline(v=axTicks(3), col="white")
   abline(v=1, col=blueblack)
-  
+
   # Add points
   points(x=plot.dat$del, y=y.at-0.1, pch=21, col=cnv.blacks[1], bg=cnv.colors[1])
   points(x=plot.dat$dup, y=y.at+0.1, pch=21, col=cnv.blacks[2], bg=cnv.colors[2])
-  
+
   # Add axes
-  y.labels <- sapply(1:nrow(plot.dat), function(i){
-    paste(plot.dat$abbrev[i], " (", plot.dat$hpo[i], ")", sep="")
+  sapply(1:nrow(plot.dat), function(i){
+    y.label <- paste(plot.dat$abbrev[i], " (", plot.dat$hpo[i], ")", sep="")
+    if(i %% 2 > 0){
+      side <- 2
+    }else{
+      side <- 4
+    }
+    axis(side, at=y.at[i], line=-0.8, las=2, tick=F, labels=y.label, cex.axis=hpo.cex)
   })
-  axis(2, at=y.at, line=-0.8, las=2, tick=F, labels=y.labels)
   axis(3, at=c(-10e10, 10e10), tck=0, labels=NA)
-  axis(3, tck=-0.025, labels=NA)
+  axis(3, tck=-0.015, labels=NA)
   axis(3, tick=F, line=-0.65)
   mtext(3, line=1.2, text=bquote("Genomic Inflation Statistic," ~ lambda["GC"]))
 }
 
 # Scatterplot of lambdas vs sample size
-lambda.scatter <- function(del, dup, hpo.n, blue.bg=TRUE,
+lambda.scatter <- function(del, dup, hpo.n, blue.bg=TRUE, pt.cex=0.85,
                            parmar=c(2.5, 3, 0.25, 0.25)){
   # Get plot data
   plot.dat <- as.data.frame(t(sapply(hpos, function(hpo){
@@ -161,19 +169,19 @@ lambda.scatter <- function(del, dup, hpo.n, blue.bg=TRUE,
     plot.bty <- "n"
     grid.col <- NA
   }
-  
+
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=xlims, ylim=ylims,
        xaxt="n", xlab="", yaxt="n", ylab="")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
-       ybottom=par("usr")[3], ytop=par("usr")[4], 
+       ybottom=par("usr")[3], ytop=par("usr")[4],
        border=plot.border, bty=plot.bty, col=plot.bg)
   x.ax.at <- log10(logscale.major)
   y.ax.at <- seq(0, 2, 0.1)
   abline(h=y.ax.at, v=x.ax.at, col=grid.col)
   abline(h=1, col=blueblack)
-  
+
   # Add linear fits
   del.fit <- robust.lm(log10(plot.dat$n), plot.dat$del)
   del.fit.p <- format.pval(cor.test(log10(plot.dat$n), plot.dat$del)$p.value)
@@ -187,15 +195,15 @@ lambda.scatter <- function(del, dup, hpo.n, blue.bg=TRUE,
           y=c(dup.fit$ci$lower, rev(dup.fit$ci$upper)),
           border=NA, bty="n", col=adjustcolor(cnv.colors[2], alpha=0.15))
   abline(dup.fit$fit, lwd=2, col=cnv.colors[2])
-  
+
   # Add points
   sapply(1:nrow(plot.dat), function(i){
-    points(x=log10(plot.dat$n)[i], y=plot.dat$dup[i], pch=21, 
+    points(x=log10(plot.dat$n)[i], y=plot.dat$dup[i], pch=21, cex=pt.cex,
            bg=cnv.colors[2], col=cnv.blacks[2])
-    points(x=log10(plot.dat$n)[i], y=plot.dat$del[i], pch=21, 
+    points(x=log10(plot.dat$n)[i], y=plot.dat$del[i], pch=21, cex=pt.cex,
            bg=cnv.colors[1], col=cnv.blacks[1])
   })
-  
+
   # Add axes
   axis(1, at=log10(logscale.minor), tck=-0.0125, labels=NA, col=blueblack)
   axis(1, at=x.ax.at, tck=-0.025, labels=NA, col=blueblack)
@@ -205,14 +213,14 @@ lambda.scatter <- function(del, dup, hpo.n, blue.bg=TRUE,
   axis(2, at=y.ax.at, tck=-0.025, labels=NA, col=blueblack)
   axis(2, at=y.ax.at, tick=F, line=-0.65, las=2)
   mtext(2, line=1.75, text=bquote("Genomic Inflation," ~ lambda["GC"]))
-  
+
   # Add P-values
   x.length <- par("usr")[2] - par("usr")[1]
   y.length <- ylims[2] - ylims[1]
-  text(x=par("usr")[2] + 0.05 * x.length, 
+  text(x=par("usr")[2] + 0.05 * x.length,
        y=par("usr")[3] + 0.15 * y.length,
        pos=2, col=cnv.colors[1], labels=bquote(.(del.fit.p)))
-  text(x=par("usr")[2] + 0.05 * x.length, 
+  text(x=par("usr")[2] + 0.05 * x.length,
        y=par("usr")[3] + 0.05 * y.length,
        pos=2, col=cnv.colors[2], labels=bquote(.(dup.fit.p)))
 }
@@ -221,19 +229,19 @@ lambda.scatter <- function(del, dup, hpo.n, blue.bg=TRUE,
 primary.vs.secondary.scatter <- function(pvals.1, pvals.2, keep.idx=NULL,
                                          cutoff.1=6, cutoff.2=-log10(0.05),
                                          sig.color="black", nonsig.color="gray75",
-                                         min.point.plot=-log10(0.5), pt.cex=0.2, 
-                                         blue.bg=TRUE, 
+                                         min.point.plot=-log10(0.5), pt.cex=0.2,
+                                         blue.bg=TRUE,
                                          parmar=c(2.25, 2.25, 0.25, 0.25)){
   # Fill NA P-values with P=1
   pvals.1 <- as.data.frame(apply(pvals.1, 2, function(ps){ps[which(is.na(ps))] <- 1; return(ps)}))
   pvals.2 <- as.data.frame(apply(pvals.2, 2, function(ps){ps[which(is.na(ps))] <- 1; return(ps)}))
-  
+
   # Subset p-values to indexes to keep (if optioned)
   if(!is.null(keep.idx)){
     pvals.1 <- pvals.1[keep.idx, ]
     pvals.2 <- pvals.2[keep.idx, ]
   }
-  
+
   # Gather plot data
   pvals <- data.frame("primary"=-log10(as.vector(as.matrix(pvals.1))),
                       "secondary"=-log10(as.vector(as.matrix(pvals.2))))
@@ -260,13 +268,13 @@ primary.vs.secondary.scatter <- function(pvals.1, pvals.2, keep.idx=NULL,
     plot.bty <- "n"
     grid.col <- NA
   }
-  
+
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=ax.lims, ylim=ax.lims,
        xaxt="n", xlab="", yaxt="n", ylab="")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
-       ybottom=par("usr")[3], ytop=par("usr")[4], 
+       ybottom=par("usr")[3], ytop=par("usr")[4],
        border=plot.border, bty=plot.bty, col=plot.bg)
   abline(h=axTicks(2), v=axTicks(1), col=grid.col)
   rect(xleft=0, xright=min.point.plot,
@@ -276,13 +284,13 @@ primary.vs.secondary.scatter <- function(pvals.1, pvals.2, keep.idx=NULL,
          y=rep(0, 25), pch=19, cex=pt.cex, col=pt.colors)
   points(y=seq(0, min.point.plot, length.out=25),
          x=rep(0, 25), pch=19, cex=pt.cex, col=pt.colors)
-  
+
   # Add points
   points(pvals, pch=19, cex=pt.cex, col=pt.colors)
-  
+
   # Add annotation lines
   abline(v=cutoff.1, h=cutoff.2, lty=2, col=blueblack)
-  
+
   # Add axes
   axis(1, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
   axis(1, tck=-0.03, labels=NA, col=blueblack)
@@ -298,24 +306,23 @@ primary.vs.secondary.scatter <- function(pvals.1, pvals.2, keep.idx=NULL,
 #####################
 ### RSCRIPT BLOCK ###
 #####################
+require(rCNV2, quietly=T)
 require(optparse, quietly=T)
-require(funr, quietly=T)
 
 # List of command-line options
 option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced."),
   make_option(c("--del-cutoff"), default=10e-6, help="Significant P-value cutoff for deletions."),
   make_option(c("--dup-cutoff"), default=10e-6, help="Significant P-value cutoff for duplications."),
-  make_option(c("--del-nomsig-bed"), default="./del_nomsig.bed", 
+  make_option(c("--del-nomsig-bed"), default="./del_nomsig.bed",
               help="Path to BED file with coordinates of nominally significant deletion windows."),
-  make_option(c("--dup-nomsig-bed"), default="./dup_nomsig.bed", 
+  make_option(c("--dup-nomsig-bed"), default="./dup_nomsig.bed",
               help="Path to BED file with coordinates of nominally significant duplication windows.")
 )
 
 # Get command-line arguments & options
 args <- parse_args(OptionParser(usage=paste("%prog primary.del.pvals.bed primary.dup.pvals.bed",
                                             "secondary.del.pvals.bed secondary.dup.pvals.bed",
-                                            "hpos.list hpo.samplesize.tsv output_prefix", 
+                                            "hpos.list hpo.samplesize.tsv output_prefix",
                                             sep=" "),
                                 option_list=option_list),
                    positional_arguments=TRUE)
@@ -336,35 +343,23 @@ secondary.dup.pvals.in <- args$args[4]
 hpos.in <- args$args[5]
 hpo.samplesize.in <- args$args[6]
 out.prefix <- args$args[7]
-rcnv.config <- opts$`rcnv-config`
 del.cutoff <- -log10(as.numeric(opts$`del-cutoff`))
 dup.cutoff <- -log10(as.numeric(opts$`dup-cutoff`))
 del.nomsig.bed <- opts$`del-nomsig-bed`
 dup.nomsig.bed <- opts$`dup-nomsig-bed`
 
 # # DEV PARAMETERS
-# primary.del.pvals.in <- "~/scratch/rCNV2_analysis_d1.DEL.meta_phred_p.all_hpos.bed.gz"
-# primary.dup.pvals.in <- "~/scratch/rCNV2_analysis_d1.DUP.meta_phred_p.all_hpos.bed.gz"
-# secondary.del.pvals.in <- "~/scratch/rCNV2_analysis_d1.DEL.meta_phred_p_secondary.all_hpos.bed.gz"
-# secondary.dup.pvals.in <- "~/scratch/rCNV2_analysis_d1.DUP.meta_phred_p_secondary.all_hpos.bed.gz"
-# hpos.in <- "~/scratch/rCNV2_analysis_d1.reordered_hpos.txt"
+# primary.del.pvals.in <- "~/scratch/rCNV2_analysis_d2.DEL.meta_phred_p.all_hpos.bed.gz"
+# primary.dup.pvals.in <- "~/scratch/rCNV2_analysis_d2.DUP.meta_phred_p.all_hpos.bed.gz"
+# secondary.del.pvals.in <- "~/scratch/rCNV2_analysis_d2.DEL.meta_phred_p_secondary.all_hpos.bed.gz"
+# secondary.dup.pvals.in <- "~/scratch/rCNV2_analysis_d2.DUP.meta_phred_p_secondary.all_hpos.bed.gz"
+# hpos.in <- "~/scratch/rCNV2_analysis_d2.reordered_hpos.txt"
 # hpo.samplesize.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
 # out.prefix <- "~/scratch/test_pval_qc"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
 # del.cutoff <- 6
 # dup.cutoff <- 6
 # del.nomsig.bed <- "~/scratch/del_nomsig.bed"
 # dup.nomsig.bed <- "~/scratch/dup_nomsig.bed"
-# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
-
-# Source common functions
-script.dir <- funr::get_script_path()
-source(paste(script.dir, "common_functions.R", sep="/"))
 
 # Load pvalue matrices & compute lambdas
 del.1 <- load.pval.matrix(primary.del.pvals.in)
@@ -390,7 +385,7 @@ cat(paste("Median lambda, duplications only:", round(median(dup.1$lambdas), 5), 
 cat(paste("Median lambda, deletions & duplications only:", round(median(c(del.1$lambdas, dup.1$lambdas)), 5), "\n"))
 
 # Plot grid of QQs
-n.plots.wide <- 10
+n.plots.wide <- 9
 n.plots.tall <- ceiling(length(hpos) / n.plots.wide)
 dim.scalar <- 7.5 / 10
 png(paste(out.prefix, "qq_grid_byHPO.png", sep="."),
@@ -404,8 +399,8 @@ dev.off()
 
 # Horizontal dotplot of primary lambdas
 pdf(paste(out.prefix, "primary_lambdas_byHPO.pdf", sep="."),
-    height=6, width=5)
-plot.lambdas(del.1, dup.1, hpos, parmar=c(0.25, 14, 2.25, 1))
+    height=6, width=8)
+plot.lambdas(del.1, dup.1, hpos, parmar=c(0.25, 11, 2.25, 11))
 dev.off()
 
 # Scatterplot of lambdas vs sample size

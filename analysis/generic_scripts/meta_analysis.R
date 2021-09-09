@@ -61,8 +61,8 @@ keep.n.cols <- opts$`keep-n-columns`
 
 # # Dev parameters
 # setwd("~/scratch")
-# infile <- "HP0001370.rCNV.DEL.sliding_window.meta_analysis.input.txt"
-# outfile <- "HP0001370.rCNV.DEL.sliding_window.meta_analysis.stats.perm_38.bed"
+# infile <- "HP0001249.rCNV.DEL.sliding_window.meta_analysis.input.txt"
+# outfile <- "HP0001249.rCNV.DEL.sliding_window.meta_analysis.stats.perm_38.bed"
 # corplot.out <- "corplot.test.jpg"
 # model <- "fe"
 # cond.excl.in <- "GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz"

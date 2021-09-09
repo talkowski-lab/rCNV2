@@ -18,7 +18,7 @@ import csv
 import pybedtools as pbt
 import argparse
 from os import path
-from athena.utils import bgzip
+import subprocess
 
 
 def load_sources(tsv_in, cnvtype):
@@ -39,13 +39,15 @@ def load_sources(tsv_in, cnvtype):
     return sources
 
 
-def density_map(sources, resolution=10000):
+def density_map(sources, xbt=None, xfrac=0.2, resolution=10000):
     """
     Make map of GD density for all input sources for a single CNV type
     """
 
     pooled = list(sources.values())[0].cat(*list(sources.values())[0:], 
                                              postmerge=False).sort().saveas()
+    if xbt is not None:
+        pooled = pooled.intersect(xbt, v=True, f=xfrac).saveas()
     counts = pbt.BedTool().makewindows(b=pooled.merge(), w=resolution).\
                  coverage(pooled, counts=True, sorted=True)
     count_bts = []
@@ -86,11 +88,12 @@ def finalize_regions(maps, cnv, min_score=0, max_score=10e10, min_size=200000,
         regions = regions.sort(g=gfile).saveas()
 
     # Trim segdups overlapping ends of each GD, and filter by size
-    left_strs = '\n'.join(['\t'.join([x.chrom, str(x.start), str(x.start + 1)]) for x in regions])
-    right_strs = '\n'.join(['\t'.join([x.chrom, str(x.end), str(x.end + 1)]) for x in regions])
-    ends = pbt.BedTool(left_strs + '\n' + right_strs, from_string=True)
-    sd_hits = pbt.BedTool(segdups).intersect(ends, u=True, wa=True)
-    regions = regions.subtract(sd_hits).filter(lambda x: len(x) >= min_size and len(x) <= max_size)
+    if segdups is not None:
+        left_strs = '\n'.join(['\t'.join([x.chrom, str(x.start), str(x.start + 1)]) for x in regions])
+        right_strs = '\n'.join(['\t'.join([x.chrom, str(x.end), str(x.end + 1)]) for x in regions])
+        ends = pbt.BedTool(left_strs + '\n' + right_strs, from_string=True)
+        sd_hits = pbt.BedTool(segdups).intersect(ends, u=True, wa=True)
+        regions = regions.subtract(sd_hits).filter(lambda x: len(x) >= min_size and len(x) <= max_size)
 
     # Add cytoband range as region name and CNV type as fifth column
     all_str = ''
@@ -190,24 +193,40 @@ def main():
     sources = {cnv : load_sources(args.sources, cnv) for cnv in cnvtypes}
 
     # Build map of GD density per CNV type
-    maps = {cnv : density_map(sources[cnv]) for cnv in cnvtypes}
+    maps_all, maps_nohc, maps_nohmc = {}, {}, {}
+    for cnv in cnvtypes:
+        map_all = density_map(sources[cnv])
+        maps_all[cnv] = map_all
+        hc_bt = finalize_regions(maps_all, cnv, min_score=args.hc_cutoff,
+                                  min_size=args.minsize, max_size=args.maxsize,
+                                  gfile=args.genome, cyto_bed=args.cytobands, 
+                                  id_prefix='HC_GD_tmp')
+        map_nohc = density_map(sources[cnv], xbt=hc_bt)
+        maps_nohc[cnv] = map_nohc
+        mc_bt = finalize_regions(maps_nohc, cnv, min_score=args.mc_cutoff,
+                                  min_size=args.minsize, max_size=args.maxsize,
+                                  gfile=args.genome, cyto_bed=args.cytobands, 
+                                  id_prefix='MC_GD_tmp')
+        hmc_bt = hc_bt.cat(mc_bt, postmerge=False)
+        map_nohmc = density_map(sources[cnv], xbt=hmc_bt)
+        maps_nohmc[cnv] = map_nohmc
 
     # Consolidate hc/mc/lc regions, trim flanking segdups, and write to outfiles
-    hc_gd_bts = [finalize_regions(maps, cnv, min_score=args.hc_cutoff,
+    hc_gd_bts = [finalize_regions(maps_all, cnv, min_score=args.hc_cutoff,
                                   min_size=args.minsize, max_size=args.maxsize,
                                   gfile=args.genome, segdups=args.segdups, 
                                   cyto_bed=args.cytobands, id_prefix='HC_GD',
                                   annoprep=args.prep_for_gene_anno) \
                  for cnv in cnvtypes]
     hc_gds = hc_gd_bts[0].cat(hc_gd_bts[1], postmerge=False).sort(g=args.genome)
-    mc_gd_bts = [finalize_regions(maps, cnv, min_score=args.mc_cutoff,
+    mc_gd_bts = [finalize_regions(maps_nohc, cnv, min_score=args.mc_cutoff,
                                   max_score=args.hc_cutoff, min_size=args.minsize, 
                                   max_size=args.maxsize, gfile=args.genome, 
                                   segdups=args.segdups, cyto_bed=args.cytobands,
                                   id_prefix='MC_GD', annoprep=args.prep_for_gene_anno) \
                  for cnv in cnvtypes]
     mc_gds = mc_gd_bts[0].cat(mc_gd_bts[1], postmerge=False).sort(g=args.genome)
-    lc_gd_bts = [finalize_regions(maps, cnv, min_score=args.lc_cutoff,
+    lc_gd_bts = [finalize_regions(maps_nohmc, cnv, min_score=args.lc_cutoff,
                                   max_score=args.mc_cutoff, min_size=args.minsize, 
                                   max_size=args.maxsize, gfile=args.genome, 
                                   segdups=args.segdups, cyto_bed=args.cytobands,
@@ -235,9 +254,9 @@ def main():
 
     # Bgzip, if optioned
     if args.bgzip:
-        bgzip(hc_outfile)
-        bgzip(mc_outfile)
-        bgzip(lc_outfile)
+        subprocess.run(['bgzip', '-f', hc_outfile])
+        subprocess.run(['bgzip', '-f', mc_outfile])
+        subprocess.run(['bgzip', '-f', lc_outfile])
 
 
 if __name__ == '__main__':

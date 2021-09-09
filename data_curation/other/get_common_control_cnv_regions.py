@@ -15,7 +15,7 @@ from os.path import splitext
 from sys import stdout
 import pandas as pd
 import pybedtools as pbt
-from athena.utils import bgzip
+import subprocess
 
 
 def main():
@@ -73,7 +73,7 @@ def main():
         outfile.write('\t'.join([x[0], str(x[1]), str(x[2])]) + '\n')
     outfile.close()
     if args.bgzip:
-        bgzip(outfile_path)
+        subprocess.run(['bgzip', '-f', outfile_path])
 
 
 if __name__ == '__main__':

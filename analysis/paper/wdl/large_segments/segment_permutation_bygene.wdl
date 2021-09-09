@@ -2,7 +2,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -14,11 +14,13 @@ workflow segment_permutation {
   Int perms_per_shard
   String perm_prefix
   String rCNV_bucket
+  String rCNV_docker
 
   call enumerate_seeds {
     input:
       total_n_perms=total_n_perms,
-      perms_per_shard=perms_per_shard
+      perms_per_shard=perms_per_shard,
+      rCNV_docker=rCNV_docker
   }
 
   scatter ( seed in enumerate_seeds.seeds ) {
@@ -28,14 +30,16 @@ workflow segment_permutation {
         seed=seed,
         n_perms=perms_per_shard,
         perm_prefix="${perm_prefix}.bygene.starting_seed_${seed}",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     call perm_shard_bygene_litGDs {
       input:
         seed=seed,
         n_perms=perms_per_shard,
         perm_prefix="${perm_prefix}.lit_GDs.bygene.starting_seed_${seed}",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     # Annotate separately to allow for caching of permutation step
     call annotate_shard as annotate_segs {
@@ -43,14 +47,16 @@ workflow segment_permutation {
         perm_table=perm_shard_bygene.perm_table,
         hpomatch="TRUE",
         perm_prefix="${perm_prefix}.bygene.starting_seed_${seed}",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     call annotate_shard as annotate_litGDs {
       input:
         perm_table=perm_shard_bygene_litGDs.perm_table,
         hpomatch="FALSE",
         perm_prefix="${perm_prefix}.lit_GDs.bygene.starting_seed_${seed}",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
   }
 
@@ -58,13 +64,15 @@ workflow segment_permutation {
     input:
       annotated_tables=annotate_segs.annotated_table,
       perm_prefix="${perm_prefix}.${total_n_perms}_permuted_segments_bygene",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
   call merge_perms as merge_litGDs {
     input:
       annotated_tables=annotate_litGDs.annotated_table,
       perm_prefix="${perm_prefix}.lit_GDs.${total_n_perms}_permuted_segments_bygene",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
 }
 
@@ -73,6 +81,7 @@ workflow segment_permutation {
 task enumerate_seeds {
   Int total_n_perms
   Int perms_per_shard
+  String rCNV_docker
 
   command <<<
     set -e
@@ -82,7 +91,7 @@ task enumerate_seeds {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:82b781b4374b85258457084abe4ca7b9d12c4f9b64471b7f336fc16279f742fb"
+    docker: "${rCNV_docker}"
     preemptible: 1
   }
 
@@ -98,6 +107,7 @@ task perm_shard_bygene {
   Int n_perms
   String perm_prefix
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -131,7 +141,7 @@ task perm_shard_bygene {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:0ac85afb703849cd30e35656d4c3fcb34ec1e88515304f6aed71ce5bda977ee0"
+    docker: "${rCNV_docker}"
     preemptible: 1
   }
 
@@ -147,6 +157,7 @@ task perm_shard_bygene_litGDs {
   Int n_perms
   String perm_prefix
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -189,7 +200,7 @@ task perm_shard_bygene_litGDs {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:cd1132eddf558c156999b20cbc65289e4bc175402205696874b8221dc947caf3"
+    docker: "${rCNV_docker}"
     preemptible: 1
   }
 
@@ -204,6 +215,7 @@ task annotate_shard {
   String hpomatch
   String perm_prefix
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -216,6 +228,7 @@ task annotate_shard {
     gsutil -m cp \
       ${rCNV_bucket}/analysis/analysis_refs/test_phenotypes.list \
       ${rCNV_bucket}/analysis/paper/data/misc/*_dnm_counts*tsv.gz \
+      ${rCNV_bucket}/analysis/paper/data/misc/*.gw_sig.genes.list \
       ${rCNV_bucket}/analysis/paper/data/misc/gene_mutation_rates.tsv.gz \
       ${rCNV_bucket}/cleaned_data/genes/annotations/gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
       refs/
@@ -223,7 +236,7 @@ task annotate_shard {
       ${rCNV_bucket}/results/segment_association/* \
       ./
 
-    # Build necessary inputs
+    # Build gene list input
     echo -e "gnomAD_constrained\tgene_lists/gnomad.v2.1.1.lof_constrained.genes.list" > genelists_to_annotate.tsv
     echo -e "gnomAD_tolerant\tgene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list" >> genelists_to_annotate.tsv
     echo -e "CLinGen_HI\tgene_lists/ClinGen.hmc_haploinsufficient.genes.list" >> genelists_to_annotate.tsv
@@ -231,16 +244,20 @@ task annotate_shard {
     echo -e "DECIPHER_LoF\tgene_lists/DDG2P.hmc_lof.genes.list" >> genelists_to_annotate.tsv
     echo -e "DECIPHER_GoF\tgene_lists/DDG2P.hmc_gof.genes.list" >> genelists_to_annotate.tsv
     echo -e "OMIM\tgene_lists/HP0000118.HPOdb.genes.list" >> genelists_to_annotate.tsv
-    echo -e "ASC\trefs/asc_dnm_counts.tsv.gz" > dnm_counts_to_annotate.tsv
-    echo -e "ASC_unaffected\trefs/asc_dnm_counts.unaffecteds.tsv.gz" >> dnm_counts_to_annotate.tsv
-    echo -e "DDD\trefs/ddd_dnm_counts.tsv.gz" >> dnm_counts_to_annotate.tsv
+
+    # Build DNM input
+    echo -e "ASC\trefs/asc_dnm_counts.tsv.gz\trefs/ASC_2020.gw_sig.genes.list" > dnm_counts_to_annotate.tsv
+    echo -e "ASC_unaffected\trefs/asc_dnm_counts.unaffecteds.tsv.gz\trefs/ASC_2020.gw_sig.genes.list" >> dnm_counts_to_annotate.tsv
+    echo -e "DDD\trefs/ddd_dnm_counts.tsv.gz\trefs/DDD_2020.gw_sig.genes.list" >> dnm_counts_to_annotate.tsv
+
+    # Build HPO-matched gene lists
     while read nocolon hpo; do
       echo -e "$hpo\tgene_lists/$nocolon.HPOdb.genes.list"
     done < refs/test_phenotypes.list \
     > hpo_genelists.tsv
     zcat rCNV.final_segments.loci.bed.gz \
     | grep -ve '^#' \
-    | awk -v FS="\t" -v OFS="\t" '{ print $4, $15 }' \
+    | awk -v FS="\t" -v OFS="\t" '{ print $4, $16 }' \
     > segment_hpos.tsv
 
     # Annotate permuted table
@@ -268,7 +285,7 @@ task annotate_shard {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:cd1132eddf558c156999b20cbc65289e4bc175402205696874b8221dc947caf3"
+    docker: "${rCNV_docker}"
     preemptible: 1
   }
 
@@ -283,6 +300,7 @@ task merge_perms {
   Array[File] annotated_tables
   String perm_prefix
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -307,7 +325,7 @@ task merge_perms {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:cd1132eddf558c156999b20cbc65289e4bc175402205696874b8221dc947caf3"
+    docker: "${rCNV_docker}"
     preemptible: 1
     disks: "local-disk 200 SSD"
   }

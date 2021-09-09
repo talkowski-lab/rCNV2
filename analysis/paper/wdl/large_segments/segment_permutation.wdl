@@ -2,7 +2,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -16,6 +16,7 @@ workflow segment_permutation {
   Int perms_per_shard
   String perm_prefix
   String rCNV_bucket
+  String rCNV_docker
 
   call perm_prep {
     input:
@@ -24,6 +25,7 @@ workflow segment_permutation {
       total_n_perms=total_n_perms,
       perms_per_shard=perms_per_shard,
       rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker,
       prefix=perm_prefix
   }
 
@@ -37,7 +39,8 @@ workflow segment_permutation {
         del_max_p_bed=perm_prep.del_max_p_bed,
         dup_max_p_bed=perm_prep.dup_max_p_bed,
         perm_prefix="${perm_prefix}.starting_seed_${seed}",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     call perm_shard_litGDs {
       input:
@@ -48,7 +51,8 @@ workflow segment_permutation {
         del_max_p_bed=perm_prep.del_max_p_bed,
         dup_max_p_bed=perm_prep.dup_max_p_bed,
         perm_prefix="${perm_prefix}.lit_GDs.starting_seed_${seed}",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
   }
 
@@ -56,13 +60,15 @@ workflow segment_permutation {
     input:
       perm_tables=perm_shard.perm_table,
       perm_prefix="${perm_prefix}.${total_n_perms}_permuted_segments",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
   call merge_perms as merge_lit_gds {
     input:
       perm_tables=perm_shard_litGDs.perm_table,
       perm_prefix="${perm_prefix}.lit_GDs.${total_n_perms}_permuted_segments",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
 }
 
@@ -74,13 +80,20 @@ task perm_prep {
   Int total_n_perms
   Int perms_per_shard
   String rCNV_bucket
+  String rCNV_docker
   String prefix
 
   command <<<
     set -e
 
-    # Make whitelist
-    bedtools merge -i ${binned_genome} | bgzip -c > whitelist.bed.gz
+    # Make whitelist after removing untestable bins (those with <2 cohorts for meta-analysis)
+    gsutil -m cp \
+      ${rCNV_bucket}/analysis/analysis_refs/*.cohort_exclusion.bed.gz \
+      ./
+    zcat *.cohort_exclusion.bed.gz | sed 's/;/\t/g' \
+    | awk -v FS="\t" -v OFS="\t" '{ if (NF<=7) print $1, $2, $3 }' \
+    | fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n \
+    | bedtools merge -i - | bgzip -c > whitelist.bed.gz
 
     # Invert whitelist as explicit blacklist (pybedtools has some unusual shuffle behavior)
     gsutil -m cat ${rCNV_bucket}/refs/GRCh37.autosomes.genome \
@@ -131,7 +144,6 @@ task perm_prep {
     # Compress to single BED of max P per window
     for cnv in DEL DUP; do
       /opt/rCNV2/analysis/paper/scripts/large_segments/get_best_p_per_window.R \
-        --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
         meta_stats/matrices/${prefix}.$cnv.meta_phred_p.all_hpos.bed.gz \
         ${prefix}.best_meta_phred_p_per_window.$cnv.bed
       bgzip -f ${prefix}.best_meta_phred_p_per_window.$cnv.bed
@@ -139,7 +151,7 @@ task perm_prep {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:d6161740758077f03f799184022a4751324fe828db2ccfbbadb5d2197fb69893"
+    docker: "${rCNV_docker}"
     preemptible: 1
   }
 
@@ -163,6 +175,7 @@ task perm_shard {
   File dup_max_p_bed
   String perm_prefix
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -174,6 +187,7 @@ task perm_shard {
       ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
       ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
       ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
+      ${rCNV_bucket}/analysis/paper/data/misc/redin_bca_breakpoints.bed.gz \
       ${rCNV_bucket}/analysis/analysis_refs/test_phenotypes.list \
       refs/
     gsutil -m cp \
@@ -197,7 +211,7 @@ task perm_shard {
       --first-seed ${seed} \
       --outfile ${perm_prefix}.bed.gz \
       --bgzip \
-      <( zcat rCNV.final_segments.loci.bed.gz | cut -f1-5,19 )
+      <( zcat rCNV.final_segments.loci.bed.gz | cut -f1-5,20 )
 
     # Annotate with genes
     /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
@@ -239,6 +253,7 @@ task perm_shard {
       --mc-gds refs/lit_GDs.mc.bed.gz \
       --lc-gds refs/lit_GDs.lc.bed.gz \
       --nahr-cnvs clustered_nahr_regions.reformatted.bed.gz \
+      --bca-tsv refs/redin_bca_breakpoints.bed.gz \
       --meta-sumstats ${perm_prefix}.final_segments.loci.all_sumstats.tsv \
       --outfile ${perm_prefix}.master_segments.bed.gz \
       --gd-recip "10e-10" \
@@ -247,7 +262,7 @@ task perm_shard {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:cd1132eddf558c156999b20cbc65289e4bc175402205696874b8221dc947caf3"
+    docker: "${rCNV_docker}"
     preemptible: 1
   }
 
@@ -267,6 +282,7 @@ task perm_shard_litGDs {
   File dup_max_p_bed
   String perm_prefix
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -278,6 +294,7 @@ task perm_shard_litGDs {
       ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
       ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
       ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
+      ${rCNV_bucket}/analysis/paper/data/misc/redin_bca_breakpoints.bed.gz \
       ${rCNV_bucket}/analysis/analysis_refs/test_phenotypes.list \
       refs/
     gsutil -m cp \
@@ -364,6 +381,7 @@ task perm_shard_litGDs {
       --mc-gds ${perm_prefix}.MC.bed.gz \
       --lc-gds ${perm_prefix}.LC.bed.gz \
       --nahr-cnvs clustered_nahr_regions.reformatted.bed.gz \
+      --bca-tsv refs/redin_bca_breakpoints.bed.gz \
       --meta-sumstats ${perm_prefix}.permuted_gds.all_sumstats.tsv \
       --outfile ${perm_prefix}.master_segments.w_dummy.bed.gz \
       --gd-recip "10e-10" \
@@ -376,7 +394,7 @@ task perm_shard_litGDs {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:cd1132eddf558c156999b20cbc65289e4bc175402205696874b8221dc947caf3"
+    docker: "${rCNV_docker}"
     preemptible: 1
   }
 
@@ -391,6 +409,7 @@ task merge_perms {
   Array[File] perm_tables
   String perm_prefix
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -427,7 +446,7 @@ task merge_perms {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:cd1132eddf558c156999b20cbc65289e4bc175402205696874b8221dc947caf3"
+    docker: "${rCNV_docker}"
     preemptible: 1
     disks: "local-disk 200 SSD"
   }

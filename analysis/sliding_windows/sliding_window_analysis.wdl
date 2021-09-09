@@ -174,7 +174,7 @@ workflow sliding_window_analysis {
       FDR_cutoff=FDR_cutoff,
       gtf=gtf,
       rCNV_bucket=rCNV_bucket,
-      rCNV_docker=rCNV_docker
+      rCNV_docker=rCNV_docker_refine
   }
   call refine_regions as refine_DUP {
     input:
@@ -198,8 +198,8 @@ workflow sliding_window_analysis {
   # Merge refined associations & regions
   call merge_refined_regions {
     input:
-      assoc_beds=[refine_DEL_gw.associations, refine_DUP_gw.associations],
-      loci_beds=[refine_DEL_gw.loci, refine_DUP_gw.loci],
+      assoc_beds=[refine_DEL.associations, refine_DUP.associations],
+      loci_beds=[refine_DEL.loci, refine_DUP.loci],
       freq_code="rCNV",
       rCNV_bucket=rCNV_bucket,
       rCNV_docker=rCNV_docker_refine
@@ -209,8 +209,8 @@ workflow sliding_window_analysis {
   call plot_region_summary as plot_rCNV_regions {
     input:
       freq_code="rCNV",
-      DEL_regions=refine_DEL_gw.loci,
-      DUP_regions=refine_DUP_gw.loci,
+      DEL_regions=refine_DEL.loci,
+      DUP_regions=refine_DUP.loci,
       rCNV_bucket=rCNV_bucket,
       rCNV_docker=rCNV_docker_refine
   }
@@ -262,6 +262,13 @@ task build_exclusion_list {
       probeset_tracks.tsv \
       control_probesets/rCNV.control_counts_by_array.tsv \
       <( fgrep -v mega ${metacohort_list} )
+
+    # Copy to Google bucket for storage
+    gsutil -m cp \
+      ${binned_genome_prefix}.cohort_exclusion.bed.gz \
+      ${binned_genome_prefix}.probe_counts.bed.gz \
+      ${binned_genome_prefix}.frac_passing.bed.gz \
+      ${rCNV_bucket}/analysis/analysis_refs/
   >>>
 
   runtime {
@@ -669,32 +676,6 @@ task refine_regions {
       ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs*.bed.gz \
       refs/
 
-    # Apply an initial loose mask per HPO to P<0.01 regions ±sig_window_pad 
-    # to reduce I/O time reading sumstats files in refinement
-    # Also add all known GD regions for null variance estimation
-    while read prefix hpo; do
-      echo -e "Subsetting $prefix summary stats prior to refinement"
-      allstats="stats/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.bed.gz"
-      primary_p_idx=$( zcat $allstats | sed -n '1p' | sed 's/\t/\n/g' \
-                       | awk -v FS="\t" '{ if ($1=="meta_phred_p") print NR }' )
-      zcat $allstats \
-      | grep -ve '^#' \
-      | awk -v FS="\t" -v OFS="\t" -v idx=$primary_p_idx \
-        '{ if ($(idx) >= 2 && $(idx) != "NA") print $1, $2, $3 }' \
-      | cat - <( zcat /opt/rCNV2/refs/UKBB_GD.Owen_2018.bed.gz \
-                 | grep -ve '^#' | cut -f1-3 ) \
-      | sort -Vk1,1 -k2,2n -k3,3n \
-      | bedtools merge -i - \
-      | awk -v OFS="\t" -v dist=${sig_window_pad} \
-        '{ if ($2-dist < 1) print $1, "1", $3+dist; else print $1, $2-dist, $3+dist }' \
-      | bedtools intersect -wa -u -header \
-        -a $allstats \
-        -b - \
-      | bgzip -c \
-      > stats/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.subset.bed.gz
-      tabix -f stats/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.subset.bed.gz
-    done < ${phenotype_list}
-
     # Write tsv inputs
     while read prefix hpo; do
       for wrapper in 1; do
@@ -710,6 +691,31 @@ task refine_regions {
     > all_GDs.${CNV}.bed
     echo "all_GDs.${CNV}.bed" > known_causal_loci_lists.${CNV}.tsv
 
+    # Apply an initial loose mask per HPO to P<0.1 regions ±sig_window_pad
+    # to reduce I/O time reading sumstats files in refinement
+    # Also add all known GD regions for null variance estimation
+    while read prefix hpo; do
+      echo -e "Subsetting $prefix summary stats prior to refinement"
+      allstats="stats/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.bed.gz"
+      primary_p_idx=$( zcat $allstats | sed -n '1p' | sed 's/\t/\n/g' \
+                       | awk -v FS="\t" '{ if ($1=="meta_phred_p") print NR }' )
+      zcat $allstats \
+      | grep -ve '^#' \
+      | awk -v FS="\t" -v OFS="\t" -v idx=$primary_p_idx \
+        '{ if ($(idx) >= 1 && $(idx) != "NA") print $1, $2, $3 }' \
+      | cat - all_GDs.${CNV}.bed \
+      | sort -Vk1,1 -k2,2n -k3,3n \
+      | bedtools merge -i - \
+      | awk -v OFS="\t" -v dist=${sig_window_pad} \
+        '{ if ($2-dist < 1) print $1, "1", $3+dist; else print $1, $2-dist, $3+dist }' \
+      | bedtools intersect -wa -u -header \
+        -a $allstats \
+        -b - \
+      | bgzip -c \
+      > stats/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.subset.bed.gz
+      tabix -f stats/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.subset.bed.gz
+    done < ${phenotype_list}
+
     # Refine significant segments
     /opt/rCNV2/analysis/sliding_windows/refine_significant_regions.py \
       --cnv ${CNV} \
@@ -717,6 +723,7 @@ task refine_regions {
       --min-nominal ${meta_nominal_cohorts_cutoff} \
       --secondary-or-nominal \
       --fdr-q-cutoff ${FDR_cutoff} \
+      --secondary-for-fdr \
       --credible-sets ${credset} \
       --distance ${sig_window_pad} \
       --known-causal-loci-list known_causal_loci_lists.${CNV}.tsv \
@@ -725,7 +732,6 @@ task refine_regions {
       --sig-assoc-bed ${freq_code}.${CNV}.final_segments.associations.pregenes.bed \
       ${freq_code}.${CNV}.segment_refinement.stats_input.tsv \
       ${metacohort_sample_table}
-
 
     # Annotate final regions with genes & sort by coordinates
     for entity in loci associations; do

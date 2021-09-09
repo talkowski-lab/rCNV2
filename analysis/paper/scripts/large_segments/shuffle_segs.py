@@ -15,7 +15,7 @@ import pybedtools as pbt
 import argparse
 from os.path import splitext
 from sys import stdout
-from athena.utils import bgzip
+import subprocess
 
 
 def load_segs(segs_in):
@@ -156,7 +156,7 @@ def main():
 
     # Bgzip, if optioned
     if args.bgzip:
-        bgzip(outfile_path)
+        subprocess.run(['bgzip', '-f', outfile_path])
 
 
 if __name__ == '__main__':

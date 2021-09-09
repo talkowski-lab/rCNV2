@@ -2,7 +2,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019-2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -14,6 +14,7 @@ workflow get_matrices {
   Float fdr_target
   String rCNV_bucket
   String prefix
+  String rCNV_docker
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
 
@@ -23,7 +24,8 @@ workflow get_matrices {
       input:
         pheno=pheno[0],
         fdr_target=fdr_target,
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
   }
 
@@ -33,14 +35,16 @@ workflow get_matrices {
       fdr_vectors=get_fdrs_perPheno.del_fdrs,
       prefix=prefix,
       CNV="DEL",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
   call merge_matrices as merge_DUP {
     input:
       fdr_vectors=get_fdrs_perPheno.dup_fdrs,
       prefix=prefix,
       CNV="DUP",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
 
   output {}
@@ -52,6 +56,7 @@ task get_fdrs_perPheno {
   String pheno
   Float fdr_target
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -87,7 +92,7 @@ task get_fdrs_perPheno {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:c2898e554c146620b4e8bd5f763fb4169370d943b969289867c79a0e061da766"
+    docker: "${rCNV_docker}"
     preemptible: 1
     disks: "local-disk 200 SSD"
   }  
@@ -100,6 +105,7 @@ task merge_matrices {
   String prefix
   String CNV
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -120,7 +126,7 @@ task merge_matrices {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:c2898e554c146620b4e8bd5f763fb4169370d943b969289867c79a0e061da766"
+    docker: "${rCNV_docker}"
     preemptible: 1
     disks: "local-disk 50 SSD"
   }  

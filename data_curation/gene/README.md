@@ -154,6 +154,14 @@ We collected the following chromatin-based gene features:
 
 All chromatin data was based on the [Roadmap Epigenomics dataset](https://www.nature.com/articles/nature14248) using the expanded 18-state ChromHMM model on 98 tissues [as described here](https://egg2.wustl.edu/roadmap/web_portal/chr_state_learning.html).  
 
+#### Gene features: protein
+
+We collected the following gene features related to the protein encoded by each gene:  
+
+| Feature name | Abbreviation | Description | Source |  
+| :--- | :--- | :--- | :--- |  
+| Probability of loss-of-function intolerance | `gnomad_pLI` | Probability of loss-of-function intolerance calculated in gnomAD | Swissprot [Bairoch & Apweiler, _Nucleic Acids Research_, 2000)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC102476) |  
+
 #### Gene features: human genetic variation
 
 We collected the following gene features related to reported genetic variation in humans:  

@@ -18,7 +18,7 @@ gcloud auth login
 
 # Set global parameters
 export rCNV_bucket="gs://rcnv_project"
-export prefix="rCNV2_analysis_d1"
+export prefix="rCNV2_analysis_d2"
 export control_hpo="HEALTHY_CONTROL"
 
 
@@ -31,6 +31,7 @@ gsutil -m cp \
 mkdir phenos/
 gsutil -m cp \
   ${rCNV_bucket}/cleaned_data/phenotypes/filtered/mega.cleaned_phenos.txt \
+  ${rCNV_bucket}/cleaned_data/phenotypes/filtered/*.final_cooccurrence_table.tsv.gz \
   phenos/
 mkdir cnvs/
 gsutil -m cp \
@@ -40,7 +41,10 @@ gsutil -m cp \
 
 
 # Compute Jaccard similarity index for all pairs of phenotypes
+echo -e "EstBB\tphenos/EstBB.final_cooccurrence_table.tsv.gz" > precomp_pairs.tsv
+echo -e "BioVU\tphenos/BioVU.final_cooccurrence_table.tsv.gz" >> precomp_pairs.tsv
 /opt/rCNV2/analysis/paper/scripts/misc_setup/hpo_jaccard.py \
+  --hpo-pair-cohorts precomp_pairs.tsv \
   --jaccardfile ${prefix}.hpo_jaccard_matrix.tsv \
   --countsfile ${prefix}.hpo_sample_overlap_counts_matrix.tsv \
   --asymfile ${prefix}.hpo_sample_overlap_fraction_matrix.tsv \
@@ -49,6 +53,7 @@ gsutil -m cp \
 
 
 # Reorder HPO terms based on hierarchical clustering (for ordering in plots)
+# TODO: COULD CONSIDER ADDING DEV/ADULT TO THIS SPLIT
 /opt/rCNV2/analysis/paper/scripts/misc_setup/reorder_hpo_terms.py \
   --outfile ${prefix}.reordered_hpos.txt \
   refs/phenotype_groups.HPO_metadata.txt \
@@ -66,7 +71,6 @@ gsutil -m cp \
 
 # Plot summary figure of HPOs
 /opt/rCNV2/analysis/paper/plot/misc/plot_hpo_summary.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   ${prefix}.reordered_hpos.txt \
   refs/phenotype_groups.HPO_metadata.txt \
   refs/HPOs_by_metacohort.table.tsv \
@@ -95,7 +99,6 @@ awk -v OFS="\t" '{ print $0, "cnvs/"$1".rCNV.bed.gz" }' \
 # Plot panels for summary figure of CNV filtering pipeline
 /opt/rCNV2/analysis/paper/plot/misc/plot_cnv_filtering_summary.R \
   --control-hpo ${control_hpo} \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   raw_cnv.input.tsv \
   raw_cnv.stats.tsv \
   rCNV.input.tsv \

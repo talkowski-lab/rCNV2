@@ -572,6 +572,13 @@ task build_exclusion_list {
       probeset_tracks.tsv \
       control_probesets/rCNV.control_counts_by_array.tsv \
       <( fgrep -v mega ${metacohort_list} )
+
+    # Copy to Google bucket for storage
+    gsutil -m cp \
+      ${gtf_prefix}.cohort_exclusion.bed.gz \
+      ${gtf_prefix}.probe_counts.bed.gz \
+      ${gtf_prefix}.frac_passing.bed.gz \
+      ${rCNV_bucket}/analysis/analysis_refs/
   >>>
 
   runtime {
@@ -898,6 +905,7 @@ task finemap_genes {
         --min-nominal ${meta_nominal_cohorts_cutoff} \
         --secondary-or-nominal \
         --fdr-q-cutoff ${FDR_cutoff} \
+        --secondary-for-fdr \
         --regularization-alpha ${finemap_elnet_alpha} \
         --regularization-l1-l2-mix ${finemap_elnet_l1_l2_mix} \
         --distance ${finemap_cluster_distance} \

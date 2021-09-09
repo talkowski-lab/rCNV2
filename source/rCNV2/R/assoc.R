@@ -568,12 +568,21 @@ make.meta.lookup.table <- function(stats.merged, cohorts, model, empirical.conti
 #' Apply saddlepoint approximation to vector of Z-scores to generate adjusted P-values
 #'
 #' @param zscores numeric vector of Z-scores
+#' @param winsorize width of quantile intervals to Winsorize \[default: 1, i.e., no Winsorization\]
+#' @param winsorize.left.tail boolean indicator to apply Winsorization to left tail of distribution \[default: FALSE\]
 #' @param phred boolean indicator of whether to -log10-scale adjusted P-values
+#' @param min.p smallest P-value to report (P-values smaller than this will be rounded up) \[default: 1e-300\]
 #'
 #' @return numeric vector of adjusted P-values
 #'
 #' @export
-saddlepoint.adj <- function(zscores, phred=T){
+saddlepoint.adj <- function(zscores, winsorize=1, winsorize.left.tail=F, phred=T, min.p=1e-300){
+  zscores.orig <- zscores
+  winsor.bounds <- quantile(zscores, probs=c(1-winsorize, winsorize), na.rm=T)
+  if(winsorize.left.tail){
+    zscores[which(zscores < winsor.bounds[1])] <- winsor.bounds[1]
+  }
+  zscores[which(zscores > winsor.bounds[2])] <- winsor.bounds[2]
   mu.hat <- mean(zscores, na.rm=T)
   sd.hat <- sd(zscores, na.rm=T)
   cumuls <- gaussianCumulants(mu.hat, sd.hat)
@@ -582,7 +591,8 @@ saddlepoint.adj <- function(zscores, phred=T){
   saddle.pdf <- saddlepoint(x, 1, cumuls)$approx
   saddle.cdf <- cumsum(saddle.pdf * 0.01)
   calc.saddle.p <- function(z){if(!is.na(z)){1 - tail(saddle.cdf[which(x<z)], 1)}else{NA}}
-  new.pvals <- sapply(zscores, calc.saddle.p)
+  new.pvals <- sapply(zscores.orig, calc.saddle.p)
+  new.pvals[which(new.pvals < min.p)] <- min.p
   if(phred==T){
     return(-log10(new.pvals))
   }else{
@@ -600,6 +610,8 @@ saddlepoint.adj <- function(zscores, phred=T){
 #' @param model specify meta-analysis model to use (see `Details`)
 #' @param saddle boolean indicator of whether to apply saddlepoint approximation
 #' (see [saddlepoint.adj()]) \[default: TRUE\]
+#' @param winsorize Winzorization interval for saddlepoint adjustment
+#' (see [saddlepoint.adj()]) \[default: 1, i.e., no Winsorization\]
 #' @param calc.fdr boolean indicator to calculate B-H FDR q-value per locus \[default: TRUE\]
 #' @param secondary boolean indicator to also compute meta-analysis statistics
 #' after dropping most significant individual cohort \[default: TRUE\]
@@ -625,7 +637,7 @@ meta <- function(stats.merged, cohorts, model="fe", saddle=T, calc.fdr=T,
 
   # Adjust P-values using saddlepoint approximation of null distribution, if optioned
   if(saddle==T){
-    meta.res$meta_phred_p <- saddlepoint.adj(meta.res$meta_z)
+    meta.res$meta_phred_p <- saddlepoint.adj(meta.res$meta_z, winsorize=winsorize)
   }
 
   # Calculate B-H adjusted q-values, if optioned
@@ -642,7 +654,7 @@ meta <- function(stats.merged, cohorts, model="fe", saddle=T, calc.fdr=T,
 
     # Saddlepoint on secondary, if optioned
     if(saddle==T){
-      meta.res.secondary$meta_phred_p <- saddlepoint.adj(meta.res.secondary$meta_z)
+      meta.res.secondary$meta_phred_p <- saddlepoint.adj(meta.res.secondary$meta_z, winsorize=winsorize)
     }
 
     meta.res$meta_lnOR_secondary <- meta.res.secondary$meta_lnOR

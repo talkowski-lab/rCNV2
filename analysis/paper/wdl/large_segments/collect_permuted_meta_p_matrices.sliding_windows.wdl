@@ -2,7 +2,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019-2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -13,6 +13,7 @@ workflow get_matrices {
   File phenotype_list
   String rCNV_bucket
   String prefix
+  String rCNV_docker
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
 
@@ -21,7 +22,8 @@ workflow get_matrices {
     call get_pheno_matrices {
       input:
         pheno=pheno[0],
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
   }
 
@@ -31,14 +33,16 @@ workflow get_matrices {
       matrices=get_pheno_matrices.del_matrix,
       prefix=prefix,
       CNV="DEL",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
   call merge_matrices as merge_DUP {
     input:
       matrices=get_pheno_matrices.dup_matrix,
       prefix=prefix,
       CNV="DUP",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
 
   output {}
@@ -49,6 +53,7 @@ workflow get_matrices {
 task get_pheno_matrices {
   String pheno
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -89,7 +94,7 @@ task get_pheno_matrices {
   }
 
   runtime {
-    docker: "talkowski/rcnv@sha256:32208d4ae1e351b1d2bc57c06952abe8b1ebc16b5c0b19908a863970b7bc15a9"
+    docker: "${rCNV_docker}"
     preemptible: 1
     disks: "local-disk 200 SSD"
   }  
@@ -102,6 +107,7 @@ task merge_matrices {
   String prefix
   String CNV
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -125,7 +131,7 @@ task merge_matrices {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:32208d4ae1e351b1d2bc57c06952abe8b1ebc16b5c0b19908a863970b7bc15a9"
+    docker: "${rCNV_docker}"
     preemptible: 1
     disks: "local-disk 200 SSD"
   }  

@@ -18,7 +18,7 @@ gcloud auth login
 
 # Set global parameters
 export rCNV_bucket="gs://rcnv_project"
-export prefix="rCNV2_analysis_d1"
+export prefix="rCNV2_analysis_d2"
 
 
 # Localize all analysis refs, sliding window meta-analysis stats, and large segment results
@@ -30,6 +30,8 @@ gsutil -m cp \
   ${rCNV_bucket}/refs/GRCh37.autosomes.genome \
   ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
   ${rCNV_bucket}/analysis/paper/data/misc/*_dnm_counts*tsv.gz \
+  ${rCNV_bucket}/analysis/paper/data/misc/*.gw_sig.genes.list \
+  ${rCNV_bucket}/analysis/paper/data/misc/redin_bca_breakpoints.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/misc/gene_mutation_rates.tsv.gz \
   ${rCNV_bucket}/cleaned_data/genes/annotations/gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
   refs/
@@ -51,7 +53,7 @@ gsutil -m cp -r \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists \
   ./
 gsutil -m cp \
-  ${rCNV_bucket}/analysis/paper/data/hpo/rCNV2_analysis_d1.hpo_jaccard_matrix.tsv \
+  ${rCNV_bucket}/analysis/paper/data/hpo/rCNV2_analysis_d2.hpo_jaccard_matrix.tsv \
   ./
 
 
@@ -130,9 +132,9 @@ while read nocolon hpo; do
 done < refs/test_phenotypes.list \
 > hpo_genelists.tsv
 cat << EOF > dnm_counts_to_annotate.tsv
-ASC${TAB}refs/asc_dnm_counts.tsv.gz
-ASC_unaffected${TAB}refs/asc_dnm_counts.unaffecteds.tsv.gz
-DDD${TAB}refs/ddd_dnm_counts.tsv.gz
+ASC${TAB}refs/asc_dnm_counts.tsv.gz${TAB}refs/ASC_2020.gw_sig.genes.list
+ASC_unaffected${TAB}refs/asc_dnm_counts.unaffecteds.tsv.gz${TAB}refs/ASC_2020.gw_sig.genes.list
+DDD${TAB}refs/ddd_dnm_counts.tsv.gz${TAB}refs/DDD_2020.gw_sig.genes.list
 EOF
 cat \
   <( zcat ${prefix}.final_segments.loci.all_sumstats.tsv.gz ) \
@@ -148,24 +150,28 @@ cat \
   --common-dels combined_common_cnvs.DEL.$af_suffix.bed.gz \
   --common-dups combined_common_cnvs.DUP.$af_suffix.bed.gz \
   --common-cnv-cov 0.5 \
-  --hpo-jaccard-matrix rCNV2_analysis_d1.hpo_jaccard_matrix.tsv \
+  --hpo-jaccard-matrix rCNV2_analysis_d2.hpo_jaccard_matrix.tsv \
   --min-jaccard-sum 1.0 \
   --genelists genelists_to_annotate.tsv \
   --hpo-genelists hpo_genelists.tsv \
   --dnm-tsvs dnm_counts_to_annotate.tsv \
   --snv-mus refs/gene_mutation_rates.tsv.gz \
+  --bca-tsv refs/redin_bca_breakpoints.bed.gz \
   --gtex-matrix refs/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
   --meta-sumstats pooled_sumstats.tsv \
   --neuro-hpos refs/neuro_hpos.list \
+  --dev-hpos refs/rCNV2.hpos_by_severity.developmental.list \
   --gd-recip "10e-10" \
   --nahr-recip 0.25 \
   --bgzip
-# Polish NAHR labels following manual review (note: requires refs/${prefix}.correct_NAHR_labels.tsv)
-/opt/rCNV2/analysis/paper/scripts/large_segments/polish_nahr_labels.R \
-  ${prefix}.master_segments.pre_nahr_polishing.bed.gz \
-  refs/${prefix}.correct_nahr_labels.tsv \
-  ${prefix}.master_segments.bed
-bgzip -f ${prefix}.master_segments.bed
+# TODO: UPDATE THIS
+# # Polish NAHR labels following manual review (note: requires refs/${prefix}.correct_NAHR_labels.tsv)
+# /opt/rCNV2/analysis/paper/scripts/large_segments/polish_nahr_labels.R \
+#   ${prefix}.master_segments.pre_nahr_polishing.bed.gz \
+#   refs/${prefix}.correct_nahr_labels.tsv \
+#   ${prefix}.master_segments.bed
+# bgzip -f ${prefix}.master_segments.bed
+mv ${prefix}.master_segments.pre_nahr_polishing.bed.gz ${prefix}.master_segments.bed.gz
 gsutil -m cp \
   ${prefix}.master_segments.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/
@@ -177,20 +183,18 @@ if [ -e basic_distribs ]; then
 fi
 mkdir basic_distribs
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_basic_segment_distribs.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   --gw-sig $del_cutoff \
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   basic_distribs/${prefix}
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_seg_attributes_vs_ngenes.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   basic_distribs/${prefix}
 # Get range of effect sizes across all g-w sig associations
 zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f10 | sort -nk1,1 | head -n1
-zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f10 | sort -nk1,1 | tail -n1
-zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f10 \
+zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f11 | sort -nk1,1 | tail -n1
+zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f11 \
 | awk '{ sum+=$1 }END{ print sum/NR }'
 
 
@@ -198,7 +202,7 @@ zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f10 \
 # Note: in practice, this is parallelized in the cloud using segment_permutation.wdl
 # The code to execute these permutation tests is contained elsewhere
 # Copy results of segment permutation tests (note: requires permissions)
-n_seg_perms=100000
+n_seg_perms=10000
 gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/permutations/${prefix}*${n_seg_perms}_permuted_segments.bed.gz \
   ./
@@ -212,7 +216,6 @@ if [ -e perm_test_plots ]; then
 fi
 mkdir perm_test_plots
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_segment_permutations.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   --constrained-genes gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
@@ -226,7 +229,7 @@ mkdir perm_test_plots
 # Note: in practice, this is parallelized in the cloud using segment_permutation_bygene.wdl
 # The code to execute these permutation tests is contained elsewhere
 # Copy results of segment permutation tests (note: requires permissions)
-n_seg_perms=100000
+n_seg_perms=10000
 gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/permutations/${prefix}*${n_seg_perms}_permuted_segments_bygene.tsv.gz \
   ./
@@ -239,7 +242,6 @@ if ! [ -e perm_test_plots ]; then
   mkdir perm_test_plots
 fi
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_segment_bygene_perms.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   ${prefix}.${n_seg_perms}_permuted_segments_bygene.tsv.gz \
@@ -254,7 +256,6 @@ if [ -e effect_size_plots ]; then
 fi
 mkdir effect_size_plots
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_effect_sizes.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   effect_size_plots/${prefix}
@@ -266,7 +267,6 @@ if [ -e pleiotropy_plots ]; then
 fi
 mkdir pleiotropy_plots
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_pleiotropy.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   pleiotropy_plots/${prefix}
@@ -278,7 +278,6 @@ if [ -e nahr_vs_nonrecurrent ]; then
 fi
 mkdir nahr_vs_nonrecurrent
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_seg_mechanism_comparisons.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   nahr_vs_nonrecurrent/${prefix}
@@ -290,7 +289,6 @@ if [ -e dnm_distributions ]; then
 fi
 mkdir dnm_distributions
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_oligogenicity_index_comparisons.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   refs/ddd_dnm_counts.tsv.gz \
@@ -306,7 +304,6 @@ if [ -e assoc_stat_plots ]; then
 fi
 mkdir assoc_stat_plots
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_example_miami.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   --del-cutoff ${del_cutoff} \
   --dup-cutoff ${dup_cutoff} \
   --xaxis-label "200kb sliding windows in 10kb steps" \
@@ -323,14 +320,14 @@ if ! [ -e meta_stats/perm_res ]; then
   mkdir meta_stats/perm_res
 fi
 # Gather all permutation P-values 
-# (Note: in practice, this has been parallelized in FireCloud with collect_permuted_meta_p_matrices.wdl )
+# (Note: in practice, this has been parallelized in FireCloud with collect_permuted_fdrs.sliding_windows.wdl)
+# (Note 2: this is a _different_ WDL than collect_permuted_meta_p_matrices.sliding_windows.wdl)
 gsutil -m cp \
-  ${rCNV_bucket}/analysis/sliding_windows/permuted_pvalue_matrices/*tsv.gz \
+  ${rCNV_bucket}/analysis/sliding_windows/permuted_pvalue_matrices/*.permuted_fdrs.tsv.gz \
   meta_stats/perm_res/
 # Make plots of permuted P-values vs empirical FDR target
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_permuted_fdr.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
-  --fdr-target 0.000003715428 \
+  --fdr-target "${del_cutoff}" \
   meta_stats/perm_res/${prefix}.rCNV.DEL.sliding_window.meta_analysis.stats.permuted_fdrs.tsv.gz \
   meta_stats/perm_res/${prefix}.rCNV.DUP.sliding_window.meta_analysis.stats.permuted_fdrs.tsv.gz \
   refs/HPOs_by_metacohort.table.tsv \
@@ -377,7 +374,6 @@ for cnv in DEL DUP; do
 done
 # Generate plots
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_sliding_window_pval_distribs.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   --del-cutoff ${del_cutoff} \
   --dup-cutoff ${dup_cutoff} \
   --del-nomsig-bed ./nomsig_windows.DEL.bed \
@@ -410,44 +406,59 @@ while read nocolon hpo; do
   echo $nocolon
   for cnv in DEL DUP; do
     echo $cnv
-    primary_cutoff=$( fgrep -v "#" refs/sliding_window.rCNV.$cnv.empirical_genome_wide_pval.hpo_cutoffs.tsv \
-                      | head -n1 | cut -f2 )
+    case $cnv in
+      DEL)
+        primary_cutoff=$del_cutoff
+        ;;
+      DUP)
+        primary_cutoff=$dup_cutoff
+        ;;
+      esac
     /opt/rCNV2/analysis/paper/scripts/large_segments/get_sig_windows.R \
       --primary-p-cutoff $primary_cutoff \
       --secondary-p-cutoff 0.05 \
       --min-nominal 2 \
       --secondary-or-nominal \
+      --fdr-q-cutoff 0.05 \
       meta_stats/$nocolon.rCNV.$cnv.sliding_window.meta_analysis.stats.bed.gz \
       meta_stats/sigbins/$nocolon.$cnv.sig_windows.bed
-    fgrep -v "#" meta_stats/sigbins/$nocolon.$cnv.sig_windows.bed \
-    | sort -Vk1,1 -k2,2n -k3,3n \
-    | bedtools merge -d 1000000 -i - \
-    | bgzip -c \
-    > meta_stats/sigbins/$nocolon.$cnv.sig_windows.merged.bed.gz
+    # fgrep -v "#" meta_stats/sigbins/$nocolon.$cnv.sig_windows.bed \
+    # | sort -Vk1,1 -k2,2n -k3,3n \
+    # | bedtools merge -d 1000000 -i - \
+    # | bgzip -c \
+    # > meta_stats/sigbins/$nocolon.$cnv.sig_windows.merged.bed.gz
   done
 done < refs/test_phenotypes.list
-# Match final significant refined associations with their original significant windows
-while read nocolon hpo; do
-  for cnv in DEL DUP; do
-    zcat rCNV.final_segments.associations.bed.gz \
-    | fgrep -w $hpo \
-    | fgrep -w $cnv \
-    | cut -f1-4 \
-    | bedtools intersect -wa -wb -a - \
-      -b meta_stats/sigbins/$nocolon.$cnv.sig_windows.merged.bed.gz \
-    | awk -v FS="\t" -v OFS="\t" -v hpo=$hpo -v cnv=$cnv \
-      '{ print $4, cnv, hpo, $7-$6, $3-$2 }'
-  done
-done < refs/test_phenotypes.list \
-| sort -Vk1,1 -k2,2n -k3,3n -k4,4V -k5,5V \
-| cat <( echo -e "region_id\tcnv\thpo\toriginal_size\trefined_size" ) - \
-| gzip -c \
-> ${prefix}.associations.old_vs_new_size.tsv.gz
-# Scatterplot of original segment size (total sig bp) & finemapped size
-/opt/rCNV2/analysis/paper/plot/large_segments/plot_orig_vs_refined_assoc_sizes.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
-  ${prefix}.associations.old_vs_new_size.tsv.gz \
-  assoc_stat_plots/${prefix}
+# Cluster all significant windows to determine maximal segment size
+for cnv in DEL DUP; do
+  cat meta_stats/sigbins/*.$cnv.sig_windows.bed \
+  | sort -Vk1,1 -k2,2n -k3,3n \
+  | bedtools merge -d 200000 -i - \
+  | bgzip -c \
+  > meta_stats/sigbins/all_HPOs.$cnv.sig_windows.merged.bed.gz
+done
+# Match final significant refined segments with their original significant windows
+# TODO: UPDATE THIS TO MATCH ONE SEGMENT TO ONE ORIGINAL CANDIDATE REGION
+# while read nocolon hpo; do
+#   for cnv in DEL DUP; do
+#     zcat rCNV.final_segments.associations.bed.gz \
+#     | fgrep -w $hpo \
+#     | fgrep -w $cnv \
+#     | cut -f1-4 \
+#     | bedtools intersect -wa -wb -a - \
+#       -b meta_stats/sigbins/$nocolon.$cnv.sig_windows.merged.bed.gz \
+#     | awk -v FS="\t" -v OFS="\t" -v hpo=$hpo -v cnv=$cnv \
+#       '{ print $4, cnv, hpo, $7-$6, $3-$2 }'
+#   done
+# done < refs/test_phenotypes.list \
+# | sort -Vk1,1 -k2,2n -k3,3n -k4,4V -k5,5V \
+# | cat <( echo -e "region_id\tcnv\thpo\toriginal_size\trefined_size" ) - \
+# | gzip -c \
+# > ${prefix}.associations.old_vs_new_size.tsv.gz
+# # Scatterplot of original segment size (total sig bp) & finemapped size
+# /opt/rCNV2/analysis/paper/plot/large_segments/plot_orig_vs_refined_assoc_sizes.R \
+#   ${prefix}.associations.old_vs_new_size.tsv.gz \
+#   assoc_stat_plots/${prefix}
 
 
 # Plot master grid summarizing segment association across all phenotypes

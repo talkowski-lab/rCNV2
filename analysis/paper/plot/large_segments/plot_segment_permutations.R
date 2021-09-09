@@ -17,22 +17,13 @@ options(stringsAsFactors=F, scipen=1000)
 ######################
 ### DATA FUNCTIONS ###
 ######################
-# Load gene list
-load.genelist <- function(path){
-  if(!is.null(path)){
-    as.character(read.table(path, header=F)[, 1])
-  }else{
-    NULL
-  }
-}
-
 # Load & parse permutation results
 load.perms <- function(perm.res.in, subset_to_regions=NULL, constrained.genes=NULL){
   # Read full permutation table
   perms <- read.table(perm.res.in, header=T, sep="\t", check.names=F, comment.char="")
   perms$perm_idx <- as.numeric(perms$perm_idx)
   perm.range <- sort(unique(perms$perm_idx))
-  
+
   # Post hoc annotation of constrained genes, if optioned
   if(!is.null(constrained.genes)){
     perms$n_gnomAD_constrained_genes <- as.numeric(sapply(perms$genes, function(gstr){
@@ -50,7 +41,7 @@ load.perms <- function(perm.res.in, subset_to_regions=NULL, constrained.genes=NU
   if(!is.null(subset_to_regions)){
     perms <- perms[which(perms$region_id %in% subset_to_regions), ]
   }
-  
+
   # Split each permutation into a list of dfs (one per perm)
   lapply(perm.range, function(i){
     as.data.frame(perms[which(perms$perm_idx==i), -(which(colnames(perms)=="perm_idx"))])
@@ -62,22 +53,22 @@ load.perms <- function(perm.res.in, subset_to_regions=NULL, constrained.genes=NU
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Plot scaled Venn diagram of GW-sig and literature-curated segs
-cnv.venn <- function(segs, cnv, perms=NULL, margin=0.05){
+cnv.venn <- function(segs, cnv, sig.labels, perms=NULL, margin=0.05){
   # Get plot values
-  gw.idx <- which(segs$gw_sig & segs$cnv==cnv)
+  gw.idx <- which(sig.labels & segs$cnv==cnv)
   n.gw <- length(gw.idx)
   lit.idx <- which(segs$any_gd & segs$cnv==cnv)
   n.lit <- length(lit.idx)
   both.idx <- intersect(gw.idx, lit.idx)
   n.both <- length(both.idx)
-  
+
   # Set colors
   colors <- c(control.cnv.colors[which(names(cnv.colors)==cnv)],
               cnv.colors[which(names(cnv.colors)==cnv)])
 
   # # Calculate permuted P-value of overlap if permutation results are provided
   # if(!is.null(perms)){
-  #   perm.dat <- perm.summary(perms, feature="any_gd", measure="sum", 
+  #   perm.dat <- perm.summary(perms, feature="any_gd", measure="sum",
   #                            subset_to_regions=segs$region_id[gw.idx])
   #   perm.p <- length(which(perm.dat[, 1] >= n.both)) / nrow(perm.dat)
   #   if(perm.p == 0){
@@ -88,7 +79,7 @@ cnv.venn <- function(segs, cnv, perms=NULL, margin=0.05){
   # }else{
   #   p.fmt <- NULL
   # }
-  # 
+  #
   # # Set axis label dimensions
   # if(cnv == "DEL"){
   #   lab.side <- 1
@@ -97,13 +88,13 @@ cnv.venn <- function(segs, cnv, perms=NULL, margin=0.05){
   #   lab.side <- 3
   #   lab.line <- -0.3
   # }
-  
+
   # Prep plot area
   par(mar=rep(0.1, 4), bty="n")
   plot(NA, xlim=c(0, 1), ylim=c(0, 1), asp=1,
-       xaxs="i", xaxt="n", xlab="", 
+       xaxs="i", xaxt="n", xlab="",
        yaxs="i", yaxt="n", ylab="")
-  draw.pairwise.venn(n.lit, n.gw, n.both, 
+  draw.pairwise.venn(n.lit, n.gw, n.both,
                      col=colors, rotation.degree=180,
                      fill=sapply(colors, adjustcolor, alpha=0.5),
                      add=T, fontfamily="sans", margin=margin)
@@ -117,13 +108,12 @@ cnv.venn <- function(segs, cnv, perms=NULL, margin=0.05){
 ### RSCRIPT BLOCK ###
 #####################
 require(optparse, quietly=T)
-require(funr, quietly=T)
 require(MASS, quietly=T)
 require(VennDiagram, quietly=T)
+require(rCNV2, quietly=T)
 
 # List of command-line options
 option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced."),
   make_option(c("--constrained-genes"), help="List of constrained genes to be annotated.")
 )
 
@@ -145,28 +135,16 @@ perm.res.in <- args$args[3]
 lit.perm.res.in <- args$args[4]
 outdir <- args$args[5]
 prefix <- args$args[6]
-rcnv.config <- opts$`rcnv-config`
 constrained.in <- opts$`constrained-genes`
 
 # # DEV PARAMETERS
 # loci.in <- "~/scratch/rCNV.final_segments.loci.bed.gz"
-# segs.in <- "~/scratch/rCNV2_analysis_d1.master_segments.bed.gz"
-# perm.res.in <- "~/scratch/rCNV2_analysis_d1.10000_permuted_segments.bed.gz"
-# lit.perm.res.in <- "~/scratch/rCNV2_analysis_d1.lit_GDs.10000_permuted_segments.bed.gz"
+# segs.in <- "~/scratch/rCNV2_analysis_d2.master_segments.bed.gz"
+# perm.res.in <- "~/scratch/rCNV2_analysis_d2.10000_permuted_segments.bed.gz"
+# lit.perm.res.in <- "~/scratch/rCNV2_analysis_d2.lit_GDs.10000_permuted_segments.bed.gz"
 # outdir <- "~/scratch/"
 # prefix <- "test_seg_perm_res"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
 # constrained.in <- "~/scratch/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list"
-# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
-
-# Source common functions
-script.dir <- funr::get_script_path()
-source(paste(script.dir, "common_functions.R", sep="/"))
 
 # Load loci & segment table
 loci <- load.loci(loci.in)
@@ -176,52 +154,99 @@ segs.all <- load.segment.table(segs.in)
 segs <- segs.all[which(segs.all$nom_sig), ]
 nomsig.ids <- segs$region_id
 
-# Split seg IDs by gw-sig vs GD (but not gw-sig)
+# Split seg IDs by gw-sig vs FDR vs. lit GD
+sig.ids <- segs$region_id[which(segs$any_sig)]
 gw.ids <- segs$region_id[which(segs$gw_sig)]
-lit.ids <- segs$region_id[which(segs$any_gd & !segs$gw_sig)]
-all.lit.ids <- segs.all$region_id[which(segs.all$any_gd & !segs.all$gw_sig)]
+fdr.ids <- segs$region_id[which(segs$fdr_sig)]
+lit.ids <- segs$region_id[which(segs$any_gd & !segs$any_sig)]
+all.lit.ids <- segs.all$region_id[which(segs.all$any_gd & !segs.all$any_sig)]
+
+# Get list of developmental loci (sig + lit GDs)
+dev.seg.ids <- get.developmental.region_ids(loci, segs)
+dev.segs <- segs[which(segs$region_id %in% dev.seg.ids), ]
+
+# Get list of NDD loci (sig + lit GDs)
+NDD.seg.ids <- get.ndd.region_ids(loci, segs)
+NDD.segs <- segs[which(segs$region_id %in% NDD.seg.ids), ]
 
 # Merge loci & segment data for genome-wide significant sites only
-gw <- merge.loci.segs(loci, segs)
+segs.sig <- merge.loci.segs(loci, segs)
 
 # Load permutation results
 constrained.genes <- load.genelist(constrained.in)
-perms <- load.perms(perm.res.in, subset_to_regions=nomsig.ids, 
+perms <- load.perms(perm.res.in, subset_to_regions=nomsig.ids,
                     constrained.genes=constrained.genes)
 lit.perms <- load.perms(lit.perm.res.in, subset_to_regions=nomsig.ids,
                         constrained.genes=constrained.genes)
 
+
 # Plot single panel of overlap with known genomic disorders
 print("Overlap with known genomic disorders:")
-pdf(paste(outdir, "/", prefix, ".gd_overlap.pdf", sep=""),
+print("All GW + FDR loci:")
+pdf(paste(outdir, "/", prefix, ".gd_overlap.all_sig.pdf", sep=""),
     height=2.2, width=2.5)
-plot.seg.perms(segs, perms, feature="any_gd", 
+plot.seg.perms(segs, perms, feature="any_gd",
+               subset_to_regions=sig.ids,
+               measure="sum", n.bins=100,
+               x.title="Known Genomic Disorders",
+               diamond.pch=22,
+               parmar=c(2.2, 2, 0, 2.0))
+dev.off()
+print("GW loci only:")
+pdf(paste(outdir, "/", prefix, ".gd_overlap.gw_only.pdf", sep=""),
+    height=2.2, width=2.5)
+plot.seg.perms(segs, perms, feature="any_gd",
                subset_to_regions=gw.ids,
                measure="sum", n.bins=100,
                x.title="Known Genomic Disorders",
                diamond.pch=22,
                parmar=c(2.2, 2, 0, 2.0))
 dev.off()
+print("FDR loci only:")
+pdf(paste(outdir, "/", prefix, ".gd_overlap.FDR_only.pdf", sep=""),
+    height=2.2, width=2.5)
+plot.seg.perms(segs, perms, feature="any_gd",
+               subset_to_regions=fdr.ids,
+               measure="sum", n.bins=100,
+               x.title="Known Genomic Disorders",
+               diamond.pch=22,
+               parmar=c(2.2, 2, 0, 2.0))
+dev.off()
 
-# Venn diagrams of overlap between gw-sig and lit GDs
+
+# Venn diagrams of overlap between discovery and lit GDs
+sapply(c("DEL", "DUP"), function(cnv){
+  pdf(paste(outdir, "/", prefix, ".all_sig_vs_lit.", cnv, ".venn.pdf", sep=""),
+      height=1, width=1)
+  cnv.venn(segs, cnv, segs$any_sig, perms, margin=0.025)
+  dev.off()
+})
 sapply(c("DEL", "DUP"), function(cnv){
   pdf(paste(outdir, "/", prefix, ".gw_vs_lit.", cnv, ".venn.pdf", sep=""),
       height=1, width=1)
-  cnv.venn(segs[which(segs$gw_sig | segs$any_gd), ], cnv, perms, margin=0.025)
+  cnv.venn(segs, cnv, segs$gw_sig, perms, margin=0.025)
+  dev.off()
+})
+sapply(c("DEL", "DUP"), function(cnv){
+  pdf(paste(outdir, "/", prefix, ".FDR_vs_lit.", cnv, ".venn.pdf", sep=""),
+      height=1, width=1)
+  cnv.venn(segs, cnv, segs$fdr_sig, perms, margin=0.025)
   dev.off()
 })
 
+
 # Plot number of genes
 print("Mean number of genes per segment:")
-plot.all.perm.res(segs, perms, lit.perms, 
+plot.all.perm.res(segs, perms, lit.perms,
                   feature="n_genes", measure="mean",
                   outdir, prefix, norm=F, norm.multi=F,
                   n.bins.single=30, n.bins.multi=50,
-                  x.title="Mean Genes per Segment", 
+                  x.title="Mean Genes per Segment",
                   pdf.dims.single=c(2.2, 2.4),
                   parmar.single=c(2.25, 2, 0, 2.2),
                   pdf.dims.multi=c(4, 3.5),
                   parmar.multi=c(2.25, 6.05, 0, 2.2))
+
 
 # Plot number of constrained genes
 if(!is.null(constrained.in)){
@@ -230,20 +255,85 @@ if(!is.null(constrained.in)){
                     feature="n_gnomAD_constrained_genes", measure="frac.any",
                     outdir, prefix, norm=F, norm.multi=F,
                     n.bins.single=15, n.bins.multi=30,
-                    xmax=100, x.title="Pct. w/Constrained Gene",
+                    x.title="Pct. w/Constrained Gene",
                     pdf.dims.single=c(2.2, 2.4),
                     parmar.single=c(2.25, 2, 0, 3),
                     pdf.dims.multi=c(4, 3.5),
                     parmar.multi=c(2.25, 6.05, 0, 3.25))
-  
+  print("Fraction of DEVELOPMENTAL segments with at least one constrained gene:")
+  plot.all.perm.res(segs, perms, lit.perms, subset_to_regions=dev.seg.ids,
+                    feature="n_gnomAD_constrained_genes", measure="frac.any",
+                    outdir, paste(prefix, "dev_only", sep="."), norm=F, norm.multi=F,
+                    n.bins.single=15, n.bins.multi=30,
+                    x.title="Pct. w/Constrained Gene",
+                    pdf.dims.single=c(2.2, 2.4),
+                    parmar.single=c(2.25, 2, 0, 3),
+                    pdf.dims.multi=c(4, 3.5),
+                    parmar.multi=c(2.25, 6.05, 0, 3.25))
+  print("Fraction of NDD segments with at least one constrained gene:")
+  plot.all.perm.res(segs, perms, lit.perms, subset_to_regions=NDD.seg.ids,
+                    feature="n_gnomAD_constrained_genes", measure="frac.any",
+                    outdir, paste(prefix, "NDD_only", sep="."), norm=F, norm.multi=F,
+                    n.bins.single=15, n.bins.multi=30,
+                    x.title="Pct. w/Constrained Gene",
+                    pdf.dims.single=c(2.2, 2.4),
+                    parmar.single=c(2.25, 2, 0, 3),
+                    pdf.dims.multi=c(4, 3.5),
+                    parmar.multi=c(2.25, 6.05, 0, 3.25))
 }
+
+
+# Plot number of BCA breakpoints
+print("Mean number of BCA breakpoints per segment:")
+plot.all.perm.res(segs, perms, lit.perms,
+                  feature="Redin_BCAs", measure="mean",
+                  outdir, prefix, norm=F, norm.multi=F,
+                  n.bins.single=30, n.bins.multi=50,
+                  x.title="Mean BCAs per Segment",
+                  pdf.dims.single=c(2.2, 2.4),
+                  parmar.single=c(2.25, 2, 0, 2.2),
+                  pdf.dims.multi=c(4, 3.5),
+                  parmar.multi=c(2.25, 6.05, 0, 2.2))
+print("Mean number of BCA breakpoints per DEVELOPMENTAL segment:")
+plot.all.perm.res(segs, perms, lit.perms, subset_to_regions=dev.seg.ids,
+                  feature="Redin_BCAs", measure="mean",
+                  outdir, paste(prefix, "dev_only", sep="."),
+                  norm=F, norm.multi=F,
+                  n.bins.single=30, n.bins.multi=50,
+                  x.title="Mean BCAs per Segment",
+                  pdf.dims.single=c(2.2, 2.4),
+                  parmar.single=c(2.25, 2, 0, 2.2),
+                  pdf.dims.multi=c(4, 3.5),
+                  parmar.multi=c(2.25, 6.05, 0, 2.2))
+print("Fraction of segments with at least one BCA:")
+plot.all.perm.res(segs, perms, lit.perms,
+                  feature="Redin_BCAs", measure="frac.any",
+                  outdir, prefix, norm=F, norm.multi=F,
+                  n.bins.single=30, n.bins.multi=50,
+                  x.title="Pct. w/BCA",
+                  pdf.dims.single=c(2.2, 2.4),
+                  parmar.single=c(2.25, 2, 0, 2.2),
+                  pdf.dims.multi=c(4, 3.5),
+                  parmar.multi=c(2.25, 6.05, 0, 2.2))
+print("Fraction of DEVELOPMENTAL segments with at least one BCA:")
+plot.all.perm.res(segs, perms, lit.perms, subset_to_regions=dev.seg.ids,
+                  feature="Redin_BCAs", measure="frac.any",
+                  outdir, paste(prefix, "dev_only", sep="."),
+                  norm=F, norm.multi=F,
+                  n.bins.single=30, n.bins.multi=50,
+                  x.title="Pct. w/BCA",
+                  pdf.dims.single=c(2.2, 2.4),
+                  parmar.single=c(2.25, 2, 0, 2.2),
+                  pdf.dims.multi=c(4, 3.5),
+                  parmar.multi=c(2.25, 6.05, 0, 2.2))
+
 
 # Plot single panel of enrichment for top P-values for non-significant GDs
 print("Enrichment for top P-values among non-sig lit GDs:")
 pdf(paste(outdir, "/", prefix, ".meta_best_p.nonsig_lit_gds.pdf", sep=""),
     height=2.3, width=2.3)
-plot.seg.perms(segs.all[which(segs$region_id %in% all.lit.ids), ], 
-               lit.perms, feature="meta_best_p", 
+plot.seg.perms(segs.all[which(segs$region_id %in% all.lit.ids), ],
+               lit.perms, feature="meta_best_p",
                subset_to_regions=all.lit.ids,
                measure="mean", n.bins=30, min.bins=10,
                x.title=bquote("Best" ~ -log[10](italic(P))),
