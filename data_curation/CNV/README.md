@@ -10,34 +10,36 @@ In practice, the commands in `filter_CNV_data.sh` were parallelized in [FireClou
 
 We aggregated CNV data from multiple sources, listed alphabetically below:  
 
-| Dataset | Citation | PMID | Platform(s) | Build | Phenos | N Cases | N Ctrls |
+| Cohort | Citation | PMID | Platform(s) | Build | Phenos | N Cases | N Ctrls |
 | --- | :--- | :--- | :--- | :--- | :--- | ---: | ---: |
-| BCH | [Talkowski _et al._, _Cell_ (2012)](https://www.sciencedirect.com/science/article/pii/S0092867412004114) | [22521361](https://www.ncbi.nlm.nih.gov/pubmed/22521361) | aCGH | hg18 | Mixed | 3,591 | 0 |  
-| BioVU | [Roden _et al._, _Clin. Pharmacol. Ther._ (2008)](https://pubmed.ncbi.nlm.nih.gov/18500243/) | [18500243](https://pubmed.ncbi.nlm.nih.gov/18500243/) | Illumina MEGAEx (100%) | hg19 | Mixed | 32,306<sup>1</sup> | 14,661<sup>1</sup> |  
-| CHOP | - | - | Mixed Illumina SNP genotyping platforms | hg19 | Mixed | 153,870<sup>1</sup> | 24,161<sup>1</sup> |
-| Coe | [Coe _et al._, _Nat. Genet._ (2014)](https://www.nature.com/articles/ng.3092) | [25217958](https://www.ncbi.nlm.nih.gov/pubmed/25217958) | Cases: SignatureChip OS v2.0 (58%), SignatureChip OS v1.0 (34%), Other (8%); Controls: Affy 6.0 (100%) | hg19 | Developmental disorders | 29,083 | 11,256 |
-| Cooper<sup>2</sup> | [Cooper _et al._, _Nat. Genet._ (2011)](https://www.nature.com/articles/ng.909) | [21841781](https://www.ncbi.nlm.nih.gov/pubmed/21841781) | Ill. 550k-610k (75%), Custom 1.2M (25%) | hg19 | Developmental disorders | 0<sup>2</sup> | 8,329 |
-| Epi25k | [Niestroj _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/10.1101/651299v1) | - | Illumina GSA-MD v1.0 (100%) | hg19 | Epilepsy | 12,053<sup>1</sup> | 8,173<sup>1</sup> |  
-| EstBB | [Leitsalu _et al._, _Int. J. Epidemiol._ (2014)](https://academic.oup.com/ije/article/44/4/1137/666872) | [24518929](https://pubmed.ncbi.nlm.nih.gov/24518929/) | Illumina GSA (100%) | hg19 | Mixed | 63,183<sup>1</sup> | 15,659<sup>1</sup> |  
-| GDX | - | - | Affy CytoScan HD & Custom Agilent SNP arrays | hg18 & hg19 | Mixed | 74,028<sup>1</sup> | 0 |
-| IU<sup>3</sup> | - | - | Affy CytoScan HD | hg19 | Mixed | 1,576<sup>3</sup> | 0 |  
-| PGC | [Marshall _et al._, _Nat. Genet._ (2017)](https://www.nature.com/articles/ng.3725) | [27869829](https://www.ncbi.nlm.nih.gov/pubmed/27869829) | Affy 6.0 (37%), Omni Express (31%), Omni Express Plus (12%), Other (20%) | hg18 | Schizophrenia | 21,094 | 20,277 |
-| SSC<sup>4</sup> | [Sanders _et al._, _Neuron_ (2015)](https://www.sciencedirect.com/science/article/pii/S0896627315007734?) | [26402605](https://www.ncbi.nlm.nih.gov/pubmed/26402605) | Omni 1Mv3 (46%), Omni 2.5 (41%), Omni 1Mv1 (13%) | hg18 | Autism | 2,795 | 0<sup>4</sup> |
-| SickKids | [Zarrei _et al._, _NPJ Genomic Medicine_ (2019)](https://www.nature.com/articles/s41525-019-0098-3) | [31602316](https://www.ncbi.nlm.nih.gov/pubmed/31602316) | Affy 6.0 (100%) | hg19 | NDDs | 2,689<sup>1</sup> | 0<sup>4</sup> |  
-| TCGA | [Zack _et al._, _Nat. Genet._ (2013)](https://www.nature.com/articles/ng.2760) | [24071852](https://www.ncbi.nlm.nih.gov/pubmed/24071852) | Affy 6.0 (100%) | hg19 | Cancer | 0<sup>5</sup> | 8,670<sup>5</sup> |  
-| TSAICG | [Huang _et al._, _Neuron_ (2017)](https://www.sciencedirect.com/science/article/pii/S0896627317305081) | [28641109](https://www.ncbi.nlm.nih.gov/pubmed/28641109) | OmniExpress (100%) | hg19 | Tourette Syndrome | 2,434 | 4,093 |
-| UKBB | [Macé _et al._, _Nat. Commun._ (2017)](https://www.nature.com/articles/s41467-017-00556-x) | [28963451](https://www.ncbi.nlm.nih.gov/pubmed/28963451) | UKBB Affy Axiom (100%) | hg19 | Mixed | 54,071<sup>1</sup> | 375,800<sup>1</sup> |
+| Boston Children's Hospital (`BCH`) | [Talkowski _et al._, _Cell_ (2012)](https://pubmed.ncbi.nlm.nih.gov/22521361) | [22521361](https://pubmed.ncbi.nlm.nih.gov/22521361) | aCGH | hg18 | Mixed | 3591 | 0 |  
+| BioVU (`BioVU`) | [Roden _et al._, _Clin. Pharmacol. Ther._ (2008)](https://pubmed.ncbi.nlm.nih.gov/18500243) | [18500243](https://pubmed.ncbi.nlm.nih.gov/18500243) | Illumina MegaEx (100%) | hg19 | Mixed | 32306 | 14661 |  
+| Children's Hospital of Philadelphia (`CHOP`) | [Li _et al._, _Nat. Commun._ (2020)](https://pubmed.ncbi.nlm.nih.gov/31937769) | [31937769](https://pubmed.ncbi.nlm.nih.gov/31937769) | Mixed Illumina SNP genotyping platforms | hg19 | Mixed | 153870 | 24161 |  
+| Eichler Lab (`Coe`) | [Coe _et al._, _Nat. Genet._ (2014)](https://pubmed.ncbi.nlm.nih.gov/25217958) | [25217958](https://pubmed.ncbi.nlm.nih.gov/25217958) | Cases: SignatureChip OS v2.0 (58%), SignatureChip OS v1.0 (34%), Other (8%); Controls: Affy 6.0 (100%) | hg19 | Developmental disorders | 29083 | 11256 |  
+| Eichler Lab (`Cooper`) | [Cooper _et al._, _Nat. Genet._ (2011)](https://pubmed.ncbi.nlm.nih.gov/21841781) | [21841781](https://pubmed.ncbi.nlm.nih.gov/21841781) | Illumina 550k-610k (75%), Custom 1.2M (25%) | hg19 | N/A | 0 | 8329 |  
+| Epi25 Consortium (`Epi25k`) | [Niestroj _et al._, _Brain_ (2020)](https://pubmed.ncbi.nlm.nih.gov/32568404) | [32568404](https://pubmed.ncbi.nlm.nih.gov/32568404) | Illumina GSA-MD v1.0 (100%) | hg19 | Epilepsy | 12053 | 8173 |  
+| Estonian Biobank (`EstBB`) | [Leitsalu _et al._, _Int. J. Epidemiol._ (2014)](https://pubmed.ncbi.nlm.nih.gov/24518929) | [24518929](https://pubmed.ncbi.nlm.nih.gov/24518929) | Illumina GSA (100%) | hg19 | Mixed | 63183 | 15659 |  
+| GeneDX (`GDX`) | - | - | Custom Aglient SNP Array (71%), CytoScan HD (29%) | hg18 & hg19 | Mixed | 74208 | 0 |  
+| Indiana University (`IU`) | - | - | CytoScan HD (100%) | hg19 | Mixed | 1576 | 0 |  
+| Ontario Population Genomics Platform (`Ontario`) | [Uddin _et al._, _Genet. Med._ (2015)](https://pubmed.ncbi.nlm.nih.gov/25503493) | [25503493](https://pubmed.ncbi.nlm.nih.gov/25503493) | CytoScan HD (100%) | hg19 | N/A | 0 | 873 |  
+| Psychiatric Genetics Consortium (`PGC`) | [Marshall _et al._, _Nat. Genet._ (2017)](https://pubmed.ncbi.nlm.nih.gov/27869829) | [27869829](https://pubmed.ncbi.nlm.nih.gov/27869829) | Affy 6.0 (37%), Omni Express (31%), Omni Express Plus (12%), Other (20%) | hg18 | Schizophrenia | 21094 | 20277 |  
+| Radboud University Medical Center (`RUMC`) | [Vulto-van Silfhout _et al._, _Hum. Mutat._ (2013)](https://pubmed.ncbi.nlm.nih.gov/24038936) | [24038936](https://pubmed.ncbi.nlm.nih.gov/24038936) | Affy 250k (100%) | hg17 | Intellectual disability | 5531 | 0 |  
+| SickKids Hospital (`SickKids`) | [Zarrei _et al._, _NPJ Genomic Medicine_ (2019)](https://pubmed.ncbi.nlm.nih.gov/31602316) | [31602316](https://pubmed.ncbi.nlm.nih.gov/31602316) | Affy 6.0 (100%) | hg19 | Developmental disorders | 2689 | 0 |  
+| Simons Simplex Collection (`SSC`) | [Sanders _et al._, _Neuron_ (2015)](https://pubmed.ncbi.nlm.nih.gov/26402605) | [26402605](https://pubmed.ncbi.nlm.nih.gov/26402605) | Omni 1Mv3 (46%), Omni 2.5 (41%), Omni 1Mv1 (13%) | hg18 | Autism | 2795 | 0 |  
+| The Cancer Genome Atlas (`TCGA`) | [Zack _et al._, _Nat. Genet._ (2013)](https://pubmed.ncbi.nlm.nih.gov/24071852) | [24071852](https://pubmed.ncbi.nlm.nih.gov/24071852) | Affy 6.0 (100%) | hg19 | N/A | 0 | 8670 |  
+| The Genetic Etiology of Tourette Syndrome Consortium (`TSAICG`) | [Huang _et al._, _Neuron (2017)](https://pubmed.ncbi.nlm.nih.gov/28641109) | [28641109](https://pubmed.ncbi.nlm.nih.gov/28641109) | OmniExpress (100%) | hg19 | Tourette Syndrome | 2434 | 4093 |  
+| UK Biobank (`UKBB`) | [Macé _et al._, _Nat. Commun._ (2017)](https://pubmed.ncbi.nlm.nih.gov/28963451) | [28963451](https://pubmed.ncbi.nlm.nih.gov/28963451) | UKBB Affy Axiom (100%) | hg19 | Mixed | 54071 | 375800 |  
 
 #### Notes on raw CNV data   
 1. Counts represent the number of samples retained after filtering outliers, described below.  
 2. Only retained control samples from Cooper _et al._ All cases from Cooper _et al._ also appear in Coe _et al._  
 3. Excluded samples from Indiana University (IU) cohort derived from buccal swab DNA, samples with known aneuploidies or large runs of homozygosity, and samples with no phenotypic indication specified.  
 4. Only retained affected children from Sanders _et al._ and Zarrei _et al._, since all controls were first-degree relatives of affected cases.  
-5. Only retained normal samples from tumor:normal pairs, and excluded any donors with known blood cancer.  
+5. Only retained normal samples from TCGA tumor:normal pairs, and excluded any TCGA donors with known blood cancer.  
 
 ## Raw CNV data processing steps  
 
-All CNV data native to hg18 was lifted over to hg19 using UCSC liftOver, requiring at least 50% of the original CNV to map successfully to hg19 in order to be retained.  
+All CNV data native to hg17 or hg18 was lifted over to hg19 using UCSC liftOver, requiring at least 50% of the original CNV to map successfully to hg19 in order to be retained.  
 
 Some datasets required manual curation prior to inclusion. Where necessary, these steps are enumerated below:  
 
@@ -48,7 +50,7 @@ Some datasets required manual curation prior to inclusion. Where necessary, thes
  * **GDX**: All CNVs were required to be ≥20kb and <40Mb in length. Except for the minority of 9,958 samples for which additional CNV call metadata was unavailable, all CNVs were further required to not have been annotated as a suspected false positive or mosaic event, have estimated copy numbers ≤1.5 for deletions or ≥2.5 for duplications, include ≥10 probes and have P(CNV) ≤ 10<sup>-10</sup>. Following CNV call filtering, we excluded all samples that either had >10 calls each, were identified as potential biological replicates, were referred for testing due to being a relative of a known carrier of a medically relevant CNV, or had “advanced maternal age” as their indication for testing.
  * **SSC**: CNVs were filtered on pCNV ≤10<sup>-9</sup>, per recommendation of the authors.  
  * **SickKids**: CNVs were filtered on ≥25kb. After CNV filtering, samples with >80 CNV calls were excluded as outliers. Finally, we identified a single locus on chr12 that had CNVs only appearing in ADHD samples at 2.8% frequency; these CNVs were removed from the callset.  
- * **TCGA**: CNVs were filtered on ≥10 probes and ≥25kb. Deletions were required to have a mean log<sub>2</sub> intensity ≤-1 and duplications were required to have a mean log<sub>2</sub> intensity of ≥0.5849625.  
+ * **TCGA**: CNVs were filtered on ≥10 probes and ≥25kb. Deletions were required to have a mean intensity ≤ log<sub>2</sub>(0.7) and duplications were required to have a mean intensity ≥  log<sub>2</sub>(1.4).  
  * **UKBB**: CNVs were filtered on quality score ≥17 and CNV size ≥25kb. After CNV filtering, samples with >10 CNV calls were excluded as outliers as well as any samples with known malignant cancers or chromosomal disorders (e.g., Down's Syndrome or sex chromosome aneuploidies).  
 
 #### CNV defragmentation  
@@ -73,7 +75,7 @@ Given that these three fragments are (i) all reported in the same sample and (ii
 
 The defragmentation algorithm as applied to these data would merge these three deletion fragments into a single CNV spanning from `54387162` to `58906151`.  
 
-Five studies were unable to be defragmented due to inadequate sample-level information: `Coe` (_controls only_), `Cooper`, `PGC`, `BioVU`, and `TSAICG`.
+Seven studies were unable to be defragmented due to inadequate sample-level information: `Coe` (_controls only_), `Cooper`, `PGC`, `BioVU`, `TSAICG`, `Ontario`, and `RUMC`.
 
 ### Raw CNV callset properties  
 
@@ -106,37 +108,6 @@ The information for this table was collected using `collect_cohort_stats.sh`, an
 All raw CNV data files and their tabix indexes are stored in a protected Google Cloud bucket, here:  
 ```
 $ gsutil ls gs://rcnv_project/raw_data/cnv/
-
-gs://rcnv_project/raw_data/cnv/BCH.raw.bed.gz
-gs://rcnv_project/raw_data/cnv/BCH.raw.bed.gz.tbi
-gs://rcnv_project/raw_data/cnv/BioVU.raw.bed.gz
-gs://rcnv_project/raw_data/cnv/BioVU.raw.bed.gz.tbi
-gs://rcnv_project/raw_data/cnv/CHOP.raw.bed.gz
-gs://rcnv_project/raw_data/cnv/CHOP.raw.bed.gz.tbi
-gs://rcnv_project/raw_data/cnv/Coe.raw.bed.gz
-gs://rcnv_project/raw_data/cnv/Coe.raw.bed.gz.tbi
-gs://rcnv_project/raw_data/cnv/Cooper.raw.bed.gz
-gs://rcnv_project/raw_data/cnv/Cooper.raw.bed.gz.tbi
-gs://rcnv_project/raw_data/cnv/Epi25k.raw.bed.gz
-gs://rcnv_project/raw_data/cnv/Epi25k.raw.bed.gz.tbi
-gs://rcnv_project/raw_data/cnv/EstBB.raw.bed.gz
-gs://rcnv_project/raw_data/cnv/EstBB.raw.bed.gz.tbi
-gs://rcnv_project/raw_data/cnv/GDX.raw.bed.gz
-gs://rcnv_project/raw_data/cnv/GDX.raw.bed.gz.tbi
-gs://rcnv_project/raw_data/cnv/IU.raw.bed.gz
-gs://rcnv_project/raw_data/cnv/IU.raw.bed.gz.tbi
-gs://rcnv_project/raw_data/cnv/PGC.raw.bed.gz
-gs://rcnv_project/raw_data/cnv/PGC.raw.bed.gz.tbi
-gs://rcnv_project/raw_data/cnv/SSC.raw.bed.gz
-gs://rcnv_project/raw_data/cnv/SSC.raw.bed.gz.tbi
-gs://rcnv_project/raw_data/cnv/SickKids.raw.bed.gz
-gs://rcnv_project/raw_data/cnv/SickKids.raw.bed.gz.tbi
-gs://rcnv_project/raw_data/cnv/TCGA.raw.bed.gz
-gs://rcnv_project/raw_data/cnv/TCGA.raw.bed.gz.tbi
-gs://rcnv_project/raw_data/cnv/TSAICG.raw.bed.gz
-gs://rcnv_project/raw_data/cnv/TSAICG.raw.bed.gz.tbi
-gs://rcnv_project/raw_data/cnv/UKBB.raw.bed.gz
-gs://rcnv_project/raw_data/cnv/UKBB.raw.bed.gz.tbi
 ```
 
 Note that permissions must be granted per user prior to data access.  

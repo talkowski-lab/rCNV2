@@ -15,12 +15,12 @@
 options(scipen=1000, stringsAsFactors=F)
 par(family="sans")
 cnv.colors <- c("DEL"="#D43925", "DUP"="#2376B2")
-logscale.size <- log10(as.vector(sapply(2:6, function(e){(1:9)*10^e})))
+logscale.size <- log10(as.vector(sapply(2:7, function(e){(1:9)*10^e})))
 # logscale.size.labels.at <- log10(as.vector(sapply(2:6, function(e){c(1, 5)*10^e})))
 # logscale.size.labels <- c("100bp", "500bp", "1kb", "5kb", "10kb", 
 #                           "50kb", "100kb", "500kb", "1Mb", "5Mb")
-logscale.size.labels.at <- 2:6
-logscale.size.labels <- c("100bp", "1kb", "10kb", "100kb", "1Mb")
+logscale.size.labels.at <- 2:7
+logscale.size.labels <- c("100bp", "1kb", "10kb", "100kb", "1Mb", "10Mb")
 logscale.rate <- log10(as.vector(sapply(-4:2, function(e){(1:9)*10^e})))
 logscale.rate.labels.at <- log10(as.vector(sapply(-3:2, function(e){c(1, 5)*10^e})))
 
@@ -63,7 +63,7 @@ add.labels <- function(x, y, labels, lab.cex=0.8){
   })
 }
 scatter_stats <- function(dat, cnv, pt.cex=1.5,
-                          xlims=c(1000, 1000000), ylims=c(0.01, 100)){
+                          xlims=c(1000, 10000000), ylims=c(0.01, 100)){
   # Prep plot values
   xlims <- log10(xlims)
   ylims <- log10(ylims)

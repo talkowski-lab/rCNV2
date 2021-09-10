@@ -491,7 +491,7 @@ print(quantile(unlist(rcnv.sizes)))
 # Plot CNVs per sample (raw & filtered)
 persamp.vals <- log10(as.numeric(unlist(lapply(list(raw, rcnv), function(df){df[, grep("_per_", colnames(df), fixed=T)]}))))
 persamp.xlims <- range(persamp.vals[which(!is.infinite(persamp.vals))], na.rm=T)
-persamp.pdf.dims <- c(3.5, 3.2)
+persamp.pdf.dims <- c(3.7, 3.2)
 pdf(paste(out.prefix, "cnv_per_sample.raw.pdf", sep="."),
     height=persamp.pdf.dims[1], width=persamp.pdf.dims[2])
 plot.persample(raw, metacohorts, xlims=persamp.xlims, title="Raw Data", blue.bg=FALSE)
@@ -505,7 +505,7 @@ dev.off()
 # Plot CNV sizes
 # size.xlims <- quantile(log10(as.numeric(unlist(raw.sizes))), probs=c(0.025, 0.975), na.rm=T)
 size.xlims <- log10(c(1000, 1000000))
-size.pdf.dims <- c(3.5, 3.1)
+size.pdf.dims <- c(3.7, 3.1)
 pdf(paste(out.prefix, "sizes.raw.pdf", sep="."),
     height=size.pdf.dims[1], width=size.pdf.dims[2])
 plot.size(raw.sizes, metacohorts, xlims=size.xlims, title="Raw Data", blue.bg=FALSE)

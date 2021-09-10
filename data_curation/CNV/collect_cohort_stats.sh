@@ -63,7 +63,7 @@ for freq in rCNV; do
   awk -v OFS="\t" -v freq=${freq} \
     '{ print $0, "/cleaned_cnv/"$1"."freq".bed.gz" }' \
     rCNV_metacohort_sample_counts.txt \
-  | fgrep -v "#" \
+  | fgrep -v "#" | fgrep -v mega \
   > ${freq}.metacohorts.input.txt
   /opt/rCNV2/data_curation/CNV/build_cnv_stats_table.py \
     --tsv ${freq}.metacohort.stats.txt \
