@@ -9,6 +9,7 @@ meta(
   cohorts,
   model = "fe",
   saddle = T,
+  winsorize = 1,
   calc.fdr = T,
   secondary = T,
   keep.n.cols = 3
@@ -24,15 +25,15 @@ meta(
 \item{saddle}{boolean indicator of whether to apply saddlepoint approximation
 (see \code{\link[=saddlepoint.adj]{saddlepoint.adj()}}) [default: TRUE]}
 
+\item{winsorize}{Winzorization interval for saddlepoint adjustment
+(see \code{\link[=saddlepoint.adj]{saddlepoint.adj()}}) [default: 1, i.e., no Winsorization]}
+
 \item{calc.fdr}{boolean indicator to calculate B-H FDR q-value per locus [default: TRUE]}
 
 \item{secondary}{boolean indicator to also compute meta-analysis statistics
 after dropping most significant individual cohort [default: TRUE]}
 
 \item{keep.n.cols}{number of columns from original BED format to retain}
-
-\item{winsorize}{Winzorization interval for saddlepoint adjustment
-(see \code{\link[=saddlepoint.adj]{saddlepoint.adj()}}) [default: 1, i.e., no Winsorization]}
 }
 \value{
 data frame of meta-analysis summary statistics

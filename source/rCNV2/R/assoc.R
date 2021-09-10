@@ -625,8 +625,8 @@ saddlepoint.adj <- function(zscores, winsorize=1, winsorize.left.tail=F, phred=T
 #' @return data frame of meta-analysis summary statistics
 #'
 #' @export
-meta <- function(stats.merged, cohorts, model="fe", saddle=T, calc.fdr=T,
-                 secondary=T, keep.n.cols=3){
+meta <- function(stats.merged, cohorts, model="fe", saddle=T, winsorize=1,
+                 calc.fdr=T, secondary=T, keep.n.cols=3){
   # Make meta-analysis lookup table
   meta.lookup.table <- make.meta.lookup.table(stats.merged, cohorts, model,
                                               empirical.continuity=T)
