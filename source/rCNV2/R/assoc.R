@@ -711,7 +711,7 @@ meta <- function(stats.merged, cohorts, model="fe", saddle=T, adjust.biobanks=F,
 
     # Saddlepoint on secondary, if optioned
     if(saddle==T){
-      meta.res.secondary$meta_phred_p <- saddlepoint.adj(meta.res.secondary$meta_z, winsorize=winsorize)
+      meta.res.secondary[, c("meta_z", "meta_phred_p")] <- saddlepoint.adj(meta.res.secondary$meta_z, winsorize=winsorize)
     }
 
     meta.res$meta_lnOR_secondary <- meta.res.secondary$meta_lnOR
