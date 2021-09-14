@@ -13,6 +13,7 @@
   print.stats = T,
   echo.lambdas = F,
   legend = T,
+  xmax = NULL,
   ymax = NULL,
   reflection = F,
   label.cex = 1
@@ -35,6 +36,8 @@
 stdout (for logging purposes) [default: FALSE]}
 
 \item{legend}{boolean indicator to add legend [default: TRUE]}
+
+\item{xmax}{maximum X-value to plot [default: include all points]}
 
 \item{ymax}{maximum Y-value to plot [default: same as smallest P-value]}
 

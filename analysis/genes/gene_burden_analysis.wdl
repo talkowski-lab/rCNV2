@@ -563,6 +563,7 @@ task build_exclusion_list {
     rCNV2/data_curation/other/probe_based_exclusion.py \
       --outfile ${gtf_prefix}.cohort_exclusion.bed.gz \
       --probecounts-outfile ${gtf_prefix}.probe_counts.bed.gz \
+      --control-mean-counts-outfile ${gtf_prefix}.mean_probe_counts_per_cohort.bed.gz \
       --frac-pass-outfile ${gtf_prefix}.frac_passing.bed.gz \
       --min-probes ${min_probes_per_gene} \
       --min-frac-samples ${min_frac_controls_probe_exclusion} \
@@ -591,6 +592,7 @@ task build_exclusion_list {
   output {
     File exclusion_bed = "${gtf_prefix}.cohort_exclusion.bed.gz"
     File probe_counts = "${gtf_prefix}.probe_counts.bed.gz"
+    File control_mean_counts = "${gtf_prefix}.mean_probe_counts_per_cohort.bed.gz"
     File frac_passing = "${gtf_prefix}.frac_passing.bed.gz"
   }  
 }

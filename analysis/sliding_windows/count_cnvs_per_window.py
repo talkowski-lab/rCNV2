@@ -107,7 +107,9 @@ def main():
 
     if args.outbed is None \
     or args.outbed in 'stdout -'.split():
-        bins.saveas(stdout, trackline=header)
+        stdout.write(header + '\n')
+        for rec in bins:
+            stdout.write('\t'.join([str(x) for x in rec.fields]) + '\n')
     else:
         outbed = args.outbed
         if path.splitext(outbed)[1] in '.gz .bz .bgz .bgzip .gzip'.split():

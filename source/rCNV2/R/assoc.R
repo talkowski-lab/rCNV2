@@ -428,6 +428,9 @@ make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T)
 #' @param cohorts vector of all cohort names
 #' @param row.idx row index in `stats.merged` corresponding to locus of interest
 #' @param model specify meta-analysis model to use (see `Details`)
+#' @param adjust.biobanks boolean indicator to include biobank status as a categorical
+#' covariate in meta-analysis model \[default: FALSE\]
+#' @param probe.counts data frame of control probe counts (see `Details`) \[default: NULL\]
 #' @param empirical.continuity boolean indicator to apply Sweeting empirical
 #' continuity correction \[default: TRUE\]
 #' @param drop_top_cohort boolean indicator to drop most significant individual
@@ -438,12 +441,16 @@ make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T)
 #' * `re` : random-effects model implemented by [metafor::rma.uni()]
 #' * `mh` : Mantel-Haenszel model implemented by [metafor::rma.mh()]
 #'
+#' `probe.counts` must be a BED-style data frame matching the exact entries in
+#' stats.merged with one numeric column of probe counts for each cohort.
+#'
 #' @return numeric vector of meta-analysis summary statistics
 #'
 #' @seealso [make.meta.df()]
 #'
 #' @export
 meta.single <- function(stats.merged, cohorts, row.idx, model="fe",
+                        adjust.biobanks=F, probe.counts=NULL,
                         empirical.continuity=T, drop_top_cohort=F){
   # Collect list of cohorts to exclude
   exclude.cohorts <- unlist(strsplit(stats.merged$exclude_cohorts[row.idx], split=";"))
@@ -468,11 +475,26 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="fe",
   # Check that at least two cohorts remain
   n.cohorts <- length(cohorts)
   if(n.cohorts >= 2){
-
     # Check if at least one CNV was observed
     n.cnvs <- sum(stats.merged.sub[, grep("_alt", colnames(stats.merged.sub), fixed=T)])
     if(n.cnvs > 0){
       meta.df <- make.meta.df(stats.merged.sub, cohorts, 1, empirical.continuity)
+      # Add covariates, if optioned
+      if(adjust.biobanks | !is.null(probe.counts)){
+        mods <- c()
+        if(adjust.biobanks){
+          meta.df$is_biobank <- as.numeric(meta.df$cohort_name %in% biobanks)
+          mods <- c(mods, "is_biobank")
+        }
+        if(!is.null(probe.counts)){
+          meta.df$probe_count <- as.numeric(probe.counts[row.idx, meta.df$cohort_name])
+          mods <- c(mods, "probe_count")
+        }
+        mods <- as.formula(paste("~", paste(mods, collapse=" + ")))
+      }else{
+        mods <- NULL
+      }
+
       # If strictly zero case CNVs are observed, unable to estimate effect size
       if(nrow(meta.df) > 0){
         if(all(meta.df$case_alt==0)){
@@ -480,7 +502,7 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="fe",
         }else{
           # Meta-analysis
           if(model=="re"){
-            meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+            meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt, mods=mods,
                                          measure="OR", data=meta.df, method="REML", random = ~ 1 | cohort, slab=cohort_name,
                                          add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
                                  error=function(e){
@@ -492,13 +514,13 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="fe",
             out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
                                   meta.res$zval, -log10(meta.res$pval)))
           }else if(model=="mh"){
-            meta.res <- rma.mh(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+            meta.res <- rma.mh(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt, mods=mods,
                                measure="OR", data=meta.df, slab=cohort_name,
                                add=0, drop00=F, correct=F)
             out.v <- as.numeric(c(meta.res$b, meta.res$ci.lb, meta.res$ci.ub,
                                   meta.res$zval, -log10(meta.res$MHp)))
           }else if(model=="fe"){
-            meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt,
+            meta.res <- tryCatch(rma.uni(ai=control_ref, bi=case_ref, ci=control_alt, di=case_alt, mods=mods,
                                          measure="OR", data=meta.df, method="FE", slab=cohort_name,
                                          add=0, drop00=F, correct=F, digits=5, control=list(maxiter=100, stepadj=0.5)),
                                  error=function(e){
@@ -507,8 +529,8 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="fe",
                                            measure="OR", data=meta.df, method="FE", slab=cohort_name,
                                            add=0, drop00=F, correct=F, digits=5, control=list(maxiter=10000, stepadj=0.4))
                                  })
-            out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb, meta.res$ci.ub,
-                                  meta.res$zval, -log10(meta.res$pval)))
+            out.v <- as.numeric(c(meta.res$b[1,1], meta.res$ci.lb[1], meta.res$ci.ub[1],
+                                  meta.res$zval[1], -log10(meta.res$pval)[1]))
           }
           # Force to p-values reflecting Ha : OR > 1
           if(!is.na(out.v[1]) & !is.na(out.v[5])){
@@ -535,6 +557,9 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="fe",
 #' @param stats.merged association statistics for all cohorts (see [combine.single.cohort.assoc.stats()])
 #' @param cohorts vector of all cohort names
 #' @param model specify meta-analysis model to use (see `Details`)
+#' @param adjust.biobanks boolean indicator to include biobank status as a categorical
+#' covariate in meta-analysis model \[default: FALSE\]
+#' @param probe.counts data frame of control probe counts (see `Details`) \[default: NULL\]
 #' @param empirical.continuity boolean indicator to apply Sweeting empirical
 #' continuity correction \[default: TRUE\]
 #'
@@ -543,19 +568,32 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="fe",
 #' * `re` : random-effects model implemented by [metafor::rma.uni()]
 #' * `mh` : Mantel-Haenszel model implemented by [metafor::rma.mh()]
 #'
+#' `probe.counts` must be a BED-style data frame matching the exact entries in
+#' stats.merged with one numeric column of probe counts for each cohort.
+#'
 #' @return data frame of all unique case & control CNV counts
 #'
 #' @export
-make.meta.lookup.table <- function(stats.merged, cohorts, model, empirical.continuity=T){
-  unique.counts.df <- unique(stats.merged[, sort(unique(c(grep("_ref", colnames(stats.merged), fixed=T),
-                                                          grep("_alt", colnames(stats.merged), fixed=T),
-                                                          which(colnames(stats.merged) == "exclude_cohorts"))))])
+make.meta.lookup.table <- function(stats.merged, cohorts, model, adjust.biobanks=F,
+                                   probe.counts=NULL, empirical.continuity=T){
+  # Make dataframe of CNV counts sorted by cohort
+  counts.df <- stats.merged[, sort(unique(c(grep("_ref", colnames(stats.merged), fixed=T),
+                                            grep("_alt", colnames(stats.merged), fixed=T),
+                                            which(colnames(stats.merged) == "exclude_cohorts"))))]
 
-  unique.stats <- t(sapply(1:nrow(unique.counts.df), function(i){
-    meta.single(unique.counts.df, cohorts, i, model, empirical.continuity)
+  # If probe adjustment is not optioned, can collapse to unique counts to save runtime
+  if(is.null(probe.counts)){
+    counts.df <- unique(counts.df)
+  }
+
+  # Compute meta-analysis stats for all rows in counts.df
+  meta.stats <- t(sapply(1:nrow(counts.df), function(i){
+    meta.single(counts.df, cohorts, i, model, adjust.biobanks,
+                probe.counts, empirical.continuity)
   }))
 
-  lookup.table <- cbind(unique.counts.df, unique.stats)
+  # Format output table
+  lookup.table <- cbind(counts.df, meta.stats)
   stat.colnames <- c("meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper", "meta_z", "meta_phred_p")
   colnames(lookup.table)[(ncol(lookup.table)-4):ncol(lookup.table)] <- stat.colnames
 
@@ -571,12 +609,13 @@ make.meta.lookup.table <- function(stats.merged, cohorts, model, empirical.conti
 #' @param winsorize width of quantile intervals to Winsorize \[default: 1, i.e., no Winsorization\]
 #' @param winsorize.left.tail boolean indicator to apply Winsorization to left tail of distribution \[default: FALSE\]
 #' @param phred boolean indicator of whether to -log10-scale adjusted P-values
-#' @param min.p smallest P-value to report (P-values smaller than this will be rounded up) \[default: 1e-300\]
 #'
-#' @return numeric vector of adjusted P-values
+#' @return data.frame with two columns:
+#' * `$zscores` for corrected Z-scores
+#' * `$pvalues` for P-values corresponding to corrected Z-scores
 #'
 #' @export
-saddlepoint.adj <- function(zscores, winsorize=1, winsorize.left.tail=F, phred=T, min.p=1e-300){
+saddlepoint.adj <- function(zscores, winsorize=1, winsorize.left.tail=F, phred=T){
   zscores.orig <- zscores
   winsor.bounds <- quantile(zscores, probs=c(1-winsorize, winsorize), na.rm=T)
   if(winsorize.left.tail){
@@ -589,15 +628,17 @@ saddlepoint.adj <- function(zscores, winsorize=1, winsorize.left.tail=F, phred=T
   dx <- 0.01
   x <- seq(-40, 40, dx)
   saddle.pdf <- saddlepoint(x, 1, cumuls)$approx
-  saddle.cdf <- cumsum(saddle.pdf * 0.01)
-  calc.saddle.p <- function(z){if(!is.na(z)){1 - tail(saddle.cdf[which(x<z)], 1)}else{NA}}
-  new.pvals <- sapply(zscores.orig, calc.saddle.p)
-  new.pvals[which(new.pvals < min.p)] <- min.p
+  # Dev note: must infer parameters of saddlepoint-approximated normal for precise extreme P-values with pnorm()
+  mu.saddle <- sum(x * saddle.pdf) * dx
+  sd.saddle <- sqrt(sum(saddle.pdf * dx * (x - mu.saddle)^2))
+  # Compute new Z-scores and P-values
+  new.zscores <- (zscores.orig - mu.saddle) / sd.saddle
   if(phred==T){
-    return(-log10(new.pvals))
+    new.pvals <- -pnorm(new.zscores, lower.tail=FALSE, log.p=TRUE)/log(10)
   }else{
-    return(new.pvals)
+    new.pvals <- pnorm(new.zscores, lower.tail=FALSE)
   }
+  return(data.frame("zscores" = new.zscores, "pvalues" = new.pvals))
 }
 
 
@@ -610,6 +651,9 @@ saddlepoint.adj <- function(zscores, winsorize=1, winsorize.left.tail=F, phred=T
 #' @param model specify meta-analysis model to use (see `Details`)
 #' @param saddle boolean indicator of whether to apply saddlepoint approximation
 #' (see [saddlepoint.adj()]) \[default: TRUE\]
+#' @param adjust.biobanks boolean indicator to include biobank status as a categorical
+#' covariate in meta-analysis model \[default: FALSE\]
+#' @param probe.counts data frame of control probe counts (see `Details`) \[default: NULL\]
 #' @param winsorize Winzorization interval for saddlepoint adjustment
 #' (see [saddlepoint.adj()]) \[default: 1, i.e., no Winsorization\]
 #' @param calc.fdr boolean indicator to calculate B-H FDR q-value per locus \[default: TRUE\]
@@ -622,22 +666,34 @@ saddlepoint.adj <- function(zscores, winsorize=1, winsorize.left.tail=F, phred=T
 #' * `re` : random-effects model implemented by [metafor::rma.uni()]
 #' * `mh` : Mantel-Haenszel model implemented by [metafor::rma.mh()]
 #'
+#' `probe.counts` must be a BED-style data frame matching the exact entries in
+#' stats.merged with one numeric column of probe counts for each cohort.
+#'
 #' @return data frame of meta-analysis summary statistics
 #'
 #' @export
-meta <- function(stats.merged, cohorts, model="fe", saddle=T, winsorize=1,
-                 calc.fdr=T, secondary=T, keep.n.cols=3){
+meta <- function(stats.merged, cohorts, model="fe", saddle=T, adjust.biobanks=F,
+                 probe.counts=NULL, winsorize=1, calc.fdr=T, secondary=T, keep.n.cols=3){
   # Make meta-analysis lookup table
   meta.lookup.table <- make.meta.lookup.table(stats.merged, cohorts, model,
+                                              adjust.biobanks, probe.counts,
                                               empirical.continuity=T)
 
   # Merge stats into full list
-  meta.res <- merge(stats.merged, meta.lookup.table, sort=F, all.x=T, all.y=F)
+  if(is.null(probe.counts)){
+    # Must be merged when probe.counts is not provided because make.meta.lookup.table()
+    # only computes unique count vectors to save time
+    meta.res <- merge(stats.merged, meta.lookup.table, sort=F, all.x=T, all.y=F)
+  }else{
+    # Otherwise, every row in stats.merged will be evaluated and can be directly
+    # combined with cbind()
+    meta.res <- cbind(stats.merged, meta.lookup.table[, (-4:0)+ncol(meta.lookup.table)])
+  }
   meta.res <- meta.res[with(meta.res, order(chr, start)), ]
 
   # Adjust P-values using saddlepoint approximation of null distribution, if optioned
   if(saddle==T){
-    meta.res$meta_phred_p <- saddlepoint.adj(meta.res$meta_z, winsorize=winsorize)
+    meta.res[, c("meta_z", "meta_phred_p")] <- saddlepoint.adj(meta.res$meta_z, winsorize=winsorize)
   }
 
   # Calculate B-H adjusted q-values, if optioned
@@ -648,7 +704,8 @@ meta <- function(stats.merged, cohorts, model="fe", saddle=T, winsorize=1,
   # Compute secondary P-value
   if(secondary==T){
     meta.res.secondary <- as.data.frame(t(sapply(1:nrow(meta.res), function(i){
-      meta.single(meta.res, cohorts, i, model, empirical.continuity=T, drop_top_cohort=T)
+      meta.single(meta.res, cohorts, i, model, adjust.biobanks, probe.counts,
+                  empirical.continuity=T, drop_top_cohort=T)
     })))
     colnames(meta.res.secondary) <- c("meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper", "meta_z", "meta_phred_p")
 

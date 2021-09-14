@@ -181,6 +181,29 @@ def label_cohort_fails(cohort_fracs_df, min_frac, keep_n_columns):
     return fails_df
 
 
+def get_cohort_means(array_counts, intervals, tnames, header, keep_n_columns):
+    """
+    Compute weighted mean of average number of probes  per cohort for all intervals
+    """
+
+    cohorts = array_counts.keys()
+    cohort_totals = {c : sum(v.values()) for c, v in array_counts.items()}
+    cohort_df = pd.DataFrame.from_dict(array_counts).fillna(value=0)
+
+    probes_df = pd.read_csv(intervals.fn, sep='\t', header=None).iloc[:, keep_n_columns:]
+    probes_df.columns = tnames
+    probes_df = probes_df.loc[:, probes_df.columns.isin(cohort_df.index)]
+
+    probe_sums = probes_df @ cohort_df
+    probe_means = probe_sums / np.array(list(cohort_totals.values()))
+
+    coords_df = pd.read_csv(intervals.fn, sep='\t', header=None).iloc[:, :keep_n_columns]
+    coords_df.columns = header
+    df_out = pd.concat([coords_df, probe_means], axis=1)
+
+    return float_cleanup(df_out, 1, keep_n_columns)
+
+
 def main():
     """
     Main block
@@ -200,6 +223,10 @@ def main():
                         'exclusion criteria [default: stdout]', default='stdout')
     parser.add_argument('--probecounts-outfile', help='Output BED file annotated with ' +
                         'number of probes per interval [optional]')
+    parser.add_argument('--control-mean-counts-outfile', help='Output BED file ' +
+                        'annotated with mean number of probes in controls per ' +
+                        'cohort, computed as the weighted average per platform ' +
+                        '[optional]')
     parser.add_argument('--frac-pass-outfile', help='Output BED file annotated with ' +
                         'fraction of passing samples per cohort per per interval [optional]')
     parser.add_argument('--min-interval-size', dest='min_size', type=int, 
@@ -267,6 +294,17 @@ def main():
         cohort_labels_df.to_csv(outfile, sep='\t', index=False)
         if args.bgzip:
             bgzip(outfile)
+
+    # [Optional] Step 7. Compute average number of probes per cohort per interval
+    means_outfile = args.control_mean_counts_outfile
+    if means_outfile is not None:
+        cohort_means_df = get_cohort_means(array_counts, intervals, tnames, 
+                                           header, args.keep_n_columns)
+        if 'compressed' in determine_filetype(means_outfile):
+            means_outfile = path.splitext(means_outfile)[0]
+        cohort_means_df.to_csv(means_outfile, sep='\t', index=False)
+        if args.bgzip:
+            bgzip(means_outfile)
 
 
 if __name__ == '__main__':

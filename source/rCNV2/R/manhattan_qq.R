@@ -248,6 +248,7 @@ plot.manhattan <- function(df, cutoff=1e-08, highlights=NULL,
 #' @param echo.lambdas boolean indicator to print genomic control statistic to
 #' stdout (for logging purposes) \[default: FALSE\]
 #' @param legend boolean indicator to add legend \[default: TRUE\]
+#' @param xmax maximum X-value to plot \[default: include all points\]
 #' @param ymax maximum Y-value to plot \[default: same as smallest P-value\]
 #' @param reflection boolean indicator to invert plot (useful for Miami plots)
 #' @param label.cex scaling factor for label text
@@ -260,7 +261,7 @@ plot.qq <- function(stats, cutoff=NULL, highlights=NULL,
                     highlight.color="#4EE69A",
                     highlight.name="Positive Controls",
                     print.stats=T, echo.lambdas=F,
-                    legend=T, ymax=NULL, reflection=F,
+                    legend=T, xmax=NULL, ymax=NULL, reflection=F,
                     label.cex=1){
 
   # Dummy function to plot N/A QQ for analyses with no cases
@@ -351,6 +352,9 @@ plot.qq <- function(stats, cutoff=NULL, highlights=NULL,
     }
 
     expected <- -log10(expected)
+    if(is.null(xmax)){
+      xmax <- max(expected, na.rm=T)
+    }
 
     if(reflection == F){
       p <- -log10(p)
@@ -374,7 +378,7 @@ plot.qq <- function(stats, cutoff=NULL, highlights=NULL,
     par(mar=mars, bty="n")
     plot(x=expected, y=p, type="n", xaxt="n", yaxt="n",
          xlab="", ylab="", xaxs="i", yaxs="i",
-         xlim=c(0, 1.1 * max(expected)), ylim=range(c(0, 1.1 * ymax)))
+         xlim=c(0, 1.1 * xmax), ylim=range(c(0, 1.1 * ymax)))
     polygon(x=conf.int[, 1], y=conf.int[, 2], col="gray90", border=NA)
     abline(0, ab.end, col="gray50")
     if(!is.null(cutoff)){

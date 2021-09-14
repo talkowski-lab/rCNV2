@@ -58,6 +58,7 @@ done > probeset_tracks.tsv
 /opt/rCNV2/data_curation/other/probe_based_exclusion.py \
   --outfile ${binned_genome_prefix}.cohort_exclusion.bed.gz \
   --probecounts-outfile ${binned_genome_prefix}.probe_counts.bed.gz \
+  --control-mean-counts-outfile ${binned_genome_prefix}.mean_probe_counts_per_cohort.bed.gz \
   --frac-pass-outfile ${binned_genome_prefix}.frac_passing.bed.gz \
   --min-probes ${min_probes_per_window} \
   --min-frac-samples ${min_frac_controls_probe_exclusion} \

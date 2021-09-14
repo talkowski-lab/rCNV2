@@ -12,7 +12,7 @@
 
 
 # Load libraries
-require(rCNV2, quietly=TRUE)
+require(rCNV2, quietly=T)
 require(optparse, quietly=T)
 require(metafor, quietly=T)
 require(EQL, quietly=T)
@@ -32,6 +32,10 @@ option_list <- list(
               help="provided P-values are Phred-scaled (-log10(P)) [default %default]"),
   make_option(c("--spa"), action="store_true", default=FALSE,
               help="apply saddlepoint approximation of null distribution [default %default]"),
+  make_option(c("--adjust-biobanks"), action="store_true", default=FALSE,
+              help="include biobank label as a covariate in meta-analysis [default %default]"),
+  make_option(c("--probe-counts"), type="character", metavar="path", default=NULL,
+              help="BED file with one column of control probe counts per cohort (will be used as covariate) [default %default]"),
   make_option(c("--no-fdr"), action="store_true", default=FALSE,
               help="do not compute Benjamini-Hochberg FDR q-values [default: compute FDR]"),
   make_option(c("--no-secondary"), action="store_true", default=FALSE,
@@ -55,19 +59,23 @@ model <- opts$model
 cond.excl.in <- opts$`conditional-exclusion`
 p.is.phred <- opts$`p-is-phred`
 spa <- opts$spa
+adjust.biobanks <- opts$`adjust-biobanks`
+probe.counts.in <- opts$`probe-counts`
 calc.fdr <- !(opts$`no-fdr`)
 secondary <- !(opts$`no-secondary`)
 keep.n.cols <- opts$`keep-n-columns`
 
 # # Dev parameters
 # setwd("~/scratch")
-# infile <- "HP0001249.rCNV.DEL.sliding_window.meta_analysis.input.txt"
-# outfile <- "HP0001249.rCNV.DEL.sliding_window.meta_analysis.stats.perm_38.bed"
+# infile <- "HP0000707.rCNV.DEL.sliding_window.meta_analysis.input.txt"
+# outfile <- "HP0000707.rCNV.DEL.sliding_window.meta_analysis.stats.bed"
 # corplot.out <- "corplot.test.jpg"
 # model <- "fe"
 # cond.excl.in <- "GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz"
 # p.is.phred <- T
 # spa <- T
+# adjust.biobanks <- T
+# probe.counts.in <- "GRCh37.200kb_bins_10kb_steps.raw.mean_probe_counts_per_cohort.bed.gz"
 # calc.fdr <- T
 # secondary <- T
 # keep.n.cols <- 3
@@ -79,6 +87,19 @@ stats.list <- lapply(1:ncohorts, function(i){
   read.assoc.stats.single(cohort.info[i, 2], cohort.info[i, 1], p.is.phred, keep.n.cols)
 })
 names(stats.list) <- cohort.info[, 1]
+
+# Read probe counts, if optioned
+if(!is.null(probe.counts.in)){
+  probe.counts <- read.table(probe.counts.in, header=T, sep="\t", comment.char="")
+  colnames(probe.counts)[1] <- c("chr")
+  # Sanity check to make sure exact same entries are represented in stats.list
+  if(!identical(stats.list[[1]][1:keep.n.cols], probe.counts[1:keep.n.cols])){
+    stop(paste("Issue with input files: First", keep.n.cols, "columns of input",
+               "association stats files and --probe-counts file must be identical."))
+  }
+}else{
+  probe.counts <- NULL
+}
 
 # Plot correlations of odds ratios between cohorts, if optioned
 if(!is.null(corplot.out)){
@@ -92,8 +113,9 @@ if(!is.null(corplot.out)){
 # Conduct meta-analysis & write to file
 stats.merged <- combine.single.cohort.assoc.stats(stats.list, cond.excl.in, keep.n.cols)
 stats.meta <- meta(stats.merged, cohort.info[, 1], model=model,
-                   saddle=spa, calc.fdr=calc.fdr, secondary=secondary,
-                   keep.n.cols=keep.n.cols)
+                   saddle=spa, adjust.biobanks=adjust.biobanks,
+                   probe.counts=probe.counts, calc.fdr=calc.fdr,
+                   secondary=secondary, keep.n.cols=keep.n.cols)
 colnames(stats.meta)[1] <- "#chr"
 write.table(stats.meta, outfile, sep="\t",
             row.names=F, col.names=T, quote=F)

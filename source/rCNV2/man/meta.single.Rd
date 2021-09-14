@@ -9,6 +9,8 @@ meta.single(
   cohorts,
   row.idx,
   model = "fe",
+  adjust.biobanks = F,
+  probe.counts = NULL,
   empirical.continuity = T,
   drop_top_cohort = F
 )
@@ -21,6 +23,11 @@ meta.single(
 \item{row.idx}{row index in \code{stats.merged} corresponding to locus of interest}
 
 \item{model}{specify meta-analysis model to use (see \code{Details})}
+
+\item{adjust.biobanks}{boolean indicator to include biobank status as a categorical
+covariate in meta-analysis model [default: FALSE]}
+
+\item{probe.counts}{data frame of control probe counts (see \code{Details}) [default: NULL]}
 
 \item{empirical.continuity}{boolean indicator to apply Sweeting empirical
 continuity correction [default: TRUE]}
@@ -41,6 +48,9 @@ Perform a meta-analysis of CNVs for a single locus
 \item \code{re} : random-effects model implemented by \code{\link[metafor:rma.uni]{metafor::rma.uni()}}
 \item \code{mh} : Mantel-Haenszel model implemented by \code{\link[metafor:rma.mh]{metafor::rma.mh()}}
 }
+
+\code{probe.counts} must be a BED-style data frame matching the exact entries in
+stats.merged with one numeric column of probe counts for each cohort.
 }
 \seealso{
 \code{\link[=make.meta.df]{make.meta.df()}}
