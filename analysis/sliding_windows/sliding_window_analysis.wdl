@@ -582,6 +582,7 @@ task meta_analysis {
         --conditional-exclusion ${exclusion_bed} \
         --p-is-phred \
         --spa \
+        --adjust-biobanks \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed

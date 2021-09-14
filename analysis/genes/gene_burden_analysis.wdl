@@ -759,6 +759,7 @@ task meta_analysis {
         --keep-n-columns 4 \
         --p-is-phred \
         --spa \
+        --adjust-biobanks \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed

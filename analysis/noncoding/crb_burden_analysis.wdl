@@ -608,6 +608,7 @@ task meta_analysis {
         --conditional-exclusion ${exclusion_bed} \
         --p-is-phred \
         --spa \
+        --adjust-biobanks \
         --keep-n-columns 4 \
         ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed
@@ -708,6 +709,7 @@ task coding_meta_analysis {
         --p-is-phred \
         --keep-n-columns 4 \
         --spa \
+        --adjust-biobanks \
         ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed

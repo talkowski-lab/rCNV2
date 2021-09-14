@@ -192,6 +192,7 @@ done > probeset_tracks.tsv
 /opt/rCNV2/data_curation/other/probe_based_exclusion.py \
   --outfile ${gtf_prefix}.cohort_exclusion.bed.gz \
   --probecounts-outfile ${gtf_prefix}.probe_counts.bed.gz \
+  --control-mean-counts-outfile ${gtf_prefix}.mean_probe_counts_per_cohort.bed.gz \
   --frac-pass-outfile ${gtf_prefix}.frac_passing.bed.gz \
   --min-probes ${min_probes_per_gene} \
   --min-frac-samples ${min_frac_controls_probe_exclusion} \
@@ -318,6 +319,7 @@ while read prefix hpo; do
         --model ${meta_model_prefix} \
         --p-is-phred \
         --spa \
+        --adjust-biobanks \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.perm_$i.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.perm_$i.bed
@@ -444,6 +446,7 @@ while read prefix hpo; do
         --keep-n-columns 4 \
         --p-is-phred \
         --spa \
+        --adjust-biobanks \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
