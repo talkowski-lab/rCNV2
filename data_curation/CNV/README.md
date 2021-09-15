@@ -50,7 +50,7 @@ Some datasets required manual curation prior to inclusion. Where necessary, thes
  * **GDX**: All CNVs were required to be ≥20kb and <40Mb in length. Except for the minority of 9,958 samples for which additional CNV call metadata was unavailable, all CNVs were further required to not have been annotated as a suspected false positive or mosaic event, have estimated copy numbers ≤1.5 for deletions or ≥2.5 for duplications, include ≥10 probes and have P(CNV) ≤ 10<sup>-10</sup>. Following CNV call filtering, we excluded all samples that either had >10 calls each, were identified as potential biological replicates, were referred for testing due to being a relative of a known carrier of a medically relevant CNV, or had “advanced maternal age” as their indication for testing.
  * **SSC**: CNVs were filtered on pCNV ≤10<sup>-9</sup>, per recommendation of the authors.  
  * **SickKids**: CNVs were filtered on ≥25kb. After CNV filtering, samples with >80 CNV calls were excluded as outliers. Finally, we identified a single locus on chr12 that had CNVs only appearing in ADHD samples at 2.8% frequency; these CNVs were removed from the callset.  
- * **TCGA**: CNVs were filtered on ≥10 probes and ≥25kb. Deletions were required to have a mean intensity ≤ log<sub>2</sub>(0.7) and duplications were required to have a mean intensity ≥  log<sub>2</sub>(1.4).  
+ * **TCGA**: CNVs were filtered on ≥10 probes and ≥25kb. Deletions were required to have a mean intensity ≤ log<sub>2</sub>(0.6) and duplications were required to have a mean intensity ≥  log<sub>2</sub>(1.45).  
  * **UKBB**: CNVs were filtered on quality score ≥17 and CNV size ≥25kb. After CNV filtering, samples with >10 CNV calls were excluded as outliers as well as any samples with known malignant cancers or chromosomal disorders (e.g., Down's Syndrome or sex chromosome aneuploidies).  
 
 #### CNV defragmentation  
@@ -80,6 +80,8 @@ Seven studies were unable to be defragmented due to inadequate sample-level info
 ### Raw CNV callset properties  
 
 The properties of each callset are listed below after initial data processing steps but prior to further filtering.  
+
+As [described below](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#case-control-metacohorts), we subdivided 13,139 control samples from the UKBB cohort to use as proxy controls for cases from GeneDx; these cohorts are referred to as `UKBB_main` and `UKBB_sub` for the main UKBB cohort and the subset of 13,139 controls, respectively.  
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
@@ -169,7 +171,9 @@ The information for this table was collected using `collect_cohort_stats.sh`, an
 
 For analyses, we combined CNV data from multiple cohorts into seven matched groups, dubbed **metacohorts**, to control for technical differences between individual data sources and cohorts.  
 
-Individual cohorts were assigned to metacohorts on the basis of similarity in CNV counts across the genome, which matched expectations based on platforms and processing pipelines for each callset.  
+Individual cohorts were assigned to metacohorts on the basis of similarity in sample recruitment protocols, microarray probesets, and other technical factors.  
+
+We did not modify cohorts that had matched cases and controls with one exception: as the UKBB Axiom array design most closely matched the predominant array platform used by the GeneDx cohort, we randomly selected 13,139 controls from the UKBB (dubbed `UKBB_sub`) to group with GeneDx cases in the `meta2` metacohort. We retained all remaining UKBB samples (dubbed `UKBB_main`) in the `meta5` metacohort.  
 
 These metacohorts represent the basic unit on which all burden testing was performed, and are described in the table below.  
 

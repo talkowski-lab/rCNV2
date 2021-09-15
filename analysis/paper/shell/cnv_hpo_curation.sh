@@ -53,7 +53,6 @@ echo -e "BioVU\tphenos/BioVU.final_cooccurrence_table.tsv.gz" >> precomp_pairs.t
 
 
 # Reorder HPO terms based on hierarchical clustering (for ordering in plots)
-# TODO: COULD CONSIDER ADDING DEV/ADULT TO THIS SPLIT
 /opt/rCNV2/analysis/paper/scripts/misc_setup/reorder_hpo_terms.py \
   --outfile ${prefix}.reordered_hpos.txt \
   refs/phenotype_groups.HPO_metadata.txt \
