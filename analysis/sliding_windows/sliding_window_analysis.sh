@@ -27,9 +27,6 @@ gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
 
 
-
-
-
 ### Determine probe density-based conditional exclusion list
 # NOTE: This code must be run using a DIFFERENT DOCKER: us.gcr.io/broad-dsmap/athena-cloud
 # Test/dev parameters
