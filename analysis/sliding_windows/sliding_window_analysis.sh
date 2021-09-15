@@ -27,9 +27,6 @@ gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
 
 
-
-
-
 ### Determine probe density-based conditional exclusion list
 # NOTE: This code must be run using a DIFFERENT DOCKER: us.gcr.io/broad-dsmap/athena-cloud
 # Test/dev parameters
@@ -58,6 +55,7 @@ done > probeset_tracks.tsv
 /opt/rCNV2/data_curation/other/probe_based_exclusion.py \
   --outfile ${binned_genome_prefix}.cohort_exclusion.bed.gz \
   --probecounts-outfile ${binned_genome_prefix}.probe_counts.bed.gz \
+  --control-mean-counts-outfile ${binned_genome_prefix}.mean_probe_counts_per_cohort.bed.gz \
   --frac-pass-outfile ${binned_genome_prefix}.frac_passing.bed.gz \
   --min-probes ${min_probes_per_window} \
   --min-frac-samples ${min_frac_controls_probe_exclusion} \
@@ -322,6 +320,7 @@ while read prefix hpo; do
         --conditional-exclusion ${exclusion_bed} \
         --p-is-phred \
         --spa \
+        --adjust-biobanks \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
@@ -469,6 +468,7 @@ while read prefix hpo; do
       --conditional-exclusion ${exclusion_bed} \
       --p-is-phred \
       --spa \
+      --adjust-biobanks \
       ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
       ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
     bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed

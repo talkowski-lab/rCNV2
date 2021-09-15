@@ -9,6 +9,9 @@ meta(
   cohorts,
   model = "fe",
   saddle = T,
+  adjust.biobanks = F,
+  probe.counts = NULL,
+  winsorize = 1,
   calc.fdr = T,
   secondary = T,
   keep.n.cols = 3
@@ -24,15 +27,20 @@ meta(
 \item{saddle}{boolean indicator of whether to apply saddlepoint approximation
 (see \code{\link[=saddlepoint.adj]{saddlepoint.adj()}}) [default: TRUE]}
 
+\item{adjust.biobanks}{boolean indicator to include biobank status as a categorical
+covariate in meta-analysis model [default: FALSE]}
+
+\item{probe.counts}{data frame of control probe counts (see \code{Details}) [default: NULL]}
+
+\item{winsorize}{Winzorization interval for saddlepoint adjustment
+(see \code{\link[=saddlepoint.adj]{saddlepoint.adj()}}) [default: 1, i.e., no Winsorization]}
+
 \item{calc.fdr}{boolean indicator to calculate B-H FDR q-value per locus [default: TRUE]}
 
 \item{secondary}{boolean indicator to also compute meta-analysis statistics
 after dropping most significant individual cohort [default: TRUE]}
 
 \item{keep.n.cols}{number of columns from original BED format to retain}
-
-\item{winsorize}{Winzorization interval for saddlepoint adjustment
-(see \code{\link[=saddlepoint.adj]{saddlepoint.adj()}}) [default: 1, i.e., no Winsorization]}
 }
 \value{
 data frame of meta-analysis summary statistics
@@ -47,4 +55,7 @@ Conduct CNV association meta-analyses for one or more cohorts at one or more loc
 \item \code{re} : random-effects model implemented by \code{\link[metafor:rma.uni]{metafor::rma.uni()}}
 \item \code{mh} : Mantel-Haenszel model implemented by \code{\link[metafor:rma.mh]{metafor::rma.mh()}}
 }
+
+\code{probe.counts} must be a BED-style data frame matching the exact entries in
+stats.merged with one numeric column of probe counts for each cohort.
 }

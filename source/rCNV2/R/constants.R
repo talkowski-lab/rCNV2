@@ -104,6 +104,7 @@ load.rcnv.env <- function(load.strings=TRUE, load.colors=TRUE, load.scales=TRUE)
                         "meta5" = "UKBB",
                         "meta6" = "EstBB",
                         "meta7" = "BioVU"),
+      biobanks = c("meta5", "meta6", "meta7"),
       pheno.abbrevs = c("Mixed", "Neuro.", "Non-Neuro."),
       neuro.hpos = c("HP:0000707", "HP:0000708", "HP:0012639", "HP:0031466",
                      "HP:0012759", "HP:0002011", "HP:0007302", "HP:0000759",

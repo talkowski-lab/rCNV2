@@ -209,6 +209,7 @@ task build_exclusion_list {
     /opt/rCNV2/data_curation/other/probe_based_exclusion.py \
       --outfile ${crbs_prefix}.cohort_exclusion.bed.gz \
       --probecounts-outfile ${crbs_prefix}.probe_counts.bed.gz \
+      --control-mean-counts-outfile ${crbs_prefix}.mean_probe_counts_per_cohort.bed.gz \
       --frac-pass-outfile ${crbs_prefix}.frac_passing.bed.gz \
       --min-probes ${min_probes_per_crb} \
       --min-frac-samples ${min_frac_controls_probe_exclusion} \
@@ -230,6 +231,7 @@ task build_exclusion_list {
   output {
     File exclusion_bed = "${crbs_prefix}.cohort_exclusion.bed.gz"
     File probe_counts = "${crbs_prefix}.probe_counts.bed.gz"
+    File control_mean_counts = "${crbs_prefix}.mean_probe_counts_per_cohort.bed.gz"
     File frac_passing = "${crbs_prefix}.frac_passing.bed.gz"
   }  
 }
@@ -606,6 +608,7 @@ task meta_analysis {
         --conditional-exclusion ${exclusion_bed} \
         --p-is-phred \
         --spa \
+        --adjust-biobanks \
         --keep-n-columns 4 \
         ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed
@@ -706,6 +709,7 @@ task coding_meta_analysis {
         --p-is-phred \
         --keep-n-columns 4 \
         --spa \
+        --adjust-biobanks \
         ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed

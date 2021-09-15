@@ -4,7 +4,14 @@
 \alias{make.meta.lookup.table}
 \title{Create meta-analysis lookup table}
 \usage{
-make.meta.lookup.table(stats.merged, cohorts, model, empirical.continuity = T)
+make.meta.lookup.table(
+  stats.merged,
+  cohorts,
+  model,
+  adjust.biobanks = F,
+  probe.counts = NULL,
+  empirical.continuity = T
+)
 }
 \arguments{
 \item{stats.merged}{association statistics for all cohorts (see \code{\link[=combine.single.cohort.assoc.stats]{combine.single.cohort.assoc.stats()}})}
@@ -12,6 +19,11 @@ make.meta.lookup.table(stats.merged, cohorts, model, empirical.continuity = T)
 \item{cohorts}{vector of all cohort names}
 
 \item{model}{specify meta-analysis model to use (see \code{Details})}
+
+\item{adjust.biobanks}{boolean indicator to include biobank status as a categorical
+covariate in meta-analysis model [default: FALSE]}
+
+\item{probe.counts}{data frame of control probe counts (see \code{Details}) [default: NULL]}
 
 \item{empirical.continuity}{boolean indicator to apply Sweeting empirical
 continuity correction [default: TRUE]}
@@ -29,4 +41,7 @@ Make meta-analysis lookup table to shorten time required to run full meta-analys
 \item \code{re} : random-effects model implemented by \code{\link[metafor:rma.uni]{metafor::rma.uni()}}
 \item \code{mh} : Mantel-Haenszel model implemented by \code{\link[metafor:rma.mh]{metafor::rma.mh()}}
 }
+
+\code{probe.counts} must be a BED-style data frame matching the exact entries in
+stats.merged with one numeric column of probe counts for each cohort.
 }

@@ -130,13 +130,29 @@ yes "HEALTHY_CONTROL" \
 >> cleaned_phenos/all/PGC.cleaned_phenos.txt
 
 
-# Make dummy phenotype files for control-only cohorts (Cooper & TCGA)
-for cohort in Cooper TCGA; do
+# Make dummy phenotype files for control-only cohorts (Cooper, GSD, Ontario, TCGA)
+for cohort in Cooper GSD Ontario TCGA; do
   yes "HEALTHY_CONTROL" \
   | head -n $( fgrep ${cohort} /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f4 ) \
   | awk -v OFS="\t" -v cohort=${cohort} '{ print cohort"_CONTROL_"NR, $1 }' \
   > cleaned_phenos/all/${cohort}.cleaned_phenos.txt
 done
+
+
+# Make dummy phenotype file for RUMC ID cases
+echo -e "dummy\tintellectual_disability" > id.dummy.tsv
+time /opt/rCNV2/data_curation/phenotype/indication_to_HPO.py \
+  --obo hp.obo \
+  -s /opt/rCNV2/refs/hpo/supplementary_hpo_mappings.tsv \
+  -x /opt/rCNV2/refs/hpo/break_hpo_mappings.tsv \
+  --no-match-default "HP:0000001;HP:0000118;UNKNOWN" \
+  -o id.conversion_table.txt \
+  id.dummy.tsv
+yes $( fgrep "dummy" id.conversion_table.txt | cut -f2 ) \
+| head -n $( fgrep RUMC /opt/rCNV2/refs/rCNV_sample_counts.txt | cut -f3 ) \
+| awk -v OFS="\t" '{ print "RUMC_CASE_"NR, $1 }' \
+> cleaned_phenos/all/RUMC.cleaned_phenos.txt
+
 
 
 # Tabulate UKBB ICD-10 dictionary of all terms with at least 48 samples for manual review
