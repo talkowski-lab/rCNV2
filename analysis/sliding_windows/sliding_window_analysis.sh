@@ -320,7 +320,6 @@ while read prefix hpo; do
         --conditional-exclusion ${exclusion_bed} \
         --p-is-phred \
         --spa \
-        --adjust-biobanks \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
@@ -468,7 +467,6 @@ while read prefix hpo; do
       --conditional-exclusion ${exclusion_bed} \
       --p-is-phred \
       --spa \
-      --adjust-biobanks \
       ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
       ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
     bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed

@@ -34,6 +34,8 @@ option_list <- list(
               help="apply saddlepoint approximation of null distribution [default %default]"),
   make_option(c("--adjust-biobanks"), action="store_true", default=FALSE,
               help="include biobank label as a covariate in meta-analysis [default %default]"),
+  make_option(c("--min-cases"), default=1, type="numeric", metavar="integer",
+              help="minimum number of cases required for a cohort to be included in meta-analysis [default %default]"),
   make_option(c("--probe-counts"), type="character", metavar="path", default=NULL,
               help="BED file with one column of control probe counts per cohort (will be used as covariate) [default %default]"),
   make_option(c("--no-fdr"), action="store_true", default=FALSE,
@@ -60,6 +62,7 @@ cond.excl.in <- opts$`conditional-exclusion`
 p.is.phred <- opts$`p-is-phred`
 spa <- opts$spa
 adjust.biobanks <- opts$`adjust-biobanks`
+min.cases <- opts$`min-cases`
 probe.counts.in <- opts$`probe-counts`
 calc.fdr <- !(opts$`no-fdr`)
 secondary <- !(opts$`no-secondary`)
@@ -67,15 +70,16 @@ keep.n.cols <- opts$`keep-n-columns`
 
 # # Dev parameters
 # setwd("~/scratch")
-# infile <- "HP0000707.rCNV.DEL.sliding_window.meta_analysis.input.txt"
-# outfile <- "HP0000707.rCNV.DEL.sliding_window.meta_analysis.stats.bed"
+# infile <- "HP0001370.rCNV.DEL.sliding_window.meta_analysis.input.txt"
+# outfile <- "HP0001370.rCNV.DEL.sliding_window.meta_analysis.stats.bed"
 # corplot.out <- "corplot.test.jpg"
 # model <- "fe"
 # cond.excl.in <- "GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz"
 # p.is.phred <- T
 # spa <- T
 # adjust.biobanks <- T
-# probe.counts.in <- "GRCh37.200kb_bins_10kb_steps.raw.mean_probe_counts_per_cohort.bed.gz"
+# min.cases <- 100
+# probe.counts.in <- NULL
 # calc.fdr <- T
 # secondary <- T
 # keep.n.cols <- 3
@@ -111,11 +115,13 @@ if(!is.null(corplot.out)){
 }
 
 # Conduct meta-analysis & write to file
-stats.merged <- combine.single.cohort.assoc.stats(stats.list, cond.excl.in, keep.n.cols)
+stats.merged <- combine.single.cohort.assoc.stats(stats.list, cond.excl.in,
+                                                  min.cases, keep.n.cols)
 stats.meta <- meta(stats.merged, cohort.info[, 1], model=model,
                    saddle=spa, adjust.biobanks=adjust.biobanks,
-                   probe.counts=probe.counts, calc.fdr=calc.fdr,
-                   secondary=secondary, keep.n.cols=keep.n.cols)
+                   min.cases=min.cases, probe.counts=probe.counts,
+                   calc.fdr=calc.fdr, secondary=secondary,
+                   keep.n.cols=keep.n.cols)
 colnames(stats.meta)[1] <- "#chr"
 write.table(stats.meta, outfile, sep="\t",
             row.names=F, col.names=T, quote=F)

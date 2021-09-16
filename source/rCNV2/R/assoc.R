@@ -285,6 +285,7 @@ or.corplot.grid <- function(stats.list, pt.cex=1){
 #'
 #' @param stats.list list of single-cohort association stats
 #' @param cond.excl.in path to BED file of cohorts to be excluded on locus-specific basis
+#' @param min.cases minimum number of cases required to include a cohort in meta-analysis
 #' @param keep.n.cols number of columns from original BED format to retain
 #'
 #' @return data frame of association stats for all cohorts
@@ -293,7 +294,7 @@ or.corplot.grid <- function(stats.list, pt.cex=1){
 #'
 #' @export
 combine.single.cohort.assoc.stats <- function(stats.list, cond.excl.in=NULL,
-                                              keep.n.cols=3){
+                                              min.cases=1, keep.n.cols=3){
   # Merge all cohorts
   merged <- stats.list[[1]]
   mergeby.cols <- colnames(merged)[1:keep.n.cols]
@@ -322,6 +323,20 @@ combine.single.cohort.assoc.stats <- function(stats.list, cond.excl.in=NULL,
                     all.x=T, all.y=F, sort=F)
   }else{
     merged$exclude_cohorts <- ""
+  }
+
+  # Identify cohorts below min.cases threshold to be excluded
+  low.caseCount.cohorts <- unlist(sapply(names(stats.list), function(cohort){
+    df <- stats.list[[cohort]]
+    n.cases <- max(apply(head(df[, grep(".case_", colnames(df), fixed=T)], 20), 1, sum, na.rm=T), na.rm=T)
+    if(n.cases < min.cases){
+      return(cohort)
+    }
+  }))
+  if(!is.null(low.caseCount.cohorts)){
+    merged$exclude_cohorts <- as.character(sapply(merged$exclude_cohorts, function(xstr){
+      paste(sort(unique(c(unlist(strsplit(xstr, split=";")), low.caseCount.cohorts))), collapse=";")
+    }))
   }
 
   return(as.data.frame(merged))

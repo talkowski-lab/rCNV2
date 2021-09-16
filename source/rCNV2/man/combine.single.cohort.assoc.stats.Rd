@@ -7,6 +7,7 @@
 combine.single.cohort.assoc.stats(
   stats.list,
   cond.excl.in = NULL,
+  min.cases = 1,
   keep.n.cols = 3
 )
 }
@@ -14,6 +15,8 @@ combine.single.cohort.assoc.stats(
 \item{stats.list}{list of single-cohort association stats}
 
 \item{cond.excl.in}{path to BED file of cohorts to be excluded on locus-specific basis}
+
+\item{min.cases}{minimum number of cases required to include a cohort in meta-analysis}
 
 \item{keep.n.cols}{number of columns from original BED format to retain}
 }
