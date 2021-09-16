@@ -427,7 +427,7 @@ plot.qq <- function(stats, cutoff=NULL, highlights=NULL,
       }
     }
 
-    axis(x.ax, at=axTicks(1), labels=NA, tck=0)
+    axis(x.ax, at=c(0, 10e10), labels=NA, tck=0)
     axis(x.ax, at=axTicks(1), tick=F, line=-1.1, cex.axis=0.75, labels=abs(axTicks(1)))
     if(x.title == T){
       mtext(x.ax, text=expression(Expected ~ ~-log[10](italic(p))),
@@ -439,6 +439,7 @@ plot.qq <- function(stats, cutoff=NULL, highlights=NULL,
     }else{
       y.at <- seq(0, ceiling(par("usr")[4]), by=ceiling(par("usr")[4]/6))
     }
+    axis(2, at=c(0, 10e10), labels=NA, tck=0)
     axis(2, at=y.at, labels=NA, tck=-0.02)
     axis(2, at=y.at, cex.axis=0.75, tick=F, line=-0.6, las=2, labels=abs(y.at))
     mtext(2, text=expression(Observed ~ ~-log[10](italic(p))),

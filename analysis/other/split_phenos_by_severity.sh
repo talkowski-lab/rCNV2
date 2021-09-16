@@ -103,8 +103,10 @@ while read prefix hpo; do
   if [ $( cat meta_tmp_files/$prefix.meta_input.tsv | wc -l ) -gt 1 ]; then
     /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
       --model "fe" \
-      --keep-n-columns 4 \
       --p-is-phred \
+      --adjust-biobanks \
+      --min-cases 300 \
+      --keep-n-columns 4 \
       meta_tmp_files/$prefix.meta_input.tsv \
       meta_tmp_files/$prefix.stats.tsv
   fi

@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens in sliding windows, genome-wide
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/23/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/24/plain-WDL/descriptor" as scattered_perm
 
 
 workflow sliding_window_analysis {
@@ -25,6 +25,8 @@ workflow sliding_window_analysis {
   Int min_probes_per_window
   Float min_frac_controls_probe_exclusion
   String meta_model_prefix
+  Float winsorize_meta_z
+  Int meta_min_cases
   Float meta_secondary_p_cutoff
   Float meta_or_cutoff
   Int meta_nominal_cohorts_cutoff
@@ -94,6 +96,8 @@ workflow sliding_window_analysis {
         p_cutoff=p_cutoff,
         n_pheno_perms=n_pheno_perms,
         meta_model_prefix=meta_model_prefix,
+        winsorize_meta_z=winsorize_meta_z,
+        meta_min_cases=meta_min_cases,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker,
         prefix=pheno[0],
@@ -150,6 +154,8 @@ workflow sliding_window_analysis {
         meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
         max_manhattan_phred_p=max_manhattan_phred_p,
         meta_model_prefix=meta_model_prefix,
+        winsorize_meta_z=winsorize_meta_z,
+        meta_min_cases=meta_min_cases,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker,
         prefix=pheno[0],
@@ -520,6 +526,8 @@ task meta_analysis {
   Array[File] meta_p_cutoff_tables
   Int max_manhattan_phred_p
   String meta_model_prefix
+  Float winsorize_meta_z
+  Int meta_min_cases
   String rCNV_bucket
   String rCNV_docker
   String prefix
@@ -582,6 +590,9 @@ task meta_analysis {
         --conditional-exclusion ${exclusion_bed} \
         --p-is-phred \
         --spa \
+        --winsorize ${winsorize_meta_z} \
+        --adjust-biobanks \
+        --min-cases ${meta_min_cases} \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed

@@ -102,6 +102,8 @@ meta_model_prefix="fe"
 bin_overlap=0.5
 pad_controls=50000
 max_manhattan_phred_p=30
+winsorize_meta_z=0.98
+meta_min_cases=300
 
 
 
@@ -235,7 +237,7 @@ gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 while read prefix hpo; do
   for i in $( seq 1 ${n_pheno_perms} ); do
 
-    # Shuffle phenotypes for each metacohort CNV dataset, and restrict CNVs from
+    # Shuffle phenotypes for each metacohort CNV dataset, and restrict CNVs to
     # phenotype of relevance
     if ! [ -e shuffled_cnv/ ]; then
       mkdir shuffled_cnv/
@@ -245,30 +247,14 @@ while read prefix hpo; do
 
       cnvbed="cleaned_cnv/$meta.${freq_code}.bed.gz"
 
-      # Determine CNV size quintiles
+      # Shuffle phenotypes, matching by CNV type
       for CNV in DEL DUP; do
-        zcat $cnvbed \
-        | awk -v CNV="$CNV" '{ if ($1 !~ "#" && $5==CNV) print $3-$2 }' \
-        | /opt/rCNV2/utils/quantiles.py \
-          --quantiles "0,0.2,0.4,0.6,0.8,1.0" \
-          --no-header \
-        > $meta.$CNV.quantiles.tsv
-      done
-
-      # Shuffle phenotypes, matching by CNV type and size quintile
-      for CNV in DEL DUP; do
-        for qr in $( seq 1 5 ); do
-          smin=$( awk -v qr="$qr" '{ if (NR==qr) print $2 }' $meta.$CNV.quantiles.tsv )
-          smax=$( awk -v qr="$qr" '{ if (NR==(qr+1)) print $2 + 1 }' $meta.$CNV.quantiles.tsv )
-          zcat $cnvbed | sed '1d' \
-          | awk -v smin="$smin" -v smax="$smax" -v CNV="$CNV" \
-            '{ if ($3-$2>=smin && $3-$2<smax && $5==CNV) print $0 }' \
-          > cnv_subset.bed
-          paste <( cut -f1-5 cnv_subset.bed ) \
-                <( cut -f6 cnv_subset.bed | shuf --random-source seed_$i.txt ) \
-          | awk -v hpo=${hpo} '{ if ($NF ~ "HEALTHY_CONTROL" || $NF ~ hpo) print $0 }'
-          rm cnv_subset.bed
-        done
+        zcat $cnvbed | fgrep -w $CNV \
+        > cnv_subset.bed
+        paste <( cut -f1-5 cnv_subset.bed ) \
+              <( cut -f6 cnv_subset.bed | shuf --random-source seed_$i.txt ) \
+        | awk -v hpo=${hpo} '{ if ($NF ~ "HEALTHY_CONTROL" || $NF ~ hpo) print $0 }'
+        rm cnv_subset.bed
       done \
       | sort -Vk1,1 -k2,2n -k3,3n \
       | cat <( tabix -H $cnvbed ) - \
@@ -320,6 +306,9 @@ while read prefix hpo; do
         --conditional-exclusion ${exclusion_bed} \
         --p-is-phred \
         --spa \
+        --winsorize ${winsorize_meta_z} \
+        --adjust-biobanks \
+        --min-cases ${meta_min_cases} \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
@@ -467,6 +456,9 @@ while read prefix hpo; do
       --conditional-exclusion ${exclusion_bed} \
       --p-is-phred \
       --spa \
+      --winsorize ${winsorize_meta_z} \
+      --adjust-biobanks \
+      --min-cases ${meta_min_cases} \
       ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
       ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
     bgzip -f ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed

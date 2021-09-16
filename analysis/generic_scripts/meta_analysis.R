@@ -32,6 +32,8 @@ option_list <- list(
               help="provided P-values are Phred-scaled (-log10(P)) [default %default]"),
   make_option(c("--spa"), action="store_true", default=FALSE,
               help="apply saddlepoint approximation of null distribution [default %default]"),
+  make_option(c("--winsorize"), default=1, type="numeric", metavar="float",
+              help="maximum quantile of meta-analysis statistics to include when applying --spa option [default %default]"),
   make_option(c("--adjust-biobanks"), action="store_true", default=FALSE,
               help="include biobank label as a covariate in meta-analysis [default %default]"),
   make_option(c("--min-cases"), default=1, type="numeric", metavar="integer",
@@ -61,6 +63,7 @@ model <- opts$model
 cond.excl.in <- opts$`conditional-exclusion`
 p.is.phred <- opts$`p-is-phred`
 spa <- opts$spa
+winsorize <- opts$winsorize
 adjust.biobanks <- opts$`adjust-biobanks`
 min.cases <- opts$`min-cases`
 probe.counts.in <- opts$`probe-counts`
@@ -77,8 +80,9 @@ keep.n.cols <- opts$`keep-n-columns`
 # cond.excl.in <- "GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz"
 # p.is.phred <- T
 # spa <- T
+# winsorize <- 1
 # adjust.biobanks <- T
-# min.cases <- 100
+# min.cases <- 300
 # probe.counts.in <- NULL
 # calc.fdr <- T
 # secondary <- T
@@ -119,7 +123,7 @@ stats.merged <- combine.single.cohort.assoc.stats(stats.list, cond.excl.in,
                                                   min.cases, keep.n.cols)
 stats.meta <- meta(stats.merged, cohort.info[, 1], model=model,
                    saddle=spa, adjust.biobanks=adjust.biobanks,
-                   min.cases=min.cases, probe.counts=probe.counts,
+                   probe.counts=probe.counts, winsorize=winsorize,
                    calc.fdr=calc.fdr, secondary=secondary,
                    keep.n.cols=keep.n.cols)
 colnames(stats.meta)[1] <- "#chr"
