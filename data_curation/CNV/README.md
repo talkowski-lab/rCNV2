@@ -50,7 +50,7 @@ Some datasets required manual curation prior to inclusion. Where necessary, thes
  * **GDX**: All CNVs were required to be ≥20kb and <40Mb in length. Except for the minority of 9,958 samples for which additional CNV call metadata was unavailable, all CNVs were further required to not have been annotated as a suspected false positive or mosaic event, have estimated copy numbers ≤1.5 for deletions or ≥2.5 for duplications, include ≥10 probes and have P(CNV) ≤ 10<sup>-10</sup>. Following CNV call filtering, we excluded all samples that either had >10 calls each, were identified as potential biological replicates, were referred for testing due to being a relative of a known carrier of a medically relevant CNV, or had “advanced maternal age” as their indication for testing.
  * **SSC**: CNVs were filtered on pCNV ≤10<sup>-9</sup>, per recommendation of the authors.  
  * **SickKids**: CNVs were filtered on ≥25kb. After CNV filtering, samples with >80 CNV calls were excluded as outliers. Finally, we identified a single locus on chr12 that had CNVs only appearing in ADHD samples at 2.8% frequency; these CNVs were removed from the callset.  
- * **TCGA**: CNVs were filtered on ≥10 probes and ≥25kb. Deletions were required to have a mean intensity ≤ log<sub>2</sub>(0.7) and duplications were required to have a mean intensity ≥  log<sub>2</sub>(1.4).  
+ * **TCGA**: CNVs were filtered on ≥10 probes and ≥25kb. Deletions were required to have a mean intensity ≤ log<sub>2</sub>(0.6) and duplications were required to have a mean intensity ≥  log<sub>2</sub>(1.45).  
  * **UKBB**: CNVs were filtered on quality score ≥17 and CNV size ≥25kb. After CNV filtering, samples with >10 CNV calls were excluded as outliers as well as any samples with known malignant cancers or chromosomal disorders (e.g., Down's Syndrome or sex chromosome aneuploidies).  
 
 #### CNV defragmentation  
@@ -81,6 +81,8 @@ Seven studies were unable to be defragmented due to inadequate sample-level info
 
 The properties of each callset are listed below after initial data processing steps but prior to further filtering.  
 
+As [described below](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#case-control-metacohorts), we subdivided 13,139 control samples from the UKBB cohort to use as proxy controls for cases from GeneDx; these cohorts are referred to as `UKBB_main` and `UKBB_sub` for the main UKBB cohort and the subset of 13,139 controls, respectively.  
+
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
 | BCH | 3,591 | 5,159 | 1.44 | 204.0 kb | 1:1.27 | 0 | 0 | 0 | NA | NA |  
@@ -95,9 +97,10 @@ The properties of each callset are listed below after initial data processing st
 | RUMC | 5,531 | 1,777 | 0.32 | 1090.0 kb | 1:1.00 | 0 | 0 | 0 | NA | NA |  
 | SSC | 2,795 | 30,856 | 11.04 | 21.0 kb | 3.09:1 | 0 | 0 | 0 | NA | NA |  
 | SickKids | 2,689 | 72,278 | 26.88 | 55.0 kb | 1.04:1 | 0 | 0 | 0 | NA | NA |  
-| TCGA | 0 | 0 | 0 | NA | NA | 8,670 | 298,833 | 34.47 | 61.0 kb | 1.16:1 |  
+| TCGA | 0 | 0 | 0 | NA | NA | 8,670 | 206,758 | 23.85 | 60.0 kb | 1:1.16 |  
 | TSAICG | 2,434 | 3,541 | 1.45 | 91.0 kb | 1.01:1 | 4,093 | 5,834 | 1.43 | 91.0 kb | 1:1.08 |  
-| UKBB | 54,071 | 140,082 | 2.59 | 88.0 kb | 5.62:1 | 375,800 | 963,956 | 2.57 | 87.0 kb | 5.68:1 |  
+| UKBB_main | 54,071 | 140,082 | 2.59 | 88.0 kb | 5.62:1 | 362,661 | 930,043 | 2.56 | 87.0 kb | 5.69:1 |  
+| UKBB_sub | 0 | 0 | 0 | NA | NA | 13,139 | 33,913 | 2.58 | 86.0 kb | 5.64:1 |  
 | EstBB | 63,183 | 226,083 | 3.58 | 83.0 kb | 1:1.45 | 15,659 | 56,267 | 3.59 | 83.0 kb | 1:1.46 |  
 | BioVU | 32,306 | 58,955 | 1.82 | 133.0 kb | 1:1.32 | 14,661 | 27,411 | 1.87 | 132.0 kb | 1:1.40 |  
 
@@ -140,24 +143,24 @@ The properties of each rare CNV callset are listed below after the above filteri
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
-| BCH | 3,591 | 3,027 | 0.84 | 342.0 kb | 1:1.40 | 0 | 0 | 0 | NA | NA |  
-| CHOP | 153,870 | 91,122 | 0.59 | 193.0 kb | 1:1.08 | 24,161 | 16,810 | 0.7 | 186.0 kb | 1:1.02 |  
-| Coe | 29,104 | 19,639 | 0.67 | 264.0 kb | 1:1.18 | 11,256 | 9,245 | 0.82 | 177.0 kb | 1:1.58 |  
+| BCH | 3,591 | 3,028 | 0.84 | 342.0 kb | 1:1.40 | 0 | 0 | 0 | NA | NA |  
+| CHOP | 153,870 | 91,184 | 0.59 | 193.0 kb | 1:1.08 | 24,161 | 16,819 | 0.7 | 186.0 kb | 1:1.01 |  
+| Coe | 29,104 | 19,640 | 0.67 | 264.0 kb | 1:1.18 | 11,256 | 9,279 | 0.82 | 177.0 kb | 1:1.59 |  
 | Cooper | 0 | 0 | 0 | NA | NA | 8,329 | 4,183 | 0.5 | 170.0 kb | 1.38:1 |  
-| Epi25k | 12,053 | 8,987 | 0.75 | 176.0 kb | 1:1.07 | 8,173 | 5,611 | 0.69 | 185.0 kb | 1:1.14 |  
-| GDX | 74,028 | 45,043 | 0.61 | 283.0 kb | 1:1.47 | 0 | 0 | 0 | NA | NA |  
+| Epi25k | 12,053 | 8,989 | 0.75 | 176.0 kb | 1:1.07 | 8,173 | 5,611 | 0.69 | 185.0 kb | 1:1.14 |  
+| GDX | 74,028 | 45,051 | 0.61 | 283.0 kb | 1:1.47 | 0 | 0 | 0 | NA | NA |  
 | IU | 1,577 | 1,651 | 1.05 | 209.0 kb | 1:1.34 | 0 | 0 | 0 | NA | NA |  
-| Ontario | 0 | 0 | 0 | NA | NA | 873 | 743 | 0.85 | 181.0 kb | 1:1.51 |  
+| Ontario | 0 | 0 | 0 | NA | NA | 873 | 745 | 0.85 | 182.0 kb | 1:1.50 |  
 | PGC | 21,094 | 14,660 | 0.69 | 190.0 kb | 1:1.34 | 20,277 | 13,272 | 0.65 | 182.0 kb | 1:1.33 |  
 | RUMC | 5,531 | 1,486 | 0.27 | 1059.0 kb | 1.03:1 | 0 | 0 | 0 | NA | NA |  
 | SSC | 2,795 | 2,151 | 0.77 | 195.0 kb | 1:1.15 | 0 | 0 | 0 | NA | NA |  
 | SickKids | 2,689 | 3,879 | 1.44 | 181.0 kb | 1:1.35 | 0 | 0 | 0 | NA | NA |  
-| TCGA | 0 | 0 | 0 | NA | NA | 8,670 | 12,064 | 1.39 | 175.0 kb | 1:1.53 |  
+| TCGA | 0 | 0 | 0 | NA | NA | 8,670 | 8,710 | 1.0 | 178.0 kb | 1:1.71 |  
 | TSAICG | 2,434 | 1,607 | 0.66 | 198.0 kb | 1:1.31 | 4,093 | 2,663 | 0.65 | 187.0 kb | 1:1.36 |  
-| UKBB | 54,071 | 28,636 | 0.53 | 180.0 kb | 2.50:1 | 375,800 | 194,016 | 0.52 | 178.0 kb | 2.57:1 |  
-| EstBB | 63,183 | 32,860 | 0.52 | 185.0 kb | 1:1.14 | 15,659 | 8,203 | 0.52 | 182.0 kb | 1:1.13 |  
+| UKBB_main | 54,071 | 28,690 | 0.53 | 180.0 kb | 2.50:1 | 362,661 | 187,626 | 0.52 | 177.0 kb | 2.57:1 |  
+| UKBB_sub | 0 | 0 | 0 | NA | NA | 13,139 | 6,758 | 0.51 | 176.0 kb | 2.62:1 |  
+| EstBB | 63,183 | 32,868 | 0.52 | 185.0 kb | 1:1.14 | 15,659 | 8,206 | 0.52 | 182.0 kb | 1:1.13 |  
 | BioVU | 32,306 | 27,239 | 0.84 | 179.0 kb | 1:1.22 | 14,661 | 12,118 | 0.83 | 176.0 kb | 1:1.25 |  
-
 
 The information for this table was collected using `collect_cohort_stats.sh`, and is visualized below using `plot_cnv_stats_per_cohort.R`.  
 
@@ -169,17 +172,19 @@ The information for this table was collected using `collect_cohort_stats.sh`, an
 
 For analyses, we combined CNV data from multiple cohorts into seven matched groups, dubbed **metacohorts**, to control for technical differences between individual data sources and cohorts.  
 
-Individual cohorts were assigned to metacohorts on the basis of similarity in CNV counts across the genome, which matched expectations based on platforms and processing pipelines for each callset.  
+Individual cohorts were assigned to metacohorts on the basis of similarity in sample recruitment protocols, microarray probesets, and other technical factors.  
+
+We did not modify cohorts that had matched cases and controls with one exception: as the UKBB Axiom array design most closely matched the predominant array platform used by the GeneDx cohort, we randomly selected 13,139 controls from the UKBB (dubbed `UKBB_sub`) to group with GeneDx cases in the `meta2` metacohort. We retained all remaining UKBB samples (dubbed `UKBB_main`) in the `meta5` metacohort.  
 
 These metacohorts represent the basic unit on which all burden testing was performed, and are described in the table below.  
 
 | Metacohort ID | Case Source(s) | Number of Cases | Control Sources(s) | Number of Controls |  
 | :--- | :--- | ---: | :--- | ---: |  
-| `meta1` | BCH, Coe, IU, TSAICG | 36,706 | Coe, TSAICG | 15,349 |  
-| `meta2` | GDX | 74,028 | Cooper, Ontario, TCGA | 17,872 |  
-| `meta3` | Epi25k, PGC, RUMC, SSC, SickKids | 44,162 | Epi25k, PGC | 28,450 |  
+| `meta1` | BCH, Coe, IU | 34,272 | Coe, Cooper | 19,585 |  
+| `meta2` | Epi25k, GDX, TSAICG | 88,515 | Epi25k, Ontario, TSAICG, UKBB_sub | 26,278 |  
+| `meta3` | PGC, RUMC, SSC, SickKids | 32,109 | PGC, TCGA | 28,947 |  
 | `meta4` | CHOP | 153,870 | CHOP | 24,161 |  
-| `meta5` | UKBB | 54,071 | UKBB | 375,800 |  
+| `meta5` | UKBB_main | 54,071 | UKBB_main | 362,661 |  
 | `meta6` | EstBB | 63,183 | EstBB | 15,659 |  
 | `meta7` | BioVU | 32,306 | BioVU | 14,661 |  
 
@@ -187,12 +192,12 @@ These metacohorts represent the basic unit on which all burden testing was perfo
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
-| meta1 | 36,706 | 25,924 | 0.71 | 264.0 kb | 1:1.22 | 15,349 | 11,908 | 0.78 | 179.0 kb | 1:1.53 |  
-| meta2 | 74,028 | 45,043 | 0.61 | 283.0 kb | 1:1.47 | 17,872 | 16,990 | 0.95 | 174.0 kb | 1:1.27 |  
-| meta3 | 44,162 | 31,163 | 0.71 | 193.0 kb | 1:1.22 | 28,450 | 18,883 | 0.66 | 183.0 kb | 1:1.27 |  
-| meta4 | 153,870 | 91,122 | 0.59 | 193.0 kb | 1:1.08 | 24,161 | 16,810 | 0.7 | 186.0 kb | 1:1.02 |  
-| meta5 | 54,071 | 28,636 | 0.53 | 180.0 kb | 2.50:1 | 375,800 | 194,016 | 0.52 | 178.0 kb | 2.57:1 |  
-| meta6 | 63,183 | 32,860 | 0.52 | 185.0 kb | 1:1.14 | 15,659 | 8,203 | 0.52 | 182.0 kb | 1:1.13 |  
+| meta1 | 34,272 | 24,319 | 0.71 | 266.0 kb | 1:1.22 | 19,585 | 13,462 | 0.69 | 174.0 kb | 1:1.24 |  
+| meta2 | 88,515 | 55,647 | 0.63 | 256.0 kb | 1:1.39 | 26,278 | 15,777 | 0.6 | 181.0 kb | 1.31:1 |  
+| meta3 | 32,109 | 22,176 | 0.69 | 201.0 kb | 1:1.29 | 28,947 | 21,982 | 0.76 | 180.0 kb | 1:1.47 |  
+| meta4 | 153,870 | 91,184 | 0.59 | 193.0 kb | 1:1.08 | 24,161 | 16,819 | 0.7 | 186.0 kb | 1:1.01 |  
+| meta5 | 54,071 | 28,690 | 0.53 | 180.0 kb | 2.50:1 | 362,661 | 187,626 | 0.52 | 177.0 kb | 2.57:1 |  
+| meta6 | 63,183 | 32,868 | 0.52 | 185.0 kb | 1:1.14 | 15,659 | 8,206 | 0.52 | 182.0 kb | 1:1.13 |  
 | meta7 | 32,306 | 27,239 | 0.84 | 179.0 kb | 1:1.22 | 14,661 | 12,118 | 0.83 | 176.0 kb | 1:1.25 |  
 
 ![Rare CNV stats](https://storage.googleapis.com/rcnv_project/public/rCNV.metacohort.stats.jpg)  
@@ -223,13 +228,13 @@ The code to apply these filters is contained in `extract_noncoding_subsets.sh`.
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
-| meta1 | 36,706 | 7,144 | 0.19 | 187.0 kb | 1.33:1 | 15,349 | 4,838 | 0.32 | 160.0 kb | 1.57:1 |  
-| meta2 | 74,028 | 10,234 | 0.14 | 183.0 kb | 1.54:1 | 17,872 | 6,346 | 0.36 | 155.0 kb | 2.33:1 |  
-| meta3 | 44,162 | 12,195 | 0.28 | 160.0 kb | 1.54:1 | 28,450 | 8,231 | 0.29 | 164.0 kb | 1.60:1 |  
-| meta4 | 153,870 | 38,756 | 0.25 | 168.0 kb | 1.77:1 | 24,161 | 7,773 | 0.32 | 165.0 kb | 2.04:1 |  
-| meta5 | 54,071 | 11,872 | 0.22 | 162.0 kb | 4.26:1 | 375,800 | 83,150 | 0.22 | 162.0 kb | 4.33:1 |  
-| meta6 | 63,183 | 14,201 | 0.22 | 165.0 kb | 1.78:1 | 15,659 | 3,585 | 0.23 | 165.0 kb | 1.75:1 |  
-| meta7 | 32,306 | 10,941 | 0.34 | 168.0 kb | 1.91:1 | 14,661 | 4,888 | 0.33 | 168.0 kb | 1.80:1 |  
+| meta1 | 34,272 | 5,306 | 0.15 | 192.0 kb | 1.32:1 | 19,585 | 4,588 | 0.23 | 158.0 kb | 1.91:1 |  
+| meta2 | 88,515 | 12,644 | 0.14 | 174.0 kb | 1.65:1 | 26,278 | 5,896 | 0.22 | 166.0 kb | 2.49:1 |  
+| meta3 | 32,109 | 7,070 | 0.22 | 163.0 kb | 1.63:1 | 28,947 | 7,309 | 0.25 | 158.0 kb | 1.89:1 |  
+| meta4 | 153,870 | 33,003 | 0.21 | 166.0 kb | 1.85:1 | 24,161 | 6,590 | 0.27 | 165.0 kb | 2.14:1 |  
+| meta5 | 54,071 | 9,876 | 0.18 | 164.0 kb | 5.07:1 | 362,661 | 66,811 | 0.18 | 164.0 kb | 4.98:1 |  
+| meta6 | 63,183 | 12,339 | 0.2 | 165.0 kb | 1.89:1 | 15,659 | 3,094 | 0.2 | 165.0 kb | 1.86:1 |  
+| meta7 | 32,306 | 9,381 | 0.29 | 167.0 kb | 2.03:1 | 14,661 | 4,211 | 0.29 | 167.0 kb | 1.93:1 |  
 
 ![Strictly noncoding rare CNV stats](https://storage.googleapis.com/rcnv_project/public/strict_noncoding.metacohort.stats.jpg)  
 
@@ -237,13 +242,13 @@ The code to apply these filters is contained in `extract_noncoding_subsets.sh`.
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
-| meta1 | 36,706 | 5,895 | 0.16 | 189.0 kb | 1.36:1 | 15,349 | 4,015 | 0.26 | 160.0 kb | 1.69:1 |  
-| meta2 | 74,028 | 8,773 | 0.12 | 183.0 kb | 1.61:1 | 17,872 | 5,517 | 0.31 | 152.0 kb | 2.52:1 |  
-| meta3 | 44,162 | 10,346 | 0.23 | 160.0 kb | 1.66:1 | 28,450 | 6,840 | 0.24 | 164.0 kb | 1.70:1 |  
-| meta4 | 153,870 | 32,944 | 0.21 | 166.0 kb | 1.85:1 | 24,161 | 6,581 | 0.27 | 165.0 kb | 2.14:1 |  
-| meta5 | 54,071 | 9,872 | 0.18 | 164.0 kb | 5.06:1 | 375,800 | 69,235 | 0.18 | 164.0 kb | 4.99:1 |  
-| meta6 | 63,183 | 12,333 | 0.2 | 165.0 kb | 1.89:1 | 15,659 | 3,091 | 0.2 | 165.0 kb | 1.86:1 |  
-| meta7 | 32,306 | 9,381 | 0.29 | 167.0 kb | 2.03:1 | 14,661 | 4,211 | 0.29 | 167.0 kb | 1.93:1 |  
+| meta1 | 34,272 | 6,449 | 0.19 | 189.0 kb | 1.30:1 | 19,585 | 5,485 | 0.28 | 159.0 kb | 1.79:1 |  
+| meta2 | 88,515 | 14,786 | 0.17 | 174.0 kb | 1.57:1 | 26,278 | 7,049 | 0.27 | 165.0 kb | 2.32:1 |  
+| meta3 | 32,109 | 8,344 | 0.26 | 162.0 kb | 1.50:1 | 28,947 | 8,709 | 0.3 | 159.0 kb | 1.74:1 |  
+| meta4 | 153,870 | 38,817 | 0.25 | 168.0 kb | 1.78:1 | 24,161 | 7,782 | 0.32 | 166.0 kb | 2.04:1 |  
+| meta5 | 54,071 | 11,876 | 0.22 | 162.0 kb | 4.26:1 | 362,661 | 80,208 | 0.22 | 162.0 kb | 4.33:1 |  
+| meta6 | 63,183 | 14,209 | 0.22 | 165.0 kb | 1.78:1 | 15,659 | 3,588 | 0.23 | 165.0 kb | 1.75:1 |  
+| meta7 | 32,306 | 10,941 | 0.34 | 168.0 kb | 1.91:1 | 14,661 | 4,888 | 0.33 | 168.0 kb | 1.80:1 |  
 
 ![Loose noncoding rare CNV stats](https://storage.googleapis.com/rcnv_project/public/loose_noncoding.metacohort.stats.jpg)  
 

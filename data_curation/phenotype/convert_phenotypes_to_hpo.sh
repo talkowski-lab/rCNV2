@@ -22,7 +22,7 @@ alias addcom="sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta'"
 # Copy all raw phenotype data from the project Google Bucket (note: requires permissions)
 gcloud auth login
 mkdir raw_phenos/
-gsutil cp -r gs://rcnv_project/raw_data/phenotypes/* raw_phenos/
+gsutil -m cp -r gs://rcnv_project/raw_data/phenotypes/* raw_phenos/
 mkdir cleaned_phenos/
 mkdir cleaned_phenos/all/
 mkdir cleaned_phenos/intermediate/
@@ -197,9 +197,12 @@ sort -Vk2,2 raw_phenos/UKBB.raw_phenos.txt \
 | join -1 2 -2 1 -t $'\t' - <( sort -Vk1,1 UKBB.raw_phenos.conversion_table.txt ) \
 | cut -f2-3 | sort -Vk1,1 \
 > cleaned_phenos/all/UKBB.cleaned_phenos.preQC.txt
-fgrep -wf raw_phenos/UKBB.QC_pass_samples.list \
-  cleaned_phenos/all/UKBB.cleaned_phenos.preQC.txt \
-> cleaned_phenos/all/UKBB.cleaned_phenos.txt
+for suf in main sub; do
+  join -t $'\t' \
+    raw_phenos/UKBB_$suf.samples.txt \
+    cleaned_phenos/all/UKBB.cleaned_phenos.preQC.txt \
+  > cleaned_phenos/all/UKBB_$suf.cleaned_phenos.txt
+done
 
 
 # Pool all phenotypes across cohorts
@@ -337,7 +340,7 @@ while read cohort; do
       phenotype_groups.HPO_metadata.txt
   fi
 done < <( cut -f1 /opt/rCNV2/refs/rCNV_sample_counts.txt )
-for cohort in UKBB CHOP; do
+for cohort in UKBB CHOP Epi25k; do
   /opt/rCNV2/data_curation/phenotype/filter_HPO_per_sample.py \
     -o cleaned_phenos/filtered/${cohort}.cleaned_phenos.preQC.txt \
     cleaned_phenos/all/${cohort}.cleaned_phenos.preQC.txt \
