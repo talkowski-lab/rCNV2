@@ -285,8 +285,9 @@ or.corplot.grid <- function(stats.list, pt.cex=1){
 #'
 #' @param stats.list list of single-cohort association stats
 #' @param cond.excl.in path to BED file of cohorts to be excluded on locus-specific basis
-#' @param min.cases minimum number of cases required to include a cohort in meta-analysis
-#' @param keep.n.cols number of columns from original BED format to retain
+#' @param min.cases minimum number of cases required to include a cohort in meta-analysis \[default: 1\]
+#' @param keep.n.cols number of columns from original BED format to retain \[default: 3\]
+#' @param min.case.lookahead number of head rows to consider when evaluating `min.cases` criteria \[default: 20\]
 #'
 #' @return data frame of association stats for all cohorts
 #'
@@ -294,7 +295,8 @@ or.corplot.grid <- function(stats.list, pt.cex=1){
 #'
 #' @export
 combine.single.cohort.assoc.stats <- function(stats.list, cond.excl.in=NULL,
-                                              min.cases=1, keep.n.cols=3){
+                                              min.cases=1, keep.n.cols=3,
+                                              min.case.lookahead=20){
   # Merge all cohorts
   merged <- stats.list[[1]]
   mergeby.cols <- colnames(merged)[1:keep.n.cols]
@@ -328,7 +330,8 @@ combine.single.cohort.assoc.stats <- function(stats.list, cond.excl.in=NULL,
   # Identify cohorts below min.cases threshold to be excluded
   low.caseCount.cohorts <- unlist(sapply(names(stats.list), function(cohort){
     df <- stats.list[[cohort]]
-    n.cases <- max(apply(head(df[, grep(".case_", colnames(df), fixed=T)], 20), 1, sum, na.rm=T), na.rm=T)
+    n.cases <- max(apply(head(df[, grep(".case_", colnames(df), fixed=T)],
+                              min.case.lookahead), 1, sum, na.rm=T), na.rm=T)
     if(n.cases < min.cases){
       return(cohort)
     }
@@ -340,6 +343,28 @@ combine.single.cohort.assoc.stats <- function(stats.list, cond.excl.in=NULL,
   }
 
   return(as.data.frame(merged))
+}
+
+
+#' Estimate cohort inflation terms
+#'
+#' Estimates mean genome-wide effect size inflation per cohort
+#'
+#' @param stats.merged association statistics merged across cohorts as read by [combine.single.cohort.assoc.stats()]
+#' @param cohorts list of cohorts to evaluate
+#'
+#' @return named vector with mean log odds ratio for each cohort
+#'
+#' @seealso [combine.single.cohort.assoc.stats()]
+#'
+#' @export
+estimate.cohort.inflation <- function(stats.merged, cohorts){
+  # Iterate over cohorts
+  res <- as.numeric(sapply(cohorts, function(cohort){
+    mean(log(stats.merged[, paste(cohort, "odds_ratio", sep=".")]), na.rm=T)
+  }))
+  names(res) <- cohorts
+  return(res)
 }
 
 
@@ -445,6 +470,8 @@ make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T)
 #' @param model specify meta-analysis model to use (see `Details`)
 #' @param adjust.biobanks boolean indicator to include biobank status as a categorical
 #' covariate in meta-analysis model \[default: FALSE\]
+#' @param cohort.inflation numeric vector of inflation terms for each cohort as
+#' estimated by [estimate.cohort.inflation()] \[default: NULL]
 #' @param probe.counts data frame of control probe counts (see `Details`) \[default: NULL\]
 #' @param empirical.continuity boolean indicator to apply Sweeting empirical
 #' continuity correction \[default: TRUE\]
@@ -465,8 +492,9 @@ make.meta.df <- function(stats.merged, cohorts, row.idx, empirical.continuity=T)
 #'
 #' @export
 meta.single <- function(stats.merged, cohorts, row.idx, model="fe",
-                        adjust.biobanks=F, probe.counts=NULL,
-                        empirical.continuity=T, drop_top_cohort=F){
+                        adjust.biobanks=F, cohort.inflation=NULL,
+                        probe.counts=NULL, empirical.continuity=T,
+                        drop_top_cohort=F){
   # Collect list of cohorts to exclude
   exclude.cohorts <- unlist(strsplit(stats.merged$exclude_cohorts[row.idx], split=";"))
   if(drop_top_cohort == TRUE){
@@ -499,11 +527,15 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="fe",
         adjust.biobanks <- FALSE
       }
       # Add covariates, if optioned
-      if(adjust.biobanks | !is.null(probe.counts)){
+      if(adjust.biobanks | !is.null(cohort.inflation) | !is.null(probe.counts)){
         mods <- c()
         if(adjust.biobanks){
           meta.df$is_biobank <- as.numeric(meta.df$cohort_name %in% biobanks)
           mods <- c(mods, "is_biobank")
+        }
+        if(!is.null(cohort.inflation)){
+          meta.df$inflation <- cohort.inflation[meta.df$cohort_name]
+          mods <- c(mods, "inflation")
         }
         if(!is.null(probe.counts)){
           meta.df$probe_count <- as.numeric(probe.counts[row.idx, meta.df$cohort_name])
@@ -578,6 +610,8 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="fe",
 #' @param model specify meta-analysis model to use (see `Details`)
 #' @param adjust.biobanks boolean indicator to include biobank status as a categorical
 #' covariate in meta-analysis model \[default: FALSE\]
+#' @param cohort.inflation numeric vector of inflation terms for each cohort as
+#' estimated by [estimate.cohort.inflation()] \[default: NULL]
 #' @param probe.counts data frame of control probe counts (see `Details`) \[default: NULL\]
 #' @param empirical.continuity boolean indicator to apply Sweeting empirical
 #' continuity correction \[default: TRUE\]
@@ -594,7 +628,8 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="fe",
 #'
 #' @export
 make.meta.lookup.table <- function(stats.merged, cohorts, model, adjust.biobanks=F,
-                                   probe.counts=NULL, empirical.continuity=T){
+                                   cohort.inflation=NULL, probe.counts=NULL,
+                                   empirical.continuity=T){
   # Make dataframe of CNV counts sorted by cohort
   counts.df <- stats.merged[, sort(unique(c(grep("_ref", colnames(stats.merged), fixed=T),
                                             grep("_alt", colnames(stats.merged), fixed=T),
@@ -607,7 +642,7 @@ make.meta.lookup.table <- function(stats.merged, cohorts, model, adjust.biobanks
 
   # Compute meta-analysis stats for all rows in counts.df
   meta.stats <- t(sapply(1:nrow(counts.df), function(i){
-    meta.single(counts.df, cohorts, i, model, adjust.biobanks,
+    meta.single(counts.df, cohorts, i, model, adjust.biobanks, cohort.inflation,
                 probe.counts, empirical.continuity)
   }))
 
@@ -627,6 +662,7 @@ make.meta.lookup.table <- function(stats.merged, cohorts, model, adjust.biobanks
 #' @param zscores numeric vector of Z-scores
 #' @param winsorize width of quantile intervals to Winsorize \[default: 1, i.e., no Winsorization\]
 #' @param winsorize.left.tail boolean indicator to apply Winsorization to left tail of distribution \[default: FALSE\]
+#' @param mirror mirror bottom 50% of Z-scores \[default: FALSE\]
 #' @param phred boolean indicator of whether to -log10-scale adjusted P-values
 #'
 #' @return data.frame with two columns:
@@ -634,13 +670,18 @@ make.meta.lookup.table <- function(stats.merged, cohorts, model, adjust.biobanks
 #' * `$pvalues` for P-values corresponding to corrected Z-scores
 #'
 #' @export
-saddlepoint.adj <- function(zscores, winsorize=1, winsorize.left.tail=F, phred=T){
+saddlepoint.adj <- function(zscores, winsorize=1, winsorize.left.tail=F, mirror=F, phred=T){
   zscores.orig <- zscores
   winsor.bounds <- quantile(zscores, probs=c(1-winsorize, winsorize), na.rm=T)
   if(winsorize.left.tail){
     zscores[which(zscores < winsor.bounds[1])] <- winsor.bounds[1]
   }
   zscores[which(zscores > winsor.bounds[2])] <- winsor.bounds[2]
+  if(mirror){
+    z.med <- median(zscores, na.rm=T)
+    bottomhalf <- zscores[which(zscores <= z.med)]
+    zscores <- c(bottomhalf, abs(bottomhalf - z.med) + z.med)
+  }
   mu.hat <- mean(zscores, na.rm=T)
   sd.hat <- sd(zscores, na.rm=T)
   cumuls <- gaussianCumulants(mu.hat, sd.hat)
@@ -672,9 +713,13 @@ saddlepoint.adj <- function(zscores, winsorize=1, winsorize.left.tail=F, phred=T
 #' (see [saddlepoint.adj()]) \[default: TRUE\]
 #' @param adjust.biobanks boolean indicator to include biobank status as a categorical
 #' covariate in meta-analysis model \[default: FALSE\]
+#' @param cohort.inflation numeric vector of inflation terms for each cohort as
+#' estimated by [estimate.cohort.inflation()] \[default: NULL]
 #' @param probe.counts data frame of control probe counts (see `Details`) \[default: NULL\]
 #' @param winsorize Winzorization interval for saddlepoint adjustment
 #' (see [saddlepoint.adj()]) \[default: 1, i.e., no Winsorization\]
+#' @param mirror.saddle mirror bottom 50% of Z-scores prior to saddlepoint
+#' approximation (see [saddlepoint.adj()]) \[default: FALSE\]
 #' @param calc.fdr boolean indicator to calculate B-H FDR q-value per locus \[default: TRUE\]
 #' @param secondary boolean indicator to also compute meta-analysis statistics
 #' after dropping most significant individual cohort \[default: TRUE\]
@@ -692,11 +737,12 @@ saddlepoint.adj <- function(zscores, winsorize=1, winsorize.left.tail=F, phred=T
 #'
 #' @export
 meta <- function(stats.merged, cohorts, model="fe", saddle=T, adjust.biobanks=F,
-                 probe.counts=NULL, winsorize=1, calc.fdr=T, secondary=T, keep.n.cols=3){
+                 cohort.inflation=NULL, probe.counts=NULL, winsorize=1,
+                 mirror.saddle=F, calc.fdr=T, secondary=T, keep.n.cols=3){
   # Make meta-analysis lookup table
   meta.lookup.table <- make.meta.lookup.table(stats.merged, cohorts, model,
-                                              adjust.biobanks, probe.counts,
-                                              empirical.continuity=T)
+                                              adjust.biobanks, cohort.inflation,
+                                              probe.counts, empirical.continuity=T)
 
   # Merge stats into full list
   if(is.null(probe.counts)){
@@ -712,7 +758,9 @@ meta <- function(stats.merged, cohorts, model="fe", saddle=T, adjust.biobanks=F,
 
   # Adjust P-values using saddlepoint approximation of null distribution, if optioned
   if(saddle==T){
-    meta.res[, c("meta_z", "meta_phred_p")] <- saddlepoint.adj(meta.res$meta_z, winsorize=winsorize)
+    meta.res[, c("meta_z", "meta_phred_p")] <- saddlepoint.adj(meta.res$meta_z,
+                                                               winsorize=winsorize,
+                                                               mirror=mirror.saddle)
   }
 
   # Calculate B-H adjusted q-values, if optioned
@@ -723,14 +771,16 @@ meta <- function(stats.merged, cohorts, model="fe", saddle=T, adjust.biobanks=F,
   # Compute secondary P-value
   if(secondary==T){
     meta.res.secondary <- as.data.frame(t(sapply(1:nrow(meta.res), function(i){
-      meta.single(meta.res, cohorts, i, model, adjust.biobanks, probe.counts,
-                  empirical.continuity=T, drop_top_cohort=T)
+      meta.single(meta.res, cohorts, i, model, adjust.biobanks, cohort.inflation,
+                  probe.counts, empirical.continuity=T, drop_top_cohort=T)
     })))
     colnames(meta.res.secondary) <- c("meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper", "meta_z", "meta_phred_p")
 
     # Saddlepoint on secondary, if optioned
     if(saddle==T){
-      meta.res.secondary[, c("meta_z", "meta_phred_p")] <- saddlepoint.adj(meta.res.secondary$meta_z, winsorize=winsorize)
+      meta.res.secondary[, c("meta_z", "meta_phred_p")] <- saddlepoint.adj(meta.res.secondary$meta_z,
+                                                                           winsorize=winsorize,
+                                                                           mirror=mirror.saddle)
     }
 
     meta.res$meta_lnOR_secondary <- meta.res.secondary$meta_lnOR

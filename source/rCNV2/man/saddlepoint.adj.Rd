@@ -4,7 +4,13 @@
 \alias{saddlepoint.adj}
 \title{Z-score saddlepoint approximation}
 \usage{
-saddlepoint.adj(zscores, winsorize = 1, winsorize.left.tail = F, phred = T)
+saddlepoint.adj(
+  zscores,
+  winsorize = 1,
+  winsorize.left.tail = F,
+  mirror = F,
+  phred = T
+)
 }
 \arguments{
 \item{zscores}{numeric vector of Z-scores}
@@ -12,6 +18,8 @@ saddlepoint.adj(zscores, winsorize = 1, winsorize.left.tail = F, phred = T)
 \item{winsorize}{width of quantile intervals to Winsorize [default: 1, i.e., no Winsorization]}
 
 \item{winsorize.left.tail}{boolean indicator to apply Winsorization to left tail of distribution [default: FALSE]}
+
+\item{mirror}{mirror bottom 50\% of Z-scores [default: FALSE]}
 
 \item{phred}{boolean indicator of whether to -log10-scale adjusted P-values}
 }

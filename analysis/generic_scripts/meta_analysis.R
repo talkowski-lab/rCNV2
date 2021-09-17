@@ -34,8 +34,12 @@ option_list <- list(
               help="apply saddlepoint approximation of null distribution [default %default]"),
   make_option(c("--winsorize"), default=1, type="numeric", metavar="float",
               help="maximum quantile of meta-analysis statistics to include when applying --spa option [default %default]"),
+  make_option(c("--mirror-saddle"), action="store_true", default=FALSE,
+              help="mirror bottom 50% of Z-scores when approximating null distribution via saddlepoint [default %default]"),
   make_option(c("--adjust-biobanks"), action="store_true", default=FALSE,
               help="include biobank label as a covariate in meta-analysis [default %default]"),
+  make_option(c("--adjust-inflation"), action="store_true", default=FALSE,
+              help="estimate baseline effect size inflation factor per cohort and include as a covariate in meta-analysis [default %default]"),
   make_option(c("--min-cases"), default=1, type="numeric", metavar="integer",
               help="minimum number of cases required for a cohort to be included in meta-analysis [default %default]"),
   make_option(c("--probe-counts"), type="character", metavar="path", default=NULL,
@@ -64,7 +68,9 @@ cond.excl.in <- opts$`conditional-exclusion`
 p.is.phred <- opts$`p-is-phred`
 spa <- opts$spa
 winsorize <- opts$winsorize
+mirror.saddle <- opts$`mirror-saddle`
 adjust.biobanks <- opts$`adjust-biobanks`
+adjust.inflation <- opts$`adjust-inflation`
 min.cases <- opts$`min-cases`
 probe.counts.in <- opts$`probe-counts`
 calc.fdr <- !(opts$`no-fdr`)
@@ -73,15 +79,17 @@ keep.n.cols <- opts$`keep-n-columns`
 
 # # Dev parameters
 # setwd("~/scratch")
-# infile <- "HP0002360.rCNV.DEL.sliding_window.meta_analysis.input.txt"
-# outfile <- "HP0002360.rCNV.DEL.sliding_window.meta_analysis.stats.bed"
+# infile <- "HP0012759.rCNV.DEL.sliding_window.meta_analysis.input.txt"
+# outfile <- "HP0012759.rCNV.DEL.sliding_window.meta_analysis.stats.bed"
 # corplot.out <- "corplot.test.jpg"
 # model <- "fe"
 # cond.excl.in <- "GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz"
 # p.is.phred <- T
 # spa <- T
 # winsorize <- 1
-# adjust.biobanks <- T
+# mirror.saddle <- T
+# adjust.biobanks <- F
+# adjust.inflation <- F
 # min.cases <- 300
 # probe.counts.in <- NULL
 # calc.fdr <- T
@@ -121,9 +129,15 @@ if(!is.null(corplot.out)){
 # Conduct meta-analysis & write to file
 stats.merged <- combine.single.cohort.assoc.stats(stats.list, cond.excl.in,
                                                   min.cases, keep.n.cols)
+if(adjust.inflation){
+  cohort.inflation <- estimate.cohort.inflation(stats.merged, cohort.info[, 1])
+}else{
+  cohort.inflation <- NULL
+}
 stats.meta <- meta(stats.merged, cohort.info[, 1], model=model,
                    saddle=spa, adjust.biobanks=adjust.biobanks,
-                   probe.counts=probe.counts, winsorize=winsorize,
+                   cohort.inflation=cohort.inflation, probe.counts=probe.counts,
+                   winsorize=winsorize, mirror.saddle=mirror.saddle,
                    calc.fdr=calc.fdr, secondary=secondary,
                    keep.n.cols=keep.n.cols)
 colnames(stats.meta)[1] <- "#chr"

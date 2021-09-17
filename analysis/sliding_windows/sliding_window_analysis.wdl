@@ -545,16 +545,21 @@ task meta_analysis {
     #   ${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/** \
     #   ./
 
-    # Get metadata for meta-analysis
-    mega_idx=$( head -n1 "${metacohort_sample_table}" \
-                | sed 's/\t/\n/g' \
-                | awk '{ if ($1=="mega") print NR }' )
+    # Get metadata for meta-analysis (while accounting for cohorts below inclusion criteria)
+    last_cohort_col=$( head -n1 "${metacohort_sample_table}" | awk '{ print NF-1 }' )
+    keep_cols=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+                 | cut -f4-$last_cohort_col \
+                 | sed 's/\t/\n/g' \
+                 | awk -v min_n=${meta_min_cases} '{ if ($1>=min_n) print NR+3 }' \
+                 | paste -s -d, )
     ncase=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
-             | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
-             | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+             | cut -f$keep_cols \
+             | sed 's/\t/\n/g' \
+             | awk '{ sum+=$1 }END{ print sum }' )
     nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
-             | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
-             | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+             | cut -f$keep_cols \
+             | sed 's/\t/\n/g' \
+             | awk '{ sum+=$1 }END{ print sum }' )
     descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
                | awk -v FS="\t" '{ print $2 }' )
     title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
@@ -590,6 +595,7 @@ task meta_analysis {
         --conditional-exclusion ${exclusion_bed} \
         --p-is-phred \
         --spa \
+        --mirror-saddle \
         --winsorize ${winsorize_meta_z} \
         --adjust-biobanks \
         --min-cases ${meta_min_cases} \

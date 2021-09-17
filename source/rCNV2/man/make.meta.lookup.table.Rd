@@ -9,6 +9,7 @@ make.meta.lookup.table(
   cohorts,
   model,
   adjust.biobanks = F,
+  cohort.inflation = NULL,
   probe.counts = NULL,
   empirical.continuity = T
 )
@@ -22,6 +23,9 @@ make.meta.lookup.table(
 
 \item{adjust.biobanks}{boolean indicator to include biobank status as a categorical
 covariate in meta-analysis model [default: FALSE]}
+
+\item{cohort.inflation}{numeric vector of inflation terms for each cohort as
+estimated by \code{\link[=estimate.cohort.inflation]{estimate.cohort.inflation()}} [default: NULL]}
 
 \item{probe.counts}{data frame of control probe counts (see \code{Details}) [default: NULL]}
 

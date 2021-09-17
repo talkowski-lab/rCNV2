@@ -10,8 +10,10 @@ meta(
   model = "fe",
   saddle = T,
   adjust.biobanks = F,
+  cohort.inflation = NULL,
   probe.counts = NULL,
   winsorize = 1,
+  mirror.saddle = F,
   calc.fdr = T,
   secondary = T,
   keep.n.cols = 3
@@ -30,10 +32,16 @@ meta(
 \item{adjust.biobanks}{boolean indicator to include biobank status as a categorical
 covariate in meta-analysis model [default: FALSE]}
 
+\item{cohort.inflation}{numeric vector of inflation terms for each cohort as
+estimated by \code{\link[=estimate.cohort.inflation]{estimate.cohort.inflation()}} [default: NULL]}
+
 \item{probe.counts}{data frame of control probe counts (see \code{Details}) [default: NULL]}
 
 \item{winsorize}{Winzorization interval for saddlepoint adjustment
 (see \code{\link[=saddlepoint.adj]{saddlepoint.adj()}}) [default: 1, i.e., no Winsorization]}
+
+\item{mirror.saddle}{mirror bottom 50\% of Z-scores prior to saddlepoint
+approximation (see \code{\link[=saddlepoint.adj]{saddlepoint.adj()}}) [default: FALSE]}
 
 \item{calc.fdr}{boolean indicator to calculate B-H FDR q-value per locus [default: TRUE]}
 

@@ -158,6 +158,7 @@ task permuted_burden_test {
         --conditional-exclusion ${exclusion_bed} \
         --p-is-phred \
         --spa \
+        --mirror-saddle \
         --winsorize ${winsorize_meta_z} \
         --adjust-biobanks \
         --min-cases ${meta_min_cases} \
