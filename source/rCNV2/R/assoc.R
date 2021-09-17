@@ -494,6 +494,10 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="fe",
     n.cnvs <- sum(stats.merged.sub[, grep("_alt", colnames(stats.merged.sub), fixed=T)])
     if(n.cnvs > 0){
       meta.df <- make.meta.df(stats.merged.sub, cohorts, 1, empirical.continuity)
+      # Disable biobank correction term if there aren't at least two biobanks & two non-biobanks
+      if(length(which(cohorts %in% biobanks)) < 2 | length(which(!(cohorts %in% biobanks))) < 2){
+        adjust.biobanks <- FALSE
+      }
       # Add covariates, if optioned
       if(adjust.biobanks | !is.null(probe.counts)){
         mods <- c()

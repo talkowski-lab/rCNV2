@@ -64,33 +64,33 @@ echo -e "#chr\tstart\tend\tgene\tcds\tcontrol_cnvs\tcontrol_cnvs_weighted\tcase_
 > meta_tmp_files/counts_header.tsv
 while read prefix hpo; do
 
-  # Compute single-cohort effect sizes for meta-analysis
-  while read meta cohorts; do
-    if [ -e $meta.constrained_del_counts.per_hpo.tsv ]; then
-      # Make synthetic counts
-      n_ctrl=$( awk -v hpo="HEALTHY_CONTROL" '{ if ($1==hpo) print $2; else print "0"}' \
-                  $meta.constrained_del_counts.per_hpo.tsv \
-                | sort -nrk1,1 | uniq | head -n1 )
-      n_case=$( awk -v hpo="$hpo" '{ if ($1==hpo) print $2; else print "0"}' \
-                  $meta.constrained_del_counts.per_hpo.tsv \
-                | sort -nrk1,1 | uniq | head -n1 )
-      echo -e "1\t1\t2\tall_constrained_genes\t$( cat gencode.v19.canonical.constrained.coords.bed | wc -l )" \
-      | awk -v n_ctrl="$n_ctrl" -v n_case="$n_case" -v OFS="\t" \
-        '{ print $0, n_ctrl, n_ctrl, n_case, n_case }' \
-      | cat meta_tmp_files/counts_header.tsv - \
-      | bgzip -c > meta_tmp_files/$meta.$prefix.constrained_del_counts.bed.gz
+  # # Compute single-cohort effect sizes for meta-analysis
+  # while read meta cohorts; do
+  #   if [ -e $meta.constrained_del_counts.per_hpo.tsv ]; then
+  #     # Make synthetic counts
+  #     n_ctrl=$( awk -v hpo="HEALTHY_CONTROL" '{ if ($1==hpo) print $2; else print "0"}' \
+  #                 $meta.constrained_del_counts.per_hpo.tsv \
+  #               | sort -nrk1,1 | uniq | head -n1 )
+  #     n_case=$( awk -v hpo="$hpo" '{ if ($1==hpo) print $2; else print "0"}' \
+  #                 $meta.constrained_del_counts.per_hpo.tsv \
+  #               | sort -nrk1,1 | uniq | head -n1 )
+  #     echo -e "1\t1\t2\tall_constrained_genes\t$( cat gencode.v19.canonical.constrained.coords.bed | wc -l )" \
+  #     | awk -v n_ctrl="$n_ctrl" -v n_case="$n_case" -v OFS="\t" \
+  #       '{ print $0, n_ctrl, n_ctrl, n_case, n_case }' \
+  #     | cat meta_tmp_files/counts_header.tsv - \
+  #     | bgzip -c > meta_tmp_files/$meta.$prefix.constrained_del_counts.bed.gz
 
-      # Compute single-cohort stats
-      /opt/rCNV2/analysis/generic_scripts/fisher_test_single_cohort.R \
-        --pheno-table refs/HPOs_by_metacohort.table.tsv \
-        --cohort-name $meta \
-        --case-hpo "$hpo" \
-        --keep-n-columns 4 \
-        --bgzip \
-        "meta_tmp_files/$meta.$prefix.constrained_del_counts.bed.gz" \
-        "meta_tmp_files/$meta.$prefix.constrained_del_stats.bed.gz"
-    fi
-  done < <( fgrep -v mega refs/rCNV_metacohort_list.txt )
+  #     # Compute single-cohort stats
+  #     /opt/rCNV2/analysis/generic_scripts/fisher_test_single_cohort.R \
+  #       --pheno-table refs/HPOs_by_metacohort.table.tsv \
+  #       --cohort-name $meta \
+  #       --case-hpo "$hpo" \
+  #       --keep-n-columns 4 \
+  #       --bgzip \
+  #       "meta_tmp_files/$meta.$prefix.constrained_del_counts.bed.gz" \
+  #       "meta_tmp_files/$meta.$prefix.constrained_del_stats.bed.gz"
+  #   fi
+  # done < <( fgrep -v mega refs/rCNV_metacohort_list.txt )
 
   # Compute meta-analysis effect size
   while read meta cohorts; do
@@ -104,7 +104,6 @@ while read prefix hpo; do
     /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
       --model "fe" \
       --p-is-phred \
-      --adjust-biobanks \
       --min-cases 300 \
       --keep-n-columns 4 \
       meta_tmp_files/$prefix.meta_input.tsv \
