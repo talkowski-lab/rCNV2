@@ -154,11 +154,10 @@ task permuted_burden_test {
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
       /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
-        --model ${meta_model_prefix} \
-        --conditional-exclusion ${exclusion_bed} \
+        --model "${meta_model_prefix}" \
+        --conditional-exclusion "${exclusion_bed}" \
         --p-is-phred \
         --spa \
-        --mirror-saddle \
         --winsorize ${winsorize_meta_z} \
         --adjust-biobanks \
         --min-cases ${meta_min_cases} \

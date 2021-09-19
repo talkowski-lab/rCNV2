@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens in sliding windows, genome-wide
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/24/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/26/plain-WDL/descriptor" as scattered_perm
 
 
 workflow sliding_window_analysis {
@@ -595,7 +595,6 @@ task meta_analysis {
         --conditional-exclusion ${exclusion_bed} \
         --p-is-phred \
         --spa \
-        --mirror-saddle \
         --winsorize ${winsorize_meta_z} \
         --adjust-biobanks \
         --min-cases ${meta_min_cases} \
