@@ -4,18 +4,20 @@
 \alias{estimate.cohort.inflation}
 \title{Estimate cohort inflation terms}
 \usage{
-estimate.cohort.inflation(stats.merged, cohorts)
+estimate.cohort.inflation(stats.df)
 }
 \arguments{
-\item{stats.merged}{association statistics merged across cohorts as read by \code{\link[=combine.single.cohort.assoc.stats]{combine.single.cohort.assoc.stats()}}}
-
-\item{cohorts}{list of cohorts to evaluate}
+\item{stats.df}{association statistics for a single cohorts as read by \code{\link[=read.assoc.stats.single]{read.assoc.stats.single()}}}
 }
 \value{
-named vector with mean log odds ratio for each cohort
+named vector with mean standardized log odds ratio for each cohort
 }
 \description{
-Estimates mean genome-wide effect size inflation per cohort
+Estimates mean genome-wide standardized effect size per cohort
+}
+\details{
+Note that \code{keep.or.confint} must be \code{TRUE} when reading data
+with \code{\link[=read.assoc.stats.single]{read.assoc.stats.single()}} for this method to work
 }
 \seealso{
 \code{\link[=combine.single.cohort.assoc.stats]{combine.single.cohort.assoc.stats()}}

@@ -6,6 +6,7 @@
 \usage{
 saddlepoint.adj(
   zscores,
+  xidxs = NULL,
   winsorize = 1,
   winsorize.left.tail = F,
   mirror = F,
@@ -15,9 +16,14 @@ saddlepoint.adj(
 \arguments{
 \item{zscores}{numeric vector of Z-scores}
 
-\item{winsorize}{width of quantile intervals to Winsorize [default: 1, i.e., no Winsorization]}
+\item{xidxs}{optional list of \code{zscores} indexes to exclude when fitting
+saddlepoint [default: include all regions ]}
 
-\item{winsorize.left.tail}{boolean indicator to apply Winsorization to left tail of distribution [default: FALSE]}
+\item{winsorize}{width of quantile intervals to Winsorize
+[default: 1, i.e., no Winsorization]}
+
+\item{winsorize.left.tail}{boolean indicator to apply Winsorization to left
+tail of distribution [default: FALSE]}
 
 \item{mirror}{mirror bottom 50\% of Z-scores [default: FALSE]}
 

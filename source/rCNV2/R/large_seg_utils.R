@@ -200,6 +200,40 @@ get.ndd.region_ids <- function(loci, segs, sig.only=FALSE){
 }
 
 
+#' Split segments by effect size
+#'
+#' Split segments into groups based on effect size quantiles
+#'
+#' @param segs segment dataframe (imported with [load.segment.table()])
+#' @param quantiles number of quantiles to divide \[default: 2\]
+#'
+#' @return list of length `quantiles` with region IDs for each quantile
+#'
+#' @details uses `meta_best_lnor` values while matching on CNV type to
+#' compute quantile cutoffs
+#'
+#' @export split.regions.by.effect.size
+#' @export
+split.regions.by.effect.size <- function(segs, quantiles=2){
+  # Compute quantiles per CNV type
+  quants <- lapply(c("DEL", "DUP"), function(cnv){
+    cutoffs <- as.numeric(quantile(segs$meta_best_lnor[which(segs$cnv==cnv)],
+                                   probs=seq(0, 1, length.out=quantiles+1)))
+    cutoffs[c(1, length(cutoffs))] <- c(-Inf, Inf)
+    return(cutoffs)
+  })
+  names(quants) <- c("DEL", "DUP")
+
+  lapply(1:quantiles, function(i){
+    unique(as.character(unlist(sapply(c("DEL", "DUP"), function(cnv){
+      segs$region_id[which(segs$cnv==cnv
+                           & segs$meta_best_lnor >= quants[[cnv]][i]
+                           & segs$meta_best_lnor < quants[[cnv]][i+1])]
+    }))))
+  })
+}
+
+
 #' Normalize DNM counts
 #'
 #' Normalize segment DNM counts vs. synonymous inflation

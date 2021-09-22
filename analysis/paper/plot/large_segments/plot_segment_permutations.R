@@ -169,6 +169,12 @@ dev.segs <- segs[which(segs$region_id %in% dev.seg.ids), ]
 NDD.seg.ids <- get.ndd.region_ids(loci, segs)
 NDD.segs <- segs[which(segs$region_id %in% NDD.seg.ids), ]
 
+# Get list of strong-effect and weak-effect loci
+seg.ids.by.effect <- split.regions.by.effect.size(segs, quantiles=3)
+weak.seg.ids <- seg.ids.by.effect[[1]]
+moderate.seg.ids <- seg.ids.by.effect[[2]]
+strong.seg.ids <- seg.ids.by.effect[[3]]
+
 # Merge loci & segment data for genome-wide significant sites only
 segs.sig <- merge.loci.segs(loci, segs)
 
@@ -281,6 +287,36 @@ if(!is.null(constrained.in)){
                     pdf.dims.multi=c(4, 3.5),
                     parmar.multi=c(2.25, 6.05, 0, 3.25))
 }
+
+
+# Fraction with at least one constrained gene, split by effect size
+pdf(paste(outdir, "/", prefix, ".frac_constrained_genes.weak_effect_segs_only.pdf", sep=""),
+    height=2.2, width=2.5)
+plot.seg.perms(segs, perms, subset_to_regions=weak.seg.ids,
+               feature="n_gnomAD_constrained_genes", measure="frac.any",
+               n.bins=15,
+               x.title="Pct. w/Constrained Gene",
+               diamond.pch=22,
+               parmar=c(2.2, 2, 0, 2.0))
+dev.off()
+pdf(paste(outdir, "/", prefix, ".frac_constrained_genes.medium_effect_segs_only.pdf", sep=""),
+    height=2.2, width=2.5)
+plot.seg.perms(segs, perms, subset_to_regions=moderate.seg.ids,
+               feature="n_gnomAD_constrained_genes", measure="frac.any",
+               n.bins=15,
+               x.title="Pct. w/Constrained Gene",
+               diamond.pch=22,
+               parmar=c(2.2, 2, 0, 2.0))
+dev.off()
+pdf(paste(outdir, "/", prefix, ".frac_constrained_genes.strong_effect_segs_only.pdf", sep=""),
+    height=2.2, width=2.5)
+plot.seg.perms(segs, perms, subset_to_regions=strong.seg.ids,
+               feature="n_gnomAD_constrained_genes", measure="frac.any",
+               n.bins=15,
+               x.title="Pct. w/Constrained Gene",
+               diamond.pch=22,
+               parmar=c(2.2, 2, 0, 2.0))
+dev.off()
 
 
 # Plot number of BCA breakpoints

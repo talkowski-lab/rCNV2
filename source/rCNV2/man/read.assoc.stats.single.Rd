@@ -4,7 +4,13 @@
 \alias{read.assoc.stats.single}
 \title{Load single-cohort association statistics}
 \usage{
-read.assoc.stats.single(stats.in, prefix, p.is.phred, keep.n.cols = 3)
+read.assoc.stats.single(
+  stats.in,
+  prefix,
+  p.is.phred,
+  keep.n.cols = 3,
+  keep.or.confint = FALSE
+)
 }
 \arguments{
 \item{stats.in}{path to input BED file with association statistics}
@@ -14,9 +20,12 @@ read.assoc.stats.single(stats.in, prefix, p.is.phred, keep.n.cols = 3)
 \item{p.is.phred}{boolean indicator of the P-value being -log10-scaled in \code{stats.in}}
 
 \item{keep.n.cols}{number of columns from original BED format to retain}
+
+\item{keep.or.confint}{boolean indicator to retain confidence intervals for
+odds ratio estimates [default: only keep point estimate]}
 }
 \value{
-data frame of formatted associtation stats
+data frame of formatted association stats
 }
 \description{
 Load association statistics for a single cohort from an input file

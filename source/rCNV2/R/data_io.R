@@ -11,6 +11,25 @@
 # Functions for handling I/O of various preformatted datasets
 
 
+#' Load BED3
+#'
+#' Load a simple BED3 file
+#'
+#' @param bed.in path to input BED fil
+#' @param header boolean indicator if BED has header \[default: TRUE\]
+#'
+#' @return data frame of coordinates
+#'
+#' @export load.bed3
+#' @export
+load.bed3 <- function(bed.in, header=T){
+  bed <- read.table(bed.in, header=header, sep="\t", comment.char="", check.names=F)
+  colnames(bed) <- c("chr", "start", "end")
+  bed[, -1] <- apply(bed[, -1], 2, as.numeric)
+  return(bed)
+}
+
+
 #' Load single-cohort association statistics
 #'
 #' Load association statistics for a single cohort from an input file
@@ -19,19 +38,21 @@
 #' @param prefix cohort name (to be appended to columns)
 #' @param p.is.phred boolean indicator of the P-value being -log10-scaled in `stats.in`
 #' @param keep.n.cols number of columns from original BED format to retain
+#' @param keep.or.confint boolean indicator to retain confidence intervals for
+#' odds ratio estimates \[default: only keep point estimate\]
 #'
-#' @return data frame of formatted associtation stats
+#' @return data frame of formatted association stats
 #'
 #' @export
-read.assoc.stats.single <- function(stats.in, prefix, p.is.phred, keep.n.cols=3){
+read.assoc.stats.single <- function(stats.in, prefix, p.is.phred, keep.n.cols=3,
+                                    keep.or.confint=FALSE){
   # Read data & subset to necessary columns
   stats <- read.table(stats.in, header=T, sep="\t", comment.char="")
   colnames(stats)[1] <- "chr"
   cols.to.keep <- c(colnames(stats)[1:keep.n.cols], "case_alt", "case_ref",
-                    "control_alt", "control_ref", "fisher_phred_p")
+                    "control_alt", "control_ref", "fisher_phred_p",
+                    "fisher_OR", "fisher_OR_lower", "fisher_OR_upper")
   stats <- stats[, which(colnames(stats) %in% cols.to.keep)]
-  stats$odds_ratio <- calc.or(stats$control_ref, stats$control_alt,
-                              stats$case_ref, stats$case_alt)
   colnames(stats)[which(colnames(stats)=="fisher_phred_p")] <- "p_value"
   if(p.is.phred==T){
     stats$p_value <- 10^-stats$p_value
@@ -102,10 +123,13 @@ load.pval.matrix <- function(matrix.in, has.coords=T, ncols.coords=3, p.is.phred
   if(p.is.phred == T){
     pvals <- as.data.frame(apply(pvals, 2, function(x){10^-x}))
   }
-  expected <- ppoints(nrow(pvals))
-  lambdas <- apply(pvals, 2, function(obs){dchisq(median(obs, na.rm=T), df=1)/dchisq(median(expected), df=1)})
+  expected.full <- ppoints(nrow(pvals))
+  lambdas <- apply(pvals, 2, function(obs){
+    expected <- ppoints(length(obs[which(!is.na(obs))]))
+    dchisq(median(obs, na.rm=T), df=1)/dchisq(median(expected), df=1)
+  })
   return(list("coords" = coords, "pvals" = pvals,
-              "expected" = expected, "lambdas" = lambdas))
+              "expected" = expected.full, "lambdas" = lambdas))
 }
 
 

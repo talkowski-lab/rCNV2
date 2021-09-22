@@ -238,6 +238,7 @@ gsutil -m cp \
 # Plot segment permutation results while matching on number of genes per segment
 # Note: depending on the number of permutations, the Docker image RAM may need 
 # to be increased (e.g., 2GB for 100k permutations is insufficient)
+# TODO: DEBUG THIS
 if ! [ -e perm_test_plots ]; then
   mkdir perm_test_plots
 fi
@@ -251,6 +252,7 @@ fi
 
 
 # Plot effect size covariates
+# TODO: DEBUG THIS
 if [ -e effect_size_plots ]; then
   rm -rf effect_size_plots
 fi
