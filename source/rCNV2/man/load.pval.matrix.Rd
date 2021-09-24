@@ -4,7 +4,12 @@
 \alias{load.pval.matrix}
 \title{Load P-value matrix}
 \usage{
-load.pval.matrix(matrix.in, has.coords = T, ncols.coords = 3, p.is.phred = T)
+load.pval.matrix(
+  matrix.in,
+  has.coords = T,
+  ncols.coords = 3,
+  p.is.neg.log10 = T
+)
 }
 \arguments{
 \item{matrix.in}{path to matrix.tsv}
@@ -14,7 +19,7 @@ load.pval.matrix(matrix.in, has.coords = T, ncols.coords = 3, p.is.phred = T)
 \item{ncols.coords}{number of leading columns to treat as coordinates (only
 used if \code{has.coords = TRUE}) [default: \code{3}]}
 
-\item{p.is.phred}{boolean indicator if P-values in matrix are \code{-log10}-scaled}
+\item{p.is.neg.log10}{boolean indicator if P-values in matrix are \code{-log10}-scaled}
 }
 \value{
 list of four objects:

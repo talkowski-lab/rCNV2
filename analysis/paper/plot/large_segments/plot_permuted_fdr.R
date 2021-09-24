@@ -24,7 +24,7 @@ load.hpos <- function(hpos.in){
              "n"=as.numeric(hpos[, 3]))
 }
 
-# Load & phred-scale precomputed FDR matrix
+# Load & neglog10-scale precomputed FDR matrix
 load.fdrs <- function(fdrs.in){
   fdrs <- read.table(fdrs.in, header=T, sep="\t", comment.char="", check.names=F)
   colnames(fdrs) <- sapply(colnames(fdrs), function(x){unlist(strsplit(x, split=".", fixed=T))[1]})

@@ -175,7 +175,7 @@ get.adjusted.cutoffs <- function(cutoff.mat, stat, pred.n=NULL, exclude.outliers
 plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target,
                       model="exponential", title=NULL, linear.fit=F, plot.exp=T, floor=F){
 
-  phred.target <- -log10(fdr.target)
+  neglog10.target <- -log10(fdr.target)
   if(is.null(title)){
     title <- stat
   }
@@ -186,7 +186,7 @@ plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target,
        y=c(0, max(cutoff.mat$fdr.cutoff)),
            type="n", xaxt="n", yaxt="n", xlab="", ylab="")
   points(x=cutoff.mat$n.cases, y=cutoff.mat$fdr.cutoff, col="gray75")
-  abline(h=phred.target, lty=2)
+  abline(h=neglog10.target, lty=2)
 
   # Add trendline
   if(linear.fit==T){
@@ -197,7 +197,7 @@ plot.fdrs <- function(cutoff.mat, cutoff.stat.df, stat, fdr.target,
     fit.df <- data.frame("x"=round(quantile(0:par("usr")[2], probs=seq(0, 1, 0.005))))
     fit.df$y <- predict(fit, newdata=fit.df)
     if(floor==T){
-      fit.df$y[which(fit.df$y < phred.target)] <- phred.target
+      fit.df$y[which(fit.df$y < neglog10.target)] <- neglog10.target
     }
     if(plot.exp==T){
       lines(fit.df$x, fit.df$y, col="red", lwd=3)

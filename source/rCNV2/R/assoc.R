@@ -698,7 +698,7 @@ make.meta.lookup.table <- function(stats.merged, cohorts, model, adjust.biobanks
 #' @param winsorize.left.tail boolean indicator to apply Winsorization to left
 #' tail of distribution \[default: FALSE\]
 #' @param mirror mirror bottom 50% of Z-scores \[default: FALSE\]
-#' @param phred boolean indicator of whether to -log10-scale adjusted P-values
+#' @param neglog10 boolean indicator of whether to -log10-scale adjusted P-values
 #'
 #' @return data.frame with two columns:
 #' * `$zscores` for corrected Z-scores
@@ -706,7 +706,7 @@ make.meta.lookup.table <- function(stats.merged, cohorts, model, adjust.biobanks
 #'
 #' @export
 saddlepoint.adj <- function(zscores, xidxs=NULL, winsorize=1, winsorize.left.tail=F,
-                            mirror=F, phred=T){
+                            mirror=F, neglog10=T){
   zscores.orig <- zscores
   if(!is.null(xidxs)){
     zscores <- zscores[-xidxs]
@@ -732,7 +732,7 @@ saddlepoint.adj <- function(zscores, xidxs=NULL, winsorize=1, winsorize.left.tai
   sd.saddle <- sqrt(sum(saddle.pdf * dx * (x - mu.saddle)^2))
   # Compute new Z-scores and P-values
   new.zscores <- (zscores.orig - mu.saddle) / sd.saddle
-  if(phred==T){
+  if(neglog10==T){
     new.pvals <- -pnorm(new.zscores, lower.tail=FALSE, log.p=TRUE)/log(10)
   }else{
     new.pvals <- pnorm(new.zscores, lower.tail=FALSE)

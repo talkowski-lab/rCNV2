@@ -39,7 +39,7 @@ extract.cohorts <- function(stats){
 }
 
 # Apply saddlepoint approximation to vector of Z-scores to generate adjusted P-values and Z-scores
-saddlepoint.adj <- function(zscores, phred=T, min.p=10e-300){
+saddlepoint.adj <- function(zscores, neglog10=T, min.p=10e-300){
   mu.hat <- mean(zscores, na.rm=T)
   sd.hat <- sd(zscores, na.rm=T)
   zscores <- zscores - mu.hat
@@ -68,9 +68,9 @@ saddlepoint.adj <- function(zscores, phred=T, min.p=10e-300){
   }
   new.stats <- t(sapply(zscores, calc.saddle.p.z))
   colnames(new.stats) <- c("zscore", "p")
-  if(phred==T){
+  if(neglog10==T){
     new.stats[, 2] <- -log10(new.stats[, 2])
-    colnames(new.stats)[2] <- "phred_p"
+    colnames(new.stats)[2] <- "neglog10_p"
   }
   return(as.data.frame(new.stats))
 }
@@ -92,9 +92,9 @@ calc.ors <- function(stats, cohorts, spa=T){
     ors$zscore <- (ors$lnOR - mean(ors$lnOR, na.rm=T)) / sqrt(ors$var)
     # Adjust Z-score with SPA, if optioned
     if(spa==T){
-      adj.z.p <- saddlepoint.adj(ors$zscore, phred=T)
+      adj.z.p <- saddlepoint.adj(ors$zscore, neglog10=T)
       ors$zscore <- adj.z.p$zscore
-      ors$phred_p <- adj.z.p$phred_p
+      ors$neglog10_p <- adj.z.p$neglog10_p
     }
     colnames(ors) <- paste(cohort, colnames(ors), sep=".")
     return(ors)
@@ -111,10 +111,10 @@ weighted.z <- function(stats, cohorts, spa=T){
     weighted.mean(z, inv.var, na.rm=T)
   })
   if(spa==T){
-    meta.z.p <- saddlepoint.adj(meta.z, phred=T)
+    meta.z.p <- saddlepoint.adj(meta.z, neglog10=T)
   }else{
     meta.z.p <- data.frame("zscore" = meta.z,
-                           "phred_p" = -log10(pnorm(abs(meta.z), lower.tail=F)))
+                           "neglog10_p" = -log10(pnorm(abs(meta.z), lower.tail=F)))
   }
   meta.z.p$lnOR <-  sapply(1:nrow(stats), function(i){
     lnor <- stats[i, grep("lnOR", colnames(stats), fixed=T)]
@@ -122,7 +122,7 @@ weighted.z <- function(stats, cohorts, spa=T){
     inv.var <- 1/var
     weighted.mean(lnor, inv.var, na.rm=T)
   })
-  meta.z.p$phred_fdr_q <- -log10(p.adjust(10^-meta.z.p$phred_p, method="fdr"))
+  meta.z.p$neglog10_fdr_q <- -log10(p.adjust(10^-meta.z.p$neglog10_p, method="fdr"))
   colnames(meta.z.p) <- paste("meta", colnames(meta.z.p), sep=".")
   as.data.frame(cbind(stats, meta.z.p))
 }
@@ -130,17 +130,17 @@ weighted.z <- function(stats, cohorts, spa=T){
 # Volcano plot
 volcano <- function(meta.res, p.cutoff=-log10(0.05), color="red", ymax=NULL){
   if(is.null(ymax)){
-    ymax <- max(p.cutoff, max(meta.res$meta.phred_p, na.rm=T))
+    ymax <- max(p.cutoff, max(meta.res$meta.neg.log10_p, na.rm=T))
   }
   ylims <- c(0, ymax)
   xlims <- range(meta.res$meta.lnOR)
-  sig <- which(meta.res$meta.zscore>0 & meta.res$meta.phred_p>=p.cutoff)
+  sig <- which(meta.res$meta.zscore>0 & meta.res$meta.neg.log10_p>=p.cutoff)
   par(mar=c(3.5, 3.5, 1.3, 1))
   plot(NA, xlim=xlims, ylim=ylims, xlab="", ylab="")
   abline(v=0)
   segments(x0=0, x1=par("usr")[2], y0=p.cutoff, y1=p.cutoff, lty=2, col=color)
-  points(meta.res$meta.lnOR[-sig], meta.res$meta.phred_p[-sig], cex=0.2, col="gray30")
-  points(meta.res$meta.lnOR[sig], meta.res$meta.phred_p[sig], cex=0.2, col=color)
+  points(meta.res$meta.lnOR[-sig], meta.res$meta.neg.log10_p[-sig], cex=0.2, col="gray30")
+  points(meta.res$meta.lnOR[sig], meta.res$meta.neg.log10_p[sig], cex=0.2, col=color)
   mtext(1, line=2.25, text=bquote(italic("ln") * (OR)))
   mtext(2, line=2, text=bquote(-log[10](italic(P))))
 }
@@ -204,9 +204,9 @@ meta.res <- as.data.frame(do.call("rbind", meta.res.split))
 # Extract significant track names
 if(!is.null(signif.outfile)){
   if(use.fdr==T){
-    sig.idx <- which(meta.res$meta.phred_fdr_q >= cutoff & meta.res$meta.zscore > 0)
+    sig.idx <- which(meta.res$meta.neg.log10_fdr_q >= cutoff & meta.res$meta.zscore > 0)
   }else{
-    sig.idx <- which(meta.res$meta.phred_p >= cutoff & meta.res$meta.zscore > 0)
+    sig.idx <- which(meta.res$meta.neg.log10_p >= cutoff & meta.res$meta.zscore > 0)
   }
   if(length(sig.idx) > 0){
     sig.tracks <- unique(meta.res[sig.idx, which(colnames(meta.res) %in% c("trackname", "original_path"))])
@@ -224,9 +224,9 @@ write.table(meta.res, outfile, sep="\t",
 if(!is.null(volcano.out)){
   png(volcano.out, height=4*300, width=8*300, res=300)
   par(mfrow=c(1, 2))
-  volcano(meta.res.split$DEL, p.cutoff=cutoff, color="red", ymax=max(meta.res$meta.phred_p, na.rm=T))
+  volcano(meta.res.split$DEL, p.cutoff=cutoff, color="red", ymax=max(meta.res$meta.neg.log10_p, na.rm=T))
   mtext(3, line=0.1, text="Deletions", col="red", font=2)
-  volcano(meta.res.split$DUP, p.cutoff=cutoff, color="blue", ymax=max(meta.res$meta.phred_p, na.rm=T))
+  volcano(meta.res.split$DUP, p.cutoff=cutoff, color="blue", ymax=max(meta.res$meta.neg.log10_p, na.rm=T))
   mtext(3, line=0.1, text="Duplications", col="blue", font=2)
   dev.off()
 }

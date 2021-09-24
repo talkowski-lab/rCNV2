@@ -21,9 +21,9 @@ options(stringsAsFactors=F, scipen=1000)
 plot.volcano <- function(stats, cnv, pt.cex=0.2, blue.bg=FALSE,
                          parmar=c(2.25, 2.25, 0.25, 0.25)){
   # Get plot data
-  plot.df <- stats[which(stats$cnv==cnv), c("meta.lnOR", "meta.phred_p")]
+  plot.df <- stats[which(stats$cnv==cnv), c("meta.lnOR", "meta.neg.log10_p")]
   xlims <- range(stats$meta.lnOR, na.rm=T)
-  ylims <- range(stats$meta.phred_p, na.rm=T)
+  ylims <- range(stats$meta.neg.log10_p, na.rm=T)
   x.label <- paste(c("DEL"="Deletion", "DUP"="Duplication")[cnv], "Odds Ratio")
   if(blue.bg==TRUE){
     plot.bg <- bluewhite

@@ -4,7 +4,7 @@
 \alias{load.meta.stats}
 \title{Load meta-analysis association statistics}
 \usage{
-load.meta.stats(stats.in, p.is.phred, keep.n.cols = 3)
+load.meta.stats(stats.in, p.is.neg.log10, keep.n.cols = 3)
 }
 \arguments{
 \item{stats.in}{path to input BED file with association statistics}

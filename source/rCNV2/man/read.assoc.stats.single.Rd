@@ -7,7 +7,7 @@
 read.assoc.stats.single(
   stats.in,
   prefix,
-  p.is.phred,
+  p.is.neg.log10,
   keep.n.cols = 3,
   keep.or.confint = FALSE
 )
@@ -17,7 +17,7 @@ read.assoc.stats.single(
 
 \item{prefix}{cohort name (to be appended to columns)}
 
-\item{p.is.phred}{boolean indicator of the P-value being -log10-scaled in \code{stats.in}}
+\item{p.is.neg.log10}{boolean indicator of the P-value being -log10-scaled in \code{stats.in}}
 
 \item{keep.n.cols}{number of columns from original BED format to retain}
 

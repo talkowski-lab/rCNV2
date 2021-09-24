@@ -74,7 +74,7 @@ outfile <- args$args[2]
 corplot.out <- opts$`or-corplot`
 model <- opts$model
 cond.excl.in <- opts$`conditional-exclusion`
-p.is.phred <- opts$`p-is-neg-log10`
+p.is.neg.log10 <- opts$`p-is-neg-log10`
 spa <- opts$spa
 spa.xbed.in <- opts$`spa-exclude`
 winsorize <- opts$winsorize
@@ -94,7 +94,7 @@ keep.n.cols <- opts$`keep-n-columns`
 # corplot.out <- "corplot.test.jpg"
 # model <- "fe"
 # cond.excl.in <- "GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz"
-# p.is.phred <- T
+# p.is.neg.log10 <- T
 # spa <- T
 # spa.xbed.in <- "DEL_GDs.bed.gz"
 # winsorize <- 0.99
@@ -111,7 +111,7 @@ keep.n.cols <- opts$`keep-n-columns`
 cohort.info <- read.table(infile, header=F, sep="\t")
 ncohorts <- nrow(cohort.info)
 stats.list <- lapply(1:ncohorts, function(i){
-  read.assoc.stats.single(cohort.info[i, 2], cohort.info[i, 1], p.is.phred,
+  read.assoc.stats.single(cohort.info[i, 2], cohort.info[i, 1], p.is.neg.log10,
                           keep.n.cols, keep.or.confint=TRUE)
 })
 names(stats.list) <- cohort.info[, 1]

@@ -10,7 +10,7 @@ saddlepoint.adj(
   winsorize = 1,
   winsorize.left.tail = F,
   mirror = F,
-  phred = T
+  neglog10 = T
 )
 }
 \arguments{
@@ -27,7 +27,7 @@ tail of distribution [default: FALSE]}
 
 \item{mirror}{mirror bottom 50\% of Z-scores [default: FALSE]}
 
-\item{phred}{boolean indicator of whether to -log10-scale adjusted P-values}
+\item{neglog10}{boolean indicator of whether to -log10-scale adjusted P-values}
 }
 \value{
 data.frame with two columns:

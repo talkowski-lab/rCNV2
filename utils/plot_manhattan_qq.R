@@ -108,7 +108,7 @@ if(miami == F){
   out.prefix <- args$args[3]
 }
 p.col.name <- opts$`p-col-name`
-p.is.phred <- opts$`p-is-neg-log10`
+p.is.neg.log10 <- opts$`p-is-neg-log10`
 min.p <- 10^-(opts$`max-neg-log10-p`)
 cutoff <- opts$cutoff
 highlight.in <- opts$`highlight-bed`
@@ -139,9 +139,9 @@ if(miami == F){
 }
 
 # Load data
-stats <- load.manhattan.stats(stats.in, p.col.name, p.is.phred, min.p)
+stats <- load.manhattan.stats(stats.in, p.col.name, p.is.neg.log10, min.p)
 if(miami == T){
-  stats2 <- load.manhattan.stats(stats2.in, p.col.name, p.is.phred, min.p)
+  stats2 <- load.manhattan.stats(stats2.in, p.col.name, p.is.neg.log10, min.p)
 }
 
 if(!is.na(highlight.in)){

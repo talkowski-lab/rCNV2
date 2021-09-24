@@ -467,7 +467,7 @@ add.bracket <- function(xleft, xright, y0, height, col=blueblack, staple.wex=0.0
   text(x=xleft-staple.width, y=y0, pos=2, col=col, labels=left.label)
 }
 
-# Add panel of phred-scaled P-values 
+# Add panel of neglog10-scaled P-values 
 add.pvalues <- function(ss, y0, cnv.type, panel.height=0.2, pt.cex=0.6, gw.sig=NULL, 
                         min.y=9, gw.sig.label="Genome-wide significance",
                         gw.sig.label.side="above"){

@@ -27,9 +27,9 @@ load.bed <- function(infile){
 
 
 # Load p-value matrix
-load.pvalues <- function(pvalues.in, bed, p.is.phred){
+load.pvalues <- function(pvalues.in, bed, p.is.neg.log10){
   pvalues <- load.bed(pvalues.in)
-  if(p.is.phred==T){
+  if(p.is.neg.log10==T){
     pvalues[, -c(1:3)] <- apply(pvalues[, -c(1:3)], 2, function(p){10^-p})
   }
   pvalues <- merge(pvalues, bed, all.x=F, all.y=T, 
@@ -192,7 +192,7 @@ if(length(args$args) != 1){
 bed.in <- args$args[1]
 pvalues.in <- opts$pvalues
 secondary.pvalues.in <- opts$`secondary-pvalues`
-p.is.phred <- opts$`p-is-neg-log10`
+p.is.neg.log10 <- opts$`p-is-neg-log10`
 p.cutoffs.in <- opts$`p-cutoffs`
 ors.in <- opts$`odds-ratios`
 or.is.ln <- opts$`or-is-ln`
@@ -208,7 +208,7 @@ out.prefix <- opts$`out-prefix`
 # pvalues.in <- "~/scratch/DUP.pval_matrix.bed.gz"
 # secondary.pvalues.in <- "~/scratch/DUP.secondary_pval_matrix.bed.gz"
 # p.cutoffs.in <- "~/scratch/sliding_window.rCNV.DUP.empirical_genome_wide_pval.hpo_cutoffs.tsv"
-# p.is.phred <- T
+# p.is.neg.log10 <- T
 # ors.in <- "~/scratch/DUP.lnOR_lower_matrix.bed.gz"
 # or.is.ln <- T
 # min.secondary.p <- 0.05
@@ -223,7 +223,7 @@ bed <- load.bed(bed.in)
 
 # Load p-values and determine significant windows, if provided
 if(!is.null(pvalues.in)){
-  pvalues <- load.pvalues(pvalues.in, bed, p.is.phred)
+  pvalues <- load.pvalues(pvalues.in, bed, p.is.neg.log10)
   p.cutoffs <- load.p.cutoffs(p.cutoffs.in)
   sig.pvals <- get.sig.pval.idxs(pvalues, p.cutoffs)
 }else{
@@ -232,7 +232,7 @@ if(!is.null(pvalues.in)){
 
 # Load secondary p-values and determine significant windows, if provided
 if(!is.null(pvalues.in)){
-  secondary.pvalues <- load.pvalues(secondary.pvalues.in, bed, p.is.phred)
+  secondary.pvalues <- load.pvalues(secondary.pvalues.in, bed, p.is.neg.log10)
   secondary.p.cutoffs <- p.cutoffs
   secondary.p.cutoffs$max.p <- min.secondary.p
   sig.secondary.pvals <- get.sig.pval.idxs(secondary.pvalues, secondary.p.cutoffs)

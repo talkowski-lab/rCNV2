@@ -7,7 +7,7 @@
 load.manhattan.stats(
   stats.in,
   p.col.name = "p",
-  p.is.phred = F,
+  p.is.neg.log10 = F,
   min.p = 10^-100
 )
 }
@@ -16,7 +16,7 @@ load.manhattan.stats(
 
 \item{p.col.name}{name of column in header for P-value column [default: 'p']}
 
-\item{p.is.phred}{boolean indicator if P-values as provided are -log10 scaled [default: FALSE]}
+\item{p.is.neg.log10}{boolean indicator if P-values as provided are -log10 scaled [default: FALSE]}
 
 \item{min.p}{minimum P-value to retain as numerically meaningful [default: 10^-100]}
 }
