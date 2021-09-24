@@ -110,7 +110,7 @@ genes <- genes[which(genes$transcript %in% elig.tx), ]
 
 # Load meta-analysis summary stats
 ss <- load.sumstats(sumstats.in, region)
-ss$meta_phred_p[which(is.na(as.numeric(ss$meta_phred_p)))] <- 0
+ss$meta_neg_log10_p[which(is.na(as.numeric(ss$meta_neg_log10_p)))] <- 0
 ss$meta_lnOR[which(is.na(as.numeric(ss$meta_lnOR)))] <- 0
 ss$meta_lnOR_lower[which(is.na(as.numeric(ss$meta_lnOR_lower)))] <- -100
 ss$meta_lnOR_upper[which(is.na(as.numeric(ss$meta_lnOR_upper)))] <- 100

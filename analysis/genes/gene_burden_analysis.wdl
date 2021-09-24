@@ -26,7 +26,7 @@ workflow gene_burden_analysis {
   Float min_cds_ovr_dup
   Int max_genes_per_cnv
   Float p_cutoff
-  Int max_manhattan_phred_p
+  Int max_manhattan_neg_log10_p
   Float meta_secondary_p_cutoff
   Int meta_nominal_cohorts_cutoff
   Float FDR_cutoff
@@ -78,7 +78,7 @@ workflow gene_burden_analysis {
         min_cds_ovr_dup=min_cds_ovr_dup,
         max_genes_per_cnv=max_genes_per_cnv,
         p_cutoff=p_cutoff,
-        max_manhattan_phred_p=max_manhattan_phred_p,
+        max_manhattan_neg_log10_p=max_manhattan_neg_log10_p,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker_fisher,
         prefix=pheno[0],
@@ -138,7 +138,7 @@ workflow gene_burden_analysis {
         rCNV_docker=rCNV_docker_fisher,
         dummy_completion_markers=rCNV_perm_test.completion_marker,
         fdr_table_suffix="empirical_genome_wide_pval",
-        p_val_column_name="meta_phred_p"
+        p_val_column_name="meta_neg_log10_p"
     }
   }
 
@@ -154,7 +154,7 @@ workflow gene_burden_analysis {
         exclusion_bed=build_exclusion_list.exclusion_bed,
         freq_code="rCNV",
         meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
-        max_manhattan_phred_p=max_manhattan_phred_p,
+        max_manhattan_neg_log10_p=max_manhattan_neg_log10_p,
         meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker_meta,
@@ -385,7 +385,7 @@ task burden_test {
   Float min_cds_ovr_dup
   Int max_genes_per_cnv
   Float p_cutoff
-  Int max_manhattan_phred_p
+  Int max_manhattan_neg_log10_p
   String rCNV_bucket
   String rCNV_docker
   String prefix
@@ -471,9 +471,9 @@ task burden_test {
 
         # Generate Manhattan & QQ plots
         /opt/rCNV2/utils/plot_manhattan_qq.R \
-          --p-col-name "fisher_phred_p" \
-          --p-is-phred \
-          --max-phred-p ${max_manhattan_phred_p} \
+          --p-col-name "fisher_neg_log10_p" \
+          --p-is-neg-log10 \
+          --max-neg-log10-p ${max_manhattan_neg_log10_p} \
           --cutoff ${p_cutoff} \
           --highlight-bed "${prefix}.highlight_regions.bed" \
           --highlight-name "Constrained genes associated with this phenotype" \
@@ -486,9 +486,9 @@ task burden_test {
       # Generate Miami & QQ plots
       /opt/rCNV2/utils/plot_manhattan_qq.R \
         --miami \
-        --p-col-name "fisher_phred_p" \
-        --p-is-phred \
-        --max-phred-p ${max_manhattan_phred_p} \
+        --p-col-name "fisher_neg_log10_p" \
+        --p-is-neg-log10 \
+        --max-neg-log10-p ${max_manhattan_neg_log10_p} \
         --cutoff ${p_cutoff} \
         --highlight-bed "${prefix}.highlight_regions.bed" \
         --highlight-name "Constrained genes associated with this phenotype" \
@@ -688,7 +688,7 @@ task meta_analysis {
   File exclusion_bed
   String freq_code
   Array[File] meta_p_cutoff_tables
-  Int max_manhattan_phred_p
+  Int max_manhattan_neg_log10_p
   String meta_model_prefix
   String rCNV_bucket
   String rCNV_docker
@@ -757,7 +757,7 @@ task meta_analysis {
         --model ${meta_model_prefix} \
         --conditional-exclusion ${exclusion_bed} \
         --keep-n-columns 4 \
-        --p-is-phred \
+        --p-is-neg-log10 \
         --spa \
         --adjust-biobanks \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
@@ -767,9 +767,9 @@ task meta_analysis {
 
       # Generate Manhattan & QQ plots
       /opt/rCNV2/utils/plot_manhattan_qq.R \
-        --p-col-name "meta_phred_p" \
-        --p-is-phred \
-        --max-phred-p ${max_manhattan_phred_p} \
+        --p-col-name "meta_neg_log10_p" \
+        --p-is-neg-log10 \
+        --max-neg-log10-p ${max_manhattan_neg_log10_p} \
         --cutoff $meta_p_cutoff \
         --highlight-bed "${prefix}.highlight_regions.bed" \
         --highlight-name "Constrained genes associated with this phenotype" \
@@ -782,9 +782,9 @@ task meta_analysis {
     # Generate Miami & QQ plots
     /opt/rCNV2/utils/plot_manhattan_qq.R \
       --miami \
-      --p-col-name "meta_phred_p" \
-      --p-is-phred \
-      --max-phred-p ${max_manhattan_phred_p} \
+      --p-col-name "meta_neg_log10_p" \
+      --p-is-neg-log10 \
+      --max-neg-log10-p ${max_manhattan_neg_log10_p} \
       --cutoff $DUP_p_cutoff \
       --highlight-bed "${prefix}.highlight_regions.bed" \
       --highlight-name "Constrained genes associated with this phenotype" \

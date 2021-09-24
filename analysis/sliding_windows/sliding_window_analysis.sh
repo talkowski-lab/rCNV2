@@ -101,7 +101,7 @@ meta_p_cutoff=0.000003767103
 meta_model_prefix="fe"
 bin_overlap=0.5
 pad_controls=50000
-max_manhattan_phred_p=30
+max_manhattan_neg_log10_p=30
 winsorize_meta_z=1
 meta_min_cases=300
 
@@ -132,17 +132,10 @@ while read prefix hpo; do
 
     # Iterate over CNV types
     for CNV in DEL DUP; do
+
       # Set CNV-specific parameters
-      case "$CNV" in
-        DEL)
-          highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz
-          highlight_title="Known DEL GDs (Owen 2018)"
-          ;;
-        DUP)
-          highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz
-          highlight_title="Known DUP GDs (Owen 2018)"
-          ;;
-      esac
+      highlight_bed=/opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz
+      highlight_title="Known $CNV GDs (consensus list)"
 
       # Count CNVs
       /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
@@ -168,9 +161,9 @@ while read prefix hpo; do
 
       # Generate Manhattan & QQ plots
       /opt/rCNV2/utils/plot_manhattan_qq.R \
-        --p-col-name "fisher_phred_p" \
-        --p-is-phred \
-        --max-phred-p ${max_manhattan_phred_p} \
+        --p-col-name "fisher_neg_log10_p" \
+        --p-is-neg-log10 \
+        --max-neg-log10-p ${max_manhattan_neg_log10_p} \
         --cutoff ${p_cutoff} \
         --highlight-bed "$highlight_bed" \
         --highlight-name "$highlight_title" \
@@ -183,15 +176,15 @@ while read prefix hpo; do
     # Generate Miami & QQ plots
     /opt/rCNV2/utils/plot_manhattan_qq.R \
       --miami \
-      --p-col-name "fisher_phred_p" \
-      --p-is-phred \
-      --max-phred-p ${max_manhattan_phred_p} \
+      --p-col-name "fisher_neg_log10_p" \
+      --p-is-neg-log10 \
+      --max-neg-log10-p ${max_manhattan_neg_log10_p} \
       --cutoff ${p_cutoff} \
-      --highlight-bed /opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz \
-      --highlight-name "Known DUP GDs (Owen 2018)" \
+      --highlight-bed /opt/rCNV2/refs/lit_GDs.all.DUP.bed.gz \
+      --highlight-name "Known DUP GDs (consensus list)" \
       --label-prefix "DUP" \
-      --highlight-bed-2 /opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz \
-      --highlight-name-2 "Known DEL GDs (Owen 2018)" \
+      --highlight-bed-2 /opt/rCNV2/refs/lit_GDs.all.DEL.bed.gz \
+      --highlight-name-2 "Known DEL GDs (consensus list)" \
       --label-prefix-2 "DEL" \
       --title "$title" \
       "$meta.${prefix}.${freq_code}.DUP.sliding_window.stats.bed.gz" \
@@ -304,8 +297,9 @@ while read prefix hpo; do
       /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
         --model ${meta_model_prefix} \
         --conditional-exclusion ${exclusion_bed} \
-        --p-is-phred \
+        --p-is-neg-log10 \
         --spa \
+        --spa-exclude /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
         --winsorize ${winsorize_meta_z} \
         --adjust-biobanks \
         --min-cases ${meta_min_cases} \
@@ -324,7 +318,7 @@ done < refs/test_phenotypes.list
 
 # Gather all permutation results and compute FDR CDFs
 mkdir perm_res/
-p_val_column_name="meta_phred_p"
+p_val_column_name="meta_neg_log10_p"
 while read prefix hpo; do
   echo -e "\nSTARTING $prefix\n"
   gsutil -m cp \
@@ -436,19 +430,10 @@ while read prefix hpo; do
 
   # Run meta-analysis for each CNV type
   for CNV in DEL DUP; do
+
     # Set CNV-specific parameters
-    case "$CNV" in
-      DEL)
-        highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz
-        highlight_title="Known DEL GDs (Owen 2018)"
-        meta_p_cutoff=$DEL_p_cutoff
-        ;;
-      DUP)
-        highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz
-        highlight_title="Known DUP GDs (Owen 2018)"
-        meta_p_cutoff=$DUP_p_cutoff
-        ;;
-    esac
+    highlight_bed=/opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz
+    highlight_title="Known $CNV GDs (consensus list)"
 
     # Perform meta-analysis
     while read meta cohorts; do
@@ -459,8 +444,9 @@ while read prefix hpo; do
       --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
       --model ${meta_model_prefix} \
       --conditional-exclusion ${exclusion_bed} \
-      --p-is-phred \
+      --p-is-neg-log10 \
       --spa \
+      --spa-exclude /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
       --winsorize ${winsorize_meta_z} \
       --adjust-biobanks \
       --min-cases ${meta_min_cases} \
@@ -471,9 +457,9 @@ while read prefix hpo; do
 
     # Generate Manhattan & QQ plots
     /opt/rCNV2/utils/plot_manhattan_qq.R \
-      --p-col-name "meta_phred_p" \
-      --p-is-phred \
-      --max-phred-p ${max_manhattan_phred_p} \
+      --p-col-name "meta_neg_log10_p" \
+      --p-is-neg-log10 \
+      --max-neg-log10-p ${max_manhattan_neg_log10_p} \
       --cutoff $meta_p_cutoff \
       --highlight-bed "$highlight_bed" \
       --highlight-name "$highlight_title" \
@@ -486,16 +472,16 @@ while read prefix hpo; do
   # Generate Miami & QQ plots
   /opt/rCNV2/utils/plot_manhattan_qq.R \
     --miami \
-    --p-col-name "meta_phred_p" \
-    --p-is-phred \
-    --max-phred-p ${max_manhattan_phred_p} \
+    --p-col-name "meta_neg_log10_p" \
+    --p-is-neg-log10 \
+    --max-neg-log10-p ${max_manhattan_neg_log10_p} \
     --cutoff $DUP_p_cutoff \
-    --highlight-bed /opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz \
-    --highlight-name "Known DUP GDs (Owen 2018)" \
+    --highlight-bed /opt/rCNV2/refs/lit_GDs.all.DUP.bed.gz \
+    --highlight-name "Known DUP GDs (consensus list)" \
     --label-prefix "DUP" \
     --cutoff-2 $DEL_p_cutoff \
-    --highlight-bed-2 /opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz \
-    --highlight-name-2 "Known DEL GDs (Owen 2018)" \
+    --highlight-bed-2 /opt/rCNV2/refs/lit_GDs.all.DEL.bed.gz \
+    --highlight-name-2 "Known DEL GDs (consensus list)" \
     --label-prefix-2 "DEL" \
     --title "$title" \
     "${prefix}.${freq_code}.DUP.sliding_window.meta_analysis.stats.bed.gz" \
@@ -521,7 +507,7 @@ while read prefix hpo; do
 done < ${phenotype_list} \
 | gsutil -m cp -I meta_res/
 # Primary p-values
-p_val_column_name="meta_phred_p"
+p_val_column_name="meta_neg_log10_p"
 while read prefix hpo; do
   echo -e "$prefix\n\n"
   for CNV in DEL DUP; do
@@ -541,7 +527,7 @@ paste meta_res/*.${freq_code}.$CNV.sliding_window.meta_analysis.p_values.txt \
 | gzip -c \
 > ${freq_code}.observed_pval_matrix.txt.gz
 # Secondary p-values
-p_val_column_name="meta_phred_p_secondary"
+p_val_column_name="meta_neg_log10_p_secondary"
 while read prefix hpo; do
   echo -e "$prefix\n\n"
   for CNV in DEL DUP; do
@@ -584,8 +570,8 @@ meta_p_cutoffs_tsv="refs/sliding_window.rCNV.DEL.bonferroni_pval.hpo_cutoffs.tsv
 meta_secondary_p_cutoff=0.05
 meta_nominal_cohorts_cutoff=2
 sig_window_pad=200000
-credset=0.95
-FDR_cutoff=0.05
+credset=0.99
+FDR_cutoff=0.01
 gtf="gencode.v19.canonical.pext_filtered.gtf.gz"
 
 
@@ -623,7 +609,7 @@ while read prefix hpo; do
   echo -e "Subsetting $prefix summary stats prior to refinement"
   allstats="stats/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.bed.gz"
   primary_p_idx=$( zcat $allstats | sed -n '1p' | sed 's/\t/\n/g' \
-                   | awk -v FS="\t" '{ if ($1=="meta_phred_p") print NR }' )
+                   | awk -v FS="\t" '{ if ($1=="meta_neg_log10_p") print NR }' )
   zcat $allstats \
   | grep -ve '^#' \
   | awk -v FS="\t" -v OFS="\t" -v idx=$primary_p_idx \

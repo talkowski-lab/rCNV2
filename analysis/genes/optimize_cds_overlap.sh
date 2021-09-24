@@ -99,7 +99,7 @@ for CNV in DEL DUP; do
     --or-corplot cds_optimization_data/${CNV}.cds_optimization.or_corplot_grid.jpg \
     --model "fe" \
     --keep-n-columns 4 \
-    --p-is-phred \
+    --p-is-neg-log10 \
     ${CNV}.meta_analysis.input.txt \
     /dev/stdout \
   | cut -f4- | sed -e 's/^mincds_//g' -e 's/^min_cds/#min_cds/g' \

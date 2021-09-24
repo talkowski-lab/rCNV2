@@ -125,14 +125,14 @@ def calc_all_effects(cs_dict, phenos, ssdir):
                     iv_lnor, (iv_lnor_lower, iv_lnor_upper) = iv_mean(lnors, lnor_vars)
 
                 # Gathers peak primary and secondary p-values
-                if np.all(np.isnan(wdf.meta_phred_p)):
+                if np.all(np.isnan(wdf.meta_neg_log10_p)):
                     best_p_primary = 0
                 else:
-                    best_p_primary = np.nanmax(wdf.meta_phred_p)
-                if np.all(np.isnan(wdf.meta_phred_p_secondary)):
+                    best_p_primary = np.nanmax(wdf.meta_neg_log10_p)
+                if np.all(np.isnan(wdf.meta_neg_log10_p_secondary)):
                     best_p_secondary = 0
                 else:
-                    best_p_secondary = np.nanmax(wdf.meta_phred_p_secondary)
+                    best_p_secondary = np.nanmax(wdf.meta_neg_log10_p_secondary)
 
                 # Add OR estimate and peak pvalues to fx_df
                 newvals = [seg_id, hpo, cnv, iv_lnor, iv_lnor_lower, iv_lnor_upper,

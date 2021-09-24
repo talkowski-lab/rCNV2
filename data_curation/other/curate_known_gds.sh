@@ -202,6 +202,17 @@ for conf in hc mc lc; do
 done
 
 
+# Subset to simple BED3 files split by CNV type for reference
+for CNV in DEL DUP; do
+  zcat lit_GDs.hc.bed.gz lit_GDs.mc.bed.gz lit_GDs.lc.bed.gz \
+  | fgrep -v "#" | fgrep -w $CNV | cut -f1-3 \
+  | sort -Vk1,1 -k2,2n -k3,3n | bedtools merge -i - \
+  | cat <( echo -e "#chr\tstart\tend" ) - \
+  | bgzip -c > lit_GDs.all.$CNV.bed.gz
+  tabix -f lit_GDs.all.$CNV.bed.gz
+done
+
+
 # Build comparison table of predicted NAHR-mediated CNVs
 /opt/rCNV2/data_curation/other/predict_nahr_cnvs.sh
 
@@ -215,4 +226,8 @@ gsutil -m cp \
   lit_GDs.lc.bed.gz \
   clustered_nahr_regions.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/
+gsutil -m cp \
+  lit_GDs.all.DEL.bed.gz \
+  lit_GDs.all.DUP.bed.gz \
+  ${rCNV_bucket}/analysis/analysis_refs/
 

@@ -201,8 +201,8 @@ add.coord.line(start, end, coord.panel.y0, highlight.start, highlight.end,
                highlight.col=highlight.color, tick.height=0.04, vlines=TRUE, vlines.bottom=total.height)
 
 # Add association summary stats
-ss.na.ranges <- which(is.na(as.numeric(ss$meta_phred_p)))
-ss.nonna.ranges <- which(!is.na(as.numeric(ss$meta_phred_p)))
+ss.na.ranges <- which(is.na(as.numeric(ss$meta_neg_log10_p)))
+ss.nonna.ranges <- which(!is.na(as.numeric(ss$meta_neg_log10_p)))
 ss.na.left.stop <- ss$pos[max(ss.na.ranges[which(ss.na.ranges < min(ss.nonna.ranges))])]
 ss.na.right.start <- ss$pos[min(ss.na.ranges[which(ss.na.ranges > min(ss.nonna.ranges))])]
 add.pvalues(ss, y0=pval.panel.y0, panel.height=pval.panel.height, cnv.type=cnv.type, 

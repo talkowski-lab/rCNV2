@@ -179,7 +179,7 @@ task permuted_burden_test {
         --model ${meta_model_prefix} \
         --conditional-exclusion ${exclusion_bed} \
         --keep-n-columns 4 \
-        --p-is-phred \
+        --p-is-neg-log10 \
         --spa \
         --adjust-biobanks \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \

@@ -76,8 +76,8 @@ while read prefix hpo; do
       for model in meta_analysis weighted_meta_analysis; do
         # Compute lambdas
         /opt/rCNV2/utils/plot_manhattan_qq.R \
-          --p-col-name "meta_phred_p" \
-          --p-is-phred \
+          --p-col-name "meta_neg_log10_p" \
+          --p-is-neg-log10 \
           --cutoff ${meta_p_cutoff} \
           --highlight-bed "${prefix}.highlight_regions.bed" \
           --highlight-name "Constrained genes associated with this phenotype" \

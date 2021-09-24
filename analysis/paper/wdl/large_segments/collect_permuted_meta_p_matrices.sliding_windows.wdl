@@ -73,7 +73,7 @@ task get_pheno_matrices {
       for i in $( seq 1 $n_pheno_perms ); do
 
         p_idx=$( zcat perm_res/${pheno}.rCNV.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
-                 | sed -n '1p' | sed 's/\t/\n/g' | awk -v OFS="\t" '{ if ($1=="meta_phred_p") print NR }' )
+                 | sed -n '1p' | sed 's/\t/\n/g' | awk -v OFS="\t" '{ if ($1=="meta_neg_log10_p") print NR }' )
 
         zcat perm_res/${pheno}.rCNV.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed.gz \
         | grep -ve '^#' \

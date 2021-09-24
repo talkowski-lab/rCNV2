@@ -50,10 +50,10 @@ read.assoc.stats.single <- function(stats.in, prefix, p.is.phred, keep.n.cols=3,
   stats <- read.table(stats.in, header=T, sep="\t", comment.char="")
   colnames(stats)[1] <- "chr"
   cols.to.keep <- c(colnames(stats)[1:keep.n.cols], "case_alt", "case_ref",
-                    "control_alt", "control_ref", "fisher_phred_p",
+                    "control_alt", "control_ref", "fisher_neg_log10_p",
                     "fisher_OR", "fisher_OR_lower", "fisher_OR_upper")
   stats <- stats[, which(colnames(stats) %in% cols.to.keep)]
-  colnames(stats)[which(colnames(stats)=="fisher_phred_p")] <- "p_value"
+  colnames(stats)[which(colnames(stats)=="fisher_neg_log10_p")] <- "p_value"
   if(p.is.phred==T){
     stats$p_value <- 10^-stats$p_value
   }

@@ -155,7 +155,7 @@ option_list <- list(
               help="matrix of p-values per window per phenotype. [default %default]"),
   make_option(c("--secondary-pvalues"), default=NULL, 
               help="matrix of secondary p-values per window per phenotype. [default %default]"),
-  make_option(c("--p-is-phred"), type="logical", default=F, action="store_true",
+  make_option(c("--p-is-neg-log10"), type="logical", default=F, action="store_true",
               help="supplied P-values are Phred-scaled (-log10[P]). [default %default]"),
   make_option(c("--p-cutoffs"), default=NULL, 
               help="tsv of maximum P-value to consider significant per phenotype. [default: 0.05 for all]"),
@@ -192,7 +192,7 @@ if(length(args$args) != 1){
 bed.in <- args$args[1]
 pvalues.in <- opts$pvalues
 secondary.pvalues.in <- opts$`secondary-pvalues`
-p.is.phred <- opts$`p-is-phred`
+p.is.phred <- opts$`p-is-neg-log10`
 p.cutoffs.in <- opts$`p-cutoffs`
 ors.in <- opts$`odds-ratios`
 or.is.ln <- opts$`or-is-ln`

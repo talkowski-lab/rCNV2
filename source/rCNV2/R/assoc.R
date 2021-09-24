@@ -174,7 +174,7 @@ fisher.burden.test <- function(bed, keep.n.cols=3, precision=10){
                            "control_alt" = f.res$control.CNV,
                            "control_ref" = f.res$control.ref,
                            "control_freq" = round(f.res$control.CNV.freq, precision),
-                           "fisher_phred_p" = round(-log10(f.res$p), precision),
+                           "fisher_neg_log10_p" = round(-log10(f.res$p), precision),
                            "fisher_OR" = round(f.res$OR, precision),
                            "fisher_OR_lower" = round(f.res$OR.lower, precision),
                            "fisher_OR_upper" = round(f.res$OR.upper, precision))
@@ -679,7 +679,7 @@ make.meta.lookup.table <- function(stats.merged, cohorts, model, adjust.biobanks
 
   # Format output table
   lookup.table <- cbind(counts.df, meta.stats)
-  stat.colnames <- c("meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper", "meta_z", "meta_phred_p")
+  stat.colnames <- c("meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper", "meta_z", "meta_neg_log10_p")
   colnames(lookup.table)[(ncol(lookup.table)-4):ncol(lookup.table)] <- stat.colnames
 
   return(lookup.table)
@@ -811,7 +811,7 @@ meta <- function(stats.merged, cohorts, model="fe", saddle=T, adjust.biobanks=F,
       spa.xidxs <- NULL
     }
     # Apply saddlepoint adjustment
-    meta.res[, c("meta_z", "meta_phred_p")] <- saddlepoint.adj(meta.res$meta_z,
+    meta.res[, c("meta_z", "meta_neg_log10_p")] <- saddlepoint.adj(meta.res$meta_z,
                                                                xidxs=spa.xidxs,
                                                                winsorize=winsorize,
                                                                mirror=mirror.saddle)
@@ -819,7 +819,7 @@ meta <- function(stats.merged, cohorts, model="fe", saddle=T, adjust.biobanks=F,
 
   # Calculate B-H adjusted q-values, if optioned
   if(calc.fdr==T){
-    meta.res$meta_phred_fdr_q <- -log10(p.adjust(10^-meta.res$meta_phred_p, method="BH"))
+    meta.res$meta_neg_log10_fdr_q <- -log10(p.adjust(10^-meta.res$meta_neg_log10_p, method="BH"))
   }
 
   # Compute secondary P-value
@@ -828,11 +828,11 @@ meta <- function(stats.merged, cohorts, model="fe", saddle=T, adjust.biobanks=F,
       meta.single(meta.res, cohorts, i, model, adjust.biobanks, cohort.inflation,
                   probe.counts, empirical.continuity=T, drop_top_cohort=T)
     })))
-    colnames(meta.res.secondary) <- c("meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper", "meta_z", "meta_phred_p")
+    colnames(meta.res.secondary) <- c("meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper", "meta_z", "meta_neg_log10_p")
 
     # Saddlepoint on secondary, if optioned
     if(saddle==T){
-      meta.res.secondary[, c("meta_z", "meta_phred_p")] <- saddlepoint.adj(meta.res.secondary$meta_z,
+      meta.res.secondary[, c("meta_z", "meta_neg_log10_p")] <- saddlepoint.adj(meta.res.secondary$meta_z,
                                                                            xidxs=spa.xidxs,
                                                                            winsorize=winsorize,
                                                                            mirror=mirror.saddle)
@@ -842,9 +842,9 @@ meta <- function(stats.merged, cohorts, model="fe", saddle=T, adjust.biobanks=F,
     meta.res$meta_lnOR_lower_secondary <- meta.res.secondary$meta_lnOR_lower
     meta.res$meta_lnOR_upper_secondary <- meta.res.secondary$meta_lnOR_upper
     meta.res$meta_z_secondary <- meta.res.secondary$meta_z
-    meta.res$meta_phred_p_secondary <- meta.res.secondary$meta_phred_p
+    meta.res$meta_neg_log10_p_secondary <- meta.res.secondary$meta_neg_log10_p
     if(calc.fdr==T){
-      meta.res$meta_phred_fdr_q_secondary <- -log10(p.adjust(10^-meta.res$meta_phred_p_secondary, method="BH"))
+      meta.res$meta_neg_log10_fdr_q_secondary <- -log10(p.adjust(10^-meta.res$meta_neg_log10_p_secondary, method="BH"))
     }
   }
 

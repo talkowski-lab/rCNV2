@@ -156,8 +156,9 @@ task permuted_burden_test {
       /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
         --model "${meta_model_prefix}" \
         --conditional-exclusion "${exclusion_bed}" \
-        --p-is-phred \
+        --p-is-neg-log10 \
         --spa \
+        --spa-exclude /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
         --winsorize ${winsorize_meta_z} \
         --adjust-biobanks \
         --min-cases ${meta_min_cases} \

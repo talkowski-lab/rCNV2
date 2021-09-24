@@ -27,7 +27,7 @@ workflow crb_burden_analysis {
   Float min_element_ovr
   Float min_frac_all_elements
   Float p_cutoff
-  Int max_manhattan_phred_p
+  Int max_manhattan_neg_log10_p
   Float meta_secondary_p_cutoff
   Int meta_nominal_cohorts_cutoff
   String rCNV_bucket
@@ -70,7 +70,7 @@ workflow crb_burden_analysis {
         min_element_ovr=min_element_ovr,
         min_frac_all_elements=min_frac_all_elements,
         p_cutoff=p_cutoff,
-        max_manhattan_phred_p=max_manhattan_phred_p,
+        max_manhattan_neg_log10_p=max_manhattan_neg_log10_p,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker,
         prefix=pheno[0],
@@ -134,7 +134,7 @@ workflow crb_burden_analysis {
         rCNV_docker=rCNV_docker,
         dummy_completion_markers=rCNV_perm_test.completion_marker,
         fdr_table_suffix="empirical_genome_wide_pval",
-        p_val_column_name="meta_phred_p"
+        p_val_column_name="meta_neg_log10_p"
     }
   }
 
@@ -151,7 +151,7 @@ workflow crb_burden_analysis {
         freq_code="rCNV",
         noncoding_filter=noncoding_filter,
         meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
-        max_manhattan_phred_p=max_manhattan_phred_p,
+        max_manhattan_neg_log10_p=max_manhattan_neg_log10_p,
         meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker,
@@ -250,7 +250,7 @@ task burden_test {
   Float min_element_ovr
   Float min_frac_all_elements
   Float p_cutoff
-  Int max_manhattan_phred_p
+  Int max_manhattan_neg_log10_p
   String rCNV_bucket
   String rCNV_docker
   String prefix
@@ -317,9 +317,9 @@ task burden_test {
 
         # Generate Manhattan & QQ plots
         /opt/rCNV2/utils/plot_manhattan_qq.R \
-          --p-col-name "fisher_phred_p" \
-          --p-is-phred \
-          --max-phred-p ${max_manhattan_phred_p} \
+          --p-col-name "fisher_neg_log10_p" \
+          --p-is-neg-log10 \
+          --max-neg-log10-p ${max_manhattan_neg_log10_p} \
           --cutoff ${p_cutoff} \
           --label-prefix "$CNV" \
           --title "$title" \
@@ -330,9 +330,9 @@ task burden_test {
       # Generate Miami & QQ plots
       /opt/rCNV2/utils/plot_manhattan_qq.R \
         --miami \
-        --p-col-name "fisher_phred_p" \
-        --p-is-phred \
-        --max-phred-p ${max_manhattan_phred_p} \
+        --p-col-name "fisher_neg_log10_p" \
+        --p-is-neg-log10 \
+        --max-neg-log10-p ${max_manhattan_neg_log10_p} \
         --cutoff ${p_cutoff} \
         --label-prefix "DUP" \
         --label-prefix-2 "DEL" \
@@ -545,7 +545,7 @@ task meta_analysis {
   String freq_code
   String noncoding_filter
   Array[File] meta_p_cutoff_tables
-  Int max_manhattan_phred_p
+  Int max_manhattan_neg_log10_p
   String meta_model_prefix
   String rCNV_bucket
   String rCNV_docker
@@ -606,7 +606,7 @@ task meta_analysis {
         --or-corplot ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.or_corplot_grid.jpg \
         --model ${meta_model_prefix} \
         --conditional-exclusion ${exclusion_bed} \
-        --p-is-phred \
+        --p-is-neg-log10 \
         --spa \
         --adjust-biobanks \
         --keep-n-columns 4 \
@@ -617,9 +617,9 @@ task meta_analysis {
 
       # Generate Manhattan & QQ plots
       /opt/rCNV2/utils/plot_manhattan_qq.R \
-        --p-col-name "meta_phred_p" \
-        --p-is-phred \
-        --max-phred-p ${max_manhattan_phred_p} \
+        --p-col-name "meta_neg_log10_p" \
+        --p-is-neg-log10 \
+        --max-neg-log10-p ${max_manhattan_neg_log10_p} \
         --cutoff $meta_p_cutoff \
         --label-prefix "$CNV" \
         --title "$title" \
@@ -630,9 +630,9 @@ task meta_analysis {
     # Generate Miami & QQ plots
     /opt/rCNV2/utils/plot_manhattan_qq.R \
       --miami \
-      --p-col-name "meta_phred_p" \
-      --p-is-phred \
-      --max-phred-p ${max_manhattan_phred_p} \
+      --p-col-name "meta_neg_log10_p" \
+      --p-is-neg-log10 \
+      --max-neg-log10-p ${max_manhattan_neg_log10_p} \
       --cutoff $DUP_p_cutoff \
       --label-prefix "DUP" \
       --cutoff-2 $DEL_p_cutoff \
@@ -706,7 +706,7 @@ task coding_meta_analysis {
         --or-corplot ${prefix}.${freq_code}.$CNV.crb_burden.or_corplot_grid.jpg \
         --model ${meta_model_prefix} \
         --conditional-exclusion ${exclusion_bed} \
-        --p-is-phred \
+        --p-is-neg-log10 \
         --keep-n-columns 4 \
         --spa \
         --adjust-biobanks \

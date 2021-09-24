@@ -20,7 +20,7 @@ workflow sliding_window_analysis {
   Float bin_overlap
   Int pad_controls
   Float p_cutoff
-  Int max_manhattan_phred_p
+  Int max_manhattan_neg_log10_p
   Int n_pheno_perms
   Int min_probes_per_window
   Float min_frac_controls_probe_exclusion
@@ -75,7 +75,7 @@ workflow sliding_window_analysis {
         bin_overlap=bin_overlap,
         pad_controls=pad_controls,
         p_cutoff=p_cutoff,
-        max_manhattan_phred_p=max_manhattan_phred_p,
+        max_manhattan_neg_log10_p=max_manhattan_neg_log10_p,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker,
         prefix=pheno[0],
@@ -120,7 +120,7 @@ workflow sliding_window_analysis {
         rCNV_docker=rCNV_docker,
         dummy_completion_markers=rCNV_perm_test.completion_marker,
         fdr_table_suffix="empirical_genome_wide_pval",
-        p_val_column_name="meta_phred_p"
+        p_val_column_name="meta_neg_log10_p"
     }
 
     # Genome-wide, secondary
@@ -136,7 +136,7 @@ workflow sliding_window_analysis {
         rCNV_docker=rCNV_docker,
         dummy_completion_markers=rCNV_perm_test.completion_marker,
         fdr_table_suffix="empirical_genome_wide_pval_secondary",
-        p_val_column_name="meta_phred_p_secondary"
+        p_val_column_name="meta_neg_log10_p_secondary"
     }
   }
 
@@ -152,7 +152,7 @@ workflow sliding_window_analysis {
         exclusion_bed=build_exclusion_list.exclusion_bed,
         freq_code="rCNV",
         meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
-        max_manhattan_phred_p=max_manhattan_phred_p,
+        max_manhattan_neg_log10_p=max_manhattan_neg_log10_p,
         meta_model_prefix=meta_model_prefix,
         winsorize_meta_z=winsorize_meta_z,
         meta_min_cases=meta_min_cases,
@@ -304,7 +304,7 @@ task burden_test {
   Float bin_overlap
   Int pad_controls
   Float p_cutoff
-  Int max_manhattan_phred_p
+  Int max_manhattan_neg_log10_p
   String rCNV_bucket
   String rCNV_docker
   String prefix
@@ -337,17 +337,10 @@ task burden_test {
 
       # Iterate over CNV types
       for CNV in DEL DUP; do
+
         # Set CNV-specific parameters
-        case "$CNV" in
-          DEL)
-            highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz
-            highlight_title="Known DEL GDs (Owen 2018)"
-            ;;
-          DUP)
-            highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz
-            highlight_title="Known DUP GDs (Owen 2018)"
-            ;;
-        esac
+        highlight_bed=/opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz
+        highlight_title="Known $CNV GDs (consensus list)"
 
         # Count CNVs
         /opt/rCNV2/analysis/sliding_windows/count_cnvs_per_window.py \
@@ -373,9 +366,9 @@ task burden_test {
 
         # Generate Manhattan & QQ plots
         /opt/rCNV2/utils/plot_manhattan_qq.R \
-          --p-col-name "fisher_phred_p" \
-          --p-is-phred \
-          --max-phred-p ${max_manhattan_phred_p} \
+          --p-col-name "fisher_neg_log10_p" \
+          --p-is-neg-log10 \
+          --max-neg-log10-p ${max_manhattan_neg_log10_p} \
           --cutoff ${p_cutoff} \
           --highlight-bed "$highlight_bed" \
           --highlight-name "$highlight_title" \
@@ -388,15 +381,15 @@ task burden_test {
       # Generate Miami & QQ plots
       /opt/rCNV2/utils/plot_manhattan_qq.R \
         --miami \
-        --p-col-name "fisher_phred_p" \
-        --p-is-phred \
-        --max-phred-p ${max_manhattan_phred_p} \
+        --p-col-name "fisher_neg_log10_p" \
+        --p-is-neg-log10 \
+        --max-neg-log10-p ${max_manhattan_neg_log10_p} \
         --cutoff ${p_cutoff} \
-        --highlight-bed /opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz \
-        --highlight-name "Known DUP GDs (Owen 2018)" \
+        --highlight-bed /opt/rCNV2/refs/lit_GDs.all.DUP.bed.gz \
+        --highlight-name "Known DUP GDs (consensus list)" \
         --label-prefix "DUP" \
-        --highlight-bed-2 /opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz \
-        --highlight-name-2 "Known DEL GDs (Owen 2018)" \
+        --highlight-bed-2 /opt/rCNV2/refs/lit_GDs.all.DEL.bed.gz \
+        --highlight-name-2 "Known DEL GDs (consensus list)" \
         --label-prefix-2 "DEL" \
         --title "$title" \
         "$meta.${prefix}.${freq_code}.DUP.sliding_window.stats.bed.gz" \
@@ -524,7 +517,7 @@ task meta_analysis {
   File exclusion_bed
   String freq_code
   Array[File] meta_p_cutoff_tables
-  Int max_manhattan_phred_p
+  Int max_manhattan_neg_log10_p
   String meta_model_prefix
   Float winsorize_meta_z
   Int meta_min_cases
@@ -566,35 +559,27 @@ task meta_analysis {
     DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
                     sliding_window.${freq_code}.DEL.bonferroni_pval.hpo_cutoffs.tsv )
     DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                    sliding_window.${freq_code}.DUP.bonferroni_pval.hpo_cutoffs.tsv )
+                    sliding_window.${freq_code}.DEL.bonferroni_pval.hpo_cutoffs.tsv )
 
     # Run meta-analysis for each CNV type
     for CNV in DEL DUP; do
+
       # Set CNV-specific parameters
-      case "$CNV" in
-        DEL)
-          highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz
-          highlight_title="Known DEL GDs (Owen 2018)"
-          meta_p_cutoff=$DEL_p_cutoff
-          ;;
-        DUP)
-          highlight_bed=/opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz
-          highlight_title="Known DUP GDs (Owen 2018)"
-          meta_p_cutoff=$DUP_p_cutoff
-          ;;
-      esac
+      highlight_bed=/opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz
+      highlight_title="Known $CNV GDs (consensus list)"
 
       # Perform meta-analysis
       while read meta cohorts; do
         echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.sliding_window.stats.bed.gz"
-      done < <( fgrep -v mega ${metacohort_list} ) \
+      done < <( fgrep -v mega ${metacohort_list}) \
       > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
       /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
         --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
         --model ${meta_model_prefix} \
         --conditional-exclusion ${exclusion_bed} \
-        --p-is-phred \
+        --p-is-neg-log10 \
         --spa \
+        --spa-exclude /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
         --winsorize ${winsorize_meta_z} \
         --adjust-biobanks \
         --min-cases ${meta_min_cases} \
@@ -605,9 +590,9 @@ task meta_analysis {
 
       # Generate Manhattan & QQ plots
       /opt/rCNV2/utils/plot_manhattan_qq.R \
-        --p-col-name "meta_phred_p" \
-        --p-is-phred \
-        --max-phred-p ${max_manhattan_phred_p} \
+        --p-col-name "meta_neg_log10_p" \
+        --p-is-neg-log10 \
+        --max-neg-log10-p ${max_manhattan_neg_log10_p} \
         --cutoff $meta_p_cutoff \
         --highlight-bed "$highlight_bed" \
         --highlight-name "$highlight_title" \
@@ -620,16 +605,16 @@ task meta_analysis {
     # Generate Miami & QQ plots
     /opt/rCNV2/utils/plot_manhattan_qq.R \
       --miami \
-      --p-col-name "meta_phred_p" \
-      --p-is-phred \
-      --max-phred-p ${max_manhattan_phred_p} \
+      --p-col-name "meta_neg_log10_p" \
+      --p-is-neg-log10 \
+      --max-neg-log10-p ${max_manhattan_neg_log10_p} \
       --cutoff $DUP_p_cutoff \
-      --highlight-bed /opt/rCNV2/refs/UKBB_GD.Owen_2018.DUP.bed.gz \
-      --highlight-name "Known DUP GDs (Owen 2018)" \
+      --highlight-bed /opt/rCNV2/refs/lit_GDs.all.DUP.bed.gz \
+      --highlight-name "Known DUP GDs (consensus list)" \
       --label-prefix "DUP" \
       --cutoff-2 $DEL_p_cutoff \
-      --highlight-bed-2 /opt/rCNV2/refs/UKBB_GD.Owen_2018.DEL.bed.gz \
-      --highlight-name-2 "Known DEL GDs (Owen 2018)" \
+      --highlight-bed-2 /opt/rCNV2/refs/lit_GDs.all.DEL.bed.gz \
+      --highlight-name-2 "Known DEL GDs (consensus list)" \
       --label-prefix-2 "DEL" \
       --title "$title" \
       "${prefix}.${freq_code}.DUP.sliding_window.meta_analysis.stats.bed.gz" \
@@ -716,7 +701,7 @@ task refine_regions {
       echo -e "Subsetting $prefix summary stats prior to refinement"
       allstats="stats/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.bed.gz"
       primary_p_idx=$( zcat $allstats | sed -n '1p' | sed 's/\t/\n/g' \
-                       | awk -v FS="\t" '{ if ($1=="meta_phred_p") print NR }' )
+                       | awk -v FS="\t" '{ if ($1=="meta_neg_log10_p") print NR }' )
       zcat $allstats \
       | grep -ve '^#' \
       | awk -v FS="\t" -v OFS="\t" -v idx=$primary_p_idx \

@@ -21,7 +21,7 @@ options(stringsAsFactors=F, scipen=1000)
 load.sumstats <- function(sumstats.in){
   sumstats <- read.table(sumstats.in, header=T, sep="\t", comment.char="", check.names=F)
   colnames(sumstats)[1] <- gsub("#", "", colnames(sumstats)[1], fixed=T)
-  keep.cols <- c("chr", "start", "end", "n_nominal_cohorts", "meta_phred_p", "meta_phred_p_secondary", "meta_phred_fdr_q")
+  keep.cols <- c("chr", "start", "end", "n_nominal_cohorts", "meta_neg_log10_p", "meta_neg_log10_p_secondary", "meta_neg_log10_fdr_q")
   sumstats[, which(colnames(sumstats) %in% keep.cols)]
 }
 
@@ -29,8 +29,8 @@ load.sumstats <- function(sumstats.in){
 filter.sumstats <- function(sumstats, primary.cutoff=6, secondary.cutoff=-log10(0.05),
                             min.nominal=2, secondary.or.nominal=FALSE,
                             fdr.cutoff=NULL){
-  primary.hits <- which(sumstats$meta_phred_p >= primary.cutoff)
-  secondary.hits <- which(sumstats$meta_phred_p_secondary >= secondary.cutoff)
+  primary.hits <- which(sumstats$meta_neg_log10_p >= primary.cutoff)
+  secondary.hits <- which(sumstats$meta_neg_log10_p_secondary >= secondary.cutoff)
   nominal.hits <- which(sumstats$n_nominal_cohorts >= min.nominal)
   if(secondary.or.nominal){
     hits <- intersect(primary.hits, unique(c(secondary.hits, nominal.hits)))
@@ -38,7 +38,7 @@ filter.sumstats <- function(sumstats, primary.cutoff=6, secondary.cutoff=-log10(
     hits <- intersect(primary.hits, intersect(secondary.hits, nominal.hits))
   }
   if(!is.null(fdr.cutoff)){
-    fdr.hits <- which(sumstats$meta_phred_fdr_q >= fdr.cutoff)
+    fdr.hits <- which(sumstats$meta_neg_log10_fdr_q >= fdr.cutoff)
     hits <- unique(sort(c(hits, fdr.hits)))
   }
   sumstats[hits, ]

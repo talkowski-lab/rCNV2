@@ -119,10 +119,10 @@ task perm_prep {
         echo $cnv
         statsfile=meta_stats/$nocolon.rCNV.$cnv.sliding_window.meta_analysis.stats.bed.gz
         idx=$( zcat $statsfile | head -n1 | sed 's/\t/\n/g' \
-               | awk '{ if ($1=="meta_phred_p") print NR }' )
+               | awk '{ if ($1=="meta_neg_log10_p") print NR }' )
         zcat $statsfile | sed '1d' | cut -f$idx \
         | cat <( echo -e $nocolon"_"$cnv ) - \
-        > meta_stats/matrices/$nocolon.$cnv.meta_phred_p.tsv
+        > meta_stats/matrices/$nocolon.$cnv.meta_neg_log10_p.tsv
       done
     done < ${phenotype_list}
 
@@ -136,17 +136,17 @@ task perm_prep {
     for cnv in DEL DUP; do
       paste \
         window_coordinates.bed \
-        meta_stats/matrices/*.$cnv.meta_phred_p.tsv \
+        meta_stats/matrices/*.$cnv.meta_neg_log10_p.tsv \
       | bgzip -c \
-      > meta_stats/matrices/${prefix}.$cnv.meta_phred_p.all_hpos.bed.gz
+      > meta_stats/matrices/${prefix}.$cnv.meta_neg_log10_p.all_hpos.bed.gz
     done
 
     # Compress to single BED of max P per window
     for cnv in DEL DUP; do
       /opt/rCNV2/analysis/paper/scripts/large_segments/get_best_p_per_window.R \
-        meta_stats/matrices/${prefix}.$cnv.meta_phred_p.all_hpos.bed.gz \
-        ${prefix}.best_meta_phred_p_per_window.$cnv.bed
-      bgzip -f ${prefix}.best_meta_phred_p_per_window.$cnv.bed
+        meta_stats/matrices/${prefix}.$cnv.meta_neg_log10_p.all_hpos.bed.gz \
+        ${prefix}.best_meta_neg_log10_p_per_window.$cnv.bed
+      bgzip -f ${prefix}.best_meta_neg_log10_p_per_window.$cnv.bed
     done
   >>>
 
@@ -159,8 +159,8 @@ task perm_prep {
     File whitelist = "whitelist.bed.gz"
     File blacklist = "blacklist.bed.gz"
     Array[String] seeds = read_lines("seeds.txt")
-    File del_max_p_bed = "${prefix}.best_meta_phred_p_per_window.DEL.bed.gz"
-    File dup_max_p_bed = "${prefix}.best_meta_phred_p_per_window.DUP.bed.gz"
+    File del_max_p_bed = "${prefix}.best_meta_neg_log10_p_per_window.DEL.bed.gz"
+    File dup_max_p_bed = "${prefix}.best_meta_neg_log10_p_per_window.DUP.bed.gz"
   }
 }
 

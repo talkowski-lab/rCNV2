@@ -35,7 +35,7 @@ option_list <- list(
   make_option(c("--conditional-exclusion"), type="character", default=NULL,
               help="BED file annotated with cohorts to conditionally exclude on a locus-specific basis",
               metavar="path"),
-  make_option(c("--p-is-phred"), action="store_true", default=FALSE,
+  make_option(c("--p-is-neg-log10"), action="store_true", default=FALSE,
               help="provided P-values are Phred-scaled (-log10(P)) [default: %default]"),
   make_option(c("--spa"), action="store_true", default=FALSE,
               help="apply saddlepoint approximation of null distribution [default: %default]"),
@@ -74,7 +74,7 @@ outfile <- args$args[2]
 corplot.out <- opts$`or-corplot`
 model <- opts$model
 cond.excl.in <- opts$`conditional-exclusion`
-p.is.phred <- opts$`p-is-phred`
+p.is.phred <- opts$`p-is-neg-log10`
 spa <- opts$spa
 spa.xbed.in <- opts$`spa-exclude`
 winsorize <- opts$winsorize

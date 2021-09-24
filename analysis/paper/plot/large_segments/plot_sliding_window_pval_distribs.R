@@ -349,10 +349,10 @@ del.nomsig.bed <- opts$`del-nomsig-bed`
 dup.nomsig.bed <- opts$`dup-nomsig-bed`
 
 # # DEV PARAMETERS
-# primary.del.pvals.in <- "~/scratch/rCNV2_analysis_d2.DEL.meta_phred_p.all_hpos.bed.gz"
-# primary.dup.pvals.in <- "~/scratch/rCNV2_analysis_d2.DUP.meta_phred_p.all_hpos.bed.gz"
-# secondary.del.pvals.in <- "~/scratch/rCNV2_analysis_d2.DEL.meta_phred_p_secondary.all_hpos.bed.gz"
-# secondary.dup.pvals.in <- "~/scratch/rCNV2_analysis_d2.DUP.meta_phred_p_secondary.all_hpos.bed.gz"
+# primary.del.pvals.in <- "~/scratch/rCNV2_analysis_d2.DEL.meta_neg_log10_p.all_hpos.bed.gz"
+# primary.dup.pvals.in <- "~/scratch/rCNV2_analysis_d2.DUP.meta_neg_log10_p.all_hpos.bed.gz"
+# secondary.del.pvals.in <- "~/scratch/rCNV2_analysis_d2.DEL.meta_neg_log10_p_secondary.all_hpos.bed.gz"
+# secondary.dup.pvals.in <- "~/scratch/rCNV2_analysis_d2.DUP.meta_neg_log10_p_secondary.all_hpos.bed.gz"
 # hpos.in <- "~/scratch/rCNV2_analysis_d2.reordered_hpos.txt"
 # hpo.samplesize.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
 # out.prefix <- "~/scratch/test_pval_qc"

@@ -19,7 +19,7 @@ options(stringsAsFactors=F, scipen=1000, family="sans")
 ######################
 # Load summary stats
 load.sumstats <- function(stats.in, chrom.colors, sig.color,
-                          p.col.name="meta_phred_p"){
+                          p.col.name="meta_neg_log10_p"){
   # Read data
   stats <- read.table(stats.in, header=T, sep="\t", check.names=F, comment.char="")
   colnames(stats)[1] <- gsub("#", "", colnames(stats)[1])
@@ -218,8 +218,8 @@ xaxis.label <- opts$`xaxis-label`
 # xaxis.label <- "Chromosomes"
 
 # Load sumstats
-del <- load.sumstats(del.in, p.col.name="meta_phred_p")
-dup <- load.sumstats(dup.in, p.col.name="meta_phred_p")
+del <- load.sumstats(del.in, p.col.name="meta_neg_log10_p")
+dup <- load.sumstats(dup.in, p.col.name="meta_neg_log10_p")
 
 # # DEV: downsample
 # del <- del[sort(sample(1:nrow(del), 20000, replace=F)), ]
