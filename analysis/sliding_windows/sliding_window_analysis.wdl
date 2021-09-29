@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens in sliding windows, genome-wide
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/26/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_sliding_window_perm_test/versions/27/plain-WDL/descriptor" as scattered_perm
 
 
 workflow sliding_window_analysis {
@@ -573,7 +573,6 @@ task meta_analysis {
       done < <( fgrep -v mega ${metacohort_list}) \
       > ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt
       /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
-        --or-corplot ${prefix}.${freq_code}.$CNV.sliding_window.or_corplot_grid.jpg \
         --model ${meta_model_prefix} \
         --conditional-exclusion ${exclusion_bed} \
         --p-is-neg-log10 \
@@ -622,8 +621,6 @@ task meta_analysis {
     # Copy results to output bucket
     gsutil -m cp *.sliding_window.meta_analysis.stats.bed.gz* \
       "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/stats/"
-    gsutil -m cp *.sliding_window.or_corplot_grid.jpg \
-      "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/plots/"
     gsutil -m cp *.sliding_window.meta_analysis.*.png \
       "${rCNV_bucket}/analysis/sliding_windows/${prefix}/${freq_code}/plots/"
 
