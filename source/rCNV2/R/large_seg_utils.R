@@ -70,7 +70,8 @@ load.segment.table <- function(segs.in){
   segs[, listcol.idxs] <- apply(segs[, listcol.idxs], 2, strsplit, split=";")
 
   # Convert numeric columns to numerics
-  numcol.idxs <- unique(c(which(colnames(segs) %in% c("start", "end", "size", "meta_best_p", "Redin_BCAs")),
+  numcol.idxs <- unique(c(which(colnames(segs) %in% c("start", "end", "size", "meta_best_p",
+                                                      "min_LOEUF", "min_MisOEUF", "Redin_BCAs")),
                           grep("^n_", colnames(segs), fixed=F),
                           grep("_dnm_", colnames(segs), fixed=T),
                           grep("_express", colnames(segs), fixed=T)))

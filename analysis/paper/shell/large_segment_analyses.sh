@@ -34,6 +34,7 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/misc/redin_bca_breakpoints.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/misc/gene_mutation_rates.tsv.gz \
   ${rCNV_bucket}/cleaned_data/genes/annotations/gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
+  ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
   refs/
 mkdir meta_stats/
 gsutil -m cp \
@@ -154,6 +155,7 @@ cat \
   --min-jaccard-sum 1.0 \
   --genelists genelists_to_annotate.tsv \
   --hpo-genelists hpo_genelists.tsv \
+  --gene-constraint-metadata refs/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
   --dnm-tsvs dnm_counts_to_annotate.tsv \
   --snv-mus refs/gene_mutation_rates.tsv.gz \
   --bca-tsv refs/redin_bca_breakpoints.bed.gz \

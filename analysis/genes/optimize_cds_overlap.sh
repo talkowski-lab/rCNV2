@@ -36,7 +36,6 @@ gsutil -m cp \
 
 
 # Subset GTF to genes of interest for deletions & duplications
-# TODO: UPDATE THIS TO SAME LISTS USED FOR GENE SCORING
 opt/rCNV2/utils/filter_gtf_by_genelist.py \
   -o gencode.v19.canonical.pext_filtered.DEL.gtf.gz \
   --bgzip \
@@ -54,9 +53,7 @@ mkdir cnv_counts
 while read meta cohorts; do
   for CNV in DEL DUP; do
     /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
-      --pad-controls 0 \
       --min-cds-ovr 0 \
-      --max-genes 20000 \
       -t $CNV \
       --hpo "$( paste -d\; -s refs/rCNV2.hpos_by_severity.developmental.list )" \
       --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
@@ -70,7 +67,7 @@ while read meta cohorts; do
       cleaned_cnv/${meta}.rCNV.bed.gz \
       gencode.v19.canonical.pext_filtered.${CNV}.gtf.gz
   done
-done < <( fgrep -v "mega" rCNV_metacohort_list.txt )
+done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt )
 
 
 # Summarize counts & effect size per cohort at various CDS cutoffs
@@ -86,17 +83,16 @@ while read meta cohorts; do
       cnv_counts/${meta}.${CNV}.genes_per_cnv.bed.gz \
       cds_optimization_data/${meta}.${CNV}.counts_per_cds.tsv
   done
-done < <( fgrep -v "mega" rCNV_metacohort_list.txt )
+done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt )
 
 
 # Meta-analyze CNV counts across cohorts at each CDS cutoff
 for CNV in DEL DUP; do
   while read meta cohorts; do
     echo -e "$meta\tcds_optimization_data/${meta}.${CNV}.counts_per_cds.tsv"
-  done < <( fgrep -v "mega" rCNV_metacohort_list.txt ) \
+  done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt ) \
   > ${CNV}.meta_analysis.input.txt
   /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
-    --or-corplot cds_optimization_data/${CNV}.cds_optimization.or_corplot_grid.jpg \
     --model "fe" \
     --keep-n-columns 4 \
     --p-is-neg-log10 \

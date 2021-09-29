@@ -150,7 +150,8 @@ if(!is.null(corplot.out)){
 # Merge data across cohorts
 stats.merged <- combine.single.cohort.assoc.stats(stats.list, cond.excl.in,
                                                   min.cases, keep.n.cols)
-
+# DEV: downsample
+stats.merged <- stats.merged[seq(1, nrow(stats.merged), 20), ]
 # Load saddlepoint exclusion regions, if optioned
 if(is.null(spa.xbed.in)){
   spa.xbed <- NULL

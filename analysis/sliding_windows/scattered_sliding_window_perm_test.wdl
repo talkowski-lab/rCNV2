@@ -160,7 +160,6 @@ task permuted_burden_test {
         --spa \
         --spa-exclude /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
         --winsorize ${winsorize_meta_z} \
-        --adjust-biobanks \
         --min-cases ${meta_min_cases} \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed

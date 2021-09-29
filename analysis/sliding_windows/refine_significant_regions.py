@@ -277,7 +277,6 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_neg_log10=True,
     """
 
     hpo_info = {'blocks' : {}}
-    se_by_chrom = {}
 
     # First pass: parse data for significant windows only
     hpo_info['sig_windows'] = parse_stats(stats_in, primary_p_cutoff, p_is_neg_log10, 
@@ -357,6 +356,7 @@ def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2,
     with open(statslist) as infile:
         reader = csv.reader(infile, delimiter='\t')
         for hpo, stats_in, pval, in reader:
+            print('Loading data from {}...'.format(hpo))
             primary_p_cutoff = float(pval)
             hpo_data[hpo] = process_hpo(hpo, stats_in, primary_p_cutoff, 
                                         p_is_neg_log10=True, 
@@ -373,92 +373,220 @@ def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2,
     return hpo_data
 
 
-def estimate_null_variance_basic(hpo_data):
+def assign_or_quantiles(hpo_data, n_or_bins=1):
     """
-    Estimates null variance per phenotype from average of all significant windows
+    Assign all associations into quantiles based on effect size
     """
 
-    vardict_all = {hpo : {} for hpo in hpo_data.keys()}
-    vardict_sig = {hpo : [] for hpo in hpo_data.keys()}
-    vardict_best = {hpo : [] for hpo in hpo_data.keys()}
+    # Gather effect size estimate of most significant window per block
+    lnors = {}
+    for hpo, hdat in hpo_data.items():
+        for bid, bdat in hdat['blocks'].items():
+            best_p = 1
+            best_wid = None
+            best_lnor = 0
+            for wid in list(bdat['refine_res'].keys()):
+                w_p = hdat['all_windows'][wid]['primary_p']
+                if w_p < best_p:
+                    best_p = w_p
+                    best_wid = wid
+                    best_lnor = hdat['all_windows'][wid]['lnOR']
+            lnors[bid] = {'lnor' : best_lnor, 'hpo' : hpo}
 
-    for hpo, dat in hpo_data.items():
-        
-        for window, gdat in dat['all_windows'].items():
-            # Estimate null variance from effect size per Wakefield, AJHG, 2007
-            var = (float(gdat['lnOR']) / 1.96) ** 2
-            vardict_all[hpo][window] = var
-            if window in dat['sig_windows'].keys():
-                vardict_sig[hpo].append(var)
-        
-        for bdat in dat['blocks'].values():
-            bpvals = [(window, dat['all_windows'][window]['primary_p']) for window \
-                          in bdat['refine_res'].keys()]
-            best_window = sorted(bpvals, key=lambda x: x[1])[0][0]
-            vardict_best[hpo].append(vardict_all[hpo][best_window])
+    # Assign blocks to quantiles
+    quants = np.floor(n_or_bins * np.argsort([x['lnor'] for x in lnors.values()]) / len(lnors))
+    qdict = {a : int(b) for a, b in zip(lnors.keys(), quants)}
+    for bid in qdict.keys():
+        hpo_data[lnors[bid]['hpo']]['blocks'][bid]['lnor_quantile'] = qdict[bid]
+
+    return hpo_data
+
+
+def estimate_null_variance_basic(hpo_data, Wsq, dev_hpos=[], n_or_bins=1, 
+                                 split_gw_fdr=False):
+    """
+    Estimates null variance from average of all significant windows and best window per block
+    """
 
     # Compute 2 null variance estimates for refining:
     # 1. Mean of all significant windows
     # 2. Mean of all top windows (one per block)
+    vardict_sig = {hpo : {'gw' : {i : [] for i in range(n_or_bins + 1)},
+                          'fdr' : {i : [] for i in range(n_or_bins + 1)}} \
+                   for hpo in hpo_data.keys()}
+    vardict_best = {hpo : {'gw' : {i : [] for i in range(n_or_bins + 1)},
+                           'fdr' : {i : [] for i in range(n_or_bins + 1)}} \
+                    for hpo in hpo_data.keys()}
 
-    v1 = np.nanmean([x for l in vardict_sig.values() for x in l if x > 0])
-    v2 = np.nanmean([x for l in vardict_best.values() for x in l if x > 0])
+    # Collect variance estimates from each significant block
+    for hpo, dat in hpo_data.items():
+        for bdat in dat['blocks'].values():
 
-    return [v1, v2]
+            # Get block-wide odds ratio quantile and significance level
+            lnor_q = bdat['lnor_quantile']
+            gw_sig = any([dat['all_windows'][wid]['gw_sig'] for wid \
+                          in bdat['refine_res'].keys()])
+            if gw_sig:
+                w_sig = 'gw'
+            else:
+                w_sig = 'fdr'
+            if not split_gw_fdr:
+                gw_sig = True
+
+            # Get odds ratio for each significant window within the block 
+            sig_wids = [wid for wid in bdat['refine_res'].keys() \
+                        if any([dat['all_windows'][wid]['gw_sig'],
+                                dat['all_windows'][wid]['fdr_sig']])]
+            sig_lnors = {wid: dat['all_windows'][wid]['lnOR'] for wid in sig_wids}
+            sig_vars = {wid : (float(lnor) / 1.96) ** 2 for wid, lnor in sig_lnors.items()}
+
+            # Get odds ratio of single window with strongest P-value
+            bpvals = [(window, dat['all_windows'][window]['primary_p']) \
+                      for window in sig_wids]
+            best_wid = sorted(bpvals, key=lambda x: x[1])[0][0]
+            best_var = sig_vars[best_wid]
+
+            # Update overall variance estimate collectors
+            vardict_sig[hpo][w_sig][lnor_q] += list(sig_vars.values())
+            vardict_best[hpo][w_sig][lnor_q].append(best_var)
+
+    # Summarize variance estimates across strata
+    for sig in 'gw fdr'.split():
+        for i in range(n_or_bins):
+
+            # Developmental HPOs
+            var_sig_dev_all = [vardict_sig[h][sig][i] for h in dev_hpos]
+            var_sig_dev = np.nanmean([v for sub in var_sig_dev_all for v in sub])
+            var_best_dev_all = [vardict_best[h][sig][i] for h in dev_hpos]
+            var_best_dev = np.nanmean([v for sub in var_best_dev_all for v in sub])
+            for hpo in dev_hpos:
+                Wsq[hpo][sig][i] += [var_sig_dev, var_best_dev]
+
+            # All other HPOs
+            other_hpos = list(set(hpo_data.keys()).difference(set(dev_hpos)))
+            var_sig_other_all = [vardict_sig[h][sig][i] for h in other_hpos]
+            var_sig_other = np.nanmean([v for sub in var_sig_other_all for v in sub])
+            var_best_other_all = [vardict_best[h][sig][i] for h in other_hpos]
+            var_best_other = np.nanmean([v for sub in var_best_other_all for v in sub])
+            for hpo in other_hpos:
+                Wsq[hpo][sig][i] += [var_sig_other, var_best_other]
+
+    return Wsq
 
 
-def estimate_null_variance_gs(gs_lists, statslist, refine_secondary=False):
+def estimate_null_variance_gs(gs_lists, statslist, Wsq, single_gs_hpo=False, 
+                              n_or_bins=1):
     """
-    Estimates null variance for all cases from the average of a list of known causal windows
+    Estimates null variance from the average of a list of known causal windows
     """
 
-    var = []
 
-    statspath = open(statslist).readline().rstrip().split('\t')[1]
-    statsbed = pbt.BedTool(statspath)
-    if path.splitext(statspath)[1] in '.gz .bgz .bgzip'.split():
-        statsfin = gzip.open(statspath, 'rt')
-    else:
-        statsfin = open(statspath)
-    statscols = statsfin.readline().rstrip().split('\t')
+    statspaths = {h : p for h, p in [x.rstrip().split('\t')[:2] \
+                  for x in open(statslist).readlines()]}
+    with gzip.open(list(statspaths.values())[0], 'rt') as ex_statfile:
+        statscols = ex_statfile.readline().rstrip().split('\t')
 
+    # Estimate null variance for each entry in gs_lists
     for gspath in gs_lists:
-        # Intersect sumstats for highest-level phenotype with GS regions
-        gsdf = statsbed.intersect(pbt.BedTool(gspath), u=True, f=1.0).\
-                   to_dataframe(names=statscols)
-        gsdf['window'] = gsdf[['#chr', 'start', 'end']].astype(str).\
-                             aggregate('_'.join, axis=1)
+        for hpo, statspath in statspaths.items():
+            # Intersect sumstats for phenotype with GS regions
+            gsdf = pbt.BedTool(statspath).\
+                       intersect(pbt.BedTool(gspath), u=True, f=1.0).\
+                       to_dataframe(names=statscols)
+            gsdf['window'] = gsdf[['#chr', 'start', 'end']].astype(str).\
+                                 aggregate('_'.join, axis=1)
 
-        # Read effect sizes per window from highest level phenotype
-        if refine_secondary:
-            keep_cols = 'window meta_lnOR_secondary'.split()
-        else:
-            keep_cols = 'window meta_lnOR'.split()
-        stats = gsdf.loc[:, keep_cols].rename(columns={'meta_lnOR' : 'lnOR',
-                                                       'meta_lnOR_secondary' : 'lnOR'})
-        gs_vars = (stats.lnOR.astype(float) / 1.96) ** 2
-        var.append(float(np.nanmean(gs_vars)))
+            # Read effect sizes per window and convert to mean variance
+            stats = gsdf.loc[:, 'window meta_lnOR'.split()].\
+                         rename(columns={'meta_lnOR' : 'lnOR'})
+            gs_var = np.nanmean((stats.lnOR.astype(float) / 1.96) ** 2)
 
-    return var
+            # Update Wsq estimates for all sig. and effect size quantiles
+            if single_gs_hpo:
+                for hpo in Wsq.keys():
+                    for sig in 'gw fdr'.split():
+                        for i in range(n_or_bins):
+                            Wsq[hpo][sig][i].append(gs_var)
+                break
+            else:
+                for sig in 'gw fdr'.split():
+                    for i in range(n_or_bins):
+                        Wsq[hpo][sig][i].append(gs_var)
+
+    return Wsq
 
 
-def update_refine(hpo_data, Wsq, cs_val=0.95, block_merge_dist=200000):
+def estimate_null_variance(hpo_data, gs_list, statslist, dev_hpos=[], 
+                           n_or_bins=1, split_gw_fdr=False, single_gs_hpo=False):
+    """
+    Estimate null variance for fine-mapping, optionally splitting on several covariates
+    """
+
+    # Build null variance hierarchy
+    Wsq = {hpo : {'gw' : {i : [] for i in range(n_or_bins)}, 
+                  'fdr' : {i : [] for i in range(n_or_bins)}} \
+           for hpo in hpo_data.keys()}
+
+    # Estimate null variance using 2+ approaches
+    #   1. all significant windows
+    #   2. most significant window per block
+    #   3+. known causal regions (optional; can be multiple lists)
+    Wsq = estimate_null_variance_basic(hpo_data, Wsq, dev_hpos, n_or_bins, split_gw_fdr)
+    if gs_list is not None:
+        with open(gs_list) as gsf:
+            Wsq = estimate_null_variance_gs([x.rstrip() for x in gsf.readlines()], 
+                                            statslist, Wsq, single_gs_hpo, n_or_bins)
+
+    # Prune nans from all null variance estimates
+    for hpo in Wsq.keys():
+        for sig in 'gw fdr'.split():
+            for i in range(n_or_bins):
+                var_list = Wsq[hpo][sig][i]
+                Wsq[hpo][sig][i] = list(np.array(var_list)[~np.isnan(var_list)])
+
+    return Wsq
+
+
+def output_null_var_tsv(Wsq, outfile):
+    """
+    Write table of null variance estimates to .tsv file
+    """
+
+    with open(outfile, 'w') as fout:
+        header = '\t'.join('#HPO sig odds_ratio_quantile null_variance'.split())
+        fout.write(header + '\n')
+
+        for hpo in Wsq.keys():
+            for sig in 'gw fdr'.split():
+                for i, var_ests in Wsq[hpo][sig].items():
+                    out_fmt = '\t'.join([hpo, sig, str(i), '{}']) + '\n'
+                    for v in var_ests:
+                        fout.write(out_fmt.format(v))
+
+
+def update_refine(hpo_data, Wsq, split_gw_fdr=False, cs_val=0.95, 
+                  block_merge_dist=200000):
     """
     Update initial refinement results (flat prior) with null variances
     If multiple Wsqs are provided, uses Bayesian model averaging across them
     """
 
-    if not isinstance(Wsq, list):
-        Wsq = list(Wsq)
-
     for hpo, hdat in hpo_data.items():
         for block_id, bdat in hdat['blocks'].items():
             windows = list(bdat['refine_res'].keys())
             window_priors = {window : 1 / len(windows) for window in windows}
+
+            # Get block-wide odds ratio quantile and significance level
+            lnor_q = bdat['lnor_quantile']
+            gw_sig = any([hdat['all_windows'][wid]['gw_sig'] for wid in windows])
+            if gw_sig or not split_gw_fdr:
+                b_sig = 'gw'
+            else:
+                b_sig = 'fdr'
             
             # Compute ABFs and PIPs at each null variance estimate
             bma_input = []
-            for W in Wsq:
+            for W in Wsq[hpo][b_sig][lnor_q]:
                 refine_res, credset_coords, credset_bt, credset_windows \
                     = refine(window_priors, hpo_data[hpo]['all_windows'], W, 
                              cs_val, block_merge_dist)
@@ -645,8 +773,35 @@ def cluster_credsets(hpo_data, block_merge_dist=200000):
     return clustered_credsets
 
 
+def define_joint_credints(hpo_data, hpo_dict, cs_val):
+    """
+    Function to average PIPs across all windows from two or more HPOs to define a 
+    consensus set of credible intervals
+    """
+
+    # Take union of all windows evaluated in all phenotypes
+    all_wids = [hpo_data[hpo]['blocks'][bid]['refine_res'].keys() \
+                for bid, hpo in hpo_dict.items()]
+    all_wids = set([w for l in all_wids for w in l])
+    pip_df = pd.DataFrame(index=all_wids)
+
+    # Map PIPs from each HPO onto pip_df
+    for bid, hpo in hpo_dict.items():
+        pip_map = {k : v['PIP'] for k, v in hpo_data[hpo]['blocks'][bid]['refine_res'].items()}
+        pip_df[hpo] = pip_df.index.map(pip_map)
+
+    # Average PIPs across all HPOs
+    pip_df.fillna(value=0, inplace=True)
+    refine_res = pip_df.mean(axis=1).to_frame(name='PIP').to_dict(orient='index')
+
+    # Redefine credible intervals
+    credset_coords, credset_bt, credset_windows = make_cs(refine_res, cs_val)
+
+    return credset_bt
+
+
 def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS', 
-                    block_prefix=None):
+                    block_prefix=None, joint_credsets=False, cs_val=0.95):
     """
     Format final list of collapsed credible sets and compute pooled summary statistics
     """
@@ -677,7 +832,10 @@ def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS
         credints_dict = {cs : hpo_data[hpo]['blocks'][cs]['credset_coords'] for cs, hpo in hpo_dict.items()}
         credints_bts = [hpo_data[hpo]['blocks'][cs]['credset_bt'] for cs, hpo in hpo_dict.items()]
         if n_members > 1:
-            credints_bt = credints_bts[0].cat(*credints_bts[1:], postmerge=False).sort().merge()
+            if joint_credsets:
+                credints_bt = define_joint_credints(hpo_data, hpo_dict, cs_val)
+            else:
+                credints_bt = credints_bts[0].cat(*credints_bts[1:], postmerge=False).sort().merge()
         else:
             credints_bt = credints_bts[0].sort().merge()
         n_credints = len(credints_bt)
@@ -784,6 +942,11 @@ def main():
                         '[default: apply no secondary criteria to FDR segments]')
     parser.add_argument('--credible-sets', dest='cs_val', type=float, default=0.95,
                         help='Credible set value. [default: 0.95]')
+    parser.add_argument('--joint-credset-definition', action='store_true', 
+                        default=False, dest='joint_credsets', help='After ' +
+                        'clustering and refinement, add a final step of joint ' +
+                        'credible set definition across all HPOs associated at ' +
+                        'each locus [default: define credsets per HPO per locus]')
     parser.add_argument('--distance', help='Distance to pad each significant window ' +
                         'prior to refinement. [default: 1Mb]', default=1000000, 
                         type=int)
@@ -791,6 +954,25 @@ def main():
                         '.bed lists of known causal loci. Used for estimating null ' +
                         'variance. Can be specified multiple times. [default: ' +
                         'no known causal regions]', dest='gs_list')
+    parser.add_argument('--single-gs-hpo', action='store_true', default=False,
+                        help='Use first row in --variance-estimation-statslist ' +
+                        'to estimate null variance for all HPOs. [default: ' +
+                        'estimate HPO-specific null variance]')
+    parser.add_argument('--variance-estimation-statslist', help='.tsv of paths to ' +
+                        'meta-analysis per phenotype to use with --known-causal-loci-list, ' +
+                        'if different from main statslist. [default: use main statslist]',
+                        dest='var_est_statslist')
+    parser.add_argument('--developmental-hpos', help='.txt file listing which ' +
+                        'HPOs to treat as developmental when estimating null ' +
+                        'variance. [default: pool all HPOs for null variance]')
+    parser.add_argument('--n-effect-size-bins', dest='n_or_bins', type=int, default=1,
+                        help='Number of effect size quantiles to evaluate when ' +
+                        'estimating null variance [default: do not split ' +
+                        'associations by effect size]')
+    parser.add_argument('--estimate-variance-by-sig', dest='split_gw_fdr', 
+                        action='store_true', help='Estimate null variance separately ' +
+                        'for genome-wide significant and FDR-significant segments. ' +
+                        '[default: pool all segments when estimating null variance]')
     parser.add_argument('--cytobands', help='BED of chromosome cytobands. Used ' +
                         'for naming regions. Optional. [default: name based on coordinates]')
     parser.add_argument('--refine-secondary', action='store_true', default=False,
@@ -801,6 +983,8 @@ def main():
     parser.add_argument('--sig-assoc-bed', help='Output BED of significant ' +
                         'segment-phenotype pairs and their corresponding association ' +
                         'statistics.')
+    parser.add_argument('--null-variance-estimates-tsv', help='Output .tsv with ' +
+                        'full table of estimated null variances.', dest='null_var_out')
     parser.add_argument('--prefix', help='Prefix for naming loci & associations.')
     args = parser.parse_args()
 
@@ -821,19 +1005,29 @@ def main():
                              args.distance, block_prefix, 
                              args.refine_secondary, args.cs_val)
 
-    # Estimate null variance based on:
-    #   1. all significant windows
-    #   2. most significant window per block
-    #   3. known causal regions (optional; can be multiple lists)
-    Wsq = estimate_null_variance_basic(hpo_data)
-    if args.gs_list is not None:
-        with open(args.gs_list) as gsf:
-            Wsq += estimate_null_variance_gs(gsf.read().splitlines(), args.statslist)
-    Wsq = sorted(Wsq)
-    print('Null variance estimates: ' + ', '.join([str(round(x, 3)) for x in Wsq]))
+    # Group blocks by effect size quantile
+    hpo_data = assign_or_quantiles(hpo_data, args.n_or_bins)
+
+    # Read list of developmental HPOs:
+    if args.developmental_hpos is not None:
+        dev_hpos = [x.rstrip() for x in open(args.developmental_hpos).readlines()]
+    else:
+        dev_hpos = []
+
+    # Estimate null variance
+    if args.var_est_statslist is not None:
+        var_est_statslist = args.var_est_statslist
+    else:
+        var_est_statslist = args.statslist
+    Wsq = estimate_null_variance(hpo_data, args.gs_list, var_est_statslist, 
+                                 dev_hpos, args.n_or_bins, args.split_gw_fdr,
+                                 args.single_gs_hpo)
+    if args.null_var_out is not None:
+        output_null_var_tsv(Wsq, args.null_var_out)
 
     # Update original refinement results with BMA of re-estimated null variances
-    hpo_data = update_refine(hpo_data, Wsq, args.cs_val, args.distance)
+    hpo_data = update_refine(hpo_data, Wsq, args.split_gw_fdr, args.cs_val, 
+                             args.distance)
 
     # Rename all blocks according to cytobands of credible sets, if optioned
     if args.cytobands is not None:
@@ -856,7 +1050,8 @@ def main():
     if args.sig_loci_bed is not None:
         sig_loci_bed = open(args.sig_loci_bed, 'w')
         output_loci_bed(hpo_data, final_loci, args.cytobands, sig_loci_bed, 
-                        ncase_dict, args.cnv, block_prefix.replace('_segment', ''))
+                        ncase_dict, args.cnv, block_prefix.replace('_segment', ''),
+                        args.joint_credsets, args.cs_val)
 
 
 if __name__ == '__main__':

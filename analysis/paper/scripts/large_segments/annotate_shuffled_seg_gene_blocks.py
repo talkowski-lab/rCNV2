@@ -81,6 +81,9 @@ def main():
                         'providing --segment-hpos.')
     parser.add_argument('--segment-hpos', help='tsv of segment ids and semicolon-' +
                         'delimited list of associated HPOs.')
+    parser.add_argument('--gene-constraint-metadata', help='Tsv of gene-level ' +
+                        'constraint metadata. If provided, will annotate minimum ' +
+                        'pLoF and missense OEUF from gnomAD.')
     parser.add_argument('--dnm-tsvs', help='Tsv of de novo mutation counts ' +
                         ' to annotate. Three columns expected: study prefix, ' +
                         'path to tsv with dnm counts, and path to list of exome-' +
@@ -138,6 +141,11 @@ def main():
             segment_hpos = {bid : hpos.split(';') for bid, hpos \
                             in csv.reader(fin, delimiter='\t')}
         header_cols += ['n_HPOmatched_genes']
+
+    # Load gene-level constraint metadata, if optioned
+    if args.gene_constraint_metadata is not None:
+        constr_df = pd.read_csv(args.gene_constraint_metadata, sep='\t')
+        header_cols += ['min_LOEUF', 'min_MisOEUF']
 
     # Load snv mutation rates, if optioned
     if args.snv_mus is not None:
@@ -205,6 +213,12 @@ def main():
         if args.hpo_genelists is not None and args.segment_hpos is not None:
             hgenes = [g for l in [hpo_genes[h] for h in segment_hpos[orig_bid]] for g in l]
             outvals.append(len([g for g in genes if g in hgenes]))
+
+        # Annotate with gene-level constraint metadata, if optioned
+        if args.gene_constraint_metadata is not None:
+            min_loeuf = constr_df.loc[constr_df.gene.isin(genes), 'gnomad_oe_lof_upper'].min()
+            min_misoeuf = constr_df.loc[constr_df.gene.isin(genes), 'gnomad_oe_mis_upper'].min()
+            outvals += [min_loeuf, min_misoeuf]
 
         # Annotate with count of de novo mutations per study, if optioned
         if args.dnm_tsvs is not None:

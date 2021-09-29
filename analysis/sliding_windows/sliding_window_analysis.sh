@@ -102,7 +102,7 @@ meta_model_prefix="fe"
 bin_overlap=0.5
 pad_controls=50000
 max_manhattan_neg_log10_p=30
-winsorize_meta_z=1
+winsorize_meta_z=0.99
 meta_min_cases=300
 
 
@@ -301,7 +301,6 @@ while read prefix hpo; do
         --spa \
         --spa-exclude /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
         --winsorize ${winsorize_meta_z} \
-        --adjust-biobanks \
         --min-cases ${meta_min_cases} \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.perm_$i.bed
@@ -448,7 +447,6 @@ while read prefix hpo; do
       --spa \
       --spa-exclude /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
       --winsorize ${winsorize_meta_z} \
-      --adjust-biobanks \
       --min-cases ${meta_min_cases} \
       ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
       ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
@@ -569,8 +567,8 @@ rCNV_bucket="gs://rcnv_project"
 meta_p_cutoffs_tsv="refs/sliding_window.rCNV.DEL.bonferroni_pval.hpo_cutoffs.tsv"
 meta_secondary_p_cutoff=0.05
 meta_nominal_cohorts_cutoff=2
-sig_window_pad=200000
-credset=0.99
+sig_window_pad=100000
+credset=0.95
 FDR_cutoff=0.01
 gtf="gencode.v19.canonical.pext_filtered.gtf.gz"
 
@@ -586,6 +584,7 @@ gsutil -m cp \
   ${rCNV_bucket}/refs/GRCh37.cytobands.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs*.bed.gz \
   refs/
+gsutil -m cp ${rCNV_bucket}/cleaned_data/genes/${gtf}* ./
 
 # Write tsv inputs
 while read prefix hpo; do
@@ -597,14 +596,11 @@ while read prefix hpo; do
   done | paste -s
 done < ${phenotype_list} \
 > ${freq_code}.${CNV}.segment_refinement.stats_input.tsv
-zcat refs/lit_GDs.*.bed.gz | fgrep -w ${CNV} | cut -f1-5 | \
-sort -Vk1,1 -k2,2n -k3,3n -k4,4V -k5,5V | bedtools merge -i - \
-> all_GDs.${CNV}.bed
-echo "all_GDs.${CNV}.bed" > known_causal_loci_lists.${CNV}.tsv
+echo "/opt/rCNV2/refs/lit_GDs.all.${CNV}.bed.gz" > known_causal_loci_lists.${CNV}.tsv
 
-# Apply an initial loose mask per HPO to P<0.1 regions ±sig_window_pad
+# Apply an initial loose mask per HPO to drop all windows with NA P-values
 # to reduce I/O time reading sumstats files in refinement
-# Also add all known GD regions for null variance estimation
+# Add back all known GD regions for null variance estimation
 while read prefix hpo; do
   echo -e "Subsetting $prefix summary stats prior to refinement"
   allstats="stats/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.bed.gz"
@@ -613,8 +609,8 @@ while read prefix hpo; do
   zcat $allstats \
   | grep -ve '^#' \
   | awk -v FS="\t" -v OFS="\t" -v idx=$primary_p_idx \
-    '{ if ($(idx) >= 1 && $(idx) != "NA") print $1, $2, $3 }' \
-  | cat - all_GDs.${CNV}.bed \
+    '{ if ($(idx) != "NA") print $1, $2, $3 }' \
+  | cat - <( zcat /opt/rCNV2/refs/lit_GDs.all.${CNV}.bed.gz ) \
   | sort -Vk1,1 -k2,2n -k3,3n \
   | bedtools merge -i - \
   | awk -v OFS="\t" -v dist=${sig_window_pad} \
@@ -636,11 +632,15 @@ done < ${phenotype_list}
   --fdr-q-cutoff ${FDR_cutoff} \
   --secondary-for-fdr \
   --credible-sets ${credset} \
+  --joint-credset-definition \
   --distance ${sig_window_pad} \
   --known-causal-loci-list known_causal_loci_lists.${CNV}.tsv \
+  --single-gs-hpo \
+  --developmental-hpos refs/rCNV2.hpos_by_severity.developmental.list \
   --cytobands refs/GRCh37.cytobands.bed.gz \
   --sig-loci-bed ${freq_code}.${CNV}.final_segments.loci.pregenes.bed \
   --sig-assoc-bed ${freq_code}.${CNV}.final_segments.associations.pregenes.bed \
+  --null-variance-estimates-tsv ${freq_code}.${CNV}.final_segments.null_variance_estimates.tsv \
   ${freq_code}.${CNV}.segment_refinement.stats_input.tsv \
   ${metacohort_sample_table}
 
@@ -652,16 +652,10 @@ for entity in loci associations; do
     ${gtf}
 done
 
-
-
 # Plot summary figures for final regions
 /opt/rCNV2/analysis/sliding_windows/regions_summary.plot.R \
   -o "${freq_code}.final_segments." \
   ${freq_code}.DEL.final_segments.loci.bed \
   ${freq_code}.DUP.final_segments.loci.bed
-
-
-
-
 
 

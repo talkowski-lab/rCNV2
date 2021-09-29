@@ -28,7 +28,6 @@ workflow sliding_window_analysis {
   Float winsorize_meta_z
   Int meta_min_cases
   Float meta_secondary_p_cutoff
-  Float meta_or_cutoff
   Int meta_nominal_cohorts_cutoff
   Float credible_interval
   Int sig_window_pad
@@ -581,7 +580,6 @@ task meta_analysis {
         --spa \
         --spa-exclude /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
         --winsorize ${winsorize_meta_z} \
-        --adjust-biobanks \
         --min-cases ${meta_min_cases} \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.sliding_window.meta_analysis.stats.bed
@@ -689,14 +687,11 @@ task refine_regions {
       done | paste -s
     done < ${phenotype_list} \
     > ${freq_code}.${CNV}.segment_refinement.stats_input.tsv
-    zcat refs/lit_GDs.*.bed.gz | fgrep -w ${CNV} | cut -f1-5 | \
-    sort -Vk1,1 -k2,2n -k3,3n -k4,4V -k5,5V | bedtools merge -i - \
-    > all_GDs.${CNV}.bed
-    echo "all_GDs.${CNV}.bed" > known_causal_loci_lists.${CNV}.tsv
+    echo "/opt/rCNV2/refs/lit_GDs.all.${CNV}.bed.gz" > known_causal_loci_lists.${CNV}.tsv
 
-    # Apply an initial loose mask per HPO to P<0.1 regions ±sig_window_pad
+    # Apply an initial loose mask per HPO to drop all windows with NA P-values
     # to reduce I/O time reading sumstats files in refinement
-    # Also add all known GD regions for null variance estimation
+    # Add back all known GD regions for null variance estimation
     while read prefix hpo; do
       echo -e "Subsetting $prefix summary stats prior to refinement"
       allstats="stats/$prefix.${freq_code}.${CNV}.sliding_window.meta_analysis.stats.bed.gz"
@@ -705,8 +700,8 @@ task refine_regions {
       zcat $allstats \
       | grep -ve '^#' \
       | awk -v FS="\t" -v OFS="\t" -v idx=$primary_p_idx \
-        '{ if ($(idx) >= 1 && $(idx) != "NA") print $1, $2, $3 }' \
-      | cat - all_GDs.${CNV}.bed \
+        '{ if ($(idx) != "NA") print $1, $2, $3 }' \
+      | cat - <( zcat /opt/rCNV2/refs/lit_GDs.all.${CNV}.bed.gz ) \
       | sort -Vk1,1 -k2,2n -k3,3n \
       | bedtools merge -i - \
       | awk -v OFS="\t" -v dist=${sig_window_pad} \
@@ -728,11 +723,15 @@ task refine_regions {
       --fdr-q-cutoff ${FDR_cutoff} \
       --secondary-for-fdr \
       --credible-sets ${credset} \
+      --joint-credset-definition \
       --distance ${sig_window_pad} \
       --known-causal-loci-list known_causal_loci_lists.${CNV}.tsv \
+      --single-gs-hpo \
+      --developmental-hpos refs/rCNV2.hpos_by_severity.developmental.list \
       --cytobands refs/GRCh37.cytobands.bed.gz \
       --sig-loci-bed ${freq_code}.${CNV}.final_segments.loci.pregenes.bed \
       --sig-assoc-bed ${freq_code}.${CNV}.final_segments.associations.pregenes.bed \
+      --null-variance-estimates-tsv ${freq_code}.${CNV}.final_segments.null_variance_estimates.tsv \
       ${freq_code}.${CNV}.segment_refinement.stats_input.tsv \
       ${metacohort_sample_table}
 
@@ -743,6 +742,7 @@ task refine_regions {
         ${freq_code}.${CNV}.final_segments.$entity.pregenes.bed \
         ${gtf}
     done
+
   >>>
 
   output {
