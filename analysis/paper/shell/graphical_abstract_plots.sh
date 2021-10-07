@@ -18,7 +18,7 @@ gcloud auth login
 
 # Set global parameters
 export rCNV_bucket="gs://rcnv_project"
-export prefix="rCNV2_analysis_d1"
+export prefix="rCNV2_analysis_d2"
 example_hpo_nocolon="HP0012759"
 
 
@@ -31,7 +31,6 @@ gsutil -m cp \
 
 # Miami plot of example phenotype
 /opt/rCNV2/analysis/paper/plot/misc/plot_dummy_miami.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   ${example_hpo_nocolon}.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
   ${example_hpo_nocolon}.rCNV.DUP.sliding_window.meta_analysis.stats.bed.gz \
   ${prefix}.example_miami.png

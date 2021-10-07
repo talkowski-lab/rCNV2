@@ -12,6 +12,7 @@
 
 
 options(stringsAsFactors=F, scipen=1000, family="sans")
+require(rCNV2, quietly=T)
 
 
 ######################
@@ -168,9 +169,7 @@ mini.miami <- function(del, dup, max.p=10,
 require(optparse, quietly=T)
 
 # List of command-line options
-option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
-)
+option_list <- list()
 
 # Get command-line arguments & options
 args <- parse_args(OptionParser(usage=paste("%prog del_stats.bed dup_stats.bed out.png", sep=" "),
@@ -187,26 +186,10 @@ if(length(args$args) != 3){
 del.in <- args$args[1]
 dup.in <- args$args[2]
 out.png <- args$args[3]
-rcnv.config <- opts$`rcnv-config`
-
-# # DEV PARAMETERS
-# del.in <- "~/scratch/HP0012759.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz"
-# dup.in <- "~/scratch/HP0012759.rCNV.DUP.sliding_window.meta_analysis.stats.bed.gz"
-# out.png <- "~/scratch/test_mini_miami.png"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
 
 # Load sumstats
 del <- load.sumstats(del.in, p.col.name="meta_neg_log10_p")
 dup <- load.sumstats(dup.in, p.col.name="meta_neg_log10_p")
-
-# # DEV: downsample
-# del <- del[sort(sample(1:nrow(del), 50000, replace=F)), ]
-# dup <- dup[sort(sample(1:nrow(dup), 50000, replace=F)), ]
 
 # Plot miami
 png(out.png, height=4.1*300, width=3.75*300, res=300, family="sans", bg=NA)

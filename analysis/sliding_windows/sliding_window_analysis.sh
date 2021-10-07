@@ -437,7 +437,7 @@ while read prefix hpo; do
       "DEL")
         p_cutoff=$DEL_p_cutoff
         ;;
-      "DUP"
+      "DUP")
         p_cutoff=$DUP_p_cutoff
         ;;
       esac

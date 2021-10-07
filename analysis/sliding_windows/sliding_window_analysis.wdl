@@ -566,6 +566,14 @@ task meta_analysis {
       # Set CNV-specific parameters
       highlight_bed=/opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz
       highlight_title="Known $CNV GDs (consensus list)"
+      case $CNV in
+        "DEL")
+          p_cutoff=$DEL_p_cutoff
+          ;;
+        "DUP")
+          p_cutoff=$DUP_p_cutoff
+          ;;
+        esac
 
       # Perform meta-analysis
       while read meta cohorts; do
@@ -590,7 +598,7 @@ task meta_analysis {
         --p-col-name "meta_neg_log10_p" \
         --p-is-neg-log10 \
         --max-neg-log10-p ${max_manhattan_neg_log10_p} \
-        --cutoff $meta_p_cutoff \
+        --cutoff "$p_cutoff" \
         --highlight-bed "$highlight_bed" \
         --highlight-name "$highlight_title" \
         --label-prefix "$CNV" \
@@ -605,11 +613,11 @@ task meta_analysis {
       --p-col-name "meta_neg_log10_p" \
       --p-is-neg-log10 \
       --max-neg-log10-p ${max_manhattan_neg_log10_p} \
-      --cutoff $DUP_p_cutoff \
+      --cutoff "$DUP_p_cutoff" \
       --highlight-bed /opt/rCNV2/refs/lit_GDs.all.DUP.bed.gz \
       --highlight-name "Known DUP GDs (consensus list)" \
       --label-prefix "DUP" \
-      --cutoff-2 $DEL_p_cutoff \
+      --cutoff-2 "$DEL_p_cutoff" \
       --highlight-bed-2 /opt/rCNV2/refs/lit_GDs.all.DEL.bed.gz \
       --highlight-name-2 "Known DEL GDs (consensus list)" \
       --label-prefix-2 "DEL" \
@@ -750,7 +758,7 @@ task refine_regions {
   runtime {
     docker: "${rCNV_docker}"
     preemptible: 1
-    memory: "4 GB"
+    memory: "8 GB"
     bootDiskSizeGb: "20"
   }
 }
