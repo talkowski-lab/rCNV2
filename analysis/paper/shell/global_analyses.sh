@@ -520,6 +520,6 @@ gsutil -m cp \
 
 # Copy plot to Google Bucket (note: requires permissions)
 gsutil -m cp \
-  ${study_prefix}.global_summary.pdf \
+  ${study_prefix}.global_summary*pdf \
   ${rCNV_bucket}/analysis/paper/plots/misc/
 

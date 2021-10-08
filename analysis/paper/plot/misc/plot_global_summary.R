@@ -31,7 +31,7 @@ get.effect.sizes <- function(stats, category, hpos, return.log2=TRUE){
     if(hpo %in% stats$HPO){
       df <- as.data.frame(t(sapply(c("DUP", "CNV", "DEL"), function(cnv){
         as.numeric(stats[which(stats$HPO==hpo & stats$category==category & stats$CNV==cnv),
-              c("meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper", "meta_neg_log10_p")])
+                         c("meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper", "meta_neg_log10_p")])
       })))
     }else{
       df <- data.frame("meta_lnOR"=rep(NA, 3),
@@ -87,7 +87,7 @@ plot.text.columns <- function(hpos, meta, x.at=c(0, 2, 8), y.lab.buffer=0.05,
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
   sapply(1:length(x.at), function(i){
     axis(3, at=c(x.at[i]+0.125, (c(x.at[-1], par("usr")[2]) - 0.25)[i]),
-         tck=0, labels=NA, xpd=T, col=blueblack, line=y.top)
+         tck=0, labels=NA, xpd=T, col=blueblack, line=y.top+y.buffer)
   })
   height <- par("usr")[4]-par("usr")[3]
   text(x=x.at, y=par("usr")[4]+(y.lab.buffer*height)+(y.top*(sum(par("mar")[c(1,3)])/height)),
@@ -107,7 +107,7 @@ plot.text.columns <- function(hpos, meta, x.at=c(0, 2, 8), y.lab.buffer=0.05,
        pos=4, xpd=T)
 }
 
-# Plot a single panel of effect sizes
+# Plot a single vertical panel of effect sizes
 plot.ors <- function(stats, category, hpos, xlims=NULL, title=NULL,
                      ytop=-0.6, y.buffer=0.1, y.lab.buffer=0.015,
                      pt.cex=0.85, pt.vex=0.15){
@@ -159,12 +159,181 @@ plot.ors <- function(stats, category, hpos, xlims=NULL, title=NULL,
   })
 }
 
+# Plot a single horizontal panel of effect sizes
+plot.ors.horiz <- function(stats, category, hpos, ylims=NULL, title=NULL,
+                           x.buffer=0.1, pt.cex=1, pt.wex=0.15,
+                           channels.above=FALSE, invert.channels.above=FALSE,
+                           channels.below=FALSE, invert.channels.below=FALSE,
+                           channel.step.above=NULL, channel.step.below=NULL,
+                           shade.channels=FALSE, channel.step=5,
+                           hline=NA, hline.color=blueblack){
+  # Get plot data
+  pdat <- get.effect.sizes(stats, category, hpos)
+  if(is.null(ylims)){
+    ylims <- range(unlist(sapply(pdat, function(x){x[, 1:3]})), na.rm=T)
+  }
+  ybottom <- min(ylims); ytop <- max(ylims)
+  na.idxs <- which(sapply(hpos, is.na))
+  channel.idxs <- seq(0, length(hpos)+channel.step, by=channel.step)
+  if(!is.null(channel.step.above)){
+    top.channel.idxs <- seq(0, length(hpos)+channel.step.above, by=channel.step.above)
+  }else{
+    top.channel.idxs <- channel.idxs
+  }
+  if(!is.null(channel.step.below)){
+    bottom.channel.idxs <- seq(0, length(hpos)+channel.step.below, by=channel.step.below)
+  }else{
+    bottom.channel.idxs <- channel.idxs
+  }
+
+  # Prep plot area
+  par(bty="n")
+  plot(NA, xlim=c(0, length(hpos)), ylim=ylims,
+       xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
+  y.mid <- mean(par("usr")[3:4])
+  if(channels.above){
+    if(invert.channels.above){
+      top.channel.col <- "white"
+      top.channel.border <- bluewhite
+      rect(xleft=0, xright=length(hpos), ybottom=y.mid, ytop=10e10, xpd=T,
+           col=bluewhite, border=NA, bty="n")
+    }else{
+      top.channel.col <- bluewhite
+      top.channel.border <- "white"
+    }
+    rect(xleft=top.channel.idxs[-length(top.channel.idxs)]+x.buffer,
+         xright=top.channel.idxs[-1]-x.buffer,
+         ybottom=y.mid, ytop=10e10, xpd=T,
+         col=top.channel.col, border=top.channel.border, bty="o")
+  }
+  if(channels.below){
+    if(invert.channels.below){
+      bottom.channel.col <- "white"
+      bottom.channel.border <- NA
+      rect(xleft=0, xright=length(hpos), ybottom=y.mid, ytop=-10e10, xpd=T,
+           col=bluewhite, border=NA, bty="n")
+    }else{
+      bottom.channel.col <- bluewhite
+      bottom.channel.border <- NA
+    }
+    rect(xleft=bottom.channel.idxs[-length(bottom.channel.idxs)]+x.buffer,
+         xright=bottom.channel.idxs[-1]-x.buffer,
+         ybottom=y.mid, ytop=-10e10, xpd=T,
+         col=bottom.channel.col, border=bottom.channel.border, bty="n")
+  }
+  rect(xleft=0, xright=length(pdat), ybottom=ybottom, ytop=ytop,
+       border=NA, bty="n", col="white")
+  if(shade.channels){
+    rect(xleft=0, xright=length(pdat), ybottom=ybottom, ytop=ytop,
+         border=NA, bty="n", col=bluewhite)
+    rect(xleft=channel.idxs[-length(channel.idxs)]+x.buffer,
+         xright=channel.idxs[-1]-x.buffer,
+         ybottom=ybottom, ytop=ytop,
+         border=NA, bty="n", col="white")
+  }else{
+    axis(1, at=0:length(pdat), tck=0.02, col=bluewhite, labels=NA)
+    axis(3, at=0:length(pdat), tck=0.02, col=bluewhite, labels=NA)
+  }
+  segments(x0=0, x1=length(hpos), y0=0, y1=0, col=ns.color)
+  if(!is.na(hline)){
+    abline(h=hline, col=hline.color, lty=5, lwd=0.75)
+  }
+  if(length(na.idxs) > 0){
+    rect(xleft=na.idxs-1, xright=na.idxs, ybottom=ybottom, ytop=ytop,
+         border="white", bty="o", col="white")
+  }
+  rect(xleft=c(0, na.idxs), xright=c(na.idxs-1, length(hpos)),
+       ybottom=ybottom, ytop=ytop,
+       border=blueblack, col=NA, xpd=T)
+  mtext(3, text=title, font=1)
+
+  # Add points
+  point.xmods <- -0.5+c(-pt.wex, 0, pt.wex)
+  sapply(1:length(pdat), function(x){
+    df <- pdat[[x]]
+    fmt <- format.points(df, bonf.p=0.05/nrow(stats))
+    segments(x0=x+point.xmods, x1=x+point.xmods, y0=df[, 2], y1=df[, 3],
+             lwd=fmt$lwd, col=fmt$border, lend="round")
+    points(x=x+point.xmods, y=df[, 1], pch=21, cex=pt.cex*fmt$cex.adj,
+           col=fmt$border, lwd=pt.cex*fmt$lwd, bg=fmt$fill)
+  })
+
+  # Add left Y-axis
+  axis(2, at=-10:10, col=blueblack, tck=-0.025, labels=NA, line=0)
+  sapply(-10:10, function(y){
+    axis(2, at=y, tick=F, labels=2^y, line=-0.5, las=2)
+  })
+  mtext(2, text="Odds Ratio", line=2.1)
+}
+
+# Plot diagonal text labels
+plot.text.diag <- function(hpos, meta, y.at=c(0.2, 2), background=T,
+                           x.buffer=0.1, box.vex=0.5, angle=40,
+                           angle.text.mod=12, text.xadj=-0.8){
+  # Get basic plotting info
+  nhpos <- length(hpos)
+  x.at <- (1:nhpos)-0.5
+  hpo.labels <- hpos
+  hpo.labels[which(hpo.labels == "UNKNOWN")] <- "N/A"
+  diag.xmod <- 1/tan(angle*pi/180)
+
+  # Prep plot area & add y-axis titles
+  par(bty="n")
+  plot(x=NA, y=NA, xlim=c(0, nhpos), ylim=c(0, 11),
+       xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
+
+  # First row of square indicators
+  rect(xleft=(1:nhpos)-1+x.buffer, xright=(1:nhpos)-x.buffer,
+       ybottom=10, ytop=11, col=bluewhite, border=NA, bty="n")
+  sapply(1:nhpos, function(i){
+    hpo.color.top <- get.hpo.color(hpos[i], color.by="neuro")
+    hpo.color.bottom <- get.hpo.color(hpos[i], color.by="severity")
+    polygon(x=i+c(-1+x.buffer, -1+x.buffer, -x.buffer, -x.buffer),
+            y=10.5+c(-box.vex/2, box.vex/2, box.vex/2, -box.vex/2),
+            xpd=T, border=blueblack, col=hpo.color.top)
+    polygon(x=i+c(-1+x.buffer, -x.buffer, -x.buffer, -1+x.buffer),
+            y=10.5+c(-box.vex/2, box.vex/2, -box.vex/2, -box.vex/2),
+            xpd=T, border=blueblack, col=hpo.color.bottom)
+  })
+
+  # Draw diagonal shading
+  sapply(1:nhpos, function(x){
+    polygon(x=c(x-1+x.buffer, x-x.buffer, x-x.buffer-(10*diag.xmod), x-1+x.buffer-(10*diag.xmod)),
+            y=c(10, 10, 0, 0), xpd=T, col=bluewhite, border=NA, bty="n")
+  })
+  abline(h=y.at + c(3, 2*y.at[1]), col="white", xpd=T, lwd=1.5)
+  col.header.y.at <- c(-0.15, 3, y.at[2]+(2*y.at[1]), 10)
+  sapply(1:3, function(i){
+    y0 <- col.header.y.at[i]+0.15
+    y1 <- col.header.y.at[i+1]-0.15
+    segments(x0=-11.4+(diag.xmod*y0), x1=-11.4+(diag.xmod*y1),
+             y0=y0, y1=y1, xpd=T, col=blueblack)
+  })
+
+  # Add text labels
+  text(x=(1:nhpos)+text.xadj-((10-y.at[1])*diag.xmod), y=rep(y.at[1], nhpos), pos=4,
+       srt=angle + angle.text.mod, labels=hpo.labels, xpd=T)
+  text(x=(1:nhpos)-((10-y.at[2])*diag.xmod), y=rep(y.at[2], nhpos), pos=2,
+       srt=angle + angle.text.mod, xpd=T,
+       labels=prettyNum(meta$samples[match(hpos, meta$HPO)], big.mark=","))
+  text(x=(1:nhpos)-x.buffer, y=rep(10-y.at[1], nhpos), pos=2,
+       srt=angle + angle.text.mod, labels=hpo.abbrevs[hpos], xpd=T)
+
+  # Add column titles
+  text(x=c(text.xadj-((10-y.at[1])*diag.xmod),
+           -x.buffer-((10-y.at[2])*diag.xmod),
+           -x.buffer)-0.3, y=c(y.at, 10),
+       font=2, pos=c(4, 2, 2), srt=angle + angle.text.mod, xpd=T,
+       labels=c("HPO", "Cases", "Description"))
+}
+
+
 # Wrapper to plot full table of rCNV effect sizes organized by HPO hierarchy
 plot.global.effects.byhpo <- function(stats, meta, panel.widths,
-                                y.top=-0.6, pt.cex=0.85,
-                                parmar=c(0.2, 0.1, 4, 0.2)){
-  # Subset stats to HPOs in meta
-  stats <- stats[which(stats$HPO %in% meta$HPO), ]
+                                      y.top=-0.6, pt.cex=0.85,
+                                      parmar=c(0.2, 0.1, 4, 0.2)){
+  # Subset stats to HPOs in meta and to categories being plotted
+  stats <- stats[which(stats$HPO %in% meta$HPO & stats$category %in% c(2, 3, 5, 8, 9)), ]
   hpos <- meta$HPO
 
   # Prep layout
@@ -193,13 +362,54 @@ plot.global.effects.byhpo <- function(stats, meta, panel.widths,
   plot.ors(stats, 5, meta$HPO, xlims=or.lims, ytop=y.top, pt.cex=pt.cex,
            title="Dosage Sensitive (DS) Genes\n(Excluding GDs)")
 
-  # Category 7: constrained genes genes outside of known GDs & DS genes
-  plot.ors(stats, 7, meta$HPO, xlims=or.lims, ytop=y.top, pt.cex=pt.cex,
-           title="LoF-Constrained Genes\n(Exclud. GDs + DS Genes)")
-
-  # Category 8: all remaining genes
+  # Category 8: constrained genes genes outside of known GDs & DS genes
   plot.ors(stats, 8, meta$HPO, xlims=or.lims, ytop=y.top, pt.cex=pt.cex,
+           title="PTV-Constrained Genes\n(Exclud. GDs + DS Genes)")
+
+  # Category 9: all remaining genes
+  plot.ors(stats, 9, meta$HPO, xlims=or.lims, ytop=y.top, pt.cex=pt.cex,
            title="All Other Genes\n(Excl. GDs, DS, and Constr.)")
+}
+
+# Wrapper to plot condensed figure of rCNV effect sizes sorted by effect size
+plot.global.effects.byOR <- function(stats, meta, panel.heights,
+                                     vertical.gridlines=FALSE, gridline.step=5,
+                                     pt.cex=0.85, parmar=c(0, 3, 2, 0.2)){
+  # Subset stats to HPOs in meta and only categories being plotted
+  stats <- stats[which(stats$HPO %in% meta$HPO & stats$category %in% c(3, 7)), ]
+  hpos <- meta$HPO[which(!is.na(meta$HPO))]
+
+  # Prep layout
+  layout(matrix(c(1:length(panel.heights)), ncol=1, byrow=T), heights=panel.heights)
+  par(bty="n", mar=parmar)
+
+  # Get effect size range of categories 3 and 7
+  cat3.ors <- do.call("rbind", lapply(get.effect.sizes(stats, 3, hpos), function(df){df[, 1]}))
+  cat7.ors <- do.call("rbind", lapply(get.effect.sizes(stats, 7, hpos), function(df){df[, 1]}))
+  or.lims <- 1.1 * range(cbind(cat3.ors, cat7.ors), na.rm=T)
+
+  # Sort HPOs by effect size of constrained gene deletions
+  hpos.ordered <- hpos[order(-cat7.ors[, 3])]
+  last.dev.idx <- max(which(hpos.ordered %in% developmental.hpos))
+  # hpos.ordered <- hpos[order(-apply(cbind(cat3.ors, cat7.ors), 1, mean))]
+
+  # Category 3: Known GDs
+  plot.ors.horiz(stats, 3, hpos.ordered, pt.cex=pt.cex, ylims=or.lims,
+                 channels.below=FALSE, invert.channels.below=TRUE,
+                 shade.channels=vertical.gridlines, channel.step=gridline.step)
+
+  # Category 7: Constrained genes outside of known GDs
+  plot.ors.horiz(stats, 7, hpos.ordered, pt.cex=pt.cex, ylims=or.lims, hline=log2(2),
+                 channels.above=FALSE, channels.below=TRUE,
+                 invert.channels.above=TRUE, channel.step.below=1,
+                 shade.channels=vertical.gridlines, channel.step=gridline.step)
+  abline(v=last.dev.idx+c(-0.035, 0.035), lwd=1, col=severity.colors[2:3])
+
+  # Add HPO information in bottom half of plot
+  parmar[3] <- 0
+  par(mar=parmar)
+  plot.text.diag(hpos.ordered, meta, y.at=c(0.1, 5.1), box.vex=0.7,
+                 angle=42, angle.text.mod=4.25, text.xadj=-0.82)
 }
 
 
@@ -241,13 +451,20 @@ hpos <- as.character(read.table(hpos.in, header=F, sep="\t")[, 1])
 meta <- load.hpo.metadata(meta.in, sample.counts.in, hpos)
 stats <- load.global.stats(stats.in)
 
-# Plot figure
+# Plot full figure ordered by HPOs
 panel.widths <- c(1.1, 10, rep(3.5, 5))
-pdf(paste(out.prefix, "pdf", sep="."), height=7.75, width=12)
+pdf(paste(out.prefix, "ordered_by_hpo.pdf", sep="."),
+    height=7.75, width=12)
 plot.global.effects.byhpo(stats, meta, panel.widths,
-                    parmar=c(0.2, 0.1, 3, 0.2))
+                          parmar=c(0.2, 0.1, 3, 0.2))
 dev.off()
 
-
-
+# Plot slimmer figure ordered by average effect size
+panel.heights <- c(4, 4, 5)
+pdf(paste(out.prefix, "ordered_by_effect_size.pdf", sep="."),
+    height=5, width=10)
+plot.global.effects.byOR(stats, meta, panel.heights,
+                         vertical.gridlines=T, gridline.step=5,
+                         pt.cex=1.15, parmar=c(0.2, 14, 1.5, 0.2))
+dev.off()
 
