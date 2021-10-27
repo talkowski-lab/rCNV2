@@ -96,8 +96,8 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
-p_cutoff=0.000003767103
-meta_p_cutoff=0.000003767103
+p_cutoff=0.000003742655
+meta_p_cutoff=0.000003742655
 meta_model_prefix="fe"
 bin_overlap=0.5
 pad_controls=50000
@@ -207,7 +207,7 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
-p_cutoff=0.000003767103
+p_cutoff=0.000003742655
 n_pheno_perms=50
 exclusion_bed=GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz #Note: this file must be generated above
 meta_model_prefix="fe"
@@ -381,8 +381,8 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 binned_genome="windows/GRCh37.200kb_bins_10kb_steps.raw.bed.gz"
 rCNV_bucket="gs://rcnv_project"
-p_cutoff=0.000003767103
-meta_p_cutoff=0.000003767103
+p_cutoff=0.000003742655
+meta_p_cutoff=0.000003742655
 meta_model_prefix="fe"
 bin_overlap=0.5
 pad_controls=50000
@@ -575,6 +575,8 @@ meta_nominal_cohorts_cutoff=2
 sig_window_pad=100000
 credset=0.95
 FDR_cutoff=0.01
+block_jaccard=0.2
+window_jaccard=0.8
 gtf="gencode.v19.canonical.pext_filtered.gtf.gz"
 
 
@@ -589,6 +591,7 @@ gsutil -m cp \
   ${rCNV_bucket}/refs/GRCh37.cytobands.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs*.bed.gz \
   refs/
+gsutil -m cp gs://rcnv_project/cleaned_data/cnv/mega.${freq_code}.bed.gz ./
 gsutil -m cp ${rCNV_bucket}/cleaned_data/genes/${gtf}* ./
 
 # Write tsv inputs
@@ -636,9 +639,12 @@ done < ${phenotype_list}
   --secondary-or-nominal \
   --fdr-q-cutoff ${FDR_cutoff} \
   --secondary-for-fdr \
+  --cnv-bed mega.${freq_code}.bed.gz \
   --credible-sets ${credset} \
   --joint-credset-definition \
-  --distance ${sig_window_pad} \
+  --refine-pad ${sig_window_pad} \
+  --block-jaccard ${block_jaccard} \
+  --window-jaccard ${window_jaccard} \
   --known-causal-loci-list known_causal_loci_lists.${CNV}.tsv \
   --single-gs-hpo \
   --developmental-hpos refs/rCNV2.hpos_by_severity.developmental.list \

@@ -31,6 +31,8 @@ workflow sliding_window_analysis {
   Int meta_nominal_cohorts_cutoff
   Float credible_interval
   Int sig_window_pad
+  Float refine_block_jaccard
+  Float refine_window_jaccard
   Float FDR_cutoff
   File gtf
   File contigfile
@@ -175,6 +177,8 @@ workflow sliding_window_analysis {
       meta_secondary_p_cutoff=meta_secondary_p_cutoff,
       meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
       sig_window_pad=sig_window_pad,
+      block_jaccard=refine_block_jaccard,
+      window_jaccard=refine_window_jaccard,
       credset=credible_interval,
       FDR_cutoff=FDR_cutoff,
       gtf=gtf,
@@ -193,6 +197,8 @@ workflow sliding_window_analysis {
       meta_secondary_p_cutoff=meta_secondary_p_cutoff,
       meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
       sig_window_pad=sig_window_pad,
+      block_jaccard=refine_block_jaccard,
+      window_jaccard=refine_window_jaccard,
       credset=credible_interval,
       FDR_cutoff=FDR_cutoff,
       gtf=gtf,
@@ -664,6 +670,8 @@ task refine_regions {
   Int meta_nominal_cohorts_cutoff
   Float FDR_cutoff
   Int sig_window_pad
+  Float block_jaccard
+  Float window_jaccard
   Float credset
   File gtf
 
@@ -681,6 +689,8 @@ task refine_regions {
       ${rCNV_bucket}/refs/GRCh37.cytobands.bed.gz \
       ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs*.bed.gz \
       refs/
+    gsutil -m cp ${rCNV_bucket}/cleaned_data/cnv/mega.${freq_code}.bed.gz ./
+
 
     # Write tsv inputs
     while read prefix hpo; do
@@ -727,9 +737,12 @@ task refine_regions {
       --secondary-or-nominal \
       --fdr-q-cutoff ${FDR_cutoff} \
       --secondary-for-fdr \
+      --cnv-bed mega.${freq_code}.bed.gz \
       --credible-sets ${credset} \
       --joint-credset-definition \
-      --distance ${sig_window_pad} \
+      --refine-pad ${sig_window_pad} \
+      --block-jaccard ${block_jaccard} \
+      --window-jaccard ${window_jaccard} \
       --known-causal-loci-list known_causal_loci_lists.${CNV}.tsv \
       --single-gs-hpo \
       --developmental-hpos refs/rCNV2.hpos_by_severity.developmental.list \

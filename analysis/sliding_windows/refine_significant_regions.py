@@ -19,7 +19,10 @@ import pandas as pd
 from scipy.stats import norm
 import string
 import networkx as nx
+from sklearn.cluster import KMeans
+from operator import itemgetter
 from itertools import combinations
+from collections import Counter
 import argparse
 from sys import stdout
 
@@ -85,7 +88,8 @@ def ci2se(ci):
     return (ci[1] - ci[0]) / (2 * 1.96)
 
 
-def make_cs(refine_res, cs_val=0.95, cs_merge_buffer=200000):
+def make_cs(refine_res, cs_val=0.95, cs_merge_buffer=200000, 
+            cov_df=None, jac_cutoff=0.8, sig_wids=[]):
     """
     Merge windows into credible set based on sum of ranked PIPs
     Pads CS with ±cs_merge_buffer; recommended to set to size of one full bin
@@ -105,15 +109,26 @@ def make_cs(refine_res, cs_val=0.95, cs_merge_buffer=200000):
             break
 
     # Convert window IDs back to pbt.BedTool and merge to nonredundant intervals
-    credset_bt = pbt.BedTool('\n'.join([x.replace('_', '\t') for x in cs_windows]), 
-                             from_string=True).sort().merge(d=cs_merge_buffer)
+    # Include all windows with sufficient covariance with any significant window from credset
+    if cov_df is not None:
+        cs_sig_windows = set(sig_wids).intersection(set(cs_windows))
+        best_cov = cov_df.loc[cov_df.index.isin(cs_sig_windows), :].max()
+        cs_windows = list(set(cs_windows).union(set(best_cov.index[best_cov >= jac_cutoff])))
+        credset_bt = pbt.BedTool('\n'.join([x.replace('_', '\t') for x in cs_windows]), 
+                                 from_string=True).sort().merge()
+
+    # Otherwise, use fixed merge distance
+    else:
+        credset_bt = pbt.BedTool('\n'.join([x.replace('_', '\t') for x in cs_windows]), 
+                                 from_string=True).sort().merge(d=cs_merge_buffer)
+    
     credset_coords = [[x.chrom, x.start, x.end] for x in credset_bt]
     
     return credset_coords, credset_bt, cs_windows
 
 
 def refine(window_priors, window_info, null_variance=0.42 ** 2, cs_val=0.95, 
-           cs_merge_buffer=200000):
+           cs_merge_buffer=200000, cov_df=None, jac_cutoff=0.8):
     """
     Refines a set of windows given their prior probability and effect size estimates
     Inputs:
@@ -165,8 +180,9 @@ def refine(window_priors, window_info, null_variance=0.42 ** 2, cs_val=0.95,
             refine_res[window]['PIP'] = posteriors[window] / posterior_sum
 
     # Define credible set as sum of ranked PIPs >= credset_val
+    sig_wids = [k for k, v in window_info.items() if v['gw_sig'] or v['fdr_sig']]
     credset_coords, credset_bt, credset_windows \
-        = make_cs(refine_res, cs_val, cs_merge_buffer)
+        = make_cs(refine_res, cs_val, cs_merge_buffer, cov_df, jac_cutoff, sig_wids)
 
     return refine_res, credset_coords, credset_bt, credset_windows
 
@@ -263,7 +279,7 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_neg_log10=True,
 def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_neg_log10=True, 
                 secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
                 secondary_or_nominal=True, fdr_q_cutoff=0.05, 
-                secondary_for_fdr=False, block_merge_dist=200000, 
+                secondary_for_fdr=False, block_merge_dist=1000000, 
                 block_prefix='window_block', null_variance=0.42 ** 2, 
                 refine_secondary=False, cs_val=0.95):
     """
@@ -319,7 +335,8 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_neg_log10=True,
         blocks = windows_bt.merge(d=block_merge_dist, c=4, o='distinct')
 
         # Assign block IDs
-        blocks_wids = {'_'.join([hpo, block_prefix, str(k)]) : block for k, block in enumerate(blocks)}
+        blocks_wids = {'_'.join([hpo, block_prefix, str(k)]) : block \
+                       for k, block in enumerate(blocks)}
 
         # Perform initial refinment of each block with flat prior
         for block_id, block in blocks_wids.items():
@@ -369,6 +386,266 @@ def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2,
                                         block_prefix=block_prefix,
                                         refine_secondary=refine_secondary,
                                         cs_val=cs_val)
+
+    return hpo_data
+
+
+def calc_cnv_cov(cnvbed, hpo_data, cnv, frac=0.5, max_search_dist=20000000):
+    """
+    Compute a CNV covariance matrix for cases from each HPO per chromosome
+    """
+
+    cnv_cov = {}
+    cnvbt_orig = pbt.BedTool(cnvbed)
+    contigs = set([x.chrom for x in cnvbt_orig])
+
+    # Iterate over each HPO
+    for hpo, hdat in hpo_data.items():
+        print('Computing covariance matrixes for {}...'.format(hpo))
+
+        # Make single bedtool of all windows per contig
+        wbt_dict = {contig : {'all_wids' : set()} for contig in contigs}
+        for wid in hdat['all_windows'].keys():
+            contig = wid.split('_')[0]
+            wbt_dict[contig]['all_wids'].add(wid)
+        for contig in contigs:
+            wbt_str = ''
+            for wid in wbt_dict[contig]['all_wids']:
+                wbt_str += '\t'.join(wid.split('_') + [wid]) + '\n'
+            wbt_dict[contig]['wbt'] = pbt.BedTool(wbt_str, from_string=True)
+
+        # Filter CNVs by HPO and CNV type
+        cnvbt = cnvbt_orig.filter(lambda x: hpo in x[5])
+        if cnv != 'NS':
+            cnvbt = cnvbt.filter(lambda x: x[4] == cnv).saveas()
+
+        # Make covariance matrix of all by all windows per chromosome
+        cov_dfs = {}
+        for contig in contigs:
+            
+            # Filter CNVs and windows to contig of interest
+            cnvbt_contig = cnvbt.filter(lambda x: x.chrom == contig)
+            wbt_contig = wbt_dict[contig]['wbt']
+            all_contig_wids = wbt_dict[contig]['all_wids']
+
+            # Make dict mapping window ID to dict of set(CNV ids)
+            cnvs_per_window = {wid : set() for wid in all_contig_wids}
+            for hit in cnvbt_contig.intersect(wbt_contig, wa=True, wb=True, F=frac):
+                cnvid = hit[3]
+                wid = hit[-1]
+                cnvs_per_window[wid].add(cnvid)            
+            
+            # Compute covarance for all pairs of windows
+            cov_dfs[contig] = pd.DataFrame(columns=all_contig_wids)
+            for wid_a in all_contig_wids:
+                jac_l = []
+                
+                # If first window has no CNVs, Jaccard index = 0 for all mates
+                cnvs_a = cnvs_per_window[wid_a]
+                if len(cnvs_a) == 0:
+                    cov_dfs[contig].loc[wid_a] = [0.0] * len(all_contig_wids)
+                    continue
+
+                for wid_b in all_contig_wids:
+                    # If the Jaccard index has already been computed, 
+                    # can copy value across matrix diagonal
+                    if wid_b in cov_dfs[contig].index:
+                        jac_l.append(cov_dfs[contig].loc[wid_b, wid_a])
+                        continue
+
+                    # If second window has no CNVs, Jaccard index = 0
+                    cnvs_b = cnvs_per_window[wid_b]
+                    if len(cnvs_b) == 0:
+                        jac_l.append(0.0)
+                        continue
+
+                    # Otherwise, compute Jaccard index as long as windows are
+                    # closer than max_search_dist apart
+                    mid_a = np.mean([int(x) for x in wid_a.split('_')[1:]])
+                    mid_b = np.mean([int(x) for x in wid_b.split('_')[1:]])
+                    if np.abs(mid_b - mid_a) > max_search_dist:
+                        jac_l.append(0.0)
+                    else:
+                        jac_l.append(len(cnvs_a.intersection(cnvs_b)) / len(cnvs_a.union(cnvs_b)))
+
+                cov_dfs[contig].loc[wid_a] = jac_l
+
+        cnv_cov[hpo] = cov_dfs
+
+    return cnv_cov
+
+
+def merge_blocks_by_cov(hpo_data, cnv_cov, jac_cutoff=0.8, 
+                        block_merge_dist=200000, cs_val=0.95, 
+                        block_prefix='window_block'):
+    """
+    Merge blocks from the same HPO by CNV covariance
+    """
+
+    for hpo, hdat in hpo_data.items():
+
+        all_bids = list(hdat['blocks'].keys())
+
+        # Construct graph of all blocks
+        G = nx.Graph()
+        for bid in all_bids:
+            G.add_node(bid)
+
+        # Add edges between pairs of nodes where at least one pair of windows from 
+        # their credible intervals shares CNV cov >= jac_cutoff
+        for bid_a in all_bids:
+            chrom_a = hdat['blocks'][bid_a]['credset_coords'][0][0]
+            
+            for bid_b in all_bids:
+                chrom_b = hdat['blocks'][bid_b]['credset_coords'][0][0]
+                
+                # Only process nonredundant block pairs on the same chromosome
+                if bid_a == bid_b or chrom_a != chrom_b:
+                    continue
+
+                cov_df = cnv_cov[hpo][chrom_a]
+                wids_a = hdat['blocks'][bid_a]['credset_windows']
+                wids_b = hdat['blocks'][bid_b]['credset_windows']
+                cov_df = cov_df.loc[cov_df.index.isin(wids_a), 
+                                    cov_df.columns.isin(wids_b)]
+                best_jac = cov_df.max().max()
+                if best_jac >= jac_cutoff:
+                    G.add_edge(bid_a, bid_b)
+
+        # Collapse all subgraphs of two or more nodes
+        k = 0
+        for cluster in nx.connected_components(G):
+            if len(cluster) > 1:
+                k += 1
+                new_bid = '_'.join([hpo, block_prefix, 'merged', str(k)])
+
+                # Take union of all windows
+                windows = set()
+                for bid in cluster:
+                    windows.update(hdat['blocks'][bid]['refine_res'].keys())
+
+                # Update refinement
+                window_priors = {window : 1 / len(windows) for window in windows}
+                refine_res, credset_coords, credset_bt, credset_windows = \
+                    refine(window_priors, hdat['all_windows'], cs_val=cs_val, 
+                           cs_merge_buffer=block_merge_dist)
+
+                # Determine maximum significance level of any window in credible set
+                if any([hdat['all_windows'][wid]['gw_sig'] for wid in credset_windows]):
+                    credset_max_sig = 'genome_wide'
+                elif any([hdat['all_windows'][wid]['fdr_sig'] for wid in credset_windows]):
+                    credset_max_sig = 'FDR'
+                else:
+                    credset_max_sig = 'not_significant'
+
+                # Add new merged block to hpo_data
+                block = credset_bt.merge(d=int(10e10))
+                hpo_data[hpo]['blocks'][new_bid] = \
+                    {'coords' : block,
+                    'refine_res' : refine_res,
+                    'credset_coords' : credset_coords,
+                    'credset_bt' : credset_bt,
+                    'credset_windows' : credset_windows,
+                    'credset_max_sig' : credset_max_sig}
+
+                # Remove all original member blocks
+                for bid in cluster:
+                    hpo_data[hpo]['blocks'].pop(bid)
+
+    return hpo_data
+
+
+def clump_windows(cov_df, sig_wids, jac_cutoff=0.2):
+    """
+    inputs:
+        cov_df : an input matrix of CNV covariance for pairs of windows
+        jac_cutoff : minimum Jaccard index to treat windows as non-independent
+    outputs:
+        a list of clumps of window IDs
+    """
+
+    # Make graph of all windows
+    all_wids = list(cov_df.columns)
+    wg = nx.Graph()
+    for wid in all_wids:
+        wg.add_node(wid)
+
+    # Annotate edges with Jaccard index if >= jac_cutoff
+    for sig_wid in sig_wids:
+        for other_wid in all_wids:
+            jac = cov_df.loc[sig_wid, other_wid]
+            if jac >= jac_cutoff:
+                wg.add_edge(sig_wid, other_wid)
+                wg.edges[sig_wid, other_wid]['jac'] = jac
+
+    clumps = []
+    for subg in nx.connected_components(wg):
+        if len(set(sig_wids).intersection(set(subg))) > 1:
+            clumps.append(list(subg))
+    
+    return clumps
+
+
+def split_blocks_by_cov(hpo_data, cnv_cov, jac_cutoff=0.2, block_prefix='window_block', 
+                        null_variance=0.42 ** 2, cs_val=0.95):
+    """
+    Split blocks based on CNV covariance
+    """
+
+    for hpo, hdat in hpo_data.items():
+
+        kn = 0
+        sig_wids = list(hdat['sig_windows'].keys())
+        orig_bids = list(hdat['blocks'].keys())
+
+        for block_id in orig_bids:
+            bdat = hdat['blocks'][block_id]
+            block_wids = list(bdat['refine_res'].keys())
+            sig_block_wids = list(set(sig_wids).intersection(set(block_wids)))
+            chrom = bdat['credset_coords'][0][0]
+            cov_df = cnv_cov[hpo][chrom]
+            # Note: only consider covariance between sig windows when assessing independence
+            # to avoid chaining of single-linkage between intermediate blocks
+            cov_df = cov_df.loc[cov_df.index.isin(sig_block_wids), 
+                                cov_df.columns.isin(sig_block_wids)]
+            window_clumps = clump_windows(cov_df, sig_block_wids, jac_cutoff)
+
+            # If multiple independent CNV clumps are found, split into independent blocks
+            if len(window_clumps) > 1:
+
+                for i in range(len(window_clumps)):
+
+                    # Collect data corresponding to split block
+                    windows = window_clumps[i]
+                    windows_bt = pbt.BedTool('\n'.join(['\t'.join(x.split('_') + [x]) for x in windows]), 
+                                             from_string=True).sort()
+                    coords = windows_bt.merge(c=4, o='distinct')
+                    window_priors = {window : 1 / len(windows) for window in windows}
+                    refine_res, credset_coords, credset_bt, credset_windows \
+                        = refine(window_priors, hdat['all_windows'], null_variance,
+                                 cs_val, cs_merge_buffer=0)
+                    kn += 1
+                    new_block_id = '_'.join([hpo, block_prefix, 'split', str(kn)])
+
+                    # Determine maximum significance level of any window in credible set
+                    if any([hdat['all_windows'][wid]['gw_sig'] for wid in credset_windows]):
+                        credset_max_sig = 'genome_wide'
+                    elif any([hdat['all_windows'][wid]['fdr_sig'] for wid in credset_windows]):
+                        credset_max_sig = 'FDR'
+                    else:
+                        credset_max_sig = 'not_significant'
+
+                    # Update hpo_data
+                    hpo_data[hpo]['blocks'][new_block_id] = \
+                        {'coords' : coords,
+                         'refine_res' : refine_res,
+                         'credset_coords' : credset_coords,
+                         'credset_bt' : credset_bt,
+                         'credset_windows' : credset_windows,
+                         'credset_max_sig' : credset_max_sig}
+
+                # Remove original block after splitting
+                hpo_data[hpo]['blocks'].pop(block_id)
 
     return hpo_data
 
@@ -565,7 +842,7 @@ def output_null_var_tsv(Wsq, outfile):
 
 
 def update_refine(hpo_data, Wsq, split_gw_fdr=False, cs_val=0.95, 
-                  block_merge_dist=200000):
+                  block_merge_dist=200000, cnv_cov=None, jac_cutoff=0.8):
     """
     Update initial refinement results (flat prior) with null variances
     If multiple Wsqs are provided, uses Bayesian model averaging across them
@@ -574,6 +851,7 @@ def update_refine(hpo_data, Wsq, split_gw_fdr=False, cs_val=0.95,
     for hpo, hdat in hpo_data.items():
         for block_id, bdat in hdat['blocks'].items():
             windows = list(bdat['refine_res'].keys())
+            sig_wids = [w for w in windows if w in hdat['sig_windows'].keys()]
             window_priors = {window : 1 / len(windows) for window in windows}
 
             # Get block-wide odds ratio quantile and significance level
@@ -583,13 +861,20 @@ def update_refine(hpo_data, Wsq, split_gw_fdr=False, cs_val=0.95,
                 b_sig = 'gw'
             else:
                 b_sig = 'fdr'
+
+            # Subset to covariance matrix from this chromosome, if optioned
+            if cnv_cov is not None:
+                chrom = bdat['credset_coords'][0][0]
+                cov_df = cnv_cov[hpo][chrom]
+            else:
+                cov_df = None
             
             # Compute ABFs and PIPs at each null variance estimate
             bma_input = []
             for W in Wsq[hpo][b_sig][lnor_q]:
                 refine_res, credset_coords, credset_bt, credset_windows \
                     = refine(window_priors, hpo_data[hpo]['all_windows'], W, 
-                             cs_val, block_merge_dist)
+                             cs_val, block_merge_dist, cov_df, jac_cutoff)
                 bma_input.append(refine_res)
 
             # Average ABFs for each window
@@ -604,7 +889,9 @@ def update_refine(hpo_data, Wsq, split_gw_fdr=False, cs_val=0.95,
                 refine_res[window]['PIP'] = refine_res[window]['ABF'] / ABF_sum
             
             # Recompute credible set based on BMA PIPs
-            credset_coords, credset_bt, credset_windows = make_cs(refine_res, cs_val)
+            credset_coords, credset_bt, credset_windows = \
+                make_cs(refine_res, cs_val, cov_df=cov_df, jac_cutoff=jac_cutoff, 
+                        sig_wids=sig_wids)
 
             # Determine maximum significance level of any window in credible set
             if any([hpo_data[hpo]['all_windows'][wid]['gw_sig'] for wid in credset_windows]):
@@ -637,23 +924,52 @@ def get_cytobands(bt, cyto_bed):
         bandrange = chrom + bands[0]
 
     return bandrange
-            
 
-def rename_blocks(hpo_data, cyto_bed, block_prefix):
+
+def rename_blocks(block_dict, cyto_bed, block_prefix):
     """
-    Rename segments after refinement of final credible sets
+    Rename segments using cytoband nomenclature
+    Input: dict of { old_id : pbt.BedTool of credible intervals }
+    Returns a dict mapping { old_id : new_id }
     """
 
     alpha_map = {i : l for i, l in enumerate(string.ascii_uppercase)}
 
+    rename_dict = {}
+
+    # Map cytobands to all blocks
+    cytomap = {}
+    for old_id, bt in block_dict.items():
+        cytomap[old_id] = get_cytobands(bt, cyto_bed)
+    band_counter = {b : 0 for b in set(list(cytomap.values()))}
+
+    # Rename blocks according to new scheme
+    for old_id in block_dict.keys():
+        bandrange = cytomap[old_id]
+        k = Counter(cytomap.values()).get(bandrange, 0)
+        if k < 2:
+            new_id = '_'.join([block_prefix, bandrange])
+        else:
+            new_id = '_'.join([block_prefix, bandrange, 
+                               alpha_map[band_counter[bandrange]]])
+            band_counter[bandrange] += 1
+        rename_dict[old_id] = new_id
+    
+    return rename_dict
+
+
+def rename_all_blocks(hpo_data, cyto_bed, block_prefix):
+    """
+    Rename segments using cytoband nomenclature
+    """
+
     for hpo, hdat in hpo_data.items():
-        old_ids = list(hdat['blocks'].keys())
-        for old_id in old_ids:
-            binfo = hdat['blocks'][old_id]
-            bandrange = get_cytobands(binfo['credset_bt'], cyto_bed)
-            # k = len([x for x in hdat['blocks'].keys() if bandrange in x])
-            # new_id = '_'.join([hpo, block_prefix, bandrange, alpha_map[k]])
-            new_id = '_'.join([hpo, block_prefix, bandrange])
+
+        block_dict = {bid : bd['credset_bt'] for bid, bd in hdat['blocks'].items()}
+
+        rename_dict = rename_blocks(block_dict, cyto_bed, '_'.join([hpo, block_prefix]))
+
+        for old_id, new_id in rename_dict.items():
             hpo_data[hpo]['blocks'][new_id] = hpo_data[hpo]['blocks'][old_id]
             hpo_data[hpo]['blocks'].pop(old_id)
     
@@ -664,6 +980,15 @@ def iv_mean(values, variances, conf=0.95):
     """
     Returns inverse-variance weighted mean of values and conf% confidence interval
     """
+
+    # Note: must restrict to values with positive, non-zero variance
+    keep_idxs = np.where(np.array(variances) > 0)[0].tolist()
+    values = itemgetter(*keep_idxs)(values)
+    if type(values) is not tuple:
+        values = (values, )
+    variances = itemgetter(*keep_idxs)(variances)
+    if type(variances) is not tuple:
+        variances = (variances, )
 
     weights = [1 / v for v in variances]
 
@@ -691,7 +1016,7 @@ def output_assoc_bed(hpo_data, cyto_bed, outfile, cnv='NS'):
            'best_pvalue n_cred_intervals cred_interval_coords cred_intervals_size'
     outfile.write('#' + '\t'.join(cols.split()) + '\n')
 
-    for hpo in hpo_data.keys():
+    for hpo, hdat in hpo_data.items():
         for block_id, binfo in hpo_data[hpo]['blocks'].items():
             # Get basic credible set info
             n_cred = len(binfo['credset_coords'])
@@ -700,7 +1025,7 @@ def output_assoc_bed(hpo_data, cyto_bed, outfile, cnv='NS'):
             chrom = str(binfo['credset_coords'][0][0])
             start = str(np.nanmin(binfo['credset_bt'].to_dataframe().start))
             end = str(np.nanmax(binfo['credset_bt'].to_dataframe().end))
-            windows = sorted(list(set(binfo['credset_windows'])))
+            windows = sorted(list(set([w for w in binfo['credset_windows'] if w in hdat['all_windows']])))
             wdat = hpo_data[hpo]['all_windows']
             control_freq = np.nanmean([wdat[w]['control_freq'] for w in windows])
             case_freq = np.nanmean([wdat[w]['case_freq'] for w in windows])
@@ -739,7 +1064,7 @@ def output_assoc_bed(hpo_data, cyto_bed, outfile, cnv='NS'):
     outfile.close()
 
 
-def cluster_credsets(hpo_data, block_merge_dist=200000):
+def cluster_credsets(hpo_data, block_merge_dist=200000, kmeans_subclustering=False):
     """
     Cluster credible sets across HPOs to collapse overlapping regions
     """
@@ -751,8 +1076,8 @@ def cluster_credsets(hpo_data, block_merge_dist=200000):
             for ci in binfo['credset_bt']:
                 pooled_creds_str += '\t'.join([ci.chrom, str(ci.start), 
                                                str(ci.end), bid]) + '\n'
-    merged_creds_bt = pbt.BedTool(pooled_creds_str, from_string=True).sort().\
-                          merge(c=4, o='distinct', d=block_merge_dist)
+    pooled_creds_bt = pbt.BedTool(pooled_creds_str, from_string=True).sort().saveas()
+    merged_creds_bt = pooled_creds_bt.merge(c=4, o='distinct', d=block_merge_dist)
 
     # Build nx.Graph() of credible sets to be clustered
     G = nx.Graph()
@@ -765,6 +1090,48 @@ def cluster_credsets(hpo_data, block_merge_dist=200000):
         if len(creds) > 1:
             G.add_edges_from(list(combinations(creds, 2)))
 
+    # If optioned, attempt to split subgraphs containing multiple blocks from the same HPO
+    # This corrects for daisy chaining between distinct clumps identified
+    # earlier using split_blocks_by_cov()
+    if kmeans_subclustering:
+        v1_clusters = list(nx.connected_components(G))
+        for g in v1_clusters:
+
+            # Only need to correct clusters containing >1 independent block from the same HPO
+            hpo_counts = Counter([x.split('_')[0] for x in g])
+            if any(np.array(list(hpo_counts.values())) > 1):
+
+                # Get info on all blocks in cluster
+                all_bids = list(g)
+                block_bt = pooled_creds_bt.filter(lambda x: x[3] in all_bids).saveas()
+
+                # Compute matrix of coverage between all blocks
+                block_cov = pd.DataFrame(columns=all_bids)
+                for bid in all_bids:
+                    bid_bt = block_bt.filter(lambda x: x[3] == bid).saveas()
+                    cvals = {}
+                    for x in block_bt.coverage(bid_bt):
+                        ovr_bp = int(x[5])
+                        union = bid_bt.cat(pbt.BedTool('\t'.join(x[:4]), 
+                                           from_string=True))
+                        union_bp = np.sum([len(x) for x in union])
+                        cvals[x[3]] = ovr_bp / union_bp
+                    block_cov.loc[bid] = block_cov.columns.map(cvals)
+
+                # Initial hierarchical clustering such that k clusters are obtained,
+                # where k is the max number of independent blocks from any one HPO
+                kmeans = KMeans(n_clusters=max(hpo_counts.values()), random_state=2021).fit(block_cov)
+                newclusters = {k : set() for k in range(max(hpo_counts.values()))}
+                for k, bid in zip(kmeans.labels_, block_cov.index):
+                    newclusters[k].add(bid)
+
+                # Prune all edges between new subclusters
+                for members in newclusters.values():
+                    for bid in members:
+                        for other_id in [x for x in all_bids if x not in members]:
+                            if G.has_edge(bid, other_id):
+                                G.remove_edge(bid, other_id)
+
     # Format each cluster in the graph of credsets
     clustered_credsets = \
         { 'clustered_region_' + str(i) : x for i, x \
@@ -773,7 +1140,8 @@ def cluster_credsets(hpo_data, block_merge_dist=200000):
     return clustered_credsets
 
 
-def define_joint_credints(hpo_data, hpo_dict, cs_val):
+def define_joint_credints(hpo_data, hpo_dict, cs_val, cnv_cov=None, 
+                          jac_cutoff=0.8, ncase_dict={}, return_all=True):
     """
     Function to average PIPs across all windows from two or more HPOs to define a 
     consensus set of credible intervals
@@ -785,6 +1153,13 @@ def define_joint_credints(hpo_data, hpo_dict, cs_val):
     all_wids = set([w for l in all_wids for w in l])
     pip_df = pd.DataFrame(index=all_wids)
 
+    # Compile list of significant window IDs
+    sig_wids = set()
+    for hpo in hpo_dict.values():
+        for wid in all_wids:
+            if wid in hpo_data[hpo]['sig_windows'].keys():
+                sig_wids.add(wid)
+
     # Map PIPs from each HPO onto pip_df
     for bid, hpo in hpo_dict.items():
         pip_map = {k : v['PIP'] for k, v in hpo_data[hpo]['blocks'][bid]['refine_res'].items()}
@@ -794,14 +1169,194 @@ def define_joint_credints(hpo_data, hpo_dict, cs_val):
     pip_df.fillna(value=0, inplace=True)
     refine_res = pip_df.mean(axis=1).to_frame(name='PIP').to_dict(orient='index')
 
-    # Redefine credible intervals
-    credset_coords, credset_bt, credset_windows = make_cs(refine_res, cs_val)
+    # Take CNV covariance from HPO with largest sample size for assessing CNV overlap
+    # If significant window is not present for largest HPO, iterate through 
+    # other HPOs ordered by size until all significant windows are added
+    if cnv_cov is not None:
+        hpos_by_n = [x[0] for x in sorted(ncase_dict.items(), key=lambda x: x[1], reverse=True)]
+        chrom = list(all_wids)[0].split('_')[0]
+        for i, hpo in enumerate([h for h in hpos_by_n if h in hpo_dict.values()]):
+            if i == 0:
+                cov_df = cnv_cov[hpo][chrom]
+                cov_df = cov_df.loc[cov_df.index.isin(sig_wids), :]
+            else:
+                sup_df = cnv_cov[hpo][chrom]
+                sup_df = sup_df.loc[sup_df.index.isin(sig_wids), :]
+                new_rows = ~sup_df.index.isin(cov_df.index)
+                new_cols = ~sup_df.columns.isin(cov_df.columns)
+                # Three-step update of cov_df
+                # First step: update missing columns for existing rows, if any
+                if any(new_cols):
+                    cov_df = pd.merge(cov_df, sup_df.loc[~new_rows, new_cols], 
+                                      how='left', left_index=True, right_index=True)
+                # Second step: rbind new rows, if any
+                if any(new_rows):
+                    cov_df = cov_df.append(sup_df.loc[new_rows, :])
+                # Third step: fill any NaNs with sup_df
+                cov_df.update(sup_df, overwrite=False)
+    else:
+        cov_df = None
+    cov_df.fillna(0, inplace=True)
 
-    return credset_bt
+    # Redefine credible intervals
+    credset_coords, credset_bt, credset_windows = \
+        make_cs(refine_res, cs_val, cov_df=cov_df, jac_cutoff=jac_cutoff, 
+                sig_wids=sig_wids)
+
+    if return_all:
+        return refine_res, credset_coords, credset_bt, credset_windows
+    else:
+        return credset_bt
+
+
+def joint_refine_all(hpo_data, final_loci, cs_val=0.95, cnv_cov=None, 
+                     jac_cutoff=0.8, ncase_dict={}, cs_merge_buffer=200000):
+    """
+    Wrapper to call joint_refinement() on all multi-HPO clusters
+    """
+
+    for members in final_loci.values():
+        n_members = len(members)
+        if n_members > 1:
+            hpo_dict = {cs : cs.split('_')[0] for cs in members}
+            hpos = sorted(list(set(hpo_dict.values())))
+            n_hpos = len(hpos)
+
+            # Collapse blocks from the same HPO within the same cluster prior to joint refinement
+            hpo_counts = Counter(hpo_dict.values())
+            for hpo, n in hpo_counts.items():
+                if n > 1:
+                    # Collect data corresponding to merged blocks, taking average of PIPs within a single HPO
+                    hdat = hpo_data[hpo]
+                    hbids = [k for k, v in hpo_dict.items() if v == hpo]
+                    windows = set()
+                    sig_windows = set()
+                    for bid in hbids:
+                        bwids = list(hdat['blocks'][bid]['refine_res'].keys())
+                        windows.update(bwids)
+                        sig_windows.update([w for w in hdat['sig_windows'] if w in bwids])
+                    windows = list(windows)
+                    sig_windows = list(sig_windows)
+                    chrom = windows[0].split('_')[0]
+                    pip_df = pd.DataFrame(index=windows)
+                    for bid in hbids:
+                        pip_map = {k : v['PIP'] for k, v in hdat['blocks'][bid]['refine_res'].items()}
+                        pip_df[bid] = pip_df.index.map(pip_map)
+                    pip_df.fillna(value=0, inplace=True)
+                    refine_res = pip_df.mean(axis=1).to_frame(name='PIP').to_dict(orient='index')
+                    credset_coords, credset_bt, credset_windows = \
+                        make_cs(refine_res, cs_val, cs_merge_buffer, 
+                                cnv_cov[hpo][chrom], jac_cutoff, sig_windows)
+                    coords = [chrom, 
+                              np.nanmin([x.start for x in credset_bt]), 
+                              np.nanmax([x.stop for x in credset_bt])]
+
+                    # Determine maximum significance level of any window in credible set
+                    if any([hdat['all_windows'][wid]['gw_sig'] for wid in credset_windows]):
+                        credset_max_sig = 'genome_wide'
+                    elif any([hdat['all_windows'][wid]['fdr_sig'] for wid in credset_windows]):
+                        credset_max_sig = 'FDR'
+                    else:
+                        credset_max_sig = 'not_significant'
+
+                    # Update hpo_data for first block and remove other blocks
+                    for i, bid in enumerate(hbids):
+                        if i == 0:
+                            hpo_data[hpo]['blocks'][bid] = \
+                                {'coords' : coords,
+                                 'refine_res' : refine_res,
+                                 'credset_coords' : credset_coords,
+                                 'credset_bt' : credset_bt,
+                                 'credset_windows' : credset_windows,
+                                 'credset_max_sig' : credset_max_sig}
+                        else:
+                            hpo_data[hpo]['blocks'].pop(bid)
+                            hpo_dict.pop(bid)                    
+
+            # Joint refinement of blocks after collapsing redundant blocks (see above)
+            credints_dict = {cs : hpo_data[hpo]['blocks'][cs]['credset_coords'] \
+                             for cs, hpo in hpo_dict.items()}
+            credints_bts = [hpo_data[hpo]['blocks'][cs]['credset_bt'] \
+                            for cs, hpo in hpo_dict.items()]
+            refine_res, cs_coords, cs_bt, cs_windows = \
+                define_joint_credints(hpo_data, hpo_dict, cs_val, cnv_cov, \
+                                      jac_cutoff, ncase_dict)
+
+            # Update hpo_data with results from joint refinement
+            new_coords = cs_bt.merge()
+            for bid, hpo in hpo_dict.items():
+
+                # Determine maximum significance level of any window in credible set
+                hcs_windows = [w for w in cs_windows if w in hpo_data[hpo]['all_windows'].keys()]
+                if any([hpo_data[hpo]['all_windows'][wid]['gw_sig'] for wid in hcs_windows]):
+                    credset_max_sig = 'genome_wide'
+                elif any([hpo_data[hpo]['all_windows'][wid]['fdr_sig'] for wid in hcs_windows]):
+                    credset_max_sig = 'FDR'
+                else:
+                    credset_max_sig = 'not_significant'
+
+                # Update data
+                hpo_data[hpo]['blocks'][bid] = \
+                    {'coords' : new_coords,
+                     'refine_res' : refine_res,
+                     'credset_coords' : cs_coords,
+                     'credset_bt' : cs_bt,
+                     'credset_windows' : cs_windows,
+                     'credset_max_sig' : credset_max_sig}
+
+    return hpo_data
+
+
+def prune_redundant_blocks(hpo_data):
+    """
+    Searches for blocks from the same HPO with overlapping credible intervals
+    and retains just one
+    """
+
+    for hpo, hdat in hpo_data.items():
+        if len(hdat['blocks']) == 0:
+            continue
+
+        # First step: make a graph of all blocks where edges indicate overlapping credible intervals
+        G = nx.Graph()
+        G.add_nodes_from(hdat['blocks'].keys())
+        cs_bt_strs = []
+        for bid, bdat in hdat['blocks'].items():
+            cs_bt_strs += ['{}\t{}\t{}\t{}\n'.format(*x, bid) for x in bdat['credset_coords']]
+        cs_bt = pbt.BedTool(''.join(cs_bt_strs), from_string=True)
+        for hit in cs_bt.sort().merge(c=4, o='distinct'):
+            bids = hit[3].split(',')
+            if len(bids) > 1:
+                for bid_a in bids:
+                    for bid_b in bids:
+                        if bid_a != bid_b:
+                            G.add_edge(bid_a, bid_b)
+
+        # Second step: resolve subgraphs with multiple nodes
+        for g in nx.connected_components(G):
+            if len(g) > 1:
+                # Gather evidence for each block (significance level and size)
+                criteria = {bid : (hdat['blocks'][bid]['credset_max_sig'], 
+                            np.sum([x.length for x in hdat['blocks'][bid]['credset_bt']])) \
+                            for bid in g}
+                # Keep blocks with higher significance level (GW over FDR)
+                # Break ties by taking larger block
+                criteria = {k : v for k, v in sorted(criteria.items(), 
+                                                     key=lambda x: x[1][1], 
+                                                     reverse=True)}
+                criteria = {k : v for k, v in sorted(criteria.items(), 
+                                                     key=lambda x: x[1][0].lower(), 
+                                                     reverse=True)}
+                for i, bid in enumerate(criteria.keys()):
+                    if i > 0:
+                        hpo_data[hpo]['blocks'].pop(bid)
+
+    return hpo_data
 
 
 def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS', 
-                    block_prefix=None, joint_credsets=False, cs_val=0.95):
+                    block_prefix=None, joint_credsets=False, cs_val=0.95,
+                    cnv_cov=None, jac_cutoff=0.8):
     """
     Format final list of collapsed credible sets and compute pooled summary statistics
     """
@@ -823,7 +1378,7 @@ def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS
 
     out_presort = {}
 
-    for members in final_loci.values():
+    for k, members in enumerate(final_loci.values()):
         # Get basic information for credsets in final cluster
         n_members = len(members)
         hpo_dict = {cs : cs.split('_')[0] for cs in members}
@@ -833,7 +1388,9 @@ def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS
         credints_bts = [hpo_data[hpo]['blocks'][cs]['credset_bt'] for cs, hpo in hpo_dict.items()]
         if n_members > 1:
             if joint_credsets:
-                credints_bt = define_joint_credints(hpo_data, hpo_dict, cs_val)
+                credints_bt = \
+                    define_joint_credints(hpo_data, hpo_dict, cs_val, cnv_cov, 
+                                          jac_cutoff, ncase_dict, return_all=False)
             else:
                 credints_bt = credints_bts[0].cat(*credints_bts[1:], postmerge=False).sort().merge()
         else:
@@ -847,12 +1404,14 @@ def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS
         start = str(np.nanmin(credints_bt.to_dataframe().start))
         end = str(np.nanmax(credints_bt.to_dataframe().end))
         cytoband = get_cytobands(credints_bt, cyto_bed)
-        region_id = '_'.join([region_id_prefix, '{}', cytoband])
+        region_id = '_'.join([region_id_prefix, cytoband, str(k)])
 
         # Summarize HPO-specific information pooled across all windows from each
         # contributing credset (note: *not* all windows for all merged cred intervals)
-        windows_dict = {hpo : hpo_data[hpo]['blocks'][bid]['credset_windows'] \
-                            for bid, hpo in hpo_dict.items()}
+        windows_dict = {}
+        for bid, hpo in hpo_dict.items():
+            windows_dict[hpo] = [w for w in hpo_data[hpo]['blocks'][bid]['credset_windows'] \
+                                 if w in hpo_data[hpo]['all_windows'].keys()]
         # Compute pooled control & case frequencies as mean weighted by np.sqrt(N_cases)
         control_freq_dict, case_freq_dict = {}, {}
         for hpo, windows in windows_dict.items():
@@ -879,7 +1438,8 @@ def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS
             iv_mean(list(lnor_means.values()), 
                     [ci2se(tuple(ci)) ** 2 for ci in lnor_cis.values()])
         # Get best significance level from any window
-        sig_levels = [hpo_data[hpo]['blocks'][bid]['credset_max_sig'] for bid, hpo in hpo_dict.items()]
+        sig_levels = [hpo_data[hpo]['blocks'][bid].get('credset_max_sig') \
+                      for bid, hpo in hpo_dict.items()]
         if 'genome_wide' in sig_levels:
             best_sig_level = 'genome_wide'
         elif 'FDR' in sig_levels:
@@ -900,10 +1460,14 @@ def output_loci_bed(hpo_data, final_loci, cyto_bed, outfile, ncase_dict, cnv='NS
         if best_sig_level != 'not_significant':
             out_presort[(int(chrom), int(start), int(end))] = [out_front, region_id, out_back]
 
+    # Final renaming of blocks with cytoband nomenclature using rename_blocks()
+    block_dict = {v[1] : pbt.BedTool(v[0], from_string=True) for v in out_presort.values()}
+    rename_dict = rename_blocks(block_dict, cyto_bed, region_id_prefix)
+
     # Iterate over sorted blocks and write to file
     for i, key in enumerate(sorted(out_presort.keys())):
         outline = '\t'.join([out_presort[key][0], 
-                             out_presort[key][1].format(i+1), 
+                             rename_dict[out_presort[key][1]], 
                              out_presort[key][2]])
         outfile.write(outline)
 
@@ -940,6 +1504,8 @@ def main():
                         default=False, help='Apply sample secondary and/or min. ' +
                         'nominal criteria when evaluating FDR significance. ' +
                         '[default: apply no secondary criteria to FDR segments]')
+    parser.add_argument('--cnv-bed', help='BED file of all CNVs from all cohorts. ' +
+                        'Used for computing CNV covariance between pairs of windows.')
     parser.add_argument('--credible-sets', dest='cs_val', type=float, default=0.95,
                         help='Credible set value. [default: 0.95]')
     parser.add_argument('--joint-credset-definition', action='store_true', 
@@ -947,9 +1513,21 @@ def main():
                         'clustering and refinement, add a final step of joint ' +
                         'credible set definition across all HPOs associated at ' +
                         'each locus [default: define credsets per HPO per locus]')
-    parser.add_argument('--distance', help='Distance to pad each significant window ' +
-                        'prior to refinement. [default: 1Mb]', default=1000000, 
+    parser.add_argument('--search-distance', help='Load non-significant windows within ' +
+                        'this distance of at least one significant window. [default: 1Mb]', 
+                        default=1000000, type=int)
+    parser.add_argument('--refine-pad', help='Distance to pad each significant window ' +
+                        'prior to refinement. [default: 200kb]', default=200000, 
                         type=int)
+    parser.add_argument('--block-jaccard', help='If --cnv-bed is provided, subdivide ' +
+                        'blocks of significant windows if their maximum Jaccard index of ' +
+                        'overlapping CNVs is not greater than this value. [default: 0.2]', 
+                        default=0.2, type=float, dest='block_jac')
+    parser.add_argument('--window-jaccard', help='If --cnv-bed is provided, clump ' +
+                        'windows into credible set coordinates if their Jaccard index of ' +
+                        'overlapping CNVs with a credible set is at least as large ' +
+                        'as this value. [default: 0.8]', 
+                        default=0.8, type=float, dest='window_jac')
     parser.add_argument('--known-causal-loci-list', help='.tsv list of paths to ' +
                         '.bed lists of known causal loci. Used for estimating null ' +
                         'variance. Can be specified multiple times. [default: ' +
@@ -1002,17 +1580,27 @@ def main():
     hpo_data = load_all_hpos(args.statslist, args.secondary_p_cutoff, 
                              args.min_nominal, args.secondary_or_nom, 
                              args.fdr_q_cutoff, args.secondary_for_fdr,
-                             args.distance, block_prefix, 
+                             args.search_distance, block_prefix, 
                              args.refine_secondary, args.cs_val)
-
-    # Group blocks by effect size quantile
-    hpo_data = assign_or_quantiles(hpo_data, args.n_or_bins)
 
     # Read list of developmental HPOs:
     if args.developmental_hpos is not None:
         dev_hpos = [x.rstrip() for x in open(args.developmental_hpos).readlines()]
     else:
         dev_hpos = []
+
+    # Compute CNV covariance for all window pairs involving at least one significant window
+    if args.cnv_bed is not None:
+        cnv_cov = calc_cnv_cov(args.cnv_bed, hpo_data, args.cnv)
+    else:
+        cnv_cov = None
+
+    # Collapse blocks with high CNV covariance prior to updated refinement
+    hpo_data = merge_blocks_by_cov(hpo_data, cnv_cov, args.window_jac, 
+                                   args.refine_pad, args.cs_val, block_prefix)
+
+    # Group blocks by effect size quantile
+    hpo_data = assign_or_quantiles(hpo_data, args.n_or_bins)
 
     # Estimate null variance
     if args.var_est_statslist is not None:
@@ -1022,36 +1610,57 @@ def main():
     Wsq = estimate_null_variance(hpo_data, args.gs_list, var_est_statslist, 
                                  dev_hpos, args.n_or_bins, args.split_gw_fdr,
                                  args.single_gs_hpo)
-    if args.null_var_out is not None:
-        output_null_var_tsv(Wsq, args.null_var_out)
 
     # Update original refinement results with BMA of re-estimated null variances
     hpo_data = update_refine(hpo_data, Wsq, args.split_gw_fdr, args.cs_val, 
-                             args.distance)
+                             args.refine_pad, cnv_cov, args.window_jac)
 
-    # Rename all blocks according to cytobands of credible sets, if optioned
-    if args.cytobands is not None:
-        hpo_data = rename_blocks(hpo_data, args.cytobands, block_prefix)
-
-    # Format & write final table of significant associations
-    if args.sig_assoc_bed is not None:
-        sig_assoc_bed = open(args.sig_assoc_bed, 'w')
-        output_assoc_bed(hpo_data, args.cytobands, sig_assoc_bed, args.cnv)
-
-    # Cluster credible sets across HPOs
-    final_loci = cluster_credsets(hpo_data, args.distance)
+    # Split blocks based on CNV covariance, if optioned
+    if cnv_cov is not None:
+        hpo_data = split_blocks_by_cov(hpo_data, cnv_cov, args.block_jac, block_prefix)
 
     # Read dict of N_case per HPO
     ncase_df = pd.read_csv(args.hpos_by_cohort, sep='\t').loc[:, '#HPO Total'.split()]
     ncase_df.index = ncase_df.iloc[:, 0]
     ncase_dict = ncase_df.drop(columns='#HPO').transpose().to_dict(orient='records')[0]
 
+    # Joint refinement of overlapping credible intervals across HPOs, if optioned
+    if args.joint_credsets:
+        # First pass of clustering overlapping credible sets across HPOs
+        # While attempting to split clusters such that each cluster has only one block per HPO
+        clustered_loci_v1 = cluster_credsets(hpo_data, block_merge_dist=args.refine_pad, 
+                                             kmeans_subclustering=True)
+
+        # Joint refinement of clustered blocks
+        hpo_data = joint_refine_all(hpo_data, clustered_loci_v1, args.cs_val, 
+                                    cnv_cov, args.window_jac, ncase_dict,
+                                    args.refine_pad)
+
+        # Remove any lingering redundant blocks after joint refinement
+        hpo_data = prune_redundant_blocks(hpo_data)
+
+    # Rename all blocks according to cytobands of credible sets, if optioned
+    if args.cytobands is not None:
+        hpo_data = rename_all_blocks(hpo_data, args.cytobands, block_prefix)
+
+    # Format & write final table of significant associations
+    if args.sig_assoc_bed is not None:
+        sig_assoc_bed = open(args.sig_assoc_bed, 'w')
+        output_assoc_bed(hpo_data, args.cytobands, sig_assoc_bed, args.cnv)
+
+    # Cluster final associations based on simple overlap between credints
+    if args.joint_credsets:
+        final_loci = cluster_credsets(hpo_data, block_merge_dist=0)
+    else:
+        final_loci = cluster_credsets(hpo_data, block_merge_dist=args.refine_pad)
+
     # Format & write final table of significant regions
+    # No joint refinement necessary at this step because it has already been accomplished above
     if args.sig_loci_bed is not None:
         sig_loci_bed = open(args.sig_loci_bed, 'w')
         output_loci_bed(hpo_data, final_loci, args.cytobands, sig_loci_bed, 
                         ncase_dict, args.cnv, block_prefix.replace('_segment', ''),
-                        args.joint_credsets, args.cs_val)
+                        False, args.cs_val, cnv_cov, args.window_jac)
 
 
 if __name__ == '__main__':

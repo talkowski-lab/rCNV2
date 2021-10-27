@@ -12,15 +12,18 @@
 
 
 # Launch docker image
-docker run --rm -it gcr.io/gnomad-wgs-v2-sv/rcnv
+docker run --rm -it us.gcr.io/broad-dsmap/athena-cloud:latest
 
 
 # Download necessary references (note: requires permissions)
 gcloud auth login
 mkdir refs/
-gsutil cp -r gs://rcnv_project/refs/GRCh37.Nmask.autosomes.bed.gz refs/
-gsutil cp -r gs://rcnv_project/refs/GRCh37.somatic_hypermutable_sites.bed.gz refs/
-gsutil cp -r gs://rcnv_project/refs/GRCh37.autosomes.genome refs/
+gsutil cp -r \
+  gs://rcnv_project/refs/GRCh37.Nmask.autosomes.bed.gz \
+  gs://rcnv_project/refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+  gs://rcnv_project/refs/GRCh37.autosomes.genome \
+  gs://rcnv_project/analysis/paper/data/large_segments/wgs_common_cnvs.*.1pct.bed.gz \
+  refs/
 gsutil cp -r gs://rcnv_project/cleaned_data/control_probesets ./
 
 
@@ -42,8 +45,10 @@ stepsize=10
 athena make-bins -z \
 	-x refs/GRCh37.Nmask.autosomes.bed.gz \
   -x refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+  -x refs/wgs_common_cnvs.DEL.1pct.bed.gz \
+  -x refs/wgs_common_cnvs.DUP.1pct.bed.gz \
   -s ${stepsize}000 \
-  --blacklist-cov 0.3 \
+  --exclusion-list-cov 0.3 \
 	refs/GRCh37.autosomes.genome \
 	${binsize}000 \
 	GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz
@@ -52,17 +57,17 @@ gsutil cp GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz* \
   gs://rcnv_project/cleaned_data/binned_genome/
 
 
-# # Annotate bins with count of probes per array
-for file in control_probesets/*bed.gz; do
-  echo -e "$file\tcount\t$( basename $file | sed 's/\.bed\.gz//g' )"
-done > probeset_tracks.athena.tsv
-athena annotate-bins \
-  --track-list probeset_tracks.athena.tsv \
-  --bgzip \
-  GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz \
-  GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz
-tabix -f GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz
-gsutil cp GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz* \
-  gs://rcnv_project/cleaned_data/binned_genome/
+# # # Annotate bins with count of probes per array
+# for file in control_probesets/*bed.gz; do
+#   echo -e "$file\tcount\t$( basename $file | sed 's/\.bed\.gz//g' )"
+# done > probeset_tracks.athena.tsv
+# athena annotate-bins \
+#   --track-list probeset_tracks.athena.tsv \
+#   --bgzip \
+#   GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz \
+#   GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz
+# tabix -f GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz
+# gsutil cp GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz* \
+#   gs://rcnv_project/cleaned_data/binned_genome/
 
 
