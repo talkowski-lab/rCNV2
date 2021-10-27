@@ -50,8 +50,8 @@ def process_ss_dict(ss_dict, primary_p=10e-8, secondary_p=0.05, n_nom=1,
 
         ss = pd.read_csv(bedpath, sep='\t')
 
-        sig_primary = ss['meta_phred_p'] >= -np.log10(primary_p)
-        sig_secondary = ss['meta_phred_p_secondary'] >= -np.log10(secondary_p)
+        sig_primary = ss['meta_neg_log10_p'] >= -np.log10(primary_p)
+        sig_secondary = ss['meta_neg_log10_p_secondary'] >= -np.log10(secondary_p)
         sig_nom = ss['n_nominal_cohorts'] >= n_nom
 
         if secondary_or_nom:

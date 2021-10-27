@@ -8,7 +8,9 @@ In practice, the commands in `filter_CNV_data.sh` were parallelized in [FireClou
 
 ## CNV data sources  
 
-We aggregated CNV data from multiple sources, listed alphabetically below:  
+We aggregated CNV data from multiple sources, listed alphabetically below.  
+
+Note that the sample counts in this table represent the number of samples retained after filtering outliers (described below).  
 
 | Cohort | Citation | PMID | Platform(s) | Build | Phenos | N Cases | N Ctrls |
 | --- | :--- | :--- | :--- | :--- | :--- | ---: | ---: |
@@ -30,13 +32,6 @@ We aggregated CNV data from multiple sources, listed alphabetically below:
 | The Genetic Etiology of Tourette Syndrome Consortium (`TSAICG`) | [Huang _et al._, _Neuron (2017)](https://pubmed.ncbi.nlm.nih.gov/28641109) | [28641109](https://pubmed.ncbi.nlm.nih.gov/28641109) | OmniExpress (100%) | hg19 | Tourette Syndrome | 2434 | 4093 |  
 | UK Biobank (`UKBB`) | [Macé _et al._, _Nat. Commun._ (2017)](https://pubmed.ncbi.nlm.nih.gov/28963451) | [28963451](https://pubmed.ncbi.nlm.nih.gov/28963451) | UKBB Affy Axiom (100%) | hg19 | Mixed | 54071 | 375800 |  
 
-#### Notes on raw CNV data   
-1. Counts represent the number of samples retained after filtering outliers, described below.  
-2. Only retained control samples from Cooper _et al._ All cases from Cooper _et al._ also appear in Coe _et al._  
-3. Excluded samples from Indiana University (IU) cohort derived from buccal swab DNA, samples with known aneuploidies or large runs of homozygosity, and samples with no phenotypic indication specified.  
-4. Only retained affected children from Sanders _et al._ and Zarrei _et al._, since all controls were first-degree relatives of affected cases.  
-5. Only retained normal samples from TCGA tumor:normal pairs, and excluded any TCGA donors with known blood cancer.  
-
 ## Raw CNV data processing steps  
 
 All CNV data native to hg17 or hg18 was lifted over to hg19 using UCSC liftOver, requiring at least 50% of the original CNV to map successfully to hg19 in order to be retained.  
@@ -45,12 +40,14 @@ Some datasets required manual curation prior to inclusion. Where necessary, thes
 
  * **BioVU**: TBD [TODO: ADD TEXT HERE]
  * **CHOP**: CNVs were filtered on quality score ≥40 and CNV size ≥25kb while requiring at least 10 SNPs per CNV. After CNV filtering, samples with `LRR_SD` <0.25, >20 CNV calls, or SNP call rate <98% were excluded as outliers, as well as samples genotyped on arrays with <175k SNP probes or samples labeled as cancer or Down's Syndrome patients. Finally, we identified 19 loci with apparently platform-specific artifactual CNV pileups. CNVs covered ≥10% by any of these artifact regions were removed from the callset. Lists of CHOP-specific blacklisted loci for deletions and duplications are provided as [reference files](https://github.com/talkowski-lab/rCNV2/tree/master/refs).  
+ * **Cooper**: Only retained control samples from Cooper _et al._ All cases from Cooper _et al._ also appear in Coe _et al._  
  * **Epi25k**: CNVs were filtered on ≥10 probes and ≥25kb. After CNV filtering, samples with >25 CNV calls were excluded as outliers.  
  * **EstBB**: Samples were excluded if were not included in SNP imputation, had genotype calls missing for ≥2% of sites, or belonged to two genotyping batches based on visual inspection of genotyping intensity parameters, followed by further exclusion of genotyping plates (≤24 samples per plate) that contained >3 samples with >200 CNV calls. We retained unrelated samples that had been linked to Estonian health registries and that had ≤50 raw CNV calls. We included CNVs with a quality score ≥15, were covered by ≥10 probes, and were ≥25kb in size. Finally, we pruned related samples and any samples with known malignant cancers or chromosomal disorders (e.g., Down's Syndrome or sex chromosome aneuploidies).
- * **GDX**: All CNVs were required to be ≥20kb and <40Mb in length. Except for the minority of 9,958 samples for which additional CNV call metadata was unavailable, all CNVs were further required to not have been annotated as a suspected false positive or mosaic event, have estimated copy numbers ≤1.5 for deletions or ≥2.5 for duplications, include ≥10 probes and have P(CNV) ≤ 10<sup>-10</sup>. Following CNV call filtering, we excluded all samples that either had >10 calls each, were identified as potential biological replicates, were referred for testing due to being a relative of a known carrier of a medically relevant CNV, or had “advanced maternal age” as their indication for testing.
- * **SSC**: CNVs were filtered on pCNV ≤10<sup>-9</sup>, per recommendation of the authors.  
- * **SickKids**: CNVs were filtered on ≥25kb. After CNV filtering, samples with >80 CNV calls were excluded as outliers. Finally, we identified a single locus on chr12 that had CNVs only appearing in ADHD samples at 2.8% frequency; these CNVs were removed from the callset.  
- * **TCGA**: CNVs were filtered on ≥10 probes and ≥25kb. Deletions were required to have a mean intensity ≤ log<sub>2</sub>(0.6) and duplications were required to have a mean intensity ≥  log<sub>2</sub>(1.45).  
+ * **GDX**: All CNVs were required to be ≥20kb and <40Mb in length. Except for the minority of 9,958 samples for which additional CNV call metadata was unavailable, all CNVs were further required to not have been annotated as a suspected false positive or mosaic event, have estimated copy numbers ≤1.5 for deletions or ≥2.5 for duplications, include ≥10 probes and have P(CNV) ≤ 10<sup>-10</sup>. Following CNV call filtering, we excluded all samples that either had >10 calls each, were identified as potential biological replicates, were referred for testing due to being a relative of a known carrier of a medically relevant CNV, or had “advanced maternal age” as their indication for testing.  
+ * **IU**: Excluded samples from Indiana University (IU) cohort derived from buccal swab DNA, samples with known aneuploidies or large runs of homozygosity, and samples with no phenotypic indication specified.  
+ * **SSC**: CNVs were filtered on pCNV ≤10<sup>-9</sup>, per recommendation of the authors. We only retained affected individuals since all controls were first-degree relatives of affected cases.    
+ * **SickKids**: CNVs were filtered on ≥25kb. After CNV filtering, samples with >80 CNV calls were excluded as outliers. Finally, we identified a single locus on chr12 that had CNVs only appearing in ADHD samples at 2.8% frequency; these CNVs were removed from the callset. We only retained affected individuals since all controls were first-degree relatives of affected cases.  
+ * **TCGA**: CNVs were filtered on ≥10 probes and ≥25kb. Deletions were required to have a mean intensity ≤ log<sub>2</sub>(0.6) and duplications were required to have a mean intensity ≥  log<sub>2</sub>(1.45). We only retained normal samples from TCGA tumor:normal pairs, and excluded any TCGA donors with known blood cancer.  
  * **UKBB**: CNVs were filtered on quality score ≥17 and CNV size ≥25kb. After CNV filtering, samples with >10 CNV calls were excluded as outliers as well as any samples with known malignant cancers or chromosomal disorders (e.g., Down's Syndrome or sex chromosome aneuploidies).  
 
 #### CNV defragmentation  
@@ -81,7 +78,7 @@ Seven studies were unable to be defragmented due to inadequate sample-level info
 
 The properties of each callset are listed below after initial data processing steps but prior to further filtering.  
 
-As [described below](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#case-control-metacohorts), we subdivided 13,139 control samples from the UKBB cohort to use as proxy controls for cases from GeneDx; these cohorts are referred to as `UKBB_main` and `UKBB_sub` for the main UKBB cohort and the subset of 13,139 controls, respectively.  
+As [described below](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV#case-control-metacohorts), we subdivided 13,139 control samples from the UKBB cohort to use as proxy controls for cases from GeneDx and retained the remaining 416,732 UKBB samples as a separate cohort; these cohort subsets are referred to as `UKBB_main` and `UKBB_sub` for the main UKBB cohort and the subset of 13,139 controls, respectively.  
 
 | Dataset | N Cases | Case CNVs | CNVs /Case | Case Median Size | Case DEL:DUP | N Ctrls | Ctrl CNVs | CNVs /Ctrl | Ctrl Median Size | Ctrl DEL:DUP |  
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |  
@@ -134,7 +131,7 @@ All raw CNV data was subjected to the same set of global filters:
 #### Notes on curation  
 1. "Substantial" overlap determined based on ≥50% reciprocal overlap using BEDTools ([Quinlan & Hall, _Bioinformatics_ (2010)](https://www.ncbi.nlm.nih.gov/pubmed/20110278)). For overlap-based comparisons, both breakpoints were required to be within ±100kb, and CNV type (DEL vs. DUP) was required to match.  
 2. The version of gnomAD-SV used for this analysis (gnomAD-SV v2.1, non-neuro) included 8,342 samples without known neuropsychiatric disorders as [available from the gnomAD website](https://gnomad.broadinstitute.org/downloads/) and described in [Collins\*, Brand\*, _et al._, _Nature_ (2020)](https://www.nature.com/articles/s41586-020-2287-8)  
-3. CNVs with ≥75% reciprocal overlap versus [known genomic disorder CNV loci](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/other#genomic-disorders) reported by at least two of six established resources were exempted from this filter step.  
+3. CNVs with ≥75% reciprocal overlap versus [known genomic disorder CNV loci](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/other#genomic-disorders) reported by at least two of six established resources were exempted from this filter step, as we reasoned it was possible that certain genomic disorder CNVs may be represented at frequencies close to 1% in some case-only subsets (e.g., SSC, RUMC, SickKids, GeneDx, _etc._).  
 4. "Substantial" coverage determined based on ≥50% coverage per BEDTools coverage ([Quinlan & Hall, _Bioinformatics_ (2010)](https://www.ncbi.nlm.nih.gov/pubmed/20110278)).
 
 ### Rare CNV callset properties

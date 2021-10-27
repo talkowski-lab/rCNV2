@@ -91,7 +91,7 @@ meta <- function(dlist, cohorts){
   meta.res <- as.data.frame(cbind(case.hpos, t(sapply(case.hpos, meta.single, dlist=dlist, cohorts=cohorts))))
   meta.res[, -1] <- apply(meta.res[, -1], 2, as.numeric)
   meta.res <- as.data.frame(meta.res)
-  colnames(meta.res) <- c("hpo", "lnOR", "lnOR.lower", "lnOR.upper", "zscore", "phred.pval")
+  colnames(meta.res) <- c("hpo", "lnOR", "lnOR.lower", "lnOR.upper", "zscore", "neglog10.pval")
   return(meta.res)
 }
 
@@ -205,8 +205,8 @@ del.stats <- meta(del, cohorts)
 dup.stats <- meta(dup, cohorts)
 
 # Get HPOs to keep and write to list
-keep.hpos <- setdiff(intersect(del.stats$hpo[which(del.stats$phred.pval >= -log10(0.05))],
-                               dup.stats$hpo[which(dup.stats$phred.pval >= -log10(0.05))]),
+keep.hpos <- setdiff(intersect(del.stats$hpo[which(del.stats$neglog10.pval >= -log10(0.05))],
+                               dup.stats$hpo[which(dup.stats$neglog10.pval >= -log10(0.05))]),
                      c("HP:0000118"))
 write.table(keep.hpos, hpos.keep.out, col.names=F, row.names=F, quote=F)
 

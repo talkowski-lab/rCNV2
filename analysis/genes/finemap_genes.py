@@ -25,7 +25,7 @@ import argparse
 from sys import stdout
 
 
-def format_stat(x, is_phred=False, na_val=0):
+def format_stat(x, is_neg_log10=False, na_val=0):
     """
     Helper function to format & convert p-values as needed
     """
@@ -33,7 +33,7 @@ def format_stat(x, is_phred=False, na_val=0):
     if x == 'NA':
         return float(na_val)
     else:
-        if is_phred:
+        if is_neg_log10:
             return 10 ** -float(x)
         else:
             return float(x)
@@ -139,7 +139,7 @@ def finemap(gene_priors, gene_info, null_variance=0.42 ** 2):
     return finemap_res
 
 
-def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True, 
+def parse_stats(stats_in, primary_p_cutoff, p_is_neg_log10=True, 
                 secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
                 secondary_or_nominal=True, fdr_q_cutoff=0.05, 
                 secondary_for_fdr=False, sig_only=False, keep_genes=None, 
@@ -173,9 +173,9 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
                 continue
 
         # Clean up gene data
-        primary_p = format_stat(primary_p, p_is_phred, 1)
-        primary_q = format_stat(primary_q, p_is_phred, 1)
-        secondary_p = format_stat(secondary_p, p_is_phred, 1)
+        primary_p = format_stat(primary_p, p_is_neg_log10, 1)
+        primary_q = format_stat(primary_q, p_is_neg_log10, 1)
+        secondary_p = format_stat(secondary_p, p_is_neg_log10, 1)
         n_nominal = int(n_nominal)
         sig_label = get_sig_label(primary_p, secondary_p, n_nominal, primary_q, 
                                   primary_p_cutoff, secondary_p_cutoff, 
@@ -229,7 +229,7 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_phred=True,
     return stats_dict
 
 
-def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True, 
+def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_neg_log10=True, 
                 secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
                 secondary_or_nominal=True, fdr_q_cutoff=0.05, 
                 secondary_for_fdr=False, block_merge_dist=1000000, 
@@ -250,7 +250,7 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
     se_by_chrom = {}
 
     # First pass: parse data for exome-wide or FDR significant genes only
-    hpo_info['sig_genes'] = parse_stats(stats_in, primary_p_cutoff, p_is_phred, 
+    hpo_info['sig_genes'] = parse_stats(stats_in, primary_p_cutoff, p_is_neg_log10, 
                                         secondary_p_cutoff, n_nominal_cutoff, 
                                         secondary_or_nominal, fdr_q_cutoff, 
                                         secondary_for_fdr, sig_only=True, 
@@ -275,7 +275,7 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_phred=True,
             nearby_genes = list(set(nearby_genes)) # Deduplicates
 
             # Gather gene stats
-            hpo_info['all_genes'] = parse_stats(stats_in, primary_p_cutoff, p_is_phred, 
+            hpo_info['all_genes'] = parse_stats(stats_in, primary_p_cutoff, p_is_neg_log10, 
                                                 secondary_p_cutoff, n_nominal_cutoff, 
                                                 secondary_or_nominal, fdr_q_cutoff, 
                                                 secondary_for_fdr, sig_only=False, 
@@ -331,7 +331,7 @@ def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2,
         for hpo, stats_in, pval, in reader:
             primary_p_cutoff = float(pval)
             hpo_data[hpo] = process_hpo(hpo, stats_in, primary_p_cutoff, 
-                                        p_is_phred=True, 
+                                        p_is_neg_log10=True, 
                                         secondary_p_cutoff=secondary_p_cutoff, 
                                         n_nominal_cutoff=n_nominal_cutoff, 
                                         secondary_or_nominal=secondary_or_nominal,

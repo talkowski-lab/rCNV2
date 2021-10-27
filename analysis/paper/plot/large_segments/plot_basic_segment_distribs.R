@@ -218,20 +218,25 @@ dev.off()
 
 # Scatterplot of peak P-value and corresponding lnOR for all sites
 pdf(paste(out.prefix, "all_segs.best_p_vs_or.pdf", sep="."),
-    height=2.8, width=3)
-segs.scatter(segs.all, x=log2(exp(segs.all$meta_best_lnor)), y=segs.all$meta_best_p,
-             subset_to_regions=segs.all$region_id[which(!is.infinite(segs.all$meta_best_p))],
+    height=2.9, width=3.1)
+segs.best.l2or <- log2(exp(segs.all$meta_best_lnor))
+x.max <- (4/3) * max(segs.best.l2or, na.rm=T)
+segs.best.p <- segs.all$meta_best_p
+segs.best.p[which(segs.best.p > 30)] <- 30
+segs.scatter(segs.all, x=segs.best.l2or, y=segs.best.p,
              horiz.lines.at=c(gw.sig, -log10(0.05)), horiz.lines.lty=c(5, 2),
              horiz.lines.color=c(graphabs.green, blueblack), blue.bg=FALSE,
-             xtitle=bquote("Max" ~ log[2]("Odds Ratio") * ", any pheno."),
+             xtitle="Max odds ratio, any phenotype",
+             x.at=seq(0, x.max, 2), x.labs=c(2^seq(0, 6, 2), paste("2 ^", seq(8, x.max, 2))), parse.x.labs = T,
              ytitle=bquote("Max -log"[10] * (italic(P)) * ", any phenotype"),
-             x.title.line=1.6, y.title.line=1.5, xlims=c(0, 18),
-             add.lm=F, pt.cex=0.85, parmar=c(2.75, 2.75, 0.4, 0.2))
+             y.at=seq(0, 30, 5), y.labs=c(seq(0, 25, 5), expression("" >= 30)), parse.y.labs=TRUE,
+             x.title.line=1.6, y.title.line=1.7, xlims=c(0, x.max), ylims=c(0, 30),
+             add.lm=F, pt.cex=0.6, parmar=c(2.8, 3, 0.4, 0.4))
 x.bump <- 0.04 * (par("usr")[2] - par("usr")[1])
 y.bump <- 0.04 * (par("usr")[4] - par("usr")[3])
 text(x=par("usr")[2] + x.bump, y=-log10(0.05) + y.bump, labels=format.pval(0.05), cex=0.85, pos=2, col=blueblack)
 text(x=par("usr")[2] + x.bump, y=gw.sig + 1.5*y.bump, labels=format.pval(10^-gw.sig, nsmall=1), cex=0.85, pos=2, col=graphabs.green)
-text(x=par("usr")[2] + x.bump, y=8.3, labels="Genome-wide\nsignificance", cex=0.85, pos=2, font=3, col=graphabs.green)
+text(x=par("usr")[2] + x.bump, y=11, labels="Genome-wide\nsignificance", cex=0.85, pos=2, font=3, col=graphabs.green)
 # text(x=par("usr")[2] + x.bump, y=2.4, labels="Nominal\nsignificance", cex=0.65, pos=2, font=3, col=blueblack)
 # text(x=par("usr")[2] + x.bump, y=-log10(0.05) + y.bump, labels=format.pval(0.05), cex=0.75, pos=2)
 dev.off()

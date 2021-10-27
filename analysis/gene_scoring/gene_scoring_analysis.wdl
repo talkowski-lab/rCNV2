@@ -478,7 +478,7 @@ task merge_and_meta_analysis {
     # Run meta-analysis
     /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
       --model ${meta_model_prefix} \
-      --p-is-phred \
+      --p-is-neg-log10 \
       --spa \
       ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt \
       ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed

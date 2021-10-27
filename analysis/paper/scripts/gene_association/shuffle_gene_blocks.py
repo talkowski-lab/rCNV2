@@ -28,10 +28,7 @@ def load_blocks(blocks_in):
     blocks.columns = 'block_id cnv genes'.split()
     blocks.index = blocks['block_id']
     blocks.drop(columns='block_id', inplace=True)
-    try:
-        blocks_dict = blocks.to_dict(orient='index')
-    except:
-        import pdb; pdb.set_trace()
+    blocks_dict = blocks.to_dict(orient='index')
     for bid in blocks_dict.keys():
         genes = [g for g in blocks_dict[bid]['genes'].split(';') \
                  if g is not None and g not in 'NA nan NAN'.split() and g != '']

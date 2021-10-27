@@ -132,7 +132,7 @@ meta.all <- function(counts){
     meta.res$hpo <- hpo
     cbind(meta.res, gsets)
   }))
-  colnames(meta.res) <- c("meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper", "meta_z", "meta_phred_p", "hpo", "gset")
+  colnames(meta.res) <- c("meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper", "meta_z", "meta_neg_log10_p", "hpo", "gset")
   return(meta.res)
 }
 

@@ -100,7 +100,7 @@ segs.scatter(segs.sig,
            y=segs.sig$max_ln_or,
            pt.cex=0.6,
            xlims=c(5, 7),
-           ylims=c(0, max(segs.sig$max_ln_or)),
+           ylims=c(0, max(segs.sig$pooled_ln_or)),
            xtitle=expression(italic("log")[10] * "(Size)"),
            x.at=log10(logscale.major.bp),
            x.labs.at=log10(logscale.major.bp),
@@ -314,4 +314,34 @@ segs.swarm(segs.sig,
          ytitle=expression("Max Effect Size" ~ (italic("ln") * " OR")),
          y.title.line=1.15,
          parmar=c(2.3, 2.5, 2.5, 0.1))
+dev.off()
+
+# Plot effect size vs. minimum constraint metrics from gnomAD
+pdf(paste(out.prefix, "gw_plus_FDR.lnOR_vs_minLOEUF.pdf", sep="."),
+    height=2.25, width=2.35)
+segs.scatter(segs.sig,
+             x=segs.sig$min_LOEUF,
+             y=segs.sig$max_ln_or,
+             pt.cex=0.6,
+             xlims=c(0, 1.5),
+             ylims=c(0, max(segs.sig$max_ln_or)),
+             xtitle="min(LOEUF)",
+             ytitle=expression("Max Effect Size" ~ (italic("ln") * " OR")),
+             x.title.line=1.5,
+             y.title.line=1.25,
+             parmar=c(2.5, 2.5, 0.8, 0.8))
+dev.off()
+pdf(paste(out.prefix, "gw_plus_FDR.lnOR_vs_minMisOEUF.pdf", sep="."),
+    height=2.25, width=2.35)
+segs.scatter(segs.sig,
+             x=segs.sig$min_MisOEUF,
+             y=segs.sig$max_ln_or,
+             pt.cex=0.6,
+             xlims=c(0, 1.5),
+             ylims=c(0, max(segs.sig$max_ln_or)),
+             xtitle="min(MisOEUF)",
+             ytitle=expression("Max Effect Size" ~ (italic("ln") * " OR")),
+             x.title.line=1.5,
+             y.title.line=1.25,
+             parmar=c(2.5, 2.5, 0.8, 0.8))
 dev.off()

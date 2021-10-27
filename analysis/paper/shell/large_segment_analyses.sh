@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -34,6 +34,7 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/misc/redin_bca_breakpoints.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/misc/gene_mutation_rates.tsv.gz \
   ${rCNV_bucket}/cleaned_data/genes/annotations/gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
+  ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
   refs/
 mkdir meta_stats/
 gsutil -m cp \
@@ -154,6 +155,7 @@ cat \
   --min-jaccard-sum 1.0 \
   --genelists genelists_to_annotate.tsv \
   --hpo-genelists hpo_genelists.tsv \
+  --gene-constraint-metadata refs/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
   --dnm-tsvs dnm_counts_to_annotate.tsv \
   --snv-mus refs/gene_mutation_rates.tsv.gz \
   --bca-tsv refs/redin_bca_breakpoints.bed.gz \
@@ -238,6 +240,7 @@ gsutil -m cp \
 # Plot segment permutation results while matching on number of genes per segment
 # Note: depending on the number of permutations, the Docker image RAM may need 
 # to be increased (e.g., 2GB for 100k permutations is insufficient)
+# TODO: DEBUG THIS
 if ! [ -e perm_test_plots ]; then
   mkdir perm_test_plots
 fi
@@ -251,6 +254,7 @@ fi
 
 
 # Plot effect size covariates
+# TODO: DEBUG THIS
 if [ -e effect_size_plots ]; then
   rm -rf effect_size_plots
 fi
@@ -347,7 +351,7 @@ while read nocolon hpo; do
   for cnv in DEL DUP; do
     echo $cnv
     statsfile=meta_stats/$nocolon.rCNV.$cnv.sliding_window.meta_analysis.stats.bed.gz
-    for column in meta_phred_p meta_phred_p_secondary; do
+    for column in meta_neg_log10_p meta_neg_log10_p_secondary; do
       echo $column
       idx=$( zcat $statsfile | head -n1 | sed 's/\t/\n/g' \
              | awk -v column=$column '{ if ($1==column) print NR }' )
@@ -364,7 +368,7 @@ zcat \
 > window_coordinates.bed
 # Make matrices for primary and secondary P-values across phenotypes per CNV type 
 for cnv in DEL DUP; do
-  for column in meta_phred_p meta_phred_p_secondary; do
+  for column in meta_neg_log10_p meta_neg_log10_p_secondary; do
     paste \
       window_coordinates.bed \
       meta_stats/matrices/*.$cnv.$column.tsv \
@@ -378,15 +382,15 @@ done
   --dup-cutoff ${dup_cutoff} \
   --del-nomsig-bed ./nomsig_windows.DEL.bed \
   --dup-nomsig-bed ./nomsig_windows.DUP.bed \
-  meta_stats/matrices/${prefix}.DEL.meta_phred_p.all_hpos.bed.gz \
-  meta_stats/matrices/${prefix}.DUP.meta_phred_p.all_hpos.bed.gz \
-  meta_stats/matrices/${prefix}.DEL.meta_phred_p_secondary.all_hpos.bed.gz \
-  meta_stats/matrices/${prefix}.DUP.meta_phred_p_secondary.all_hpos.bed.gz \
+  meta_stats/matrices/${prefix}.DEL.meta_neg_log10_p.all_hpos.bed.gz \
+  meta_stats/matrices/${prefix}.DUP.meta_neg_log10_p.all_hpos.bed.gz \
+  meta_stats/matrices/${prefix}.DEL.meta_neg_log10_p_secondary.all_hpos.bed.gz \
+  meta_stats/matrices/${prefix}.DUP.meta_neg_log10_p_secondary.all_hpos.bed.gz \
   refs/${prefix}.reordered_hpos.txt \
   refs/HPOs_by_metacohort.table.tsv \
   assoc_stat_plots/${prefix}
 # Calculate fraction of genome with nominal association with at least one phenotype
-searchspace=$( zcat meta_stats/matrices/${prefix}.DEL.meta_phred_p.all_hpos.bed.gz \
+searchspace=$( zcat meta_stats/matrices/${prefix}.DEL.meta_neg_log10_p.all_hpos.bed.gz \
                | cut -f1-3 | fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n \
                | bedtools merge -i - | awk '{ sum+=$3-$2 }END{ print sum }' )
 zcat ./nomsig_windows.*.bed.gz \

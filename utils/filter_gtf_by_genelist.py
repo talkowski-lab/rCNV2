@@ -28,6 +28,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('gtf', help='GTF of genes to consider.')
     parser.add_argument('genelist', help='List of genes to be included.')
+    parser.add_argument('-v', '--invert', action='store_true', help='Invert filter ' +
+                        'such that all genes from genelist will be excluded ' +
+                        '(analogous to grep -v).')
     parser.add_argument('--field', default='gene_name', 
                         help='Field to evaluate when filtering [default: "gene_name"].')
     parser.add_argument('-o', '--outgtf', help='Path to output GTF file. ' +
@@ -52,7 +55,10 @@ def main():
 
     # Filter GTF
     gtfbt = pbt.BedTool(args.gtf)
-    filtered_gtf = gtfbt.filter(lambda f: f.attrs.get(args.field, None) in genes)
+    if args.invert:
+        filtered_gtf = gtfbt.filter(lambda f: f.attrs.get(args.field, None) not in genes)
+    else:
+        filtered_gtf = gtfbt.filter(lambda f: f.attrs.get(args.field, None) in genes)
 
     # Save filtered GTF and bgzip (if optioned)
     filtered_gtf.saveas(outgtf_path)

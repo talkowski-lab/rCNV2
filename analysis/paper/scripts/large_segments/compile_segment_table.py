@@ -212,6 +212,28 @@ def annotate_hpo_genes(df, loci_hpos, hpo_genes):
     return df
 
 
+def annotate_constraint(df, constraint_path):
+    """
+    Annotates minimum LOEUF and MisOEUF from gnomAD per segment
+    """
+
+    constr_df = pd.read_csv(constraint_path, sep='\t')
+
+    def _min_metric(genes_str, constr_df, col):
+        genes = str(genes_str[0]).split(';')
+        return constr_df.loc[constr_df.gene.isin(genes), col].min()
+
+    df['min_LOEUF'] \
+        = pd.DataFrame(df.genes).apply(_min_metric, axis=1, raw=True, 
+                                       constr_df=constr_df, col='gnomad_oe_lof_upper')
+
+    df['min_MisOEUF'] \
+        = pd.DataFrame(df.genes).apply(_min_metric, axis=1, raw=True, 
+                                       constr_df=constr_df, col='gnomad_oe_mis_upper')
+
+    return df
+
+
 def count_dnms(df, dnm_path, col_prefix, mu_df=None, xgenes=None):
     """
     Annotate segments based on sum of observed de novo coding mutations
@@ -424,6 +446,9 @@ def main():
     parser.add_argument('--hpo-genelists', help='Tsv of HPO-specific genelists to ' +
                         'annotate. Will match on segment HPO. Two columns ' +
                         'expected: HPO, and path to genelist.')
+    parser.add_argument('--gene-constraint-metadata', help='Tsv of gene-level ' +
+                        'constraint metadata. If provided, will annotate minimum ' +
+                        'pLoF and missense OEUF from gnomAD.')
     parser.add_argument('--dnm-tsvs', help='Tsv of de novo mutation counts ' +
                         ' to annotate. Three columns expected: study prefix, ' +
                         'path to tsv with dnm counts, and path to list of exome-' +
@@ -555,6 +580,10 @@ def main():
         hpo_genes = load_hpo_genelists(args.hpo_genelists)
         all_df = annotate_hpo_genes(all_df, loci_hpos, hpo_genes)
 
+    # Annotate with gene-level constraint metadata, if optioned
+    if args.gene_constraint_metadata is not None:
+        all_df = annotate_constraint(all_df, args.gene_constraint_metadata)
+
     # Annotate with de novo mutations, if optioned
     if args.dnm_tsvs is not None:
         # Also, load snv mutation rates, if optioned
@@ -570,7 +599,7 @@ def main():
                 xgenes = [g.rstrip() for g in open(xgene_list).readlines()]
                 all_df = count_dnms(all_df, dnm_path, study + '_noSig', mu_df, xgenes)
 
-    # TODO: annotate with breakpoints from Redin et al., if optioned
+    # Annotate with breakpoints from Redin et al., if optioned
     if args.bca_tsv is not None:
         all_df = count_bcas(all_df, args.bca_tsv)
 

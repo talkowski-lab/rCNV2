@@ -58,8 +58,8 @@ summarize.counts <- function(case.df, control.df){
   fstats <- as.data.frame(do.call("rbind", (lapply(1:nrow(res), function(i){
     fisher.burden.test.single(as.numeric(as.vector(res[i, c("case_alt", "control_alt", "case_ref", "control_ref")])))
   })))[, c("p", "OR")])
-  colnames(fstats) <- c("fisher_phred_p", "odds_ratio")
-  fstats$fisher_phred_p <- -log10(as.numeric(fstats$fisher_phred_p))
+  colnames(fstats) <- c("fisher_neg_log10_p", "odds_ratio")
+  fstats$fisher_neg_log10_p <- -log10(as.numeric(fstats$fisher_neg_log10_p))
   as.data.frame(cbind(res, fstats))
 }
 

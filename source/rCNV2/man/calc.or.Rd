@@ -4,7 +4,15 @@
 \alias{calc.or}
 \title{Calculate CNV odds ratio}
 \usage{
-calc.or(control_ref, control_alt, case_ref, case_alt, adj = 0.5)
+calc.or(
+  control_ref,
+  control_alt,
+  case_ref,
+  case_alt,
+  adj = 0.5,
+  return.confint = FALSE,
+  alpha = 0.05
+)
 }
 \arguments{
 \item{control_ref}{number of control non-carriers}
@@ -16,9 +24,13 @@ calc.or(control_ref, control_alt, case_ref, case_alt, adj = 0.5)
 \item{case_alt}{number of case CNV carriers}
 
 \item{adj}{fixed value to use for continuity correction [default: 0.5]}
+
+\item{return.confint}{return confidence interval [default: false]}
+
+\item{alpha}{alpha value corresponding to \code{return.confint} [default: 0.05]}
 }
 \value{
-odds ratio (numeric)
+numeric vector of odds ratio, optionally with lower and upper 95\% confidence bounds
 }
 \description{
 Compute basic OR of CNV carriers with adjustment for zero-inflation

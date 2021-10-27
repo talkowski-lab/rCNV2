@@ -74,7 +74,7 @@ load.sumstats <- function(bedpath, region){
   ss$pos <- (ss$start + ss$stop)/2
   
   # Return columns of interest
-  ss[, c("chr", "pos", "meta_phred_p", "meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper")]
+  ss[, c("chr", "pos", "meta_neg_log10_p", "meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper")]
 }
 
 # Extract PIPs from BED for specified genes for a single HPO
@@ -467,7 +467,7 @@ add.bracket <- function(xleft, xright, y0, height, col=blueblack, staple.wex=0.0
   text(x=xleft-staple.width, y=y0, pos=2, col=col, labels=left.label)
 }
 
-# Add panel of phred-scaled P-values 
+# Add panel of neglog10-scaled P-values 
 add.pvalues <- function(ss, y0, cnv.type, panel.height=0.2, pt.cex=0.6, gw.sig=NULL, 
                         min.y=9, gw.sig.label="Genome-wide significance",
                         gw.sig.label.side="above"){
@@ -485,7 +485,7 @@ add.pvalues <- function(ss, y0, cnv.type, panel.height=0.2, pt.cex=0.6, gw.sig=N
   
   # Scale p-values according to y0 and panel.height
   pos <- as.numeric(ss$pos)
-  pvals.orig <- as.numeric(ss$meta_phred_p)
+  pvals.orig <- as.numeric(ss$meta_neg_log10_p)
   max.pval.orig <- max(c(9, (ceiling(max(pvals.orig, na.rm=T)) + 1)))
   pval.scale.factor <- (panel.height / max.pval.orig)
   pvals.scaled <- pval.scale.factor * pvals.orig

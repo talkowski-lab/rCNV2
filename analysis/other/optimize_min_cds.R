@@ -20,7 +20,7 @@ require(optparse, quietly=T)
 # Compute CDS optimization data and determine optimal cutoff
 optimize.cds <- function(stats, method="both"){
   # Scale primary P-value and odds ratios as a fraction of maximum possible
-  stats$frac_p <- stats$meta_phred_p / max(stats$meta_phred_p, na.rm=T)
+  stats$frac_p <- stats$meta_neg_log10_p / max(stats$meta_neg_log10_p, na.rm=T)
   stats$frac_or <- stats$meta_lnOR / max(stats$meta_lnOR, na.rm=T)
 
   # Optimize based on value of "method"

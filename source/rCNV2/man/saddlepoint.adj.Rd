@@ -4,16 +4,30 @@
 \alias{saddlepoint.adj}
 \title{Z-score saddlepoint approximation}
 \usage{
-saddlepoint.adj(zscores, winsorize = 1, winsorize.left.tail = F, phred = T)
+saddlepoint.adj(
+  zscores,
+  xidxs = NULL,
+  winsorize = 1,
+  winsorize.left.tail = F,
+  mirror = F,
+  neglog10 = T
+)
 }
 \arguments{
 \item{zscores}{numeric vector of Z-scores}
 
-\item{winsorize}{width of quantile intervals to Winsorize [default: 1, i.e., no Winsorization]}
+\item{xidxs}{optional list of \code{zscores} indexes to exclude when fitting
+saddlepoint [default: include all regions ]}
 
-\item{winsorize.left.tail}{boolean indicator to apply Winsorization to left tail of distribution [default: FALSE]}
+\item{winsorize}{width of quantile intervals to Winsorize
+[default: 1, i.e., no Winsorization]}
 
-\item{phred}{boolean indicator of whether to -log10-scale adjusted P-values}
+\item{winsorize.left.tail}{boolean indicator to apply Winsorization to left
+tail of distribution [default: FALSE]}
+
+\item{mirror}{mirror bottom 50\% of Z-scores [default: FALSE]}
+
+\item{neglog10}{boolean indicator of whether to -log10-scale adjusted P-values}
 }
 \value{
 data.frame with two columns:

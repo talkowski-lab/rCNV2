@@ -18,10 +18,10 @@ options(stringsAsFactors=F, scipen=1000, check.names=F)
 ### DATA FUNCTIONS ###
 ######################
 # Load meta-analysis summary stats & extract vector of primary P-values
-load.pvals <- function(sumstats.in, p.colname="meta_phred_p", p.is.phred=T){
+load.pvals <- function(sumstats.in, p.colname="meta_neg_log10_p", p.is.neg.log10=T){
   sumstats <- read.table(sumstats.in, header=T, sep="\t", comment.char="", check.names=F)
   pvals <- as.numeric(as.vector(sumstats[, which(colnames(sumstats) == p.colname)]))
-  if(p.is.phred==T){
+  if(p.is.neg.log10==T){
     pvals <- 10^-pvals
   }
   return(pvals)

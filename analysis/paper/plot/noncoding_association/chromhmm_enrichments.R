@@ -39,7 +39,7 @@ calc.single.chmm.enrichment <- function(stats, cnv, state){
   elig.idx <- which(stats$cnv==cnv & grepl(state, stats$trackname, fixed=T))
   ctrl.idx <- which(stats$meta.lnOR < 0)
   case.idx <- which(stats$meta.lnOR >= 0)
-  sig.idx <- which(stats$meta.phred_p >= -log10(0.05))
+  sig.idx <- which(stats$meta.neg.log10_p >= -log10(0.05))
   n.tracks <- length(elig.idx)
   frac.ctrl.sig <- length(intersect(intersect(elig.idx, ctrl.idx), sig.idx)) / n.tracks
   frac.ctrl.ns <- length(setdiff(intersect(elig.idx, ctrl.idx), sig.idx)) / n.tracks

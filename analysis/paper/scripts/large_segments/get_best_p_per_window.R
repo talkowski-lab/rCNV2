@@ -40,12 +40,12 @@ pvals.in <- args$args[1]
 outfile <- args$args[2]
 
 # # DEV PARAMETERS
-# pvals.in <- "~/scratch/rCNV2_analysis_d1.DEL.meta_phred_p.all_hpos.bed.gz"
+# pvals.in <- "~/scratch/rCNV2_analysis_d1.DEL.meta_neg_log10_p.all_hpos.bed.gz"
 # outfile <- "~/scratch/test_max_pval_per_window.DEL.bed"
 # script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/large_segments/"
 
 # Load p-value matrix
-pvals <- load.pval.matrix(pvals.in, has.coords=T, p.is.phred=T)
+pvals <- load.pval.matrix(pvals.in, has.coords=T, p.is.neg.log10=T)
 
 # Compute best P-value across any phenotype per window, and write to output file
 df.out <- pvals$coords

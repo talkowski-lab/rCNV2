@@ -19,11 +19,11 @@ gs://rcnv_project/cleaned_data/binned_genome/GRCh37.200kb_bins_10kb_steps.raw.be
 
 ### Bin creation
 
-We created sliding windows for all autosomes at 200kb resolution and 10kb step size, and excluded any bins with ≥30% coverage by N-masked sequences or known somatically hypermutable site (as applied in [Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674)).  
+We created sliding windows for all autosomes at 200kb resolution and 10kb step size, and excluded any bins with ≥30% coverage by N-masked sequences, known somatically hypermutable site (as applied in [Collins\*, Brand\*, _et al._, _bioRxiv_ (2019)](https://www.biorxiv.org/content/biorxiv/early/2019/03/14/578674)), or sites of common CNVs documented in four large genome sequencing-based references (see [our CNV filtering protocol](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/)).  
 
 The window size of 200kb was selected to approximately match the median size of rare CNVs for most cohorts following [our CNV filtering protocol](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/CNV/).  
 
-After filtering, we retained a final set of 267,237 bins for analysis.  
+After filtering, we retained a final set of 262,734 bins for analysis.  
 
 
 ### Control array probe counts  

@@ -48,9 +48,9 @@ option_list <- list(
   make_option(c("--p-col-name"), type="character", default="P",
               help="column name corresponding to P-values [default %default]",
               metavar="string"),
-  make_option(c("--p-is-phred"), type="logical", default=F, action="store_true",
+  make_option(c("--p-is-neg-log10"), type="logical", default=F, action="store_true",
               help="supplied P-values are Phred-scaled (-log10[P]) [default %default]"),
-  make_option(c("--max-phred-p"), type="numeric", default=100,
+  make_option(c("--max-neg-log10-p"), type="numeric", default=100,
               help="maximum P-value to report; more sigificant values will be rounded down [default %default]"),
   make_option(c("--cutoff"), type="numeric", default=10^-8,
               help="P-value of significance threshold [default %default]",
@@ -108,8 +108,8 @@ if(miami == F){
   out.prefix <- args$args[3]
 }
 p.col.name <- opts$`p-col-name`
-p.is.phred <- opts$`p-is-phred`
-min.p <- 10^-(opts$`max-phred-p`)
+p.is.neg.log10 <- opts$`p-is-neg-log10`
+min.p <- 10^-(opts$`max-neg-log10-p`)
 cutoff <- opts$cutoff
 highlight.in <- opts$`highlight-bed`
 highlight.name <- opts$`highlight-name`
@@ -139,9 +139,9 @@ if(miami == F){
 }
 
 # Load data
-stats <- load.manhattan.stats(stats.in, p.col.name, p.is.phred, min.p)
+stats <- load.manhattan.stats(stats.in, p.col.name, p.is.neg.log10, min.p)
 if(miami == T){
-  stats2 <- load.manhattan.stats(stats2.in, p.col.name, p.is.phred, min.p)
+  stats2 <- load.manhattan.stats(stats2.in, p.col.name, p.is.neg.log10, min.p)
 }
 
 if(!is.na(highlight.in)){

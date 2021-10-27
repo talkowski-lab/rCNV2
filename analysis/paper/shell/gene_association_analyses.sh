@@ -84,7 +84,7 @@ while read nocolon hpo; do
   for cnv in DEL DUP; do
     echo $cnv
     statsfile=meta_stats/$nocolon.rCNV.$cnv.gene_burden.meta_analysis.stats.bed.gz
-    for column in meta_phred_p meta_phred_p_secondary; do
+    for column in meta_neg_log10_p meta_neg_log10_p_secondary; do
       echo $column
       idx=$( zcat $statsfile | head -n1 | sed 's/\t/\n/g' \
              | awk -v column=$column '{ if ($1==column) print NR }' )
@@ -101,7 +101,7 @@ zcat \
 > gene_coordinates.bed
 # Make matrices for primary and secondary P-values across phenotypes per CNV type 
 for cnv in DEL DUP; do
-  for column in meta_phred_p meta_phred_p_secondary; do
+  for column in meta_neg_log10_p meta_neg_log10_p_secondary; do
     paste \
       gene_coordinates.bed \
       meta_stats/matrices/*.$cnv.$column.tsv \
@@ -116,10 +116,10 @@ done
   --dup-cutoff ${dup_cutoff} \
   --del-nomsig-bed ./nomsig_genes.DEL.bed \
   --dup-nomsig-bed ./nomsig_genes.DUP.bed \
-  meta_stats/matrices/${prefix}.DEL.meta_phred_p.all_hpos.bed.gz \
-  meta_stats/matrices/${prefix}.DUP.meta_phred_p.all_hpos.bed.gz \
-  meta_stats/matrices/${prefix}.DEL.meta_phred_p_secondary.all_hpos.bed.gz \
-  meta_stats/matrices/${prefix}.DUP.meta_phred_p_secondary.all_hpos.bed.gz \
+  meta_stats/matrices/${prefix}.DEL.meta_neg_log10_p.all_hpos.bed.gz \
+  meta_stats/matrices/${prefix}.DUP.meta_neg_log10_p.all_hpos.bed.gz \
+  meta_stats/matrices/${prefix}.DEL.meta_neg_log10_p_secondary.all_hpos.bed.gz \
+  meta_stats/matrices/${prefix}.DUP.meta_neg_log10_p_secondary.all_hpos.bed.gz \
   refs/${prefix}.reordered_hpos.txt \
   refs/HPOs_by_metacohort.table.tsv \
   assoc_stat_plots/${prefix}

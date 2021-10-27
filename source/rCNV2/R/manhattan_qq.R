@@ -17,14 +17,14 @@
 #'
 #' @param stats.in path to input file of association statistics
 #' @param p.col.name name of column in header for P-value column \[default: 'p'\]
-#' @param p.is.phred boolean indicator if P-values as provided are -log10 scaled \[default: FALSE\]
+#' @param p.is.neg.log10 boolean indicator if P-values as provided are -log10 scaled \[default: FALSE\]
 #' @param min.p minimum P-value to retain as numerically meaningful \[default: 10^-100\]
 #'
 #' @return data frame with three columns: chromosome, position, and P-value
 #'
 #' @export load.manhattan.stats
 #' @export
-load.manhattan.stats <- function(stats.in, p.col.name="p", p.is.phred=F, min.p=10^-100){
+load.manhattan.stats <- function(stats.in, p.col.name="p", p.is.neg.log10=F, min.p=10^-100){
   stats <- read.table(stats.in, header=T, comment.char="", sep="\t")
 
   # Get coordinates
@@ -42,7 +42,7 @@ load.manhattan.stats <- function(stats.in, p.col.name="p", p.is.phred=F, min.p=1
   if(p.col.name %in% colnames(stats)){
     p <- stats[, which(colnames(stats) == p.col.name)]
     p <- as.numeric(p)
-    if(p.is.phred == T){
+    if(p.is.neg.log10 == T){
       p <- 10^-p
     }
   }else{
@@ -119,14 +119,14 @@ plot.manhattan <- function(df, cutoff=1e-08, highlights=NULL,
   }
 
   if(reflection == F){
-    df.plot$phred <- -log10(df.plot[, 3])
+    df.plot$neglog10 <- -log10(df.plot[, 3])
     log.cutoff <- -log10(cutoff)
     legend.pos <- "top"
     x.ax <- 1
     mars <- c(2.1, 3.1, 0.5, 1)
     x.title <- T
   }else{
-    df.plot$phred <- log10(df.plot[, 3])
+    df.plot$neglog10 <- log10(df.plot[, 3])
     log.cutoff <- log10(cutoff)
     legend.pos <- "bottom"
     x.ax <- 3
@@ -427,7 +427,7 @@ plot.qq <- function(stats, cutoff=NULL, highlights=NULL,
       }
     }
 
-    axis(x.ax, at=axTicks(1), labels=NA, tck=0)
+    axis(x.ax, at=c(0, 10e10), labels=NA, tck=0)
     axis(x.ax, at=axTicks(1), tick=F, line=-1.1, cex.axis=0.75, labels=abs(axTicks(1)))
     if(x.title == T){
       mtext(x.ax, text=expression(Expected ~ ~-log[10](italic(p))),
@@ -439,6 +439,7 @@ plot.qq <- function(stats, cutoff=NULL, highlights=NULL,
     }else{
       y.at <- seq(0, ceiling(par("usr")[4]), by=ceiling(par("usr")[4]/6))
     }
+    axis(2, at=c(0, 10e10), labels=NA, tck=0)
     axis(2, at=y.at, labels=NA, tck=-0.02)
     axis(2, at=y.at, cex.axis=0.75, tick=F, line=-0.6, las=2, labels=abs(y.at))
     mtext(2, text=expression(Observed ~ ~-log[10](italic(p))),

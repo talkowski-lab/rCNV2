@@ -23,16 +23,16 @@ reformat.table <- function(stats){
   row.order <- with(stats, order(family, source, trackname, cnv))
   col.order <- c("family", "source", "trackname", "cnv", "n_elements", "min_size",
                  "median_size", "mean_size", "max_size", "total_bp", 
-                 "meta.phred_p", "meta.lnOR")
+                 "meta.neg.log10_p", "meta.lnOR")
   stats <- stats[row.order, col.order]
-  stats$meta.phred_p <- 10^-stats$meta.phred_p
+  stats$meta.neg.log10_p <- 10^-stats$meta.neg.log10_p
   stats$meta.lnOR <- exp(stats$meta.lnOR)
   
   # Rename columns
   colnames(stats)[which(colnames(stats) == "family")] <- "annotation_family"
   colnames(stats)[which(colnames(stats) == "trackname")] <- "annotation"
   colnames(stats)[which(colnames(stats) == "total_bp")] <- "total_basepairs"
-  colnames(stats)[which(colnames(stats) == "meta.phred_p")] <- "cnv_p_value"
+  colnames(stats)[which(colnames(stats) == "meta.neg.log10_p")] <- "cnv_p_value"
   colnames(stats)[which(colnames(stats) == "meta.lnOR")] <- "cnv_odds_ratio"
   
   return(stats)

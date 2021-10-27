@@ -58,15 +58,15 @@ get.hpo.color <- function(hpo, color.by="neuro"){
 #' @param max.decimal convert all P-values requiring more digits after the decimal
 #' to be converted to scientific notation \[default: 3\]
 #' @param equality equality symbol to print after `P` \[default: '='\]
-#' @param min.phred.p minimum order of magnitude to process before considering
+#' @param min.neg.log10.p minimum order of magnitude to process before considering
 #' P-value to be arbitrarily/meaninglessly small \[default: 100\]
 #'
 #' @return formatted P-value as character
 #'
 #' @export format.pval
 #' @export
-format.pval <- function(p, nsmall=2, max.decimal=3, equality="=", min.phred.p=100){
-  if(-log10(p)>min.phred.p){
+format.pval <- function(p, nsmall=2, max.decimal=3, equality="=", min.neg.log10.p=100){
+  if(-log10(p)>min.neg.log10.p){
     bquote(italic(P) %~~% 0)
   }else if(ceiling(-log10(p)) > max.decimal){
     parts <- unlist(strsplit(format(p, scientific=T), split="e"))

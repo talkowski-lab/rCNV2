@@ -29,6 +29,7 @@ gsutil -m cp -r \
   gs://rcnv_project/analysis/analysis_refs/* \
   gs://rcnv_project/cleaned_data/genes/gene_lists \
   gs://rcnv_project/cleaned_data/genes/*gtf* \
+  gs://rcnv_project/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
   refs/
 gsutil -m cp \
   gs://rcnv_project/analysis/gene_scoring/gene_lists/* \
@@ -36,7 +37,6 @@ gsutil -m cp \
 
 
 # Subset GTF to genes of interest for deletions & duplications
-# TODO: UPDATE THIS TO SAME LISTS USED FOR GENE SCORING
 opt/rCNV2/utils/filter_gtf_by_genelist.py \
   -o gencode.v19.canonical.pext_filtered.DEL.gtf.gz \
   --bgzip \
@@ -49,19 +49,28 @@ opt/rCNV2/utils/filter_gtf_by_genelist.py \
   refs/gene_lists/gold_standard.triplosensitive.genes.list
 
 
-# Annotate gene & CNV overlap for developmental HPOs
+# Prepare CNV type-specific exclusion lists of NAHR-mediated GDs
+for CNV in DEL DUP; do
+  bedtools intersect -u -r -f 0.25 \
+    -a /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
+    -b refs/clustered_nahr_regions.bed.gz \
+  | bgzip -c \
+  > refs/lit_GDs.all.$CNV.NAHR_only.bed.gz
+done
+
+
+# Annotate gene & CNV overlap for developmental HPOs while excluding known NAHR-mediated GDs
 mkdir cnv_counts
 while read meta cohorts; do
   for CNV in DEL DUP; do
     /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
-      --pad-controls 0 \
       --min-cds-ovr 0 \
-      --max-genes 20000 \
       -t $CNV \
       --hpo "$( paste -d\; -s refs/rCNV2.hpos_by_severity.developmental.list )" \
       --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
       --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
       --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
+      --blacklist refs/lit_GDs.all.$CNV.NAHR_only.bed.gz \
       -z \
       --verbose \
       -o /dev/null \
@@ -70,7 +79,7 @@ while read meta cohorts; do
       cleaned_cnv/${meta}.rCNV.bed.gz \
       gencode.v19.canonical.pext_filtered.${CNV}.gtf.gz
   done
-done < <( fgrep -v "mega" rCNV_metacohort_list.txt )
+done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt )
 
 
 # Summarize counts & effect size per cohort at various CDS cutoffs
@@ -86,20 +95,19 @@ while read meta cohorts; do
       cnv_counts/${meta}.${CNV}.genes_per_cnv.bed.gz \
       cds_optimization_data/${meta}.${CNV}.counts_per_cds.tsv
   done
-done < <( fgrep -v "mega" rCNV_metacohort_list.txt )
+done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt )
 
 
 # Meta-analyze CNV counts across cohorts at each CDS cutoff
 for CNV in DEL DUP; do
   while read meta cohorts; do
     echo -e "$meta\tcds_optimization_data/${meta}.${CNV}.counts_per_cds.tsv"
-  done < <( fgrep -v "mega" rCNV_metacohort_list.txt ) \
+  done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt ) \
   > ${CNV}.meta_analysis.input.txt
   /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
-    --or-corplot cds_optimization_data/${CNV}.cds_optimization.or_corplot_grid.jpg \
     --model "fe" \
     --keep-n-columns 4 \
-    --p-is-phred \
+    --p-is-neg-log10 \
     ${CNV}.meta_analysis.input.txt \
     /dev/stdout \
   | cut -f4- | sed -e 's/^mincds_//g' -e 's/^min_cds/#min_cds/g' \
@@ -109,13 +117,13 @@ done
 
 
 # Optimize CDS cutoffs
-for CNV in DEL DUP; do
-  echo $CNV
-  /opt/rCNV2/analysis/other/optimize_min_cds.R \
-    --optimize-power \
-    cds_optimization_data/${CNV}.cds_optimization.meta_analysis.stats.tsv \
-    cds_optimization_data/${CNV}
-done
+/opt/rCNV2/analysis/other/optimize_min_cds.R \
+  --optimize-power \
+  cds_optimization_data/DEL.cds_optimization.meta_analysis.stats.tsv \
+  cds_optimization_data/DEL
+/opt/rCNV2/analysis/other/optimize_min_cds.R \
+  cds_optimization_data/DUP.cds_optimization.meta_analysis.stats.tsv \
+  cds_optimization_data/DUP
 
 
 # Copy optimization data to Google bucket

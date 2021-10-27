@@ -44,7 +44,7 @@ min_cds_ovr_del=0.01
 min_cds_ovr_dup=0.83
 max_genes_per_cnv=20000
 p_cutoff=0.000003097318
-max_manhattan_phred_p=30
+max_manhattan_neg_log10_p=30
 n_pheno_perms=50
 meta_model_prefix="fe"
 i=1
@@ -122,9 +122,9 @@ while read pheno hpo; do
 
       # Generate Manhattan & QQ plots
       /opt/rCNV2/utils/plot_manhattan_qq.R \
-        --p-col-name "fisher_phred_p" \
-        --p-is-phred \
-        --max-phred-p ${max_manhattan_phred_p} \
+        --p-col-name "fisher_neg_log10_p" \
+        --p-is-neg-log10 \
+        --max-neg-log10-p ${max_manhattan_neg_log10_p} \
         --cutoff ${p_cutoff} \
         --highlight-bed "${prefix}.highlight_regions.bed" \
         --highlight-name "Constrained genes associated with this phenotype" \
@@ -137,9 +137,9 @@ while read pheno hpo; do
     # Generate Miami & QQ plots
     /opt/rCNV2/utils/plot_manhattan_qq.R \
       --miami \
-      --p-col-name "fisher_phred_p" \
-      --p-is-phred \
-      --max-phred-p ${max_manhattan_phred_p} \
+      --p-col-name "fisher_neg_log10_p" \
+      --p-is-neg-log10 \
+      --max-neg-log10-p ${max_manhattan_neg_log10_p} \
       --cutoff ${p_cutoff} \
       --highlight-bed "${prefix}.highlight_regions.bed" \
       --highlight-name "Constrained genes associated with this phenotype" \
@@ -217,7 +217,7 @@ zcat ${gtf_prefix}.cohort_exclusion.bed.gz | sed 's/;/\t/g' \
 while read prefix hpo; do
   for i in $( seq 1 ${n_pheno_perms} ); do
 
-    # Shuffle phenotypes for each metacohort CNV dataset, and restrict CNVs from
+    # Shuffle phenotypes for each metacohort CNV dataset, and restrict CNVs to
     # phenotype of relevance
     if ! [ -e shuffled_cnv/ ]; then
       mkdir shuffled_cnv/
@@ -227,30 +227,14 @@ while read prefix hpo; do
 
       cnvbed="cleaned_cnv/$meta.${freq_code}.bed.gz"
 
-      # Determine CNV size quintiles
+      # Shuffle phenotypes, matching by CNV type
       for CNV in DEL DUP; do
-        zcat $cnvbed \
-        | awk -v CNV="$CNV" '{ if ($1 !~ "#" && $5==CNV) print $3-$2 }' \
-        | /opt/rCNV2/utils/quantiles.py \
-          --quantiles "0,0.2,0.4,0.6,0.8,1.0" \
-          --no-header \
-        > $meta.$CNV.quantiles.tsv
-      done
-
-      # Shuffle phenotypes, matching by CNV type and size quintile
-      for CNV in DEL DUP; do
-        for qr in $( seq 1 5 ); do
-          smin=$( awk -v qr="$qr" '{ if (NR==qr) print $2 }' $meta.$CNV.quantiles.tsv )
-          smax=$( awk -v qr="$qr" '{ if (NR==(qr+1)) print $2 + 1 }' $meta.$CNV.quantiles.tsv )
-          zcat $cnvbed | sed '1d' \
-          | awk -v smin="$smin" -v smax="$smax" -v CNV="$CNV" \
-            '{ if ($3-$2>=smin && $3-$2<smax && $5==CNV) print $0 }' \
-          > cnv_subset.bed
-          paste <( cut -f1-5 cnv_subset.bed ) \
-                <( cut -f6 cnv_subset.bed | shuf --random-source seed_$i.txt ) \
-          | awk -v hpo=${hpo} '{ if ($NF ~ "HEALTHY_CONTROL" || $NF ~ hpo) print $0 }'
-          rm cnv_subset.bed
-        done
+        zcat $cnvbed | fgrep -w $CNV \
+        > cnv_subset.bed
+        paste <( cut -f1-5 cnv_subset.bed ) \
+              <( cut -f6 cnv_subset.bed | shuf --random-source seed_$i.txt ) \
+        | awk -v hpo=${hpo} '{ if ($NF ~ "HEALTHY_CONTROL" || $NF ~ hpo) print $0 }'
+        rm cnv_subset.bed
       done \
       | sort -Vk1,1 -k2,2n -k3,3n \
       | cat <( tabix -H $cnvbed ) - \
@@ -317,7 +301,7 @@ while read prefix hpo; do
       > ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt
       /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
         --model ${meta_model_prefix} \
-        --p-is-phred \
+        --p-is-neg-log10 \
         --spa \
         --adjust-biobanks \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
@@ -380,7 +364,7 @@ metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 rCNV_bucket="gs://rcnv_project"
 p_cutoff=0.000003097318
-max_manhattan_phred_p=30
+max_manhattan_neg_log10_p=30
 meta_model_prefix="fe"
 exclusion_bed="gencode.v19.canonical.cohort_exclusion.bed.gz" #Note: this file must be generated above
 
@@ -444,7 +428,7 @@ while read prefix hpo; do
         --model ${meta_model_prefix} \
         --conditional-exclusion ${exclusion_bed} \
         --keep-n-columns 4 \
-        --p-is-phred \
+        --p-is-neg-log10 \
         --spa \
         --adjust-biobanks \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
@@ -454,9 +438,9 @@ while read prefix hpo; do
 
       # Generate Manhattan & QQ plots
       /opt/rCNV2/utils/plot_manhattan_qq.R \
-        --p-col-name "meta_phred_p" \
-        --p-is-phred \
-        --max-phred-p ${max_manhattan_phred_p} \
+        --p-col-name "meta_neg_log10_p" \
+        --p-is-neg-log10 \
+        --max-neg-log10-p ${max_manhattan_neg_log10_p} \
         --cutoff $meta_p_cutoff \
         --highlight-bed "${prefix}.highlight_regions.bed" \
         --highlight-name "Constrained genes associated with this phenotype" \
@@ -469,9 +453,9 @@ while read prefix hpo; do
     # Generate Miami & QQ plots
     /opt/rCNV2/utils/plot_manhattan_qq.R \
       --miami \
-      --p-col-name "meta_phred_p" \
-      --p-is-phred \
-      --max-phred-p ${max_manhattan_phred_p} \
+      --p-col-name "meta_neg_log10_p" \
+      --p-is-neg-log10 \
+      --max-neg-log10-p ${max_manhattan_neg_log10_p} \
       --cutoff $DUP_p_cutoff \
       --highlight-bed "${prefix}.highlight_regions.bed" \
       --highlight-name "Constrained genes associated with this phenotype" \
@@ -498,7 +482,7 @@ while read prefix hpo; do
 done < ${phenotype_list} \
 | gsutil -m cp -I meta_res/
 # Primary p-values
-p_val_column_name="meta_phred_p"
+p_val_column_name="meta_neg_log10_p"
 while read prefix hpo; do
   echo -e "$prefix\n\n"
   for CNV in DEL DUP; do
@@ -518,7 +502,7 @@ paste meta_res/*.${freq_code}.$CNV.gene_burden.meta_analysis.p_values.txt \
 | gzip -c \
 > ${freq_code}.observed_pval_matrix.txt.gz
 # Secondary p-values
-p_val_column_name="meta_phred_p_secondary"
+p_val_column_name="meta_neg_log10_p_secondary"
 while read prefix hpo; do
   echo -e "$prefix\n\n"
   for CNV in DEL DUP; do
