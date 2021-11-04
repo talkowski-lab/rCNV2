@@ -81,9 +81,9 @@ def main():
                         'providing --segment-hpos.')
     parser.add_argument('--segment-hpos', help='tsv of segment ids and semicolon-' +
                         'delimited list of associated HPOs.')
-    parser.add_argument('--gene-constraint-metadata', help='Tsv of gene-level ' +
-                        'constraint metadata. If provided, will annotate minimum ' +
-                        'pLoF and missense OEUF from gnomAD.')
+    parser.add_argument('--gnomad-constraint-tsv', help='Tsv of gene-level ' +
+                        'constraint metadata. If provided, will annotate each ' +
+                        'segment with constraint metrics from gnomAD.')
     parser.add_argument('--dnm-tsvs', help='Tsv of de novo mutation counts ' +
                         ' to annotate. Three columns expected: study prefix, ' +
                         'path to tsv with dnm counts, and path to list of exome-' +
@@ -143,9 +143,13 @@ def main():
         header_cols += ['n_HPOmatched_genes']
 
     # Load gene-level constraint metadata, if optioned
-    if args.gene_constraint_metadata is not None:
-        constr_df = pd.read_csv(args.gene_constraint_metadata, sep='\t')
-        header_cols += ['min_LOEUF', 'min_MisOEUF']
+    if args.gnomad_constraint_tsv is not None:
+        if args.gnomad_constraint_tsv.endswith('.bgz'):
+            constr_df = pd.read_csv(args.gnomad_constraint_tsv, sep='\t', 
+                                    compression='gzip')
+        else:
+            constr_df = pd.read_csv(args.gnomad_constraint_tsv, sep='\t')
+        header_cols += ['min_LOEUF', 'min_MisOEUF', 'total_LoF_OE', 'total_mis_OE']
 
     # Load snv mutation rates, if optioned
     if args.snv_mus is not None:
@@ -215,10 +219,18 @@ def main():
             outvals.append(len([g for g in genes if g in hgenes]))
 
         # Annotate with gene-level constraint metadata, if optioned
-        if args.gene_constraint_metadata is not None:
-            min_loeuf = constr_df.loc[constr_df.gene.isin(genes), 'gnomad_oe_lof_upper'].min()
-            min_misoeuf = constr_df.loc[constr_df.gene.isin(genes), 'gnomad_oe_mis_upper'].min()
+        if args.gnomad_constraint_tsv is not None:
+            min_loeuf = constr_df.loc[constr_df.gene.isin(genes), 'oe_lof_upper'].min()
+            min_misoeuf = constr_df.loc[constr_df.gene.isin(genes), 'oe_mis_upper'].min()
             outvals += [min_loeuf, min_misoeuf]
+            for csq in 'lof mis'.split():
+                obs_snv = constr_df.loc[constr_df.gene.isin(genes), 'obs_' + csq].sum()
+                exp_snv = constr_df.loc[constr_df.gene.isin(genes), 'exp_' + csq].sum()
+                if exp_snv > 0:
+                    snv_oe = round(obs_snv / exp_snv, 6)
+                else:
+                    snv_oe = 'NA'
+                outvals.append(snv_oe)
 
         # Annotate with count of de novo mutations per study, if optioned
         if args.dnm_tsvs is not None:

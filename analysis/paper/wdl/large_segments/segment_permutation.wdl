@@ -119,8 +119,13 @@ task perm_prep {
         echo $cnv
         statsfile=meta_stats/$nocolon.rCNV.$cnv.sliding_window.meta_analysis.stats.bed.gz
         idx=$( zcat $statsfile | head -n1 | sed 's/\t/\n/g' \
-               | awk '{ if ($1=="meta_neg_log10_p") print NR }' )
-        zcat $statsfile | sed '1d' | cut -f$idx \
+               | awk -v OFS="\t" '{ print $1, NR }' \
+               | fgrep -w meta_neg_log10_p | cut -f2 )
+        if [ -z $idx ]; then
+          echo "UNABLE TO FIND COLUMN NAMED meta_neg_log10_p IN $statsfile"
+          exit
+        fi
+        zcat $statsfile | sed '1d' | cut -f $idx \
         | cat <( echo -e $nocolon"_"$cnv ) - \
         > meta_stats/matrices/$nocolon.$cnv.meta_neg_log10_p.tsv
       done
@@ -255,10 +260,11 @@ task perm_shard {
       --nahr-cnvs clustered_nahr_regions.reformatted.bed.gz \
       --bca-tsv refs/redin_bca_breakpoints.bed.gz \
       --meta-sumstats ${perm_prefix}.final_segments.loci.all_sumstats.tsv \
-      --outfile ${perm_prefix}.master_segments.bed.gz \
       --gd-recip "10e-10" \
-      --nahr-recip 0.25 \
-      --bgzip
+      --nahr-recip 0.5 \
+    | awk -v FS="\t" '{ if ($4 !~ /_GD_|nahr_/) print $0 }' \
+    | bgzip -c \
+    > ${perm_prefix}.master_segments.bed.gz
   >>>
 
   runtime {
@@ -380,14 +386,13 @@ task perm_shard_litGDs {
       --hc-gds ${perm_prefix}.HC.bed.gz \
       --mc-gds ${perm_prefix}.MC.bed.gz \
       --lc-gds ${perm_prefix}.LC.bed.gz \
+      --keep-all-gds \
       --nahr-cnvs clustered_nahr_regions.reformatted.bed.gz \
       --bca-tsv refs/redin_bca_breakpoints.bed.gz \
       --meta-sumstats ${perm_prefix}.permuted_gds.all_sumstats.tsv \
-      --outfile ${perm_prefix}.master_segments.w_dummy.bed.gz \
       --gd-recip "10e-10" \
-      --nahr-recip 0.25 \
-      --bgzip
-    zcat ${perm_prefix}.master_segments.w_dummy.bed.gz \
+      --nahr-recip 0.5 \
+    | awk -v FS="\t" '{ if ($4 !~ /^nahr_/) print $0 }' \
     | grep -ve '^Z' \
     | bgzip -c \
     > ${perm_prefix}.master_segments.bed.gz

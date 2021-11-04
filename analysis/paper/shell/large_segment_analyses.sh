@@ -35,7 +35,9 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/misc/gene_mutation_rates.tsv.gz \
   ${rCNV_bucket}/cleaned_data/genes/annotations/gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
   ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
+  ${rCNV_bucket}/cleaned_data/cnv/mega.rCNV.bed.gz \
   refs/
+wget -P refs/ https://storage.googleapis.com/gcp-public-data--gnomad/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
 mkdir meta_stats/
 gsutil -m cp \
   ${rCNV_bucket}/analysis/sliding_windows/**.rCNV.**.sliding_window.meta_analysis.stats.bed.gz \
@@ -45,6 +47,7 @@ gsutil -m cp \
   ./
 gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/loose_unclustered_nahr_regions.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/${prefix}.correct_nahr_labels.tsv \
   ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/wgs_common_cnvs.*.bed.gz \
@@ -148,6 +151,9 @@ cat \
   --lc-gds refs/lit_GDs.lc.bed.gz \
   --nahr-cnvs clustered_nahr_regions.reformatted.bed.gz \
   --outfile ${prefix}.master_segments.pre_nahr_polishing.bed.gz \
+  --loose-nahr-mask refs/loose_unclustered_nahr_regions.bed.gz \
+  --cnv-bed refs/mega.rCNV.bed.gz \
+  --genome-file refs/GRCh37.genome \
   --common-dels combined_common_cnvs.DEL.$af_suffix.bed.gz \
   --common-dups combined_common_cnvs.DUP.$af_suffix.bed.gz \
   --common-cnv-cov 0.5 \
@@ -155,7 +161,7 @@ cat \
   --min-jaccard-sum 1.0 \
   --genelists genelists_to_annotate.tsv \
   --hpo-genelists hpo_genelists.tsv \
-  --gene-constraint-metadata refs/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
+  --gnomad-constraint-tsv refs/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz  \
   --dnm-tsvs dnm_counts_to_annotate.tsv \
   --snv-mus refs/gene_mutation_rates.tsv.gz \
   --bca-tsv refs/redin_bca_breakpoints.bed.gz \
@@ -164,16 +170,14 @@ cat \
   --neuro-hpos refs/neuro_hpos.list \
   --dev-hpos refs/rCNV2.hpos_by_severity.developmental.list \
   --gd-recip "10e-10" \
-  --nahr-recip 0.25 \
+  --nahr-recip 0.5 \
   --bgzip
-# TODO: UPDATE THIS
-# # Polish NAHR labels following manual review (note: requires refs/${prefix}.correct_NAHR_labels.tsv)
-# /opt/rCNV2/analysis/paper/scripts/large_segments/polish_nahr_labels.R \
-#   ${prefix}.master_segments.pre_nahr_polishing.bed.gz \
-#   refs/${prefix}.correct_nahr_labels.tsv \
-#   ${prefix}.master_segments.bed
-# bgzip -f ${prefix}.master_segments.bed
-mv ${prefix}.master_segments.pre_nahr_polishing.bed.gz ${prefix}.master_segments.bed.gz
+# Polish NAHR labels following manual review (note: requires refs/${prefix}.correct_NAHR_labels.tsv)
+/opt/rCNV2/analysis/paper/scripts/large_segments/polish_nahr_labels.R \
+  ${prefix}.master_segments.pre_nahr_polishing.bed.gz \
+  refs/${prefix}.correct_nahr_labels.tsv \
+  ${prefix}.master_segments.bed
+bgzip -f ${prefix}.master_segments.bed
 gsutil -m cp \
   ${prefix}.master_segments.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/
