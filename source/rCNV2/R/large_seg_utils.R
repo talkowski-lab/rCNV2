@@ -241,30 +241,53 @@ split.regions.by.effect.size <- function(segs, quantiles=2){
 #'
 #' @param segs segment dataframe (imported with [load.segment.table()])
 #' @param dnm.cohorts vector of cohorts to evaluate (default: DDD, ASC, ASC_unaffected)
+#' @param is.data.table indicator that `segs` is a data.table \[default: FALSE\]
 #'
 #' @return data.frame
 #'
 #' @export
-normalize.dnms <- function(segs, dnm.cohorts=c("DDD", "ASC", "ASC_unaffected")){
+normalize.dnms <- function(segs, dnm.cohorts=c("DDD", "ASC", "ASC_unaffected"),
+                           is.data.table=FALSE){
   for(cohort in dnm.cohorts){
     syn.obs.colname <- paste(cohort, "dnm_syn_obs_wMu", sep="_")
     syn.exp.colname <- paste(cohort, "dnm_syn_exp_wMu", sep="_")
     if(syn.obs.colname %in% colnames(segs) & syn.exp.colname %in% colnames(segs)){
-      syn.obs <- segs[, which(colnames(segs)==syn.obs.colname)]
-      syn.exp <- segs[, which(colnames(segs)==syn.exp.colname)]
-      syn.d <- (syn.obs - syn.exp) / segs$n_genes
+      if(is.data.table){
+        segs[, syn.d := (get(syn.obs.colname) - get(syn.exp.colname)) / n_genes]
+      }else{
+        syn.obs <- segs[, which(colnames(segs)==syn.obs.colname)]
+        syn.exp <- segs[, which(colnames(segs)==syn.exp.colname)]
+        syn.d <- (syn.obs - syn.exp) / segs$n_genes
+      }
       for(csq in c("lof", "mis")){
         dam.obs.colname <- paste(cohort, "dnm", csq, "obs_wMu", sep="_")
         dam.exp.colname <- paste(cohort, "dnm", csq, "exp_wMu", sep="_")
         if(dam.obs.colname %in% colnames(segs) & dam.exp.colname %in% colnames(segs)){
-          dam.obs <- segs[, which(colnames(segs)==dam.obs.colname)]
-          dam.exp <- segs[, which(colnames(segs)==dam.exp.colname)]
-          dam.d <- (dam.obs - dam.exp) / segs$n_genes
+          if(is.data.table){
+            segs[, dam.d := (get(dam.obs.colname) - get(dam.exp.colname)) / n_genes]
+          }else{
+            dam.obs <- segs[, which(colnames(segs)==dam.obs.colname)]
+            dam.exp <- segs[, which(colnames(segs)==dam.exp.colname)]
+            dam.d <- (dam.obs - dam.exp) / segs$n_genes
+          }
           # Outlier-robust linear fit of obs-exp damaging ~ obs-exp synonymous
-          fit <- robust.lm(syn.d, dam.d)$fit
-          coeffs <- as.numeric(fit$coefficients)
-          dam.d.adj <- dam.d - coeffs[1] - (coeffs[2] * syn.d)
-          segs[paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_")] <- dam.d.adj
+          new.colname <- paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_")
+          if(is.data.table){
+            adj.dam.d <- function(dt){
+              fit <- robust.lm(dt$syn.d, dt$dam.d)$fit
+              coeffs <- as.numeric(fit$coefficients)
+              dt[, dam.d - coeffs[1] - (coeffs[2] * syn.d)]
+            }
+            segs[, (new.colname) := numeric()]
+            sapply(1:max(segs$perm_idx), function(i){
+              segs[perm_idx == i, (new.colname) := adj.dam.d(segs[perm_idx == i])]
+            })
+          }else{
+            fit <- robust.lm(syn.d, dam.d)$fit
+            coeffs <- as.numeric(fit$coefficients)
+            dam.d.adj <- dam.d - coeffs[1] - (coeffs[2] * syn.d)
+            segs[new.colname] <- dam.d.adj
+          }
         }
       }
     }
@@ -321,47 +344,46 @@ get.gd.overlap <- function(chrom, start, end, segs){
 #'
 #' Summarize permutation results across all permutations for a single feature
 #'
-#' @param perms list of permutation results
+#' @param perms.orig data.table of permutation results
 #' @param feature name of feature to evaluate
 #' @param measure statistic to evaluate \[default: mean\]
 #' @param subset_to_regions vector of region IDs to include \[default: include all regions\]
 #'
 #' @details Valid options for `measure` are mean, median, sum, and frac.any
 #'
-#' @return vector of statistic split by all, deletions, and duplications
+#' @return matrix of statistic per permutation split by all, deletions, and duplications
 #'
 #' @export perm.summary
 #' @export
-perm.summary <- function(perms, feature, measure="mean", subset_to_regions=NULL){
+perm.summary <- function(perms.orig, feature, measure="mean", subset_to_regions=NULL){
   if(!is.null(subset_to_regions)){
-    perms <- lapply(perms, function(df){df[which(df$region_id %in% subset_to_regions), ]})
+    # Make copy of permutation results to avoid overwriting by data.table
+    perms <- subset(perms.orig, region_id %in% subset_to_regions)
+  }else{
+    perms <- copy(perms.orig)
   }
-  do.call("rbind", lapply(perms, function(df){
-    if(measure == "mean"){
-      c("ALL" = mean(df[, which(colnames(df)==feature)], na.rm=T),
-        "DEL" = mean(df[which(df$cnv=="DEL"),
-                        which(colnames(df)==feature)], na.rm=T),
-        "DUP" = mean(df[which(df$cnv=="DUP"),
-                        which(colnames(df)==feature)], na.rm=T))
-    }else if(measure == "median"){
-      c("ALL" = median(df[, which(colnames(df)==feature)], na.rm=T),
-        "DEL" = median(df[which(df$cnv=="DEL"),
-                          which(colnames(df)==feature)], na.rm=T),
-        "DUP" = median(df[which(df$cnv=="DUP"),
-                          which(colnames(df)==feature)], na.rm=T))
-    }else if(measure == "sum"){
-      c("ALL" = sum(df[, which(colnames(df)==feature)]),
-        "DEL" = sum(df[which(df$cnv=="DEL"),
-                       which(colnames(df)==feature)]),
-        "DUP" = sum(df[which(df$cnv=="DUP"),
-                       which(colnames(df)==feature)]))
-    }else if(measure == "frac.any"){
-      hits <- which(df[, which(colnames(df)==feature)] > 0)
-      100 * c("ALL" = length(hits) / nrow(df),
-              "DEL" = length(intersect(hits, which(df$cnv=="DEL"))) / length(which(df$cnv=="DEL")),
-              "DUP" = length(intersect(hits, which(df$cnv=="DUP"))) / length(which(df$cnv=="DUP")))
-    }
-  }))
+  if(measure == "mean"){
+    ALL <- perms[, mean(get(feature), na.rm=T), by=perm_idx]
+    DEL <- perms[cnv == "DEL", mean(get(feature), na.rm=T), by=perm_idx]
+    DUP <- perms[cnv == "DUP", mean(get(feature), na.rm=T), by=perm_idx]
+  }else if(measure == "median"){
+    ALL <- perms[, median(get(feature), na.rm=T), by=perm_idx]
+    DEL <- perms[cnv == "DEL", median(get(feature), na.rm=T), by=perm_idx]
+    DUP <- perms[cnv == "DUP", median(get(feature), na.rm=T), by=perm_idx]
+  }else if(measure == "sum"){
+    ALL <- perms[, sum(get(feature), na.rm=T), by=perm_idx]
+    DEL <- perms[cnv == "DEL", sum(get(feature), na.rm=T), by=perm_idx]
+    DUP <- perms[cnv == "DUP", sum(get(feature), na.rm=T), by=perm_idx]
+  }else if(measure == "frac.any"){
+    frac.any <- function(x){100 * length(which(x[!is.na(x)]>0)) / length(x[which(!is.na(x))])}
+    ALL <- perms[, frac.any(get(feature)), by=perm_idx]
+    DEL <- perms[cnv == "DEL", frac.any(get(feature)), by=perm_idx]
+    DUP <- perms[cnv == "DUP", frac.any(get(feature)), by=perm_idx]
+  }
+  setnames(ALL, "V1", "ALL")
+  setnames(DEL, "V1", "DEL")
+  setnames(DUP, "V1", "DUP")
+  as.matrix(as.data.frame(merge(merge(ALL, DEL), DUP))[, -1])
 }
 
 #' Summarize a segment metric

@@ -46,7 +46,7 @@ gw.sig <- -log10(opts$`gw-sig`)
 # loci.in <- "~/scratch/rCNV.final_segments.loci.bed.gz"
 # segs.in <- "~/scratch/rCNV2_analysis_d2.master_segments.bed.gz"
 # out.prefix <- "~/scratch/final_segs"
-# gw.sig <- -log10(3.767103E-6)
+# gw.sig <- -log10(0.000003742655)
 
 # Load loci & segment table
 loci <- load.loci(loci.in)
@@ -143,12 +143,24 @@ axis(2, at=axTicks(2), tick=F, line=-0.65, labels=2^axTicks(2), las=2)
 dev.off()
 
 
-# Swarmplot of del vs dup effect size
+# Swarmplot of effect size stratified by significance
 pdf(paste(out.prefix, "gw_vs_FDR.del_vs_dup.lnOR.pdf", sep="."),
     height=2.25, width=2.6)
-segs.swarm(segs.sig, x.bool=!(segs.sig$gw_sig), y=segs.sig$max_ln_or,
+segs.swarm(segs.sig, x.bool=!(segs.sig$gw_sig), y=segs.sig$meta_best_lnor,
            x.labs=c("GW Sig.", "FDR Sig."), violin=T, add.pvalue=T,
            add.y.axis=T, pt.cex=0.5,
+           ytitle=bquote("Max." ~ italic("ln") * ("Odds Ratio")),
+           parmar=c(1.2, 3, 2.5, 0.2))
+dev.off()
+
+
+# Swarmplot of effect size stratified by CNV type
+pdf(paste(out.prefix, "del_vs_dup.lnOR.pdf", sep="."),
+    height=2.25, width=2.2)
+segs.swarm(segs, x.bool=!(segs$cnv=="DEL"), y=segs$meta_best_lnor,
+           x.labs=c("DEL", "DUP"), violin=T, add.pvalue=T,
+           add.y.axis=T, pt.cex=0.5, cnv.split=F,
+           boxplot.colors=cnv.blacks[1:2], boxplot.fill=cnv.whites[1:2],
            ytitle=bquote("Max." ~ italic("ln") * ("Odds Ratio")),
            parmar=c(1.2, 3, 2.5, 0.2))
 dev.off()
@@ -172,25 +184,25 @@ dev.off()
 
 # Swarmplot of del vs dup avg. expression levels
 pdf(paste(out.prefix, "sig_plus_litGDs.del_vs_dup.avg_expression.pdf", sep="."),
-    height=2, width=2.25)
+    height=2, width=2.2)
 segs.simple.vioswarm(segs, segs$gene_expression_harmonic_mean, add.y.axis=T,
                      ytitle=bquote("Avg. Gene Expression"), ytitle.line=1.75,
                      pt.cex=0.35, add.pvalue=T, parmar=c(1.2, 2.8, 1.5, 0.2))
 dev.off()
-pdf(paste(out.prefix, "gw_vs_FDR.del_vs_dup.avg_expression.pdf", sep="."),
-    height=2.25, width=2.6)
-segs.swarm(segs.sig, x.bool=!(segs.sig$gw_sig), y=segs.sig$gene_expression_harmonic_mean,
-           x.labs=c("GW Sig.", "FDR Sig."), violin=T, add.pvalue=T,
-           add.y.axis=T, ytitle=bquote("Avg. Gene Expression"),
-           pt.cex=0.5, parmar=c(1.2, 3.0, 2.6, 0.2))
-dev.off()
-pdf(paste(out.prefix, "sig_vs_litGDs.del_vs_dup.avg_expression.pdf", sep="."),
-    height=2.25, width=2.6)
-segs.swarm(segs, x.bool=!(segs$any_sig), y=segs$gene_expression_harmonic_mean,
-           x.labs=c("GW+FDR", "Lit. (Nom.)"), violin=T, add.pvalue=T,
-           add.y.axis=T, ytitle=bquote("Avg. Gene Expression"),
-           pt.cex=0.5, parmar=c(1.2, 3.0, 2.6, 0.2))
-dev.off()
+# pdf(paste(out.prefix, "gw_vs_FDR.del_vs_dup.avg_expression.pdf", sep="."),
+#     height=2.25, width=2.6)
+# segs.swarm(segs.sig, x.bool=!(segs.sig$gw_sig), y=segs.sig$gene_expression_harmonic_mean,
+#            x.labs=c("GW Sig.", "FDR Sig."), violin=T, add.pvalue=T,
+#            add.y.axis=T, ytitle=bquote("Avg. Gene Expression"),
+#            pt.cex=0.5, parmar=c(1.2, 3.0, 2.6, 0.2))
+# dev.off()
+# pdf(paste(out.prefix, "sig_vs_litGDs.del_vs_dup.avg_expression.pdf", sep="."),
+#     height=2.25, width=2.6)
+# segs.swarm(segs, x.bool=!(segs$any_sig), y=segs$gene_expression_harmonic_mean,
+#            x.labs=c("GW+FDR", "Lit. (Nom.)"), violin=T, add.pvalue=T,
+#            add.y.axis=T, ytitle=bquote("Avg. Gene Expression"),
+#            pt.cex=0.5, parmar=c(1.2, 3.0, 2.6, 0.2))
+# dev.off()
 
 
 # Swarmplot of prop ubiquitously expressed for del vs dup
@@ -200,27 +212,27 @@ segs.simple.vioswarm(segs, segs$prop_ubiquitously_expressed, add.y.axis=T,
                      ytitle=bquote("Prop.Ubiquitously Expr."), ytitle.line=1.75,
                      pt.cex=0.35, add.pvalue=T, parmar=c(1.2, 2.8, 1.5, 0.2))
 dev.off()
-pdf(paste(out.prefix, "gw_vs_FDR.del_vs_dup.prop_ubi_expressed.pdf", sep="."),
-    height=2.25, width=2.6)
-segs.swarm(segs.sig, x.bool=!(segs.sig$gw_sig), y=segs.sig$prop_ubiquitously_expressed,
-           x.labs=c("GW Sig.", "FDR Sig."), violin=T, add.pvalue=T,
-           add.y.axis=T, ytitle=bquote("Prop.Ubiquitously Expr."),
-           pt.cex=0.5, parmar=c(1.2, 3.0, 2.6, 0.2))
-dev.off()
-pdf(paste(out.prefix, "sig_vs_litGDs.del_vs_dup.prop_ubi_expressed.pdf", sep="."),
-    height=2.25, width=2.6)
-segs.swarm(segs, x.bool=!(segs$any_sig), y=segs$prop_ubiquitously_expressed,
-           x.labs=c("GW+FDR", "Lit. (Nom.)"), violin=T, add.pvalue=T,
-           add.y.axis=T, ytitle=bquote("Prop.Ubiquitously Expr."),
-           pt.cex=0.5, parmar=c(1.2, 3.0, 2.6, 0.2))
-dev.off()
+# pdf(paste(out.prefix, "gw_vs_FDR.del_vs_dup.prop_ubi_expressed.pdf", sep="."),
+#     height=2.25, width=2.6)
+# segs.swarm(segs.sig, x.bool=!(segs.sig$gw_sig), y=segs.sig$prop_ubiquitously_expressed,
+#            x.labs=c("GW Sig.", "FDR Sig."), violin=T, add.pvalue=T,
+#            add.y.axis=T, ytitle=bquote("Prop.Ubiquitously Expr."),
+#            pt.cex=0.5, parmar=c(1.2, 3.0, 2.6, 0.2))
+# dev.off()
+# pdf(paste(out.prefix, "sig_vs_litGDs.del_vs_dup.prop_ubi_expressed.pdf", sep="."),
+#     height=2.25, width=2.6)
+# segs.swarm(segs, x.bool=!(segs$any_sig), y=segs$prop_ubiquitously_expressed,
+#            x.labs=c("GW+FDR", "Lit. (Nom.)"), violin=T, add.pvalue=T,
+#            add.y.axis=T, ytitle=bquote("Prop.Ubiquitously Expr."),
+#            pt.cex=0.5, parmar=c(1.2, 3.0, 2.6, 0.2))
+# dev.off()
 
 
 # Scatterplot of peak P-value and corresponding lnOR for all sites
 pdf(paste(out.prefix, "all_segs.best_p_vs_or.pdf", sep="."),
     height=2.9, width=3.1)
 segs.best.l2or <- log2(exp(segs.all$meta_best_lnor))
-x.max <- (4/3) * max(segs.best.l2or, na.rm=T)
+x.max <- (7/6) * max(segs.best.l2or, na.rm=T)
 segs.best.p <- segs.all$meta_best_p
 segs.best.p[which(segs.best.p > 30)] <- 30
 segs.scatter(segs.all, x=segs.best.l2or, y=segs.best.p,

@@ -4,10 +4,10 @@
 \alias{perm.summary}
 \title{Summarize segment permutation results}
 \usage{
-perm.summary(perms, feature, measure = "mean", subset_to_regions = NULL)
+perm.summary(perms.orig, feature, measure = "mean", subset_to_regions = NULL)
 }
 \arguments{
-\item{perms}{list of permutation results}
+\item{perms.orig}{data.table of permutation results}
 
 \item{feature}{name of feature to evaluate}
 
@@ -16,7 +16,7 @@ perm.summary(perms, feature, measure = "mean", subset_to_regions = NULL)
 \item{subset_to_regions}{vector of region IDs to include [default: include all regions]}
 }
 \value{
-vector of statistic split by all, deletions, and duplications
+matrix of statistic per permutation split by all, deletions, and duplications
 }
 \description{
 Summarize permutation results across all permutations for a single feature

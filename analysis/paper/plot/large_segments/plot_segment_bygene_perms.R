@@ -21,24 +21,21 @@ csqs <- c("PTVs" = "lof", "Mis." = "mis")
 # Load & parse permutation results
 load.perms <- function(perm.res.in, subset_to_regions=NULL){
   # Read full permutation table
-  perms <- read.table(perm.res.in, header=T, sep="\t", check.names=F, comment.char="")
+  perms <- data.table::fread(perm.res.in, header=T, sep="\t", check.names=F)
+  perms[, perm_idx := as.numeric(perms$perm_idx)]
   colnames(perms)[1] <- gsub("#", "", colnames(perms)[1], fixed=T)
-  perm.range <- sort(unique(perms$perm_idx))
   if(!is.null(subset_to_regions)){
-    perms <- perms[which(perms$region_id %in% subset_to_regions), ]
+    perms <- subset(perms, region_id %in% subset_to_regions)
   }
 
   # Add normalized columns
-  perms$gnomAD_constrained_prop <- perms$n_gnomAD_constrained_genes / perms$n_genes
+  perms[, gnomAD_constrained_prop := n_gnomAD_constrained_genes / n_genes]
   if("n_ubiquitously_expressed_genes" %in% colnames(perms)){
-    perms$prop_ubiquitously_expressed <- perms$n_ubiquitously_expressed_genes / perms$n_genes
+    perms[, prop_ubiquitously_expressed := n_ubiquitously_expressed_genes / n_genes]
   }
 
-  # Split each permutation into a list of dfs (one per perm)
-  # Also performs per-permutation normalization of DNM excess
-  lapply(perm.range, function(i){
-    normalize.dnms(as.data.frame(perms[which(perms$perm_idx==i), -(which(colnames(perms)=="perm_idx"))]))
-  })
+  # Normalize DNM excess per permutation
+  normalize.dnms(perms, is.data.table=TRUE)
 }
 
 
@@ -47,6 +44,7 @@ load.perms <- function(perm.res.in, subset_to_regions=NULL){
 #####################
 require(optparse, quietly=T)
 require(MASS, quietly=T)
+require(data.table, quietly=T)
 require(rCNV2, quietly=T)
 
 # List of command-line options
@@ -74,8 +72,8 @@ prefix <- args$args[6]
 # # DEV PARAMETERS
 # loci.in <- "~/scratch/rCNV.final_segments.loci.bed.gz"
 # segs.in <- "~/scratch/rCNV2_analysis_d2.master_segments.bed.gz"
-# perm.res.in <- "~/scratch/rCNV2_analysis_d2.10000_permuted_segments_bygene.tsv.gz"
-# lit.perm.res.in <- "~/scratch/rCNV2_analysis_d2.lit_GDs.10000_permuted_segments_bygene.tsv.gz"
+# perm.res.in <- "~/scratch/rCNV2_analysis_d2.1000_permuted_segments_bygene.tsv.gz"
+# lit.perm.res.in <- "~/scratch/rCNV2_analysis_d2.lit_GDs.1000_permuted_segments_bygene.tsv.gz"
 # outdir <- "~/scratch"
 # prefix <- "test_perm_bygene"
 
@@ -104,7 +102,6 @@ NDD.region_ids <- get.ndd.region_ids(loci, segs)
 # Load permutation results
 perms <- load.perms(perm.res.in, subset_to_regions=nomsig.ids)
 lit.perms <- load.perms(lit.perm.res.in, subset_to_regions=nomsig.ids)
-
 
 # Fraction of discovered segments with at least one HPO-matched gene
 print("Fraction of all significant segments with at least one HPO-matched gene:")

@@ -29,11 +29,11 @@
 \arguments{
 \item{segs}{segment dataframe (imported with \code{\link[=load.segment.table]{load.segment.table()}})}
 
-\item{gw.perms}{list of permutation results for empirical segments}
+\item{gw.perms}{data.table of permutation results for empirical segments}
 
-\item{lit.perms}{list of permutation results for literature segments}
+\item{lit.perms}{data.table of permutation results for literature segments}
 
-\item{union.perms}{list of permutation results for all combined segments}
+\item{union.perms}{data.table of permutation results for all combined segments}
 
 \item{feature}{name of feature to evaluate}
 
@@ -53,7 +53,7 @@
 
 \item{xmax}{maximum for X axis}
 
-\item{max.x.ticks}{maxmimum ticks for X axis}
+\item{max.x.ticks}{maximum ticks for X axis}
 
 \item{inner.axis.cex}{expansion of inner axis}
 

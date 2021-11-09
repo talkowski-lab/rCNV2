@@ -27,7 +27,7 @@
 \arguments{
 \item{segs}{segment dataframe (imported with \code{\link[=load.segment.table]{load.segment.table()}})}
 
-\item{perms}{list of permutation results}
+\item{perms}{data.table of permutation results}
 
 \item{feature}{name of feature to evaluate}
 
