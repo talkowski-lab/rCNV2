@@ -322,6 +322,94 @@ axis(2, at=axTicks(2), tick=F, line=-0.65, labels=2^axTicks(2), las=2)
 dev.off()
 
 
+<<<<<<< HEAD
+=======
+# Swarmplot of effect size stratified by significance
+pdf(paste(out.prefix, "gw_vs_FDR.del_vs_dup.lnOR.pdf", sep="."),
+    height=2.25, width=2.6)
+segs.swarm(segs.sig, x.bool=!(segs.sig$gw_sig), y=segs.sig$meta_best_lnor,
+           x.labs=c("GW Sig.", "FDR Sig."), violin=T, add.pvalue=T,
+           add.y.axis=T, pt.cex=0.5,
+           ytitle=bquote("Max." ~ italic("ln") * ("Odds Ratio")),
+           parmar=c(1.2, 3, 2.5, 0.2))
+dev.off()
+
+
+# Swarmplot of effect size stratified by CNV type
+pdf(paste(out.prefix, "del_vs_dup.lnOR.pdf", sep="."),
+    height=2.25, width=2.2)
+segs.swarm(segs, x.bool=!(segs$cnv=="DEL"), y=segs$meta_best_lnor,
+           x.labs=c("DEL", "DUP"), violin=T, add.pvalue=T,
+           add.y.axis=T, pt.cex=0.5, cnv.split=F,
+           boxplot.colors=cnv.blacks[1:2], boxplot.fill=cnv.whites[1:2],
+           ytitle=bquote("Max." ~ italic("ln") * ("Odds Ratio")),
+           parmar=c(1.2, 3, 2.5, 0.2))
+dev.off()
+
+
+# Swarmplot of del vs dup control frequency
+pdf(paste(out.prefix, "gw_vs_FDR.del_vs_dup.control_freq.pdf", sep="."),
+    height=2.25, width=2.6)
+segs.swarm(segs.sig, x.bool=!(segs.sig$gw_sig), y=log10(segs.sig$pooled_control_freq),
+           x.labs=c("GW Sig.", "FDR Sig."), violin=T, add.pvalue=T,
+           add.y.axis=F, pt.cex=0.5,
+           parmar=c(1.2, 3.0, 2.6, 0.2))
+axis(2, at=log10(logscale.major), col=blueblack, tck=-0.03, labels=NA)
+sapply(1:length(logscale.major), function(x){
+  axis(2, at=-log10(logscale.major[x]), tick=F, las=2, line=-0.65,
+       labels=bquote(10^.(-log10(logscale.major[x]))))
+})
+mtext(2, text="CNV Freq. in Controls", line=2.1)
+dev.off()
+
+
+# Swarmplot of del vs dup avg. expression levels
+pdf(paste(out.prefix, "sig_plus_litGDs.del_vs_dup.avg_expression.pdf", sep="."),
+    height=2, width=2.2)
+segs.simple.vioswarm(segs, segs$gene_expression_harmonic_mean, add.y.axis=T,
+                     ytitle=bquote("Avg. Gene Expression"), ytitle.line=1.75,
+                     pt.cex=0.35, add.pvalue=T, parmar=c(1.2, 2.8, 1.5, 0.2))
+dev.off()
+# pdf(paste(out.prefix, "gw_vs_FDR.del_vs_dup.avg_expression.pdf", sep="."),
+#     height=2.25, width=2.6)
+# segs.swarm(segs.sig, x.bool=!(segs.sig$gw_sig), y=segs.sig$gene_expression_harmonic_mean,
+#            x.labs=c("GW Sig.", "FDR Sig."), violin=T, add.pvalue=T,
+#            add.y.axis=T, ytitle=bquote("Avg. Gene Expression"),
+#            pt.cex=0.5, parmar=c(1.2, 3.0, 2.6, 0.2))
+# dev.off()
+# pdf(paste(out.prefix, "sig_vs_litGDs.del_vs_dup.avg_expression.pdf", sep="."),
+#     height=2.25, width=2.6)
+# segs.swarm(segs, x.bool=!(segs$any_sig), y=segs$gene_expression_harmonic_mean,
+#            x.labs=c("GW+FDR", "Lit. (Nom.)"), violin=T, add.pvalue=T,
+#            add.y.axis=T, ytitle=bquote("Avg. Gene Expression"),
+#            pt.cex=0.5, parmar=c(1.2, 3.0, 2.6, 0.2))
+# dev.off()
+
+
+# Swarmplot of prop ubiquitously expressed for del vs dup
+pdf(paste(out.prefix, "sig_plus_litGDs.del_vs_dup.prop_ubi_expressed.pdf", sep="."),
+    height=2, width=2.25)
+segs.simple.vioswarm(segs, segs$prop_ubiquitously_expressed, add.y.axis=T,
+                     ytitle=bquote("Prop.Ubiquitously Expr."), ytitle.line=1.75,
+                     pt.cex=0.35, add.pvalue=T, parmar=c(1.2, 2.8, 1.5, 0.2))
+dev.off()
+# pdf(paste(out.prefix, "gw_vs_FDR.del_vs_dup.prop_ubi_expressed.pdf", sep="."),
+#     height=2.25, width=2.6)
+# segs.swarm(segs.sig, x.bool=!(segs.sig$gw_sig), y=segs.sig$prop_ubiquitously_expressed,
+#            x.labs=c("GW Sig.", "FDR Sig."), violin=T, add.pvalue=T,
+#            add.y.axis=T, ytitle=bquote("Prop.Ubiquitously Expr."),
+#            pt.cex=0.5, parmar=c(1.2, 3.0, 2.6, 0.2))
+# dev.off()
+# pdf(paste(out.prefix, "sig_vs_litGDs.del_vs_dup.prop_ubi_expressed.pdf", sep="."),
+#     height=2.25, width=2.6)
+# segs.swarm(segs, x.bool=!(segs$any_sig), y=segs$prop_ubiquitously_expressed,
+#            x.labs=c("GW+FDR", "Lit. (Nom.)"), violin=T, add.pvalue=T,
+#            add.y.axis=T, ytitle=bquote("Prop.Ubiquitously Expr."),
+#            pt.cex=0.5, parmar=c(1.2, 3.0, 2.6, 0.2))
+# dev.off()
+
+
+>>>>>>> df5ba8e245e8774b1c1a11c8de746305e02d49db
 # Scatterplot of peak P-value and corresponding lnOR for all sites
 pdf(paste(out.prefix, "all_segs.best_p_vs_or.pdf", sep="."),
     height=2.9, width=3.3)
