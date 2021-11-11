@@ -27,7 +27,7 @@ import csv
 import subprocess
 
 
-def read_bed_as_df(bed, output_hpos=False):
+def read_bed_as_df(bed, output_hpos=False, output_final_assocs=False):
     """
     Reads a BED file as a pd.DataFrame and reformats data as needed
     """
@@ -41,6 +41,12 @@ def read_bed_as_df(bed, output_hpos=False):
         hpo_df = df['hpos']
         hpo_df.index = df['region_id']
         hpo_dict = {r : h.split(';') for r, h in hpo_df.to_dict().items()}
+
+    # Extract constituent associations, if optioned
+    if output_final_assocs:
+        assoc_df = df['constituent_assocs']
+        assoc_df.index = df['region_id']
+        assoc_dict = {r : a.split(';') for r, a in assoc_df.to_dict().items()}
 
     # Add dummy column for significance level if not already present
     if 'best_sig_level' not in df.columns:
@@ -69,8 +75,12 @@ def read_bed_as_df(bed, output_hpos=False):
         df['size'] = df.end - df.start
 
     cols_ordered = 'chr start end region_id cnv sig_level coords size n_genes genes'.split()
-    if output_hpos:
+    if output_hpos and output_final_assocs:
+        return df.loc[:, cols_ordered], hpo_dict, assoc_dict
+    elif output_hpos:
         return df.loc[:, cols_ordered], hpo_dict
+    elif output_final_assocs:
+        return df.loc[:, cols_ordered], assoc_dict
     else:
         return df.loc[:, cols_ordered]
 
@@ -430,22 +440,29 @@ def annotate_expression(all_df, gtex_in, min_expression=1):
     return all_df
 
 
-def annotate_meta_sumstats(all_df, sumstats_in, add_nom_neuro=False, neuro_hpos=None,
+def annotate_meta_sumstats(all_df, sumstats_in, loci_assocs, assocs_in=None, 
+                           add_nom_neuro=False, neuro_hpos=None, 
                            add_nom_dev=False, dev_hpos=None):
     """
     Annotate segments with sumstats for best phenotype association while matching on CNV type
     Adds the following columns to all_df:
         1. meta_best_p: top P-value for any phenotype
+            Note that if assocs_in is provided, P-values will be extracted from there
+            where possible to ensure consistency with individual association reporting
         2. nom_sig: dummy indicator if the region is nominally significant in at least one phenotype
         3. nom_neuro [optional]: dummy indicator if the region is nominally significant in at least one neurological phenotype
         4. nom_dev [optional]: dummy indicator if the region is nominally significant in at least one developmental phenotype
-        5. meta_best_lnor: lnOR estimate for phenotype corresponding to meta_best_p
+        5. meta_best_lnor: top lnOR for any phenotype for any window in the credible interval(s) 
     """
 
     # Load sumstats
     ss = pd.read_csv(sumstats_in, sep='\t')
     numeric_cols = 'lnor lnor_lower lnor_upper pvalue pvalue_secondary'.split()
     ss[numeric_cols] = ss[numeric_cols].apply(pd.to_numeric)
+
+    # Load final associations, if optioned
+    if assocs_in is not None:
+        assoc_df = pd.read_csv(assocs_in, sep='\t')
 
     # Get best P-value per segment
     best_ps = []
@@ -454,16 +471,17 @@ def annotate_meta_sumstats(all_df, sumstats_in, add_nom_neuro=False, neuro_hpos=
     nomdev = []
     best_lnORs = []
     for rid, cnv in all_df.loc[:, 'region_id cnv'.split()].itertuples(index=False, name=None):
-        pvals = ss.loc[(ss.region_id == rid) & (ss.cnv == cnv), 'pvalue']
+        if rid in loci_assocs.keys() and assocs_in is not None:
+            pvals = -log10(assoc_df.best_pvalue[assoc_df.credible_set_id.isin(loci_assocs.get(rid))])
+        else:
+            pvals = ss.loc[(ss.region_id == rid) & (ss.cnv == cnv), 'pvalue']
         if len(pvals) > 0:
             top_p = float(nanmax(pvals.astype(float)))
-            top_lnOR = ss.loc[(ss.region_id == rid) & (ss.cnv == cnv) & (ss.pvalue == top_p), 'lnor'].values[0]
             best_ps.append(top_p)
             if top_p >= -log10(0.05):
                 nomsig.append(1)
             else:
                 nomsig.append(0)
-            best_lnORs.append(top_lnOR)
             if add_nom_neuro:
                 nom_hpos = ss.loc[(ss.region_id == rid) & (ss.cnv == cnv) & (ss.pvalue >= -log10(0.05)), 'hpo']
                 nom_neuro_hpos = [h for h in nom_hpos.tolist() if h in neuro_hpos]
@@ -478,13 +496,17 @@ def annotate_meta_sumstats(all_df, sumstats_in, add_nom_neuro=False, neuro_hpos=
                     nomdev.append(1)
                 else:
                     nomdev.append(0)
-
         else:
             best_ps.append(NaN)
             nomsig.append(0)
-            best_lnORs.append(NaN)
             nomneuro.append(0)
             nomdev.append(0)
+        lnors = ss.loc[(ss.region_id == rid) & (ss.cnv == cnv), 'lnor']
+        if len(lnors) > 0:
+            top_lnOR = float(nanmax(lnors.astype(float)))
+            best_lnORs.append(top_lnOR)
+        else:
+            best_lnORs.append(NaN)
 
     all_df['meta_best_p'] = best_ps
     all_df['nom_sig'] = nomsig
@@ -516,8 +538,10 @@ def main():
                         'Required.')
     parser.add_argument('--nahr-cnvs', required=True, help='BED of predicted NAHR-' +
                         'mediated CNVs. Required.')
-    parser.add_argument('-o', '--outfile', help='Path to output BED file. [default: ' +
-                        'stdout]', default='stdout')
+    parser.add_argument('--final-associations', help='BED of final associations ' +
+                        'corresponding to --final-loci. If provided, will be used ' +
+                        'to annotate best P-value to ensure consistency with ' +
+                        'original associations.')
     parser.add_argument('--loose-nahr-mask', help='BED of more lenient possible NAHR ' +
                         'events. Will only be used for labeling significant loci and/' +
                         'or GDs as NAHR; will not be included as rows in final output. ' +
@@ -573,6 +597,8 @@ def main():
                         help='Keep all HC/MC/LC GDs. Default behavior is to remove ' +
                         'lower-confidence GDs that overlap with any higher-confidence ' +
                         'segment. Not a recommended option for most analyses.')
+    parser.add_argument('-o', '--outfile', help='Path to output BED file. [default: ' +
+                        'stdout]', default='stdout')
     parser.add_argument('-z', '--bgzip', action='store_true', help='Compress ' + 
                         'output BED files with bgzip. [Default: do not compress]')
     args = parser.parse_args()
@@ -590,7 +616,8 @@ def main():
 
     # Load final significant loci
     loci_bt = pbt.BedTool(args.final_loci).cut(range(5))
-    loci_df, loci_hpos = read_bed_as_df(args.final_loci, output_hpos=True)
+    loci_df, loci_hpos, loci_assocs = \
+        read_bed_as_df(args.final_loci, output_hpos=True, output_final_assocs=True)
     loci_ids = loci_df.iloc[:, 3].tolist()
     all_df = loci_df.copy(deep=True)
     all_bt = loci_bt.saveas()
@@ -738,9 +765,15 @@ def main():
         else:
             add_nom_dev = False
             dev_hpos = None
-        all_df = annotate_meta_sumstats(all_df, args.meta_sumstats,
-                                        add_nom_neuro, neuro_hpos,
-                                        add_nom_dev, dev_hpos)
+        all_df = annotate_meta_sumstats(all_df, args.meta_sumstats, loci_assocs,
+                                        args.final_associations, add_nom_neuro, 
+                                        neuro_hpos, add_nom_dev, dev_hpos)
+
+    # Annotate GDs passing Bonferroni cutoff for total number of lit GDs tested
+    gd_bonf_cutoff = -log10(0.05 / len(hc_gd_ids + mc_gd_ids + lc_gd_ids))
+    all_df['bonf_sig_gd'] = pd.get_dummies((all_df.any_gd == 1) & \
+                                           (all_df.meta_best_p >= gd_bonf_cutoff), 
+                                           drop_first=True)
 
     # Sort & write out merged BED
     all_df.sort_values(by='chr start end cnv region_id'.split(), inplace=True)

@@ -26,6 +26,8 @@ segs.swarm(
   parse.y.labs = FALSE,
   violin = FALSE,
   pt.cex = 1,
+  boxplot.colors = NULL,
+  boxplot.fill = NULL,
   parmar = c(2.3, 3, 0.5, 0.5)
 )
 }
@@ -71,6 +73,10 @@ segs.swarm(
 \item{violin}{plot violins instead of boxes [default: FALSE]}
 
 \item{pt.cex}{expansion factor for points[default: 1]}
+
+\item{boxplot.colors}{border colors for boxplots (or violins)}
+
+\item{boxplot.fill}{fill colors for boxplots (or violins)}
 
 \item{parmar}{numeric vector of margins passed to \code{\link[=par]{par()}}}
 }

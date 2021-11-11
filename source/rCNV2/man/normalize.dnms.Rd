@@ -4,12 +4,18 @@
 \alias{normalize.dnms}
 \title{Normalize DNM counts}
 \usage{
-normalize.dnms(segs, dnm.cohorts = c("DDD", "ASC", "ASC_unaffected"))
+normalize.dnms(
+  segs,
+  dnm.cohorts = c("DDD", "ASC", "ASC_unaffected"),
+  is.data.table = FALSE
+)
 }
 \arguments{
 \item{segs}{segment dataframe (imported with \code{\link[=load.segment.table]{load.segment.table()}})}
 
 \item{dnm.cohorts}{vector of cohorts to evaluate (default: DDD, ASC, ASC_unaffected)}
+
+\item{is.data.table}{indicator that \code{segs} is a data.table [default: FALSE]}
 }
 \value{
 data.frame

@@ -43,9 +43,6 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/sliding_windows/**.rCNV.**.sliding_window.meta_analysis.stats.bed.gz \
   meta_stats/
 gsutil -m cp \
-  ${rCNV_bucket}/results/segment_association/* \
-  ./
-gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/loose_unclustered_nahr_regions.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/${prefix}.correct_nahr_labels.tsv \
@@ -55,9 +52,8 @@ gsutil -m cp \
   refs/
 gsutil -m cp -r \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists \
-  ./
-gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/hpo/rCNV2_analysis_d2.hpo_jaccard_matrix.tsv \
+  ${rCNV_bucket}/results/segment_association/* \
   ./
 
 
@@ -146,6 +142,7 @@ cat \
 > pooled_sumstats.tsv
 /opt/rCNV2/analysis/paper/scripts/large_segments/compile_segment_table.py \
   --final-loci rCNV.final_segments.loci.bed.gz \
+  --final-associations rCNV.final_segments.associations.bed.gz \
   --hc-gds refs/lit_GDs.hc.bed.gz \
   --mc-gds refs/lit_GDs.mc.bed.gz \
   --lc-gds refs/lit_GDs.lc.bed.gz \
@@ -208,7 +205,7 @@ zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f11 \
 # Note: in practice, this is parallelized in the cloud using segment_permutation.wdl
 # The code to execute these permutation tests is contained elsewhere
 # Copy results of segment permutation tests (note: requires permissions)
-n_seg_perms=10000
+n_seg_perms=100000
 gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/permutations/${prefix}*${n_seg_perms}_permuted_segments.bed.gz \
   ./
@@ -228,14 +225,15 @@ mkdir perm_test_plots
   ${prefix}.${n_seg_perms}_permuted_segments.bed.gz \
   ${prefix}.lit_GDs.${n_seg_perms}_permuted_segments.bed.gz \
   perm_test_plots/ \
-  "${prefix}.segment_perms"
+  "${prefix}.segment_perms" \
+> perm_test_plots/${prefix}.segment_perms.plot.log
 
 
 # Run segment permutation tests while matching on number of genes per segment
 # Note: in practice, this is parallelized in the cloud using segment_permutation_bygene.wdl
 # The code to execute these permutation tests is contained elsewhere
 # Copy results of segment permutation tests (note: requires permissions)
-n_seg_perms=10000
+n_seg_perms=100000
 gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/permutations/${prefix}*${n_seg_perms}_permuted_segments_bygene.tsv.gz \
   ./
@@ -254,7 +252,8 @@ fi
   ${prefix}.${n_seg_perms}_permuted_segments_bygene.tsv.gz \
   ${prefix}.lit_GDs.${n_seg_perms}_permuted_segments_bygene.tsv.gz \
   perm_test_plots/ \
-  "${prefix}.segment_perms_bygene"
+  "${prefix}.segment_perms_bygene" \
+> perm_test_plots/${prefix}.segment_perms_bygene.plot.log
 
 
 # Plot effect size covariates

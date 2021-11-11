@@ -188,32 +188,35 @@ out.prefix <- args$args[3]
 # # DEV PARAMETERS
 # loci.in <- "~/scratch/rCNV.final_segments.loci.bed.gz"
 # segs.in <- "~/scratch/rCNV2_analysis_d2.master_segments.bed.gz"
-# out.prefix <- "~/scratch/test_effect_sizes"
+# out.prefix <- "~/scratch/final_segs"
 
-# Load loci & segment tables
+# Load loci & segment table
 loci <- load.loci(loci.in)
 segs <- load.segment.table(segs.in)
 
-# Subset to nominally significant segments from discovery + literature
-segs <- segs[which(segs$nom_sig), ]
+# Create subset of all GD segs & those with nominal significance
+segs.all <- segs[which(segs$any_gd | segs$any_sig), ]
 
-# Set expected values of constrained genes
-prop_constrained.genome_avg <- 3036/18641
-segs$constrained_expected <- segs$n_genes * prop_constrained.genome_avg
+# Make analysis subset of only discovery segments at GW or FDR, or lit GDs at Bonferroni
+segs <- segs.all[which(segs.all$any_sig | segs.all$bonf_sig_gd), ]
 
-# Further subset to GW/FDR significant segments
-segs.sig <- segs[which(segs$any_sig), ]
+# Subset to loci either in top or bottom third of effect size distribution
+lnor.groups <- split.regions.by.effect.size(segs, quantiles=3)
+segs.bylnor <- segs[which(segs$region_id %in% c(lnor.groups[[1]], lnor.groups[[3]])), ]
+
+# Merge loci & segment data for genome-wide/FDR significant sites only
+segs.sig <- merge.loci.segs(loci, segs)
 
 # Get list of neuro loci (sig + lit GDs)
-neuro.plus.lit.ids <- get.neuro.region_ids(loci, segs)
+neuro.plus.lit.ids <- get.neuro.region_ids(loci, segs.all)
 neuro.segs <- segs[which(segs$region_id %in% neuro.plus.lit.ids), ]
 
 # Get list of developmental loci (sig + lit GDs)
-dev.plus.lit.ids <- get.developmental.region_ids(loci, segs)
+dev.plus.lit.ids <- get.developmental.region_ids(loci, segs.all)
 dev.segs <- segs[which(segs$region_id %in% dev.plus.lit.ids), ]
 
 # Get list of NDD loci (sig + lit GDs)
-NDD.plus.lit.ids <- get.ndd.region_ids(loci, segs)
+NDD.plus.lit.ids <- get.ndd.region_ids(loci, segs.all)
 NDD.segs <- segs[which(segs$region_id %in% NDD.plus.lit.ids), ]
 
 # Plot proportion of constrained genes vs. # of genes

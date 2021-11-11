@@ -20,32 +20,23 @@ options(stringsAsFactors=F, scipen=1000)
 # Load & parse permutation results
 load.perms <- function(perm.res.in, subset_to_regions=NULL, constrained.genes=NULL){
   # Read full permutation table
-  perms <- read.table(perm.res.in, header=T, sep="\t", check.names=F, comment.char="")
-  perms$perm_idx <- as.numeric(perms$perm_idx)
-  perm.range <- sort(unique(perms$perm_idx))
+  perms <- data.table::fread(perm.res.in, header=T, sep="\t", check.names=F)
+  perms[, perm_idx := as.numeric(perms$perm_idx)]
 
   # Post hoc annotation of constrained genes, if optioned
-  if(!is.null(constrained.genes)){
-    perms$n_gnomAD_constrained_genes <- as.numeric(sapply(perms$genes, function(gstr){
-      if(is.na(gstr)){
-        0
-      }else{
-        length(which(unlist(strsplit(gstr, split=";", fixed=T)) %in% constrained.genes))
-      }
-    }))
+  posthoc.constr <- function(gstr){
+    if(is.na(gstr)){as.integer(0)}else{
+      length(which(unlist(strsplit(gstr, split=";", fixed=T)) %in% constrained.genes))
+    }
   }
+  perms[, n_gnomAD_constrained_genes := posthoc.constr(genes), by=seq_len(nrow(perms))]
 
   # Drop unnecessary columns
   cols.to.drop <- c("#chr", "start", "end", "coords", "size", "genes")
-  perms <- perms[, -which(colnames(perms) %in% cols.to.drop)]
+  perms[, (cols.to.drop) := NULL]
   if(!is.null(subset_to_regions)){
-    perms <- perms[which(perms$region_id %in% subset_to_regions), ]
+    perms <- perms[region_id %in% subset_to_regions]
   }
-
-  # Split each permutation into a list of dfs (one per perm)
-  lapply(perm.range, function(i){
-    as.data.frame(perms[which(perms$perm_idx==i), -(which(colnames(perms)=="perm_idx"))])
-  })
 }
 
 
@@ -110,6 +101,7 @@ cnv.venn <- function(segs, cnv, sig.labels, perms=NULL, margin=0.05){
 require(optparse, quietly=T)
 require(MASS, quietly=T)
 require(VennDiagram, quietly=T)
+require(data.table, quietly=T)
 require(rCNV2, quietly=T)
 
 # List of command-line options
@@ -140,8 +132,8 @@ constrained.in <- opts$`constrained-genes`
 # # DEV PARAMETERS
 # loci.in <- "~/scratch/rCNV.final_segments.loci.bed.gz"
 # segs.in <- "~/scratch/rCNV2_analysis_d2.master_segments.bed.gz"
-# perm.res.in <- "~/scratch/rCNV2_analysis_d2.10000_permuted_segments.bed.gz"
-# lit.perm.res.in <- "~/scratch/rCNV2_analysis_d2.lit_GDs.10000_permuted_segments.bed.gz"
+# perm.res.in <- "~/scratch/rCNV2_analysis_d2.1000_permuted_segments.bed.gz"
+# lit.perm.res.in <- "~/scratch/rCNV2_analysis_d2.lit_GDs.1000_permuted_segments.bed.gz"
 # outdir <- "~/scratch/"
 # prefix <- "test_seg_perm_res"
 # constrained.in <- "~/scratch/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list"
@@ -320,16 +312,16 @@ dev.off()
 
 
 # Plot number of BCA breakpoints
-print("Mean number of BCA breakpoints per segment:")
-plot.all.perm.res(segs, perms, lit.perms,
-                  feature="Redin_BCAs", measure="mean",
-                  outdir, prefix, norm=F, norm.multi=F,
-                  n.bins.single=30, n.bins.multi=50,
-                  x.title="Mean BCAs per Segment",
-                  pdf.dims.single=c(2.2, 2.4),
-                  parmar.single=c(2.25, 2, 0, 2.2),
-                  pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.25, 6.05, 0, 2.2))
+# print("Mean number of BCA breakpoints per segment:")
+# plot.all.perm.res(segs, perms, lit.perms,
+#                   feature="Redin_BCAs", measure="mean",
+#                   outdir, prefix, norm=F, norm.multi=F,
+#                   n.bins.single=30, n.bins.multi=50,
+#                   x.title="Mean BCAs per Segment",
+#                   pdf.dims.single=c(2.2, 2.4),
+#                   parmar.single=c(2.25, 2, 0, 2.2),
+#                   pdf.dims.multi=c(4, 3.5),
+#                   parmar.multi=c(2.25, 6.05, 0, 2.2))
 print("Mean number of BCA breakpoints per DEVELOPMENTAL segment:")
 plot.all.perm.res(segs, perms, lit.perms, subset_to_regions=dev.seg.ids,
                   feature="Redin_BCAs", measure="mean",
@@ -341,16 +333,16 @@ plot.all.perm.res(segs, perms, lit.perms, subset_to_regions=dev.seg.ids,
                   parmar.single=c(2.25, 2, 0, 2.2),
                   pdf.dims.multi=c(4, 3.5),
                   parmar.multi=c(2.25, 6.05, 0, 2.2))
-print("Fraction of segments with at least one BCA:")
-plot.all.perm.res(segs, perms, lit.perms,
-                  feature="Redin_BCAs", measure="frac.any",
-                  outdir, prefix, norm=F, norm.multi=F,
-                  n.bins.single=30, n.bins.multi=50,
-                  x.title="Pct. w/BCA",
-                  pdf.dims.single=c(2.2, 2.4),
-                  parmar.single=c(2.25, 2, 0, 2.2),
-                  pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.25, 6.05, 0, 2.2))
+# print("Fraction of segments with at least one BCA:")
+# plot.all.perm.res(segs, perms, lit.perms,
+#                   feature="Redin_BCAs", measure="frac.any",
+#                   outdir, prefix, norm=F, norm.multi=F,
+#                   n.bins.single=30, n.bins.multi=50,
+#                   x.title="Pct. w/BCA",
+#                   pdf.dims.single=c(2.2, 2.4),
+#                   parmar.single=c(2.25, 2, 0, 2.2),
+#                   pdf.dims.multi=c(4, 3.5),
+#                   parmar.multi=c(2.25, 6.05, 0, 2.2))
 print("Fraction of DEVELOPMENTAL segments with at least one BCA:")
 plot.all.perm.res(segs, perms, lit.perms, subset_to_regions=dev.seg.ids,
                   feature="Redin_BCAs", measure="frac.any",

@@ -4,12 +4,15 @@
 \alias{split.regions.by.effect.size}
 \title{Split segments by effect size}
 \usage{
-\method{split}{regions.by.effect.size}(segs, quantiles = 2)
+\method{split}{regions.by.effect.size}(segs, quantiles = 2, effect.size.colname = "meta_best_lnor")
 }
 \arguments{
 \item{segs}{segment dataframe (imported with \code{\link[=load.segment.table]{load.segment.table()}})}
 
 \item{quantiles}{number of quantiles to divide [default: 2]}
+
+\item{effect.size.colname}{name of column to reference for effect sizes
+[default: \code{meta_best_lnor}]}
 }
 \value{
 list of length \code{quantiles} with region IDs for each quantile
@@ -18,6 +21,6 @@ list of length \code{quantiles} with region IDs for each quantile
 Split segments into groups based on effect size quantiles
 }
 \details{
-uses \code{meta_best_lnor} values while matching on CNV type to
-compute quantile cutoffs
+uses values from \code{effect.size.colname} \(see above\) while
+matching on CNV type to compute quantile cutoffs
 }

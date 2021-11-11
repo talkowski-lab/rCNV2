@@ -202,6 +202,8 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
 #' @param parse.y.labs format Y axis labels with [parse()] \[default: FALSE\]
 #' @param violin plot violins instead of boxes \[default: FALSE\]
 #' @param pt.cex expansion factor for points\[default: 1\]
+#' @param boxplot.colors border colors for boxplots (or violins)
+#' @param boxplot.fill fill colors for boxplots (or violins)
 #' @param parmar numeric vector of margins passed to [par()]
 #'
 #' @export segs.swarm
@@ -212,6 +214,7 @@ segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL, subset_to_re
                        add.y.axis=TRUE, ytitle=NULL, y.title.line=1.75,
                        y.at=NULL, y.labs=NULL, y.labs.at=NULL,
                        parse.y.labs=FALSE, violin=FALSE, pt.cex=1,
+                       boxplot.colors=NULL, boxplot.fill=NULL,
                        parmar=c(2.3, 3, 0.5, 0.5)){
 
   require(beeswarm, quietly=T)
@@ -264,8 +267,12 @@ segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL, subset_to_re
                            segs$pt.border[intersect(which(!x.bool), dup.idx)],
                            segs$pt.border[intersect(which(x.bool), del.idx)],
                            segs$pt.border[intersect(which(x.bool), dup.idx)])
-    boxplot.colors <- rep(cnv.blacks[1:2], 2)
-    boxplot.fill <- rep(cnv.whites[1:2], 2)
+    if(is.null(boxplot.colors)){
+      boxplot.colors <- rep(cnv.blacks[1:2], 2)
+    }
+    if(is.null(boxplot.fill)){
+      boxplot.fill <- rep(cnv.whites[1:2], 2)
+    }
   }else{
     x.at <- c(0.5, 1.5)
     width <- 0.4
@@ -282,8 +289,12 @@ segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL, subset_to_re
                           segs$pt.bg[which(x.bool)])
     pt.border.list <- list(segs$pt.border[which(!x.bool)],
                            segs$pt.border[which(x.bool)])
-    boxplot.colors <- rep(blueblack, 2)
-    boxplot.fill <- rep(bluewhite, 2)
+    if(is.null(boxplot.colors)){
+      boxplot.colors <- rep(blueblack, 2)
+    }
+    if(is.null(boxplot.fill)){
+      boxplot.fill <- rep(bluewhite, 2)
+    }
   }
 
   # Prep plot area
@@ -537,7 +548,7 @@ plot.viohist <- function(perm.dat.vals, bins, y.at, width=0.8,
 #' Function to plot segment permutation test results
 #'
 #' @param segs segment dataframe (imported with [load.segment.table()])
-#' @param perms list of permutation results
+#' @param perms data.table of permutation results
 #' @param feature name of feature to evaluate
 #' @param measure statistic to evaluate \[default: mean\]
 #' @param norm normalize values before plotting \[default: FALSE\]
@@ -565,9 +576,8 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
   # Get plot data
   if(!is.null(subset_to_regions)){
     segs <- segs[which(segs$region_id %in% subset_to_regions), ]
-    perms <- lapply(perms, function(df){df[which(df$region_id %in% subset_to_regions), ]})
   }
-  perm.dat <- perm.summary(perms, feature, measure)
+  perm.dat <- perm.summary(perms, feature, measure, subset_to_regions)
   segs.dat <- calc.segs.dat(segs, feature, measure)
 
   # Normalize data, if optioned
@@ -663,9 +673,9 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
 #' Multi-panel plot of permutation results for segment subsets
 #'
 #' @param segs segment dataframe (imported with [load.segment.table()])
-#' @param gw.perms list of permutation results for empirical segments
-#' @param lit.perms list of permutation results for literature segments
-#' @param union.perms list of permutation results for all combined segments
+#' @param gw.perms data.table of permutation results for empirical segments
+#' @param lit.perms data.table of permutation results for literature segments
+#' @param union.perms data.table of permutation results for all combined segments
 #' @param feature name of feature to evaluate
 #' @param measure statistic to evaluate \[default: mean\]
 #' @param subset_to_regions vector of region IDs to include \[default: include all regions\]
@@ -677,7 +687,7 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
 #' @param xlims limits for X axis
 #' @param xmin minimum for X axis
 #' @param xmax maximum for X axis
-#' @param max.x.ticks maxmimum ticks for X axis
+#' @param max.x.ticks maximum ticks for X axis
 #' @param inner.axis.cex expansion of inner axis
 #' @param diamond.cex expansion for observed values
 #' @param parmar numeric vector of margins passed to [par()]
@@ -884,10 +894,8 @@ plot.all.perm.res <- function(segs, gw.perms, lit.perms,
   union.ids <- intersect(subset_to_regions, segs$region_id[which(segs$any_sig | segs$any_gd)])
 
   # Merge perm results
-  union.perms <- lapply(1:length(gw.perms), function(i){
-    shared.columns <- intersect(colnames(gw.perms[[i]]), colnames(lit.perms[[i]]))
-    as.data.frame(rbind(gw.perms[[i]][shared.columns], lit.perms[[i]][shared.columns]))
-  })
+  shared.columns <- intersect(colnames(gw.perms), colnames(lit.perms))
+  union.perms <- rbind(gw.perms[, ..shared.columns], lit.perms[, ..shared.columns])
 
   # Prep output directory
   subdir <- paste(outdir, "/", prefix, "_", feature, "_", measure, sep="")

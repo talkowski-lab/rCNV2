@@ -69,20 +69,38 @@ load.segment.table <- function(segs.in){
                               grep("_genes$", colnames(segs), fixed=F)))
   segs[, listcol.idxs] <- apply(segs[, listcol.idxs], 2, strsplit, split=";")
 
+  # Rename columns with typos
+  colnames(segs) <- sapply(colnames(segs), gsub, pattern="CLinGen",
+                           replacement="ClinGen", fixed=T)
+
+  # Add columns for union of ClinGen & DECIPHER gene sets
+  segs$clinical_LoF_genes <- sapply(1:nrow(segs), function(i){
+    u <- union(unlist(segs$ClinGen_HI_genes[i]), unlist(segs$DECIPHER_LoF_genes[i]))
+    list(u[which(!is.na(u))])
+  })
+  segs$n_clinical_LoF_genes <- sapply(segs$clinical_LoF_genes, function(gstr){length(unlist(gstr))})
+  segs$clinical_GoF_genes <- sapply(1:nrow(segs), function(i){
+    u <- union(unlist(segs$ClinGen_TS_genes[i]), unlist(segs$DECIPHER_GoF_genes[i]))
+    list(u[which(!is.na(u))])
+  })
+  segs$n_clinical_GoF_genes <- sapply(segs$clinical_GoF_genes, function(gstr){length(unlist(gstr))})
+
   # Convert numeric columns to numerics
   numcol.idxs <- unique(c(which(colnames(segs) %in% c("start", "end", "size", "meta_best_p",
-                                                      "min_LOEUF", "min_MisOEUF", "Redin_BCAs")),
+                                                      "min_LOEUF", "min_MisOEUF",
+                                                      "total_LoF_OE", "total_mis_OE",
+                                                      "Redin_BCAs")),
                           grep("^n_", colnames(segs), fixed=F),
                           grep("_dnm_", colnames(segs), fixed=T),
                           grep("_express", colnames(segs), fixed=T)))
   segs[, numcol.idxs] <- apply(segs[, numcol.idxs], 2, as.numeric)
 
   # Convert boolean dummy columns to logicals
-  boolcol.idxs <- which(colnames(segs) %in% c("any_sig", "gw_sig", "fdr_sig",
+  boolcol.idxs <- which(colnames(segs) %in% c("any_sig", "gw_sig", "fdr_sig", "bonf_sig_gd",
                                               "nom_sig", "nom_neuro", "nom_dev",
                                               "hc_gd", "mc_gd", "lc_gd", "any_gd",
                                               "pathogenic", "benign", "nahr",
-                                              "pleiotropic"))
+                                              "terminal", "pleiotropic"))
   segs[, boolcol.idxs] <- apply(segs[, boolcol.idxs], 2, function(vals){
     sapply(vals, function(val){if(val==1){TRUE}else{FALSE}})})
 
@@ -98,8 +116,8 @@ load.segment.table <- function(segs.in){
   # Add graphical columns
   gw.sig.idx <- which(segs$gw_sig)
   fdr.sig.idx <- which(segs$fdr_sig)
-  nomsig.gd.idx <- which(segs$any_gd & !segs$any_sig & segs$nom_sig)
-  nonsig.gd.idx <- which(segs$any_gd & !segs$nom_sig)
+  bonfsig.gd.idx <- which(segs$any_gd & !segs$any_sig & segs$bonf_sig_gd)
+  nonsig.gd.idx <- which(segs$any_gd & !segs$bonf_sig_gd)
   segs$pt.pch <- NA; segs$pt.border <- NA; segs$pt.bg <- NA
   segs$pt.pch[gw.sig.idx] <- 22
   segs$pt.border[gw.sig.idx] <- cnv.blacks[segs$cnv[gw.sig.idx]]
@@ -107,9 +125,9 @@ load.segment.table <- function(segs.in){
   segs$pt.pch[fdr.sig.idx] <- 23
   segs$pt.border[fdr.sig.idx] <- cnv.colors[segs$cnv[fdr.sig.idx]]
   segs$pt.bg[fdr.sig.idx] <- control.cnv.colors[segs$cnv[fdr.sig.idx]]
-  segs$pt.pch[nomsig.gd.idx] <- 21
-  segs$pt.border[nomsig.gd.idx] <- control.cnv.colors[segs$cnv[nomsig.gd.idx]]
-  segs$pt.bg[nomsig.gd.idx] <- cnv.whites[segs$cnv[nomsig.gd.idx]]
+  segs$pt.pch[bonfsig.gd.idx] <- 21
+  segs$pt.border[bonfsig.gd.idx] <- control.cnv.colors[segs$cnv[bonfsig.gd.idx]]
+  segs$pt.bg[bonfsig.gd.idx] <- cnv.whites[segs$cnv[bonfsig.gd.idx]]
   segs$pt.pch[nonsig.gd.idx] <- 21
   segs$pt.border[nonsig.gd.idx] <- control.cnv.colors[segs$cnv[nonsig.gd.idx]]
   segs$pt.bg[nonsig.gd.idx] <- NA
@@ -207,18 +225,21 @@ get.ndd.region_ids <- function(loci, segs, sig.only=FALSE){
 #'
 #' @param segs segment dataframe (imported with [load.segment.table()])
 #' @param quantiles number of quantiles to divide \[default: 2\]
+#' @param effect.size.colname name of column to reference for effect sizes
+#' \[default: `meta_best_lnor`\]
 #'
 #' @return list of length `quantiles` with region IDs for each quantile
 #'
-#' @details uses `meta_best_lnor` values while matching on CNV type to
-#' compute quantile cutoffs
+#' @details uses values from `effect.size.colname` \(see above\) while
+#' matching on CNV type to compute quantile cutoffs
 #'
 #' @export split.regions.by.effect.size
 #' @export
-split.regions.by.effect.size <- function(segs, quantiles=2){
+split.regions.by.effect.size <- function(segs, quantiles=2,
+                                         effect.size.colname="meta_best_lnor"){
   # Compute quantiles per CNV type
   quants <- lapply(c("DEL", "DUP"), function(cnv){
-    cutoffs <- as.numeric(quantile(segs$meta_best_lnor[which(segs$cnv==cnv)],
+    cutoffs <- as.numeric(quantile(segs[which(segs$cnv==cnv), effect.size.colname],
                                    probs=seq(0, 1, length.out=quantiles+1)))
     cutoffs[c(1, length(cutoffs))] <- c(-Inf, Inf)
     return(cutoffs)
@@ -241,30 +262,53 @@ split.regions.by.effect.size <- function(segs, quantiles=2){
 #'
 #' @param segs segment dataframe (imported with [load.segment.table()])
 #' @param dnm.cohorts vector of cohorts to evaluate (default: DDD, ASC, ASC_unaffected)
+#' @param is.data.table indicator that `segs` is a data.table \[default: FALSE\]
 #'
 #' @return data.frame
 #'
 #' @export
-normalize.dnms <- function(segs, dnm.cohorts=c("DDD", "ASC", "ASC_unaffected")){
+normalize.dnms <- function(segs, dnm.cohorts=c("DDD", "ASC", "ASC_unaffected"),
+                           is.data.table=FALSE){
   for(cohort in dnm.cohorts){
     syn.obs.colname <- paste(cohort, "dnm_syn_obs_wMu", sep="_")
     syn.exp.colname <- paste(cohort, "dnm_syn_exp_wMu", sep="_")
     if(syn.obs.colname %in% colnames(segs) & syn.exp.colname %in% colnames(segs)){
-      syn.obs <- segs[, which(colnames(segs)==syn.obs.colname)]
-      syn.exp <- segs[, which(colnames(segs)==syn.exp.colname)]
-      syn.d <- (syn.obs - syn.exp) / segs$n_genes
+      if(is.data.table){
+        segs[, syn.d := (get(syn.obs.colname) - get(syn.exp.colname)) / n_genes]
+      }else{
+        syn.obs <- segs[, which(colnames(segs)==syn.obs.colname)]
+        syn.exp <- segs[, which(colnames(segs)==syn.exp.colname)]
+        syn.d <- (syn.obs - syn.exp) / segs$n_genes
+      }
       for(csq in c("lof", "mis")){
         dam.obs.colname <- paste(cohort, "dnm", csq, "obs_wMu", sep="_")
         dam.exp.colname <- paste(cohort, "dnm", csq, "exp_wMu", sep="_")
         if(dam.obs.colname %in% colnames(segs) & dam.exp.colname %in% colnames(segs)){
-          dam.obs <- segs[, which(colnames(segs)==dam.obs.colname)]
-          dam.exp <- segs[, which(colnames(segs)==dam.exp.colname)]
-          dam.d <- (dam.obs - dam.exp) / segs$n_genes
+          if(is.data.table){
+            segs[, dam.d := (get(dam.obs.colname) - get(dam.exp.colname)) / n_genes]
+          }else{
+            dam.obs <- segs[, which(colnames(segs)==dam.obs.colname)]
+            dam.exp <- segs[, which(colnames(segs)==dam.exp.colname)]
+            dam.d <- (dam.obs - dam.exp) / segs$n_genes
+          }
           # Outlier-robust linear fit of obs-exp damaging ~ obs-exp synonymous
-          fit <- robust.lm(syn.d, dam.d)$fit
-          coeffs <- as.numeric(fit$coefficients)
-          dam.d.adj <- dam.d - coeffs[1] - (coeffs[2] * syn.d)
-          segs[paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_")] <- dam.d.adj
+          new.colname <- paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_")
+          if(is.data.table){
+            adj.dam.d <- function(dt){
+              fit <- robust.lm(dt$syn.d, dt$dam.d)$fit
+              coeffs <- as.numeric(fit$coefficients)
+              dt[, dam.d - coeffs[1] - (coeffs[2] * syn.d)]
+            }
+            segs[, (new.colname) := numeric()]
+            sapply(1:max(segs$perm_idx), function(i){
+              segs[perm_idx == i, (new.colname) := adj.dam.d(segs[perm_idx == i])]
+            })
+          }else{
+            fit <- robust.lm(syn.d, dam.d)$fit
+            coeffs <- as.numeric(fit$coefficients)
+            dam.d.adj <- dam.d - coeffs[1] - (coeffs[2] * syn.d)
+            segs[new.colname] <- dam.d.adj
+          }
         }
       }
     }
@@ -321,47 +365,46 @@ get.gd.overlap <- function(chrom, start, end, segs){
 #'
 #' Summarize permutation results across all permutations for a single feature
 #'
-#' @param perms list of permutation results
+#' @param perms.orig data.table of permutation results
 #' @param feature name of feature to evaluate
 #' @param measure statistic to evaluate \[default: mean\]
 #' @param subset_to_regions vector of region IDs to include \[default: include all regions\]
 #'
 #' @details Valid options for `measure` are mean, median, sum, and frac.any
 #'
-#' @return vector of statistic split by all, deletions, and duplications
+#' @return matrix of statistic per permutation split by all, deletions, and duplications
 #'
 #' @export perm.summary
 #' @export
-perm.summary <- function(perms, feature, measure="mean", subset_to_regions=NULL){
+perm.summary <- function(perms.orig, feature, measure="mean", subset_to_regions=NULL){
   if(!is.null(subset_to_regions)){
-    perms <- lapply(perms, function(df){df[which(df$region_id %in% subset_to_regions), ]})
+    # Make copy of permutation results to avoid overwriting by data.table
+    perms <- subset(perms.orig, region_id %in% subset_to_regions)
+  }else{
+    perms <- copy(perms.orig)
   }
-  do.call("rbind", lapply(perms, function(df){
-    if(measure == "mean"){
-      c("ALL" = mean(df[, which(colnames(df)==feature)], na.rm=T),
-        "DEL" = mean(df[which(df$cnv=="DEL"),
-                        which(colnames(df)==feature)], na.rm=T),
-        "DUP" = mean(df[which(df$cnv=="DUP"),
-                        which(colnames(df)==feature)], na.rm=T))
-    }else if(measure == "median"){
-      c("ALL" = median(df[, which(colnames(df)==feature)], na.rm=T),
-        "DEL" = median(df[which(df$cnv=="DEL"),
-                          which(colnames(df)==feature)], na.rm=T),
-        "DUP" = median(df[which(df$cnv=="DUP"),
-                          which(colnames(df)==feature)], na.rm=T))
-    }else if(measure == "sum"){
-      c("ALL" = sum(df[, which(colnames(df)==feature)]),
-        "DEL" = sum(df[which(df$cnv=="DEL"),
-                       which(colnames(df)==feature)]),
-        "DUP" = sum(df[which(df$cnv=="DUP"),
-                       which(colnames(df)==feature)]))
-    }else if(measure == "frac.any"){
-      hits <- which(df[, which(colnames(df)==feature)] > 0)
-      100 * c("ALL" = length(hits) / nrow(df),
-              "DEL" = length(intersect(hits, which(df$cnv=="DEL"))) / length(which(df$cnv=="DEL")),
-              "DUP" = length(intersect(hits, which(df$cnv=="DUP"))) / length(which(df$cnv=="DUP")))
-    }
-  }))
+  if(measure == "mean"){
+    ALL <- perms[, mean(get(feature), na.rm=T), by=perm_idx]
+    DEL <- perms[cnv == "DEL", mean(get(feature), na.rm=T), by=perm_idx]
+    DUP <- perms[cnv == "DUP", mean(get(feature), na.rm=T), by=perm_idx]
+  }else if(measure == "median"){
+    ALL <- perms[, median(get(feature), na.rm=T), by=perm_idx]
+    DEL <- perms[cnv == "DEL", median(get(feature), na.rm=T), by=perm_idx]
+    DUP <- perms[cnv == "DUP", median(get(feature), na.rm=T), by=perm_idx]
+  }else if(measure == "sum"){
+    ALL <- perms[, sum(get(feature), na.rm=T), by=perm_idx]
+    DEL <- perms[cnv == "DEL", sum(get(feature), na.rm=T), by=perm_idx]
+    DUP <- perms[cnv == "DUP", sum(get(feature), na.rm=T), by=perm_idx]
+  }else if(measure == "frac.any"){
+    frac.any <- function(x){100 * length(which(x[!is.na(x)]>0)) / length(x[which(!is.na(x))])}
+    ALL <- perms[, frac.any(get(feature)), by=perm_idx]
+    DEL <- perms[cnv == "DEL", frac.any(get(feature)), by=perm_idx]
+    DUP <- perms[cnv == "DUP", frac.any(get(feature)), by=perm_idx]
+  }
+  setnames(ALL, "V1", "ALL")
+  setnames(DEL, "V1", "DEL")
+  setnames(DUP, "V1", "DUP")
+  as.matrix(as.data.frame(merge(merge(ALL, DEL), DUP))[, -1])
 }
 
 #' Summarize a segment metric
