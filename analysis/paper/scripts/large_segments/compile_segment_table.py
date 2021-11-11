@@ -768,15 +768,12 @@ def main():
         all_df = annotate_meta_sumstats(all_df, args.meta_sumstats, loci_assocs,
                                         args.final_associations, add_nom_neuro, 
                                         neuro_hpos, add_nom_dev, dev_hpos)
-<<<<<<< HEAD
 
     # Annotate GDs passing Bonferroni cutoff for total number of lit GDs tested
     gd_bonf_cutoff = -log10(0.05 / len(hc_gd_ids + mc_gd_ids + lc_gd_ids))
     all_df['bonf_sig_gd'] = pd.get_dummies((all_df.any_gd == 1) & \
                                            (all_df.meta_best_p >= gd_bonf_cutoff), 
                                            drop_first=True)
-=======
->>>>>>> df5ba8e245e8774b1c1a11c8de746305e02d49db
 
     # Sort & write out merged BED
     all_df.sort_values(by='chr start end cnv region_id'.split(), inplace=True)

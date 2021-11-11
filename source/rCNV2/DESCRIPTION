@@ -12,10 +12,6 @@ License: M.I.T. License
 Encoding: UTF-8
 LazyData: true
 Depends: data.table
-<<<<<<< HEAD
 RoxygenNote: 7.1.2
-=======
-RoxygenNote: 7.1.1
->>>>>>> df5ba8e245e8774b1c1a11c8de746305e02d49db
 Roxygen: list(markdown = TRUE)
 URL: https://github.com/talkowski-lab/rCNV2, https://doi.org/10.1101/2021.01.26.21250098
