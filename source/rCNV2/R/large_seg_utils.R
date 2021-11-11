@@ -128,7 +128,7 @@ load.segment.table <- function(segs.in){
   segs$pt.pch[bonfsig.gd.idx] <- 21
   segs$pt.border[bonfsig.gd.idx] <- control.cnv.colors[segs$cnv[bonfsig.gd.idx]]
   segs$pt.bg[bonfsig.gd.idx] <- cnv.whites[segs$cnv[bonfsig.gd.idx]]
-  segs$pt.pch[nonsig.gd.idx] <- 21
+  segs$pt.pch[nonsig.gd.idx] <- 13
   segs$pt.border[nonsig.gd.idx] <- control.cnv.colors[segs$cnv[nonsig.gd.idx]]
   segs$pt.bg[nonsig.gd.idx] <- NA
 

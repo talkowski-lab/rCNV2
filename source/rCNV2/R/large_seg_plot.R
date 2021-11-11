@@ -132,10 +132,10 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
   gw.idx <- which(segs$gw_sig)
   points(x[-gw.idx], y[-gw.idx], pch=segs$pt.pch[-gw.idx],
          bg=segs$pt.bg[-gw.idx], col=segs$pt.border[-gw.idx],
-         cex=pt.cex)
+         cex=pt.cex, lwd=pt.cex)
   points(x[gw.idx], y[gw.idx], pch=segs$pt.pch[gw.idx],
          bg=segs$pt.bg[gw.idx], col=segs$pt.border[gw.idx],
-         cex=pt.cex)
+         cex=pt.cex, lwd=pt.cex)
 
   # Add axis ticks
   axis(1, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
@@ -321,7 +321,7 @@ segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL, subset_to_re
   sapply(1:length(y.vals), function(i){
     beeswarm(y.vals[[i]], add=T, at=x.at[i],
              pwbg=pt.color.list[[i]], pwcol=pt.border.list[[i]],
-             pwpch=pt.pch.list[[i]], cex=pt.cex,
+             pwpch=pt.pch.list[[i]], cex=pt.cex, lwd=pt.cex,
              corral="random", corralWidth=width)
   })
 
@@ -447,7 +447,8 @@ segs.simple.vioswarm <- function(segs, y, subset_to_regions=NULL,
     # boxplot(plot.dat[[x]], at=x-0.5, col=cnv.blacks[x], lty=1, outline=F,
     #         staplewex=0, add=T, boxwex=0.2)
     beeswarm(plot.dat[[x]], at=x-0.5, add=T, corralWidth=0.8, corral="wrap",
-             pwcol=pt.color[[x]], pwbg=pt.bg[[x]], pwpch=pt.pch[[x]], cex=pt.cex)
+             pwcol=pt.color[[x]], pwbg=pt.bg[[x]], pwpch=pt.pch[[x]],
+             cex=pt.cex, lwd=pt.cex)
   })
 
   # Add x-axis

@@ -67,7 +67,7 @@ segs.sig <- merge.loci.segs(loci, segs)
 
 # Loop over all pairwise comparisons for vioswarm plots
 # Write each comparison to its own subdirectory
-for(comp in c("DEL_vs_DUP", "gw_vs_FDR",
+for(comp in c("DEL_vs_DUP", "gw_vs_FDR", "NAHR_vs_nonrecurrent",
               "terminal_vs_interstitial", "dev_vs_adult",
               "strong_vs_weak", "sig_vs_litGDs")){
 
@@ -84,6 +84,10 @@ for(comp in c("DEL_vs_DUP", "gw_vs_FDR",
     seg.df <- segs.sig
     x.bool <- !(seg.df$gw_sig)
     x.labs <- c("GW Sig.", "FDR Sig.")
+  }else if(comp == "NAHR_vs_nonrecurrent"){
+    seg.df <- segs
+    x.bool <- seg.df$nahr
+    x.labs <- c("Nonrecurrent", "NAHR")
   }else if(comp == "terminal_vs_interstitial"){
     seg.df <- segs
     x.bool <- seg.df$terminal
@@ -166,6 +170,17 @@ for(comp in c("DEL_vs_DUP", "gw_vs_FDR",
                add.y.axis=T, pt.cex=0.5, cnv.split=cnv.split,
                boxplot.colors=boxplot.colors, boxplot.fill=boxplot.fill,
                ytitle=bquote("Max." ~ italic("ln") * ("Odds Ratio")), y.title.line=1.25,
+               parmar=c(1.2, 2.75, 1.65 + parmar.y.mod, 0.2))
+    dev.off()
+
+    # Swarmplot of peak P-value
+    pdf(paste(out.prefix.sub, "peak_p_value", plot.suffix, sep="."),
+        height=plot.dims[1], width=plot.dims[2])
+    segs.swarm(seg.df, x.bool=x.bool, y=seg.df$meta_best_p,
+               x.labs=x.labs, violin=T, add.pvalue=T,
+               add.y.axis=T, pt.cex=0.5, cnv.split=cnv.split,
+               boxplot.colors=boxplot.colors, boxplot.fill=boxplot.fill,
+               ytitle=bquote("Max." ~ -log10(italic("P"))), y.title.line=1.25,
                parmar=c(1.2, 2.75, 1.65 + parmar.y.mod, 0.2))
     dev.off()
 
@@ -337,7 +352,7 @@ segs.scatter(segs.all, x=segs.best.l2or, y=segs.best.p,
              ytitle=bquote("Max -log"[10] * (italic(P)) * ", any phenotype"),
              y.at=seq(0, 20, 4), y.labs=c(seq(0, 16, 4), expression(phantom(x) >= 20)), parse.y.labs=TRUE,
              x.title.line=1.4, y.title.line=1.9, xlims=c(0, x.max), ylims=c(0, 20),
-             add.lm=F, pt.cex=0.6, parmar=c(2.4, 3, 0.4, 0.4))
+             add.lm=F, pt.cex=0.75, parmar=c(2.4, 3, 0.4, 0.4))
 x.bump <- 0.04 * (par("usr")[2] - par("usr")[1])
 y.bump <- 0.03 * (par("usr")[4] - par("usr")[3])
 text(x=par("usr")[2] + x.bump, y=-log10(0.05/95) + y.bump, labels=format.pval(0.05/95),
