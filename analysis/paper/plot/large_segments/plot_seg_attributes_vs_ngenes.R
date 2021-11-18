@@ -18,7 +18,8 @@ options(stringsAsFactors=F, scipen=1000)
 ### DATA FUNCTIONS ###
 ######################
 # Split values by CNV & bins of number of genes
-quantile.split <- function(segs, feature, breaks=NULL, break.names=NULL, probs=seq(0, 1, 0.2)){
+quantile.split <- function(segs, feature, breaks=NULL, break.names=NULL,
+                           probs=seq(0, 1, 0.2)){
   vals <- segs[, which(colnames(segs)==feature)]
   ngenes <- segs$n_genes
   if(is.null(breaks)){
@@ -70,7 +71,8 @@ constrained.obs_exp.test <- function(segs){
 scatter.vsGenes <- function(segs, feature, pt.cex=0.6, fit=NULL, rolling.span=1,
                             xlims=NULL, ylims=NULL, y.title=NULL,
                             y.title.line=2, y.pct=FALSE,
-                            horiz.line=NULL, legend.pos=NULL, blue.bg=TRUE,
+                            horiz.line=NULL, panel.first=c(),
+                            legend.pos=NULL, blue.bg=TRUE,
                             parmar=c(2.5, 3, 0.5, 0.5)){
   # Get plot values
   segs <- segs[which(segs$n_genes>0), ]
@@ -97,10 +99,11 @@ scatter.vsGenes <- function(segs, feature, pt.cex=0.6, fit=NULL, rolling.span=1,
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=xlims, ylim=ylims,
-       xaxt="n", xlab="", yaxt="n", ylab="")
-  rect(xleft=par("usr")[1], xright=par("usr")[2],
-       ybottom=par("usr")[3], ytop=par("usr")[4],
-       border=plot.border, bty=plot.bty, col=plot.bg, xpd=T)
+       xaxt="n", xlab="", yaxt="n", ylab="",
+       panel.first=c(rect(xleft=par("usr")[1], xright=par("usr")[2],
+                          ybottom=par("usr")[3], ytop=par("usr")[4],
+                          border=plot.border, bty=plot.bty, col=plot.bg, xpd=T),
+                     panel.first))
   abline(h=axTicks(2), v=axTicks(1), col=grid.col)
   if(!is.null(horiz.line)){
     abline(h=horiz.line, lty=2, col=blueblack)
@@ -240,21 +243,44 @@ if(!dir.exists(outdir)){
 }
 out.prefix <- paste(outdir, "/", basename(out.prefix), sep="/")
 
-# Plot proportion of constrained genes vs. # of genes
-pdf(paste(out.prefix, "prop_constrained_vs_ngenes.all_phenos.pdf", sep="."),
-    height=2.4, width=2.7)
-scatter.vsGenes(segs, feature="gnomAD_constrained_prop", y.title="Constrained Genes",
-                y.pct=T, pt.cex=0.6, blue.bg=FALSE,
-                horiz.line=prop_constrained.genome_avg,
-                y.title.line=2.3, parmar=c(2.45, 3.25, 0.5, 0.5))
-dev.off()
-pdf(paste(out.prefix, "prop_constrained_vs_ngenes.developmental_only.pdf", sep="."),
-    height=2.4, width=2.7)
-scatter.vsGenes(dev.segs, feature="gnomAD_constrained_prop", y.title="Constrained Genes",
-                y.pct=T, pt.cex=0.6, blue.bg=FALSE,
-                horiz.line=prop_constrained.genome_avg,
-                y.title.line=2.3, parmar=c(2.45, 3.25, 0.5, 0.5))
-dev.off()
+
+# Plot constrained gene analyses for both all phenos and just developmental
+for(pheno in c("all_phenos", "developmental")){
+  if(pheno == "all_phenos"){
+    seg.df <- segs
+  }else if(pheno == "developmental"){
+    seg.df <- dev.segs
+  }
+
+  # Plot number of constrained genes vs. # of genes
+  pdf(paste(out.prefix, "n_constrained_vs_ngenes", pheno, "pdf", sep="."),
+      height=2.4, width=2.7)
+  scatter.vsGenes(seg.df, feature="n_gnomAD_constrained_genes", y.title="Constrained Genes",
+                  pt.cex=0.6, blue.bg=FALSE, fit="loess",
+                  panel.first=c(abline(0, prop_constrained.genome_avg, lty=5, col=ns.color)),
+                  parmar=c(2.45, 3.25, 0.5, 0.5))
+  dev.off()
+
+  # # Number of constrained genes vs expected
+  # constrained.max <- max(seg.df$constrained_expected, seg.df$n_gnomAD_constrained_genes)
+  # pdf(paste(out.prefix, "constrained_genes_obs_vs_exp", pheno, "pdf", sep="."),
+  #     height=2.4, width=2.4)
+  # segs.scatter(seg.df, seg.df$constrained_expected, seg.df$n_gnomAD_constrained_genes,
+  #              xlims=c(0, constrained.max), ylims=c(0, constrained.max),
+  #              xtitle="Constrained (Expected)", ytitle="Constrained (Observed)",
+  #              pt.cex=0.6, blue.bg=FALSE)
+  # dev.off()
+
+  # Plot proportion of constrained genes vs. # of genes
+  pdf(paste(out.prefix, "prop_constrained_vs_ngenes", pheno, "pdf", sep="."),
+      height=2.4, width=2.7)
+  scatter.vsGenes(seg.df, feature="gnomAD_constrained_prop", y.title="Constrained Genes",
+                  y.pct=T, pt.cex=0.6, blue.bg=FALSE,
+                  horiz.line=prop_constrained.genome_avg,
+                  y.title.line=2.3, parmar=c(2.45, 3.25, 0.5, 0.5))
+  dev.off()
+}
+
 
 # Loop over exome cohorts and generate enrichment plots
 for(cohort in c("ASC", "DDD")){
@@ -290,14 +316,3 @@ for(cohort in c("ASC", "DDD")){
     dev.off()
   }
 }
-
-# Number of constrained genes vs expected
-constrained.max <- max(segs$constrained_expected, segs$n_gnomAD_constrained_genes)
-pdf(paste(out.prefix, "constrained_genes_obs_vs_exp.pdf", sep="."),
-    height=2.4, width=2.4)
-segs.scatter(segs, segs$constrained_expected, segs$n_gnomAD_constrained_genes,
-             xlims=c(0, constrained.max), ylims=c(0, constrained.max),
-             xtitle="Constrained (Expected)", ytitle="Constrained (Observed)",
-             pt.cex=0.6, blue.bg=FALSE)
-dev.off()
-

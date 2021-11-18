@@ -50,10 +50,10 @@ gw.sig <- -log10(opts$`gw-sig`)
 
 # Load loci & segment table
 loci <- load.loci(loci.in)
-segs <- load.segment.table(segs.in)
+segs.all <- load.segment.table(segs.in)
 
 # Create subset of all GD segs & those with nominal significance
-segs.all <- segs[which(segs$any_gd | segs$any_sig), ]
+segs.all <- segs.all[which(segs.all$any_gd | segs.all$any_sig), ]
 
 # Make analysis subset of only discovery segments at GW or FDR, or lit GDs at Bonferroni
 segs <- segs.all[which(segs.all$any_sig | segs.all$bonf_sig_gd), ]
@@ -64,6 +64,7 @@ segs.bylnor <- segs[which(segs$region_id %in% c(lnor.groups[[1]], lnor.groups[[3
 
 # Merge loci & segment data for genome-wide/FDR significant sites only
 segs.sig <- merge.loci.segs(loci, segs)
+
 
 # Loop over all pairwise comparisons for vioswarm plots
 # Write each comparison to its own subdirectory

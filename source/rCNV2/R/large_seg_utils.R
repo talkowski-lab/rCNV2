@@ -274,7 +274,7 @@ normalize.dnms <- function(segs, dnm.cohorts=c("DDD", "ASC", "ASC_unaffected"),
     syn.exp.colname <- paste(cohort, "dnm_syn_exp_wMu", sep="_")
     if(syn.obs.colname %in% colnames(segs) & syn.exp.colname %in% colnames(segs)){
       if(is.data.table){
-        segs[, syn.d := (get(syn.obs.colname) - get(syn.exp.colname)) / n_genes]
+      segs[, syn.d := (get(syn.obs.colname) - get(syn.exp.colname)) / n_genes]
       }else{
         syn.obs <- segs[, which(colnames(segs)==syn.obs.colname)]
         syn.exp <- segs[, which(colnames(segs)==syn.exp.colname)]
@@ -365,6 +365,8 @@ get.gd.overlap <- function(chrom, start, end, segs){
 #'
 #' Summarize permutation results across all permutations for a single feature
 #'
+#' @import data.table
+#'
 #' @param perms.orig data.table of permutation results
 #' @param feature name of feature to evaluate
 #' @param measure statistic to evaluate \[default: mean\]
@@ -379,7 +381,7 @@ get.gd.overlap <- function(chrom, start, end, segs){
 perm.summary <- function(perms.orig, feature, measure="mean", subset_to_regions=NULL){
   if(!is.null(subset_to_regions)){
     # Make copy of permutation results to avoid overwriting by data.table
-    perms <- subset(perms.orig, region_id %in% subset_to_regions)
+    perms <- perms.orig[region_id %in% subset_to_regions]
   }else{
     perms <- copy(perms.orig)
   }
@@ -400,6 +402,14 @@ perm.summary <- function(perms.orig, feature, measure="mean", subset_to_regions=
     ALL <- perms[, frac.any(get(feature)), by=perm_idx]
     DEL <- perms[cnv == "DEL", frac.any(get(feature)), by=perm_idx]
     DUP <- perms[cnv == "DUP", frac.any(get(feature)), by=perm_idx]
+  }
+  if(nrow(DEL) == 0){
+    DEL <- copy(ALL)
+    DEL[, V1 := 0]
+  }
+  if(nrow(DUP) == 0){
+    DUP <- copy(ALL)
+    DUP[, V1 := 0]
   }
   setnames(ALL, "V1", "ALL")
   setnames(DEL, "V1", "DEL")

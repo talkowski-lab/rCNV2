@@ -225,8 +225,8 @@ mkdir perm_test_plots
   ${prefix}.${n_seg_perms}_permuted_segments.bed.gz \
   ${prefix}.lit_GDs.${n_seg_perms}_permuted_segments.bed.gz \
   perm_test_plots/ \
-  "${prefix}.segment_perms" \
-> perm_test_plots/${prefix}.segment_perms.plot.log
+  "${prefix}.segment_perms"
+gzip perm_test_plots/${prefix}.segment_perms.permBySize.stats.tsv
 
 
 # Run segment permutation tests while matching on number of genes per segment
