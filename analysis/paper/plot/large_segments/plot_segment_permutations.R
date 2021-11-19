@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -190,18 +190,22 @@ pdf.dims.multi <- c(4, 3.5)
 parmar.multi <- c(2.3, 6.05, 0, 1.5)
 parmar.mod.frac.any <- c(0, 0, 0, 0)
 
+
 # Generate permutation plots & Venns for overlap with genomic disorders
 for(subset in c("all_sig", "gw_sig", "fdr_sig")){
   cat(paste("\nAnalyzing GD overlap for", subset))
   if(subset == "all_sig"){
     region.ids <- sig.ids
     sig.label <- "GW_plus_FDR"
+    diamond.pch <- 23
   }else if(subset == "gw_sig"){
     region.ids <- gw.ids
     sig.label <- "GW"
+    diamond.pch <- 22
   }else if(subset == "fdr_sig"){
     region.ids <- fdr.ids
     sig.label <- "FDR"
+    diamond.pch <- 23
   }
 
   # Prep output directory
@@ -217,7 +221,7 @@ for(subset in c("all_sig", "gw_sig", "fdr_sig")){
                  subset_to_regions=region.ids,
                  measure="sum", n.bins=100,
                  x.title="Known Genomic Disorders",
-                 diamond.pch=22,
+                 diamond.pch=diamond.pch,
                  parmar=parmar.single)
   dev.off()
   new.stats.df$feature <- "any_gd"

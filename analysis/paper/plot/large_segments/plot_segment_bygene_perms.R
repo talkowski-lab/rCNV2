@@ -81,27 +81,222 @@ prefix <- args$args[6]
 loci <- load.loci(loci.in)
 segs.all <- load.segment.table(segs.in)
 
-# Subset to segments nominally significant for at least one phenotype
-segs <- segs.all[which(segs.all$nom_sig), ]
-nomsig.ids <- segs$region_id
+# Create subset of all GD segs & those with nominal significance
+segs.all <- segs.all[which(segs.all$any_gd | segs.all$any_sig), ]
+
+# Make analysis subset of only discovery segments at GW or FDR, or lit GDs at Bonferroni
+segs <- segs.all[which(segs.all$any_sig | segs.all$bonf_sig_gd), ]
+analysis.ids <- segs$region_id
 
 # Merge loci & segment data for genome-wide or FDR significant sites only
 segs.sig <- merge.loci.segs(loci, segs)
 
-# Split seg IDs by gw-sig vs FDR vs. lit GD
+# Split seg IDs by gw-sig vs FDR vs. Bonf GD vs. nonsig GD
 sig.ids <- segs$region_id[which(segs$any_sig)]
 gw.ids <- segs$region_id[which(segs$gw_sig)]
 fdr.ids <- segs$region_id[which(segs$fdr_sig)]
 lit.ids <- segs$region_id[which(segs$any_gd & !segs$any_sig)]
 all.lit.ids <- segs.all$region_id[which(segs.all$any_gd & !segs.all$any_sig)]
+nonsig.lit.ids <- segs.all$region_id[which(segs.all$region_id %in% all.lit.ids & !segs.all$any_sig)]
 
-# Get list of developmental and NDD loci
-dev.region_ids <- get.developmental.region_ids(loci, segs)
-NDD.region_ids <- get.ndd.region_ids(loci, segs)
+# Get list of developmental loci (analysis set of segs only)
+dev.seg.ids <- get.developmental.region_ids(loci, segs)
+adult.seg.ids <- get.developmental.region_ids(loci, segs, adult=TRUE)
+dev.segs <- segs[which(segs$region_id %in% dev.seg.ids), ]
+
+# Get list of NDD loci (analysis set of segs only)
+NDD.seg.ids <- get.ndd.region_ids(loci, segs)
+NDD.segs <- segs[which(segs$region_id %in% NDD.seg.ids), ]
+
+# Subset to loci either in top or bottom third of effect size distribution
+lnor.groups <- split.regions.by.effect.size(segs, quantiles=3)
+
+# Merge loci & segment data for significant sites only
+segs.sig <- merge.loci.segs(loci, segs[which(segs$any_sig), ])
 
 # Load permutation results
-perms <- load.perms(perm.res.in, subset_to_regions=nomsig.ids)
-lit.perms <- load.perms(lit.perm.res.in, subset_to_regions=nomsig.ids)
+perms <- load.perms(perm.res.in, subset_to_regions=analysis.ids)
+lit.perms <- load.perms(lit.perm.res.in, subset_to_regions=analysis.ids)
+
+# Prepare logfile for permutation tests
+stats.df <- data.frame()
+
+# Set global plot properties
+pdf.dims.single <- c(2.2, 2.4)
+parmar.single <- c(2.25, 2, 0, 2)
+pdf.dims.multi <- c(4, 3.5)
+parmar.multi <- c(2.3, 6.05, 0, 1.5)
+parmar.mod.frac.any <- c(0, 0, 0, 0)
+
+
+# Generate permutation plots for HPO-matched OMIM genes among discovery segments
+for(subset in c("all_sig", "gw_sig", "fdr_sig")){
+  cat(paste("\nAnalyzing HPO-matched gene enrichment for", subset))
+  if(subset == "all_sig"){
+    region.ids <- sig.ids
+    sig.label <- "GW_plus_FDR"
+    diamond.pch <- 23
+  }else if(subset == "gw_sig"){
+    region.ids <- gw.ids
+    sig.label <- "GW"
+    diamond.pch <- 22
+  }else if(subset == "fdr_sig"){
+    region.ids <- fdr.ids
+    sig.label <- "FDR"
+    diamond.pch <- 23
+  }
+
+  # Prep output directory
+  outdir.sub <- paste(outdir, "HPOmatched_genes", sep="/")
+  if(!dir.exists(outdir.sub)){
+    dir.create(outdir.sub)
+  }
+
+  # Single panel of permutation results
+  for(measure in c("mean", "frac.any")){
+    if(measure == "frac.any"){
+      x.title <- "Pct. w/HPO-Matched Gene"
+    }else{
+      x.title <- "HPO-Matched Genes per Seg."
+    }
+    pdf(paste(paste(outdir.sub, prefix, sep="/"), "HPOmatched_genes", measure, subset, "pdf", sep="."),
+        height=pdf.dims.single[1], width=pdf.dims.single[2])
+    new.stats.df <- plot.seg.perms(segs, perms,
+                                   feature="n_HPOmatched_genes", measure=measure,
+                                   subset_to_regions=region.ids,
+                                   n.bins=15, x.title=x.title,
+                                   diamond.pch=diamond.pch, parmar=parmar.single)
+    dev.off()
+    new.stats.df$feature <- "n_HPOmatched_genes"
+    new.stats.df$measure <- measure
+    new.stats.df$sig <- sig.label
+    new.stats.df$segs <- subset
+    stats.df <- rbind(stats.df, new.stats.df)
+  }
+}
+
+
+
+# Loop over all segment partitions and generate plots for each
+for(subset in c("all_segs", "strong", "weak", "developmental", "adult",
+                "terminal", "interstitial", "NAHR", "nonrecurrent")){
+
+  stats.df.tmp <- data.frame()
+
+  # Set subset-specific properties
+  cat(paste("\nEvaluating other permutation tests for", subset))
+  if(subset == "all_segs"){
+    region.ids <- segs$region_id
+  }else if(subset == "strong"){
+    region.ids <- lnor.groups[[3]]
+  }else if(subset == "weak"){
+    region.ids <- lnor.groups[[1]]
+  }else if(subset == "developmental"){
+    region.ids <- dev.seg.ids
+  }else if(subset == "adult"){
+    region.ids <- adult.seg.ids
+  }else if(subset == "terminal"){
+    region.ids <- segs.all$region_id[which(segs.all$terminal)]
+  }else if(subset == "interstitial"){
+    region.ids <- segs.all$region_id[which(!segs.all$terminal)]
+  }else if(subset == "NAHR"){
+    region.ids <- segs.all$region_id[which(segs.all$nahr)]
+  }else if(subset == "nonrecurrent"){
+    region.ids <- segs.all$region_id[which(!segs.all$nahr)]
+  }
+  segs.sub <- segs[which(segs$region_id %in% region.ids), ]
+  outdir.sub <- paste(outdir, paste(subset, "permByGene", sep="_"), sep="/")
+  if(!dir.exists(outdir.sub)){
+    dir.create(outdir.sub)
+  }
+
+  # Mean number of constrained genes per segment
+  new.stats.df <- plot.all.perm.res(segs.sub, perms, lit.perms,
+                                    subset_to_regions=region.ids,
+                                    feature="n_gnomAD_constrained_genes", measure="mean",
+                                    outdir.sub, prefix, norm=F, norm.multi=F,
+                                    n.bins.single=30, n.bins.multi=50,
+                                    x.title="Constrained Genes per Seg.",
+                                    pdf.dims.single=pdf.dims.single,
+                                    parmar.single=parmar.single,
+                                    pdf.dims.multi=pdf.dims.multi,
+                                    parmar.multi=parmar.multi)
+  segs.df <- rbind(stats.df.tmp, new.stats.df)
+
+  # Fraction of segments with at least one constrained gene
+  new.stats.df <- plot.all.perm.res(segs.sub, perms, lit.perms,
+                                    subset_to_regions=region.ids,
+                                    feature="n_gnomAD_constrained_genes", measure="frac.any",
+                                    outdir.sub, prefix, norm=F, norm.multi=F,
+                                    n.bins.single=30, n.bins.multi=50,
+                                    x.title="Pct. w/Constrained Gene",
+                                    pdf.dims.single=pdf.dims.single,
+                                    parmar.single=parmar.single,
+                                    pdf.dims.multi=pdf.dims.multi,
+                                    parmar.multi=parmar.multi)
+  segs.df <- rbind(stats.df.tmp, new.stats.df)
+
+  # Mean number of OMIM genes per segment
+  new.stats.df <- plot.all.perm.res(segs.sub, perms, lit.perms,
+                                    subset_to_regions=region.ids,
+                                    feature="n_OMIM_genes", measure="mean",
+                                    outdir.sub, prefix, norm=F, norm.multi=F,
+                                    n.bins.single=30, n.bins.multi=50,
+                                    x.title="OMIM Genes per Seg.",
+                                    pdf.dims.single=pdf.dims.single,
+                                    parmar.single=parmar.single,
+                                    pdf.dims.multi=pdf.dims.multi,
+                                    parmar.multi=parmar.multi)
+  segs.df <- rbind(stats.df.tmp, new.stats.df)
+
+  # Fraction of segments with at least one OMIM gene
+  new.stats.df <- plot.all.perm.res(segs.sub, perms, lit.perms,
+                                    subset_to_regions=region.ids,
+                                    feature="n_OMIM_genes", measure="frac.any",
+                                    outdir.sub, prefix, norm=F, norm.multi=F,
+                                    n.bins.single=30, n.bins.multi=50,
+                                    x.title="Pct. w/OMIM Gene",
+                                    pdf.dims.single=pdf.dims.single,
+                                    parmar.single=parmar.single,
+                                    pdf.dims.multi=pdf.dims.multi,
+                                    parmar.multi=parmar.multi)
+  segs.df <- rbind(stats.df.tmp, new.stats.df)
+
+  ### TODO: FIX THIS TO ALLOW INVERSION OF X-AXIS
+  ### THIS COULD BE ACCOMPLISHED BY JUST TAKING THE NEGATIVE OF THE FEATURE
+  ### BUT FORCING THE X-AXIS FUNCTION TO TAKE THE ABSOLUTE VALUE
+  # Average min(LOEUF) per Segment
+  new.stats.df <- plot.all.perm.res(segs.sub, perms, lit.perms,
+                                    subset_to_regions=region.ids,
+                                    feature="min_LOEUF", measure="mean",
+                                    outdir.sub, prefix, norm=F, norm.multi=F,
+                                    n.bins.single=30, n.bins.multi=50,
+                                    x.title="min(LOEUF) per Segment",
+                                    pdf.dims.single=pdf.dims.single,
+                                    parmar.single=parmar.single,
+                                    pdf.dims.multi=pdf.dims.multi,
+                                    parmar.multi=parmar.multi)
+  segs.df <- rbind(stats.df.tmp, new.stats.df)
+
+  # Cleanup summary stats and append to existing log
+  stats.df.tmp$segs <- subset
+  stats.df <- rbind(stats.df, stats.df.tmp)
+}
+
+### TODO: REWORK ALL OF THE BELOW
+
+
+
+### ANALYSES
+# mean & sum of min_LOEUF
+# mean & sum of min_MisOEUF
+# mean & sum of total_LoF_OE
+# mean & sum of total_mis_OE
+# mean of gene_expression_harmonic_mean
+# mean & frac.any of n_ubiquitously_expressed_genes
+# All DNM enrichments with and without significant genes (NDD segments only)
+
+
 
 # Fraction of discovered segments with at least one HPO-matched gene
 print("Fraction of all significant segments with at least one HPO-matched gene:")

@@ -313,6 +313,10 @@ normalize.dnms <- function(segs, dnm.cohorts=c("DDD", "ASC", "ASC_unaffected"),
       }
     }
   }
+  if(is.data.table){
+    segs[, syn.d := NULL]
+    segs[, dam.d := NULL]
+  }
   return(segs)
 }
 

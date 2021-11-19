@@ -594,7 +594,7 @@ add.xaxis.to.perm.plot <- function(xlims, hard.min=-10e10, hard.max=10e10, max.x
 #' @param diamond.cex expansion for observed values
 #' @param parmar numeric vector of margins passed to [par()]
 #'
-#' @seealso [plot.viohist()]
+#' @seealso [plot.viohist()], [perm.summary()]
 #'
 #' @export plot.seg.perms
 #' @export
@@ -751,7 +751,7 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
 #' @param diamond.cex expansion for observed values
 #' @param parmar numeric vector of margins passed to [par()]
 #'
-#' @seealso [plot.seg.perms()]
+#' @seealso [plot.seg.perms()], [perm.summary()]
 #'
 #' @export plot.seg.perms.multi
 #' @export
