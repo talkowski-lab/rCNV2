@@ -70,7 +70,7 @@ segs.sig <- merge.loci.segs(loci, segs)
 # Write each comparison to its own subdirectory
 for(comp in c("DEL_vs_DUP", "gw_vs_FDR", "NAHR_vs_nonrecurrent",
               "terminal_vs_interstitial", "dev_vs_adult",
-              "strong_vs_weak", "sig_vs_litGDs")){
+              "strong_vs_weak", "sig_vs_litGDs", "pleiotropy")){
 
   # Set plotting variables
   boxplot.colors <- NULL
@@ -166,11 +166,11 @@ for(comp in c("DEL_vs_DUP", "gw_vs_FDR", "NAHR_vs_nonrecurrent",
     # Swarmplot of effect size
     pdf(paste(out.prefix.sub, "effect_size", plot.suffix, sep="."),
         height=plot.dims[1], width=plot.dims[2])
-    segs.swarm(seg.df, x.bool=x.bool, y=seg.df$meta_best_lnor,
+    segs.swarm(seg.df, x.bool=x.bool, y=log2(exp(seg.df$meta_best_lnor)),
                x.labs=x.labs, violin=T, add.pvalue=T,
                add.y.axis=T, pt.cex=0.5, cnv.split=cnv.split,
                boxplot.colors=boxplot.colors, boxplot.fill=boxplot.fill,
-               ytitle=bquote("Max." ~ italic("ln") * ("Odds Ratio")), y.title.line=1.25,
+               ytitle=bquote("Max." ~  log[2]("Odds Ratio")), y.title.line=1.25,
                parmar=c(1.2, 2.75, 1.65 + parmar.y.mod, 0.2))
     dev.off()
 
@@ -222,7 +222,7 @@ for(comp in c("DEL_vs_DUP", "gw_vs_FDR", "NAHR_vs_nonrecurrent",
                x.labs=x.labs, violin=T, add.pvalue=T,
                boxplot.colors=boxplot.colors, boxplot.fill=boxplot.fill,
                subset_to_regions=seg.df$region_id[which(seg.df$n_genes>0)],
-               ytitle=bquote("Prop.Ubiquitously Expr."), y.title.line=1.75,
+               ytitle=bquote("Prop. Ubiquitously Expr."), y.title.line=1.75,
                pt.cex=0.5, cnv.split=cnv.split,
                parmar=c(1.2, 3, 1.65 + parmar.y.mod, 0.2))
     dev.off()

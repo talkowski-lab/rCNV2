@@ -12,6 +12,7 @@ segs.scatter(
   xlims = NULL,
   ylims = NULL,
   add.lm = T,
+  add.cor = add.lm,
   pt.cex = 1,
   blue.bg = TRUE,
   horiz.lines.at = NULL,
@@ -26,6 +27,8 @@ segs.scatter(
   x.labs = NULL,
   x.labs.at = NULL,
   parse.x.labs = FALSE,
+  x.labs.line = -0.6,
+  max.x.ticks = 6,
   x.title.cex = 1,
   ytitle = NULL,
   y.title.line = 1.75,
@@ -33,6 +36,8 @@ segs.scatter(
   y.labs = NULL,
   y.labs.at = NULL,
   parse.y.labs = FALSE,
+  y.labs.line = -0.6,
+  max.y.ticks = 6,
   y.title.cex = 1,
   parmar = c(3, 3, 0.8, 0.8)
 )
@@ -51,6 +56,8 @@ segs.scatter(
 \item{ylims}{Y axis limits}
 
 \item{add.lm}{add linear trendline [default: TRUE]}
+
+\item{add.cor}{add correlation coefficients & P-values for linear model [default: TRUE]}
 
 \item{pt.cex}{expansion factor for points [default: 1]}
 
@@ -80,6 +87,10 @@ segs.scatter(
 
 \item{parse.x.labs}{format X axis labels with \code{\link[=parse]{parse()}} [default: FALSE]}
 
+\item{x.labs.line}{line for X axis labels [default: -0.6]}
+
+\item{max.x.ticks}{maximum number of X axis ticks to display [default: 6]}
+
 \item{x.title.cex}{expansion factor for X axis title [default: 1]}
 
 \item{ytitle}{title of Y axis}
@@ -93,6 +104,10 @@ segs.scatter(
 \item{y.labs.at}{if different from \code{y.at}, specify locations of \code{y.labs}}
 
 \item{parse.y.labs}{format Y axis labels with \code{\link[=parse]{parse()}} [default: FALSE]}
+
+\item{y.labs.line}{line for Y axis labels [default: -0.6]}
+
+\item{max.y.ticks}{maximum number of Y axis ticks to display [default: 6]}
 
 \item{y.title.cex}{expansion factor for Y axis title [default: 1]}
 

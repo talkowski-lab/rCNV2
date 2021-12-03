@@ -261,16 +261,6 @@ for(pheno in c("all_phenos", "developmental")){
                   parmar=c(2.45, 3.25, 0.5, 0.5))
   dev.off()
 
-  # # Number of constrained genes vs expected
-  # constrained.max <- max(seg.df$constrained_expected, seg.df$n_gnomAD_constrained_genes)
-  # pdf(paste(out.prefix, "constrained_genes_obs_vs_exp", pheno, "pdf", sep="."),
-  #     height=2.4, width=2.4)
-  # segs.scatter(seg.df, seg.df$constrained_expected, seg.df$n_gnomAD_constrained_genes,
-  #              xlims=c(0, constrained.max), ylims=c(0, constrained.max),
-  #              xtitle="Constrained (Expected)", ytitle="Constrained (Observed)",
-  #              pt.cex=0.6, blue.bg=FALSE)
-  # dev.off()
-
   # Plot proportion of constrained genes vs. # of genes
   pdf(paste(out.prefix, "prop_constrained_vs_ngenes", pheno, "pdf", sep="."),
       height=2.4, width=2.7)

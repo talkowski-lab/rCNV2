@@ -35,7 +35,29 @@ load.perms <- function(perm.res.in, subset_to_regions=NULL){
   }
 
   # Normalize DNM excess per permutation
-  normalize.dnms(perms, is.data.table=TRUE)
+  perms <- normalize.dnms(perms, is.data.table=TRUE,
+                          dnm.cohorts=c("DDD", "ASC", "ASC_unaffected",
+                                        "DDD_noSig", "ASC_noSig",
+                                        "ASC_unaffected_noSig"))
+
+  # Add columns for combined DNM excess between DDD and ASC
+  dnm.base.cols <- sapply(colnames(perms)[grep("^DDD_", colnames(perms))],
+                          gsub, pattern="^DDD_", replacement="")
+  for(col.base in dnm.base.cols){
+    new.col <- paste("DDD_plus_ASC", col.base, sep="_")
+    ddd.col <- paste("DDD", col.base, sep="_")
+    asc.col <- paste("ASC", col.base, sep="_")
+    perms[, eval(new.col) := get(ddd.col) + get(asc.col)]
+  }
+
+  # Drop unnecessary columns
+  extra.dnm.col.idxs <- setdiff(grep("_dnm_", colnames(perms)),
+                                grep("_norm_excess_per_gene", colnames(perms)))
+  cols.to.drop <- c(colnames(perms)[extra.dnm.col.idxs],
+                    "syn.d", "dam.d")
+  perms[, (cols.to.drop) := NULL]
+
+  return(perms)
 }
 
 
@@ -123,7 +145,7 @@ stats.df <- data.frame()
 
 # Set global plot properties
 pdf.dims.single <- c(2.2, 2.4)
-parmar.single <- c(2.25, 2, 0, 2)
+parmar.single <- c(2.25, 2, 0, 2.25)
 pdf.dims.multi <- c(4, 3.5)
 parmar.multi <- c(2.3, 6.05, 0, 1.5)
 parmar.mod.frac.any <- c(0, 0, 0, 0)
@@ -159,7 +181,8 @@ for(subset in c("all_sig", "gw_sig", "fdr_sig")){
     }else{
       x.title <- "HPO-Matched Genes per Seg."
     }
-    pdf(paste(paste(outdir.sub, prefix, sep="/"), "HPOmatched_genes", measure, subset, "pdf", sep="."),
+    pdf(paste(paste(outdir.sub, prefix, sep="/"), "HPOmatched_genes_permByGene",
+              measure, subset, "pdf", sep="."),
         height=pdf.dims.single[1], width=pdf.dims.single[2])
     new.stats.df <- plot.seg.perms(segs, perms,
                                    feature="n_HPOmatched_genes", measure=measure,
@@ -174,7 +197,6 @@ for(subset in c("all_sig", "gw_sig", "fdr_sig")){
     stats.df <- rbind(stats.df, new.stats.df)
   }
 }
-
 
 
 # Loop over all segment partitions and generate plots for each
@@ -221,7 +243,7 @@ for(subset in c("all_segs", "strong", "weak", "developmental", "adult",
                                     parmar.single=parmar.single,
                                     pdf.dims.multi=pdf.dims.multi,
                                     parmar.multi=parmar.multi)
-  segs.df <- rbind(stats.df.tmp, new.stats.df)
+  stats.df.tmp <- rbind(stats.df.tmp, new.stats.df)
 
   # Fraction of segments with at least one constrained gene
   new.stats.df <- plot.all.perm.res(segs.sub, perms, lit.perms,
@@ -234,7 +256,7 @@ for(subset in c("all_segs", "strong", "weak", "developmental", "adult",
                                     parmar.single=parmar.single,
                                     pdf.dims.multi=pdf.dims.multi,
                                     parmar.multi=parmar.multi)
-  segs.df <- rbind(stats.df.tmp, new.stats.df)
+  stats.df.tmp <- rbind(stats.df.tmp, new.stats.df)
 
   # Mean number of OMIM genes per segment
   new.stats.df <- plot.all.perm.res(segs.sub, perms, lit.perms,
@@ -247,7 +269,7 @@ for(subset in c("all_segs", "strong", "weak", "developmental", "adult",
                                     parmar.single=parmar.single,
                                     pdf.dims.multi=pdf.dims.multi,
                                     parmar.multi=parmar.multi)
-  segs.df <- rbind(stats.df.tmp, new.stats.df)
+  stats.df.tmp <- rbind(stats.df.tmp, new.stats.df)
 
   # Fraction of segments with at least one OMIM gene
   new.stats.df <- plot.all.perm.res(segs.sub, perms, lit.perms,
@@ -260,15 +282,12 @@ for(subset in c("all_segs", "strong", "weak", "developmental", "adult",
                                     parmar.single=parmar.single,
                                     pdf.dims.multi=pdf.dims.multi,
                                     parmar.multi=parmar.multi)
-  segs.df <- rbind(stats.df.tmp, new.stats.df)
+  stats.df.tmp <- rbind(stats.df.tmp, new.stats.df)
 
-  ### TODO: FIX THIS TO ALLOW INVERSION OF X-AXIS
-  ### THIS COULD BE ACCOMPLISHED BY JUST TAKING THE NEGATIVE OF THE FEATURE
-  ### BUT FORCING THE X-AXIS FUNCTION TO TAKE THE ABSOLUTE VALUE
   # Average min(LOEUF) per Segment
   new.stats.df <- plot.all.perm.res(segs.sub, perms, lit.perms,
                                     subset_to_regions=region.ids,
-                                    feature="min_LOEUF", measure="mean",
+                                    feature="min_LOEUF", measure="mean", invert=T,
                                     outdir.sub, prefix, norm=F, norm.multi=F,
                                     n.bins.single=30, n.bins.multi=50,
                                     x.title="min(LOEUF) per Segment",
@@ -276,226 +295,180 @@ for(subset in c("all_segs", "strong", "weak", "developmental", "adult",
                                     parmar.single=parmar.single,
                                     pdf.dims.multi=pdf.dims.multi,
                                     parmar.multi=parmar.multi)
-  segs.df <- rbind(stats.df.tmp, new.stats.df)
+  stats.df.tmp <- rbind(stats.df.tmp, new.stats.df)
+
+  # Average min(MisOEUF) per Segment
+  new.stats.df <- plot.all.perm.res(segs.sub, perms, lit.perms,
+                                    subset_to_regions=region.ids,
+                                    feature="min_MisOEUF", measure="mean", invert=T,
+                                    outdir.sub, prefix, norm=F, norm.multi=F,
+                                    n.bins.single=30, n.bins.multi=50,
+                                    x.title="min(MisOEUF) per Segment",
+                                    pdf.dims.single=pdf.dims.single,
+                                    parmar.single=parmar.single,
+                                    pdf.dims.multi=pdf.dims.multi,
+                                    parmar.multi=parmar.multi)
+  stats.df.tmp <- rbind(stats.df.tmp, new.stats.df)
+
+  # Average total LoF O/E per Segment
+  new.stats.df <- plot.all.perm.res(segs.sub, perms, lit.perms,
+                                    subset_to_regions=region.ids,
+                                    feature="total_LoF_OE", measure="mean", invert=T,
+                                    outdir.sub, prefix, norm=F, norm.multi=F,
+                                    n.bins.single=30, n.bins.multi=50,
+                                    x.title="Obs:Exp PTVs per Seg.",
+                                    pdf.dims.single=pdf.dims.single,
+                                    parmar.single=parmar.single,
+                                    pdf.dims.multi=pdf.dims.multi,
+                                    parmar.multi=parmar.multi)
+  stats.df.tmp <- rbind(stats.df.tmp, new.stats.df)
+
+  # Average total missense O/E per Segment
+  new.stats.df <- plot.all.perm.res(segs.sub, perms, lit.perms,
+                                    subset_to_regions=region.ids,
+                                    feature="total_mis_OE", measure="mean", invert=T,
+                                    outdir.sub, prefix, norm=F, norm.multi=F,
+                                    n.bins.single=30, n.bins.multi=50,
+                                    x.title="Obs:Exp Missense per Seg.",
+                                    pdf.dims.single=pdf.dims.single,
+                                    parmar.single=parmar.single,
+                                    pdf.dims.multi=pdf.dims.multi,
+                                    parmar.multi=parmar.multi)
+  stats.df.tmp <- rbind(stats.df.tmp, new.stats.df)
+
+  # Average gene expression
+  new.stats.df <- plot.all.perm.res(segs.sub, perms, lit.perms,
+                                    subset_to_regions=region.ids,
+                                    feature="gene_expression_harmonic_mean", measure="mean",
+                                    outdir.sub, prefix, norm=F, norm.multi=F,
+                                    n.bins.single=30, n.bins.multi=50,
+                                    x.title="Average Gene Expression",
+                                    pdf.dims.single=pdf.dims.single,
+                                    parmar.single=parmar.single,
+                                    pdf.dims.multi=pdf.dims.multi,
+                                    parmar.multi=parmar.multi)
+  stats.df.tmp <- rbind(stats.df.tmp, new.stats.df)
+
+  # Proportion of ubiquitously expressed genes
+  new.stats.df <- plot.all.perm.res(segs.sub, perms, lit.perms,
+                                    subset_to_regions=region.ids,
+                                    feature="prop_ubiquitously_expressed", measure="mean",
+                                    outdir.sub, prefix, norm=F, norm.multi=F,
+                                    n.bins.single=30, n.bins.multi=50,
+                                    x.title="Prop. Ubiquitously Expressed",
+                                    pdf.dims.single=pdf.dims.single,
+                                    parmar.single=parmar.single,
+                                    pdf.dims.multi=pdf.dims.multi,
+                                    parmar.multi=parmar.multi)
+  stats.df.tmp <- rbind(stats.df.tmp, new.stats.df)
+
+  # Fraction of segments with at least one ubiquitously expressed gene
+  new.stats.df <- plot.all.perm.res(segs.sub, perms, lit.perms,
+                                    subset_to_regions=region.ids,
+                                    feature="n_ubiquitously_expressed_genes", measure="frac.any",
+                                    outdir.sub, prefix, norm=F, norm.multi=F,
+                                    n.bins.single=30, n.bins.multi=50,
+                                    x.title="% Segs w/Ubiq. Expr. Gene",
+                                    pdf.dims.single=pdf.dims.single,
+                                    parmar.single=parmar.single,
+                                    pdf.dims.multi=pdf.dims.multi,
+                                    parmar.multi=parmar.multi)
+  stats.df.tmp <- rbind(stats.df.tmp, new.stats.df)
 
   # Cleanup summary stats and append to existing log
   stats.df.tmp$segs <- subset
   stats.df <- rbind(stats.df, stats.df.tmp)
 }
 
-### TODO: REWORK ALL OF THE BELOW
+
+# Loop over a subset of segment partitions and generate DNM enrichment plots for each
+# NOTE: only NDD segments used for these enrichments to match the phenotypes in DDD & ASC
+for(subset in c("all_segs", "strong", "weak", "terminal",
+                "interstitial", "NAHR", "nonrecurrent")){
+
+  stats.df.tmp <- data.frame()
+
+  # Set subset-specific properties
+  cat(paste("\nEvaluating DNM enrichments for", subset))
+  if(subset == "all_segs"){
+    region.ids <- intersect(NDD.seg.ids, segs$region_id)
+  }else if(subset == "strong"){
+    region.ids <- intersect(NDD.seg.ids, lnor.groups[[3]])
+  }else if(subset == "weak"){
+    region.ids <- intersect(NDD.seg.ids, lnor.groups[[1]])
+  }else if(subset == "terminal"){
+    region.ids <- intersect(NDD.seg.ids,
+                            segs.all$region_id[which(segs.all$terminal)])
+  }else if(subset == "interstitial"){
+    region.ids <- intersect(NDD.seg.ids,
+                            segs.all$region_id[which(!segs.all$terminal)])
+  }else if(subset == "NAHR"){
+    region.ids <- intersect(NDD.seg.ids,
+                            segs.all$region_id[which(segs.all$nahr)])
+  }else if(subset == "nonrecurrent"){
+    region.ids <- intersect(NDD.seg.ids,
+                            segs.all$region_id[which(!segs.all$nahr)])
+  }
+  segs.sub <- segs[which(segs$region_id %in% region.ids), ]
+  outdir.sub <- paste(outdir, paste(subset, "permByGene", sep="_"), sep="/")
+  if(!dir.exists(outdir.sub)){
+    dir.create(outdir.sub)
+  }
+
+  # Loop over each cohort & consequence
+  for(cohort in c("ASC", "DDD", "ASC_unaffected", "DDD_plus_ASC")){
+    for(ci in 1:length(csqs)){
+      csq <- csqs[ci]
+      csq.abbrev <- names(csqs)[ci]
+
+      # Mean excess DNMs per gene
+      new.stats.df <- plot.all.perm.res(segs.sub, perms, lit.perms,
+                                        subset_to_regions=region.ids,
+                                        feature=paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_"),
+                                        measure="mean",
+                                        outdir.sub, paste(prefix, "NDD_only", sep="."),
+                                        norm=F, norm.multi=F,
+                                        n.bins.single=100, n.bins.multi=100, min.bins=100,
+                                        x.title=bquote("Excess" ~ italic("De Novo") ~ .(csq.abbrev) ~ "/ Gene"),
+                                        pdf.dims.single=pdf.dims.single,
+                                        parmar.single=parmar.single,
+                                        pdf.dims.multi=pdf.dims.multi,
+                                        parmar.multi=parmar.multi)
+      stats.df.tmp <- rbind(stats.df.tmp, new.stats.df)
+
+      # Mean excess DNMs per gene after excluding significant genes from each study
+      new.stats.df <- plot.all.perm.res(segs.sub, perms, lit.perms,
+                                        subset_to_regions=region.ids,
+                                        feature=paste(cohort, "noSig_dnm", csq, "norm_excess_per_gene", sep="_"),
+                                        measure="mean",
+                                        outdir.sub, paste(prefix, "NDD_only", sep="."),
+                                        norm=F, norm.multi=F,
+                                        n.bins.single=100, n.bins.multi=100, min.bins=100,
+                                        x.title=bquote("Excess" ~ italic("De Novo") ~ .(csq.abbrev) ~ "/ Gene"),
+                                        pdf.dims.single=pdf.dims.single,
+                                        parmar.single=parmar.single,
+                                        pdf.dims.multi=pdf.dims.multi,
+                                        parmar.multi=parmar.multi)
+      stats.df.tmp <- rbind(stats.df.tmp, new.stats.df)
+    }
+  }
+
+  # Cleanup summary stats and append to existing log
+  stats.df.tmp$segs <- subset
+  stats.df <- rbind(stats.df, stats.df.tmp)
+}
 
 
-
-### ANALYSES
-# mean & sum of min_LOEUF
-# mean & sum of min_MisOEUF
-# mean & sum of total_LoF_OE
-# mean & sum of total_mis_OE
-# mean of gene_expression_harmonic_mean
-# mean & frac.any of n_ubiquitously_expressed_genes
-# All DNM enrichments with and without significant genes (NDD segments only)
+# Reorganize all main plots
+sapply(c("all_segs", "strong", "weak", "developmental", "adult",
+         "terminal", "interstitial", "NAHR", "nonrecurrent"),
+       function(subset){
+         outdir.sub <- paste(outdir, paste(subset, "permByGene", sep="_"), sep="/")
+         reorganize.perm.plots(outdir.sub)
+       })
 
 
-
-# Fraction of discovered segments with at least one HPO-matched gene
-print("Fraction of all significant segments with at least one HPO-matched gene:")
-pdf(paste(outdir, "/", prefix, ".HPOmatched_genes.frac_any.all_sig.pdf", sep=""),
-    height=2.2, width=2.4)
-plot.seg.perms(segs.sig, perms, feature="n_HPOmatched_genes", measure="frac.any",
-               n.bins=15, x.title="Pct. w/HPO-Matched Gene",
-               diamond.pch=23, parmar=c(2.2, 2, 0, 1.8))
-dev.off()
-print("Fraction of GW significant segments with at least one HPO-matched gene:")
-pdf(paste(outdir, "/", prefix, ".HPOmatched_genes.frac_any.gw_sig.pdf", sep=""),
-    height=2.2, width=2.4)
-plot.seg.perms(segs.sig, perms, feature="n_HPOmatched_genes", measure="frac.any",
-               subset_to_regions=gw.ids, n.bins=15, x.title="Pct. w/HPO-Matched Gene",
-               diamond.pch=22, parmar=c(2.2, 2, 0, 1.8))
-dev.off()
-print("Fraction of FDR significant segments with at least one HPO-matched gene:")
-pdf(paste(outdir, "/", prefix, ".HPOmatched_genes.frac_any.FDR_sig.pdf", sep=""),
-    height=2.2, width=2.4)
-plot.seg.perms(segs.sig, perms, feature="n_HPOmatched_genes", measure="frac.any",
-               subset_to_regions=fdr.ids, n.bins=15, x.title="Pct. w/HPO-Matched Gene",
-               diamond.pch=23, parmar=c(2.2, 2, 0, 1.8))
-dev.off()
-
-
-# Mean # of HPO-matched genes per significant segment
-print("Mean HPO-matched genes per significant segment:")
-pdf(paste(outdir, "/", prefix, ".HPOmatched_genes.mean.all_sig.pdf", sep=""),
-    height=2.2, width=2.4)
-plot.seg.perms(segs.sig, perms, feature="n_HPOmatched_genes", measure="mean",
-               n.bins=30, x.title="Mean HPO-Matched Genes",
-               diamond.pch=23, parmar=c(2.2, 2, 0, 2))
-dev.off()
-print("Mean HPO-matched genes per GW sig segment:")
-pdf(paste(outdir, "/", prefix, ".HPOmatched_genes.mean.gw_sig.pdf", sep=""),
-    height=2.2, width=2.4)
-plot.seg.perms(segs.sig, perms, feature="n_HPOmatched_genes", measure="mean",
-               subset_to_regions=gw.ids,
-               n.bins=30, x.title="Mean HPO-Matched Genes",
-               diamond.pch=22, parmar=c(2.2, 2, 0, 2))
-dev.off()
-print("Mean HPO-matched genes per FDR sig segment:")
-pdf(paste(outdir, "/", prefix, ".HPOmatched_genes.mean.fdr_sig.pdf", sep=""),
-    height=2.2, width=2.4)
-plot.seg.perms(segs.sig, perms, feature="n_HPOmatched_genes", measure="mean",
-               subset_to_regions=fdr.ids,
-               n.bins=30, x.title="Mean HPO-Matched Genes",
-               diamond.pch=23, parmar=c(2.2, 2, 0, 2))
-dev.off()
-
-
-# Fraction of segments with at least one constrained gene
-print("Fraction of segments with at least one constrained gene:")
-plot.all.perm.res(segs, perms, lit.perms,
-                  feature="n_gnomAD_constrained_genes", measure="frac.any",
-                  outdir, prefix, norm=F, norm.multi=F,
-                  n.bins.single=15, n.bins.multi=30,
-                  x.title="Pct. w/Constrained Gene",
-                  pdf.dims.single=c(2.2, 2.4),
-                  parmar.single=c(2.25, 2, 0, 2),
-                  pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.25, 6.25, 0, 3.5))
-print("Fraction of DEVELOPMENTAL segments with at least one constrained gene:")
-plot.all.perm.res(segs, perms, lit.perms, subset_to_regions=dev.region_ids,
-                  feature="n_gnomAD_constrained_genes", measure="frac.any",
-                  outdir, paste(prefix, "dev_only", sep="."), norm=F, norm.multi=F,
-                  n.bins.single=15, n.bins.multi=30,
-                  x.title="Pct. w/Constrained Gene",
-                  pdf.dims.single=c(2.2, 2.4),
-                  parmar.single=c(2.25, 2, 0, 2),
-                  pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.25, 6.25, 0, 3.5))
-print("Fraction of NDD segments with at least one constrained gene:")
-plot.all.perm.res(segs, perms, lit.perms, subset_to_regions=NDD.region_ids,
-                  feature="n_gnomAD_constrained_genes", measure="frac.any",
-                  outdir, paste(prefix, "NDD_only", sep="."), norm=F, norm.multi=F,
-                  n.bins.single=15, n.bins.multi=30,
-                  x.title="Pct. w/Constrained Gene",
-                  pdf.dims.single=c(2.2, 2.4),
-                  parmar.single=c(2.25, 2, 0, 2),
-                  pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.25, 6.25, 0, 3.5))
-
-
-# Mean number of constrained genes per segment
-print("Mean constrained genes per segment:")
-plot.all.perm.res(segs, perms, lit.perms,
-                  feature="n_gnomAD_constrained_genes", measure="mean",
-                  outdir, prefix, norm=F, norm.multi=F,
-                  n.bins.single=30, n.bins.multi=50,
-                  x.title="Mean Constrained Genes",
-                  pdf.dims.single=c(2.2, 2.4),
-                  parmar.single=c(2.25, 2, 0, 1.2),
-                  pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.25, 6.25, 0, 1.75))
-print("Mean constrained genes per DEVELOPMENTAL segment:")
-plot.all.perm.res(segs, perms, lit.perms, subset_to_regions=dev.region_ids,
-                  feature="n_gnomAD_constrained_genes", measure="mean",
-                  outdir, paste(prefix, "dev_only", sep="."), norm=F, norm.multi=F,
-                  n.bins.single=30, n.bins.multi=50,
-                  x.title="Mean Constrained Genes",
-                  pdf.dims.single=c(2.2, 2.4),
-                  parmar.single=c(2.25, 2, 0, 1.2),
-                  pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.25, 6.25, 0, 1.75))
-print("Mean constrained genes per NDD segment:")
-plot.all.perm.res(segs, perms, lit.perms, subset_to_regions=NDD.region_ids,
-                  feature="n_gnomAD_constrained_genes", measure="mean",
-                  outdir, paste(prefix, "NDD_only", sep="."), norm=F, norm.multi=F,
-                  n.bins.single=30, n.bins.multi=50,
-                  x.title="Mean Constrained Genes",
-                  pdf.dims.single=c(2.2, 2.4),
-                  parmar.single=c(2.25, 2, 0, 1.2),
-                  pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.25, 6.25, 0, 1.75))
-
-
-# Average gene expression per segment
-print("Harmonic mean of gene expression per segment:")
-plot.all.perm.res(segs, perms, lit.perms,
-                  feature="gene_expression_harmonic_mean", measure="mean",
-                  outdir, prefix, norm=F, norm.multi=F,
-                  n.bins.single=30, n.bins.multi=50,
-                  x.title="Avg. Gene Expression",
-                  pdf.dims.single=c(2.2, 2.4),
-                  parmar.single=c(2.25, 2, 0, 1.2),
-                  pdf.dims.multi=c(4, 3.5),
-                  parmar.multi=c(2.25, 6.25, 0, 0.5))
-
-
-# Mean excess number of de novo PTVs & missense per gene in ASC & DDD
-# Note: these analyses restricted to developmental & NDD loci only
-sapply(c("ASC", "DDD", "ASC_unaffected"), function(cohort){
-  sapply(1:length(csqs), function(ci){
-    csq <- csqs[ci]
-    csq.abbrev <- names(csqs)[ci]
-    print(paste(cohort, csq.abbrev, "DNMs per gene vs. expected for DEVELOPMENTAL segments:"))
-    plot.all.perm.res(segs, perms, lit.perms,
-                      feature=paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_"),
-                      measure="mean",
-                      outdir, paste(prefix, "dev_only", sep="."),
-                      subset_to_regions=dev.region_ids,
-                      norm=F, norm.multi=F,
-                      n.bins.single=100, n.bins.multi=100, min.bins=100,
-                      x.title=bquote("Excess" ~ italic("De Novo") ~ .(csq.abbrev) ~ "/ Gene"),
-                      pdf.dims.single=c(2.2, 2.4),
-                      parmar.single=c(2.25, 2, 0, 1.2),
-                      pdf.dims.multi=c(4, 3.5),
-                      parmar.multi=c(2.25, 6.05, 0, 2.3))
-    print(paste(cohort, csq.abbrev, "DNMs per gene vs. expected for NDD segments:"))
-    plot.all.perm.res(segs, perms, lit.perms,
-                      feature=paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_"),
-                      measure="mean",
-                      outdir, paste(prefix, "NDD_only", sep="."),
-                      subset_to_regions=NDD.region_ids,
-                      norm=F, norm.multi=F,
-                      n.bins.single=100, n.bins.multi=100, min.bins=100,
-                      x.title=bquote("Excess" ~ italic("De Novo") ~ .(csq.abbrev) ~ "/ Gene"),
-                      pdf.dims.single=c(2.2, 2.4),
-                      parmar.single=c(2.25, 2, 0, 1.2),
-                      pdf.dims.multi=c(4, 3.5),
-                      parmar.multi=c(2.25, 6.05, 0, 2.3))
-  })
-})
-
-
-# Mean excess number of de novo PTVs & missense per gene in ASC & DDD
-# AFTER removing exome-wide significant genes from their original publications
-# Note: these analyses restricted to developmental & NDD loci only
-sapply(c("ASC_noSig", "DDD_noSig", "ASC_unaffected_noSig"), function(cohort){
-  sapply(1:length(csqs), function(ci){
-    csq <- csqs[ci]
-    csq.abbrev <- names(csqs)[ci]
-    print(paste(cohort, csq.abbrev, "DNMs per gene vs. expected for DEVELOPMENTAL segments (significant genes REMOVED):"))
-    plot.all.perm.res(segs, perms, lit.perms,
-                      feature=paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_"),
-                      measure="mean",
-                      outdir, paste(prefix, "dev_only", sep="."),
-                      subset_to_regions=dev.region_ids,
-                      norm=F, norm.multi=F,
-                      n.bins.single=100, n.bins.multi=100, min.bins=100,
-                      x.title=bquote("Excess" ~ italic("De Novo") ~ .(csq.abbrev) ~ "/ Gene"),
-                      pdf.dims.single=c(2.2, 2.4),
-                      parmar.single=c(2.25, 2, 0, 1.2),
-                      pdf.dims.multi=c(4, 3.5),
-                      parmar.multi=c(2.25, 6.05, 0, 2.3))
-    print(paste(cohort, csq.abbrev, "DNMs per gene vs. expected for NDD segments  (significant genes REMOVED):"))
-    plot.all.perm.res(segs, perms, lit.perms,
-                      feature=paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_"),
-                      measure="mean",
-                      outdir, paste(prefix, "NDD_only", sep="."),
-                      subset_to_regions=NDD.region_ids,
-                      norm=F, norm.multi=F,
-                      n.bins.single=100, n.bins.multi=100, min.bins=100,
-                      x.title=bquote("Excess" ~ italic("De Novo") ~ .(csq.abbrev) ~ "/ Gene"),
-                      pdf.dims.single=c(2.2, 2.4),
-                      parmar.single=c(2.25, 2, 0, 1.2),
-                      pdf.dims.multi=c(4, 3.5),
-                      parmar.multi=c(2.25, 6.05, 0, 2.3))
-  })
-})
-
+# Write permutation stat results to logfile
+write.table(stats.df[, c("feature", "measure", "sig", "segs", "CNV", "obs", "exp", "fold", "pval")],
+            paste(outdir, "/", prefix, ".permByGene.stats.tsv", sep=""),
+            col.names=T, row.names=F, sep="\t", quote=F)

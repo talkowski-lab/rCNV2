@@ -26,6 +26,7 @@ gsutil -m cp -r \
   ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
   ${rCNV_bucket}/raw_data/other/satterstrom_asc_dnms.raw.tsv.gz \
+  ${rCNV_bucket}/raw_data/other/fu_*_variant_count.tsv.gz \
   ${rCNV_bucket}/raw_data/other/redin_2017.bca_breakpoints.all.tsv.gz \
   ${rCNV_bucket}/analysis/analysis_refs/GRCh37.genome \
   ${rCNV_bucket}/refs/gnomad_v2.1_sv.nonneuro.sites.vcf* \
@@ -43,7 +44,7 @@ wget https://static-content.springer.com/esm/art%3A10.1038%2Fs41586-020-2832-5/M
   -z
 
 
-# Reformat ASC de novo mutation table
+# Reformat old (2020) ASC de novo mutation table
 /opt/rCNV2/data_curation/other/curate_asc_dnms.py \
   --dnm-tsv satterstrom_asc_dnms.raw.tsv.gz \
   --genes gencode.v19.canonical.pext_filtered.genes.list \
@@ -55,6 +56,14 @@ wget https://static-content.springer.com/esm/art%3A10.1038%2Fs41586-020-2832-5/M
   --controls \
   -o asc_dnm_counts.unaffecteds.tsv.gz \
   -z
+
+
+# Reformat new (2021) ASC + SPARK de novo mutation table
+# TODO: FINISH DEBUGGING THIS
+/opt/rCNV2/analysis/paper/scripts/misc_setup/reformat_fu_asc_spark_data.R \
+  fu_asc_variant_count.tsv.gz \
+  fu_spark_variant_count.tsv.gz \
+  gencode.v19.canonical.pext_filtered.genes.list
 
 
 # Reformat Redin 2017 translocation & inversion breakpoints
@@ -151,6 +160,7 @@ zcat asc_spark_denovo_cnvs.cleaned.b37.DEL.annotated.noGDs.bed.gz \
 gsutil -m cp \
   ddd_dnm_counts.tsv.gz \
   asc_dnm_counts*tsv.gz \
+  fu_asc_spark_dnm_counts*tsv.gz \
   redin_bca_counts.tsv.gz \
   redin_bca_breakpoints.bed.gz \
   gnomad_sv_nonneuro_counts.tsv.gz \

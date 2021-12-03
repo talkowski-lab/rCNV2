@@ -110,6 +110,14 @@ load.segment.table <- function(segs.in){
   segs <- normalize.dnms(segs)
   segs <- normalize.dnms(segs, dnm.cohorts=c("DDD_noSig", "ASC_noSig", "ASC_unaffected_noSig"))
 
+  # Add columns for combined DNM excess between DDD and ASC
+  dnm.base.cols <- sapply(colnames(segs)[grep("^DDD_", colnames(segs))],
+                          gsub, pattern="^DDD_", replacement="")
+  for(col.base in dnm.base.cols){
+    new.col <- paste("DDD_plus_ASC", col.base, sep="_")
+    segs[, new.col] <- apply(segs[, paste(c("DDD", "ASC"), col.base, sep="_")], 1, sum)
+  }
+
   # Add formatted sizes
   segs$formatted_size <- paste(prettyNum(round(segs$size/1000, 0), big.mark=","), "kb", sep=" ")
 

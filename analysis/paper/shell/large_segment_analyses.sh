@@ -36,13 +36,6 @@ gsutil -m cp \
   ${rCNV_bucket}/cleaned_data/genes/annotations/gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
   ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
   ${rCNV_bucket}/cleaned_data/cnv/mega.rCNV.bed.gz \
-  refs/
-wget -P refs/ https://storage.googleapis.com/gcp-public-data--gnomad/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
-mkdir meta_stats/
-gsutil -m cp \
-  ${rCNV_bucket}/analysis/sliding_windows/**.rCNV.**.sliding_window.meta_analysis.stats.bed.gz \
-  meta_stats/
-gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/loose_unclustered_nahr_regions.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/${prefix}.correct_nahr_labels.tsv \
@@ -50,6 +43,11 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/wgs_common_cnvs.*.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/rCNV2_common_cnvs.*.bed.gz \
   refs/
+wget -P refs/ https://storage.googleapis.com/gcp-public-data--gnomad/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
+mkdir meta_stats/
+gsutil -m cp \
+  ${rCNV_bucket}/analysis/sliding_windows/**.rCNV.**.sliding_window.meta_analysis.stats.bed.gz \
+  meta_stats/
 gsutil -m cp -r \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists \
   ${rCNV_bucket}/analysis/paper/data/hpo/rCNV2_analysis_d2.hpo_jaccard_matrix.tsv \
@@ -132,8 +130,8 @@ while read nocolon hpo; do
 done < refs/test_phenotypes.list \
 > hpo_genelists.tsv
 cat << EOF > dnm_counts_to_annotate.tsv
-ASC${TAB}refs/asc_dnm_counts.tsv.gz${TAB}refs/ASC_2020.gw_sig.genes.list
-ASC_unaffected${TAB}refs/asc_dnm_counts.unaffecteds.tsv.gz${TAB}refs/ASC_2020.gw_sig.genes.list
+ASC${TAB}refs/fu_asc_spark_dnm_counts.tsv.gz${TAB}refs/ASC_2021.gw_sig.genes.list
+ASC_unaffected${TAB}refs/fu_asc_spark_dnm_counts.unaffecteds.tsv.gz${TAB}refs/ASC_2021.gw_sig.genes.list
 DDD${TAB}refs/ddd_dnm_counts.tsv.gz${TAB}refs/DDD_2020.gw_sig.genes.list
 EOF
 cat \
@@ -252,12 +250,10 @@ fi
   ${prefix}.${n_seg_perms}_permuted_segments_bygene.tsv.gz \
   ${prefix}.lit_GDs.${n_seg_perms}_permuted_segments_bygene.tsv.gz \
   perm_test_plots/ \
-  "${prefix}.segment_perms_bygene" \
-> perm_test_plots/${prefix}.segment_perms_bygene.plot.log
-
+  "${prefix}.segment_perms_bygene"
+  
 
 # Plot effect size covariates
-# TODO: DEBUG THIS
 if [ -e effect_size_plots ]; then
   rm -rf effect_size_plots
 fi
@@ -279,23 +275,12 @@ mkdir pleiotropy_plots
   pleiotropy_plots/${prefix}
 
 
-# Compare NAHR vs nonrecurrent segments
-if [ -e nahr_vs_nonrecurrent ]; then
-  rm -rf nahr_vs_nonrecurrent
-fi
-mkdir nahr_vs_nonrecurrent
-/opt/rCNV2/analysis/paper/plot/large_segments/plot_seg_mechanism_comparisons.R \
-  rCNV.final_segments.loci.bed.gz \
-  ${prefix}.master_segments.bed.gz \
-  nahr_vs_nonrecurrent/${prefix}
-
-
-# Plot oligogenicity index analysis (distributions of de novo PTVs & missense across segments)
+# Plot distributions of de novo PTVs & missense across segments
 if [ -e dnm_distributions ]; then
   rm -rf dnm_distributions
 fi
 mkdir dnm_distributions
-/opt/rCNV2/analysis/paper/plot/large_segments/plot_oligogenicity_index_comparisons.R \
+/opt/rCNV2/analysis/paper/plot/large_segments/plot_dnm_comparisons.R \
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   refs/ddd_dnm_counts.tsv.gz \
@@ -519,7 +504,6 @@ gsutil -m cp -r \
   perm_test_plots \
   effect_size_plots \
   pleiotropy_plots \
-  nahr_vs_nonrecurrent \
   dnm_distributions \
   assoc_stat_plots \
   association_grid \

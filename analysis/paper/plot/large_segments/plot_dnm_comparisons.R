@@ -4,11 +4,11 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Comparison of monogenicity vs. oligogenicity for large segments for rCNV paper
+# Evaluation of de novo mutations within large segments for rCNV paper
 
 
 options(stringsAsFactors=F, scipen=1000)
@@ -39,6 +39,14 @@ load.dnms <- function(dnms.in, mutrates){
     dnms[paste("excess", csq, sep="_")] <- residuals
   }
   return(dnms)
+}
+
+# Combine DNM data from two cohorts
+combine.dnms <- function(d1, d2, mutrates){
+  d12 <- aggregate(. ~ gene, rbind(d1, d2), sum)
+  d12[, grep("^mu_", colnames(d12))] <- NULL
+  d12 <- merge(d12, mutrates, by="gene", all.x=T, all.y=F, sort=F)
+  d12[, colnames(d1)]
 }
 
 # Calculate oligogenicity index (O_i)
@@ -209,32 +217,35 @@ mutrates <- load.mutrates(gene.mutrates.in)
 ddd <- load.dnms(ddd.dnms.in, mutrates)
 asc <- load.dnms(asc.dnms.in, mutrates)
 asc.control <- load.dnms(asc.control.dnms.in, mutrates)
-dnms <- list("ddd"=ddd, "asc"=asc, "asc_control"=asc.control)
+ddd.plus.asc <- combine.dnms(ddd, asc, mutrates)
+dnms <- list("DDD"=ddd, "ASC"=asc, "ASC_unaffected"=asc.control,
+             "DDD_plus_ASC"=ddd.plus.asc)
 
 # Load loci & segment table
 loci <- load.loci(loci.in)
-segs <- load.segment.table(segs.in)
+segs.all <- load.segment.table(segs.in)
 
-# Subset to all GD segs & those with nominal significance
-segs.all <- segs[which(segs$any_gd | segs$any_sig), ]
-segs <- segs.all[which(segs.all$nom_sig), ]
+# Create subset of all GD segs & those with nominal significance
+segs.all <- segs.all[which(segs.all$any_gd | segs.all$any_sig), ]
+
+# Make analysis subset of only discovery segments at GW or FDR, or lit GDs at Bonferroni
+segs <- segs.all[which(segs.all$any_sig | segs.all$bonf_sig_gd), ]
+
+# For DNM analyses, subset strictly to NDD segments (to match DDD & ASC phenotypes)
+dev.seg.ids <- get.developmental.region_ids(loci, segs)
+neuro.seg.ids <- get.neuro.region_ids(loci, segs)
+ndd.seg.ids <- intersect(dev.seg.ids, neuro.seg.ids)
+ndd.segs <- segs[which(segs$region_id %in% ndd.seg.ids), ]
 
 # Annotate segs with oligogenicity indexes
 for(csq in csqs){
-  segs[paste("ddd", csq, "oligo", sep=".")] <- calc.oligo.index(segs, ddd, csq=csq)
-  segs[paste("asc", csq, "oligo", sep=".")] <- calc.oligo.index(segs, asc, csq=csq)
-  segs[paste("asc_control", csq, "oligo", sep=".")] <- calc.oligo.index(segs, asc.control, csq=csq)
+  for(cohort in names(dnms)){
+    ndd.segs[paste(cohort, csq, "oligo", sep=".")] <- calc.oligo.index(ndd.segs, dnms[[cohort]], csq=csq)
+  }
 }
 
-# Merge loci & segment data for genome-wide/FDR significant sites only
-segs.sig <- merge.loci.segs(loci, segs[which(segs$any_sig), ])
-
-# Get list of developmental and NDD loci
-dev.region_ids <- get.developmental.region_ids(loci, segs)
-NDD.region_ids <- get.ndd.region_ids(loci, segs)
-
 # Swarmplots of average excess DNMs per gene split by CNV type
-sapply(c("ddd", "asc"), function(cohort){
+sapply(names(dnms), function(cohort){
   sapply(c("lof", "mis"), function(csq){
     if(csq=="lof"){
       csq.name <- "PTV"
@@ -245,51 +256,38 @@ sapply(c("ddd", "asc"), function(cohort){
     }
     pdf(paste(out.prefix, "sig_plus_litGDs", cohort, csq, "excess_per_gene.NDD_only.pdf", sep="."),
         height=2, width=1.6)
-    segs.simple.vioswarm(segs,
-                         y=segs[, paste(toupper(cohort), "dnm", csq, "norm_excess_per_gene", sep="_")],
+    segs.simple.vioswarm(ndd.segs,
+                         y=ndd.segs[, paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_")],
                          add.pvalue=T,
-                         subset_to_regions=NDD.region_ids,
                          ytitle=paste("Excess dn", csq.name, " per Gene", sep=""),
                          pt.cex=0.4,
                          parmar=c(1.2, 2.65, 1.5, 0))
     dev.off()
-
   })
 })
 
 # Swarmplots of oligogenicity index for all deletions & duplications
-pdf(paste(out.prefix, "sig_plus_litGDs.ddd_lof_oligogenicity_index.NDD_only.main.pdf", sep="."),
-    height=2.25, width=2)
-segs.simple.vioswarm(segs, y=segs$ddd.lof.oligo, subset_to_regions=NDD.region_ids,
-                     add.pvalue=T, ytitle="",
-                     pt.cex=0.4, parmar=c(1.2, 3.5, 1.5, 0))
-mtext(2, line=2.35, text=bquote("Genes Capturing" >= "90%"))
-mtext(2, line=1.45, text=bquote("of Excess" ~ italic("dn") * "PTVs"))
-dev.off()
-sapply(c("ddd", "asc"), function(cohort){
+sapply(names(dnms), function(cohort){
   sapply(csqs, function(csq){
     pdf(paste(out.prefix, "sig_plus_litGDs", cohort, csq, "oligogenicity_index.NDD_only.pdf", sep="."),
         height=2, width=1.6)
-    segs.simple.vioswarm(segs, y=segs[, paste(cohort, csq, "oligo", sep=".")], add.pvalue=T,
-                         subset_to_regions=NDD.region_ids,
+    segs.simple.vioswarm(ndd.segs, y=ndd.segs[, paste(cohort, csq, "oligo", sep=".")], add.pvalue=T,
                          ytitle="Oligogenicity Index",
                          pt.cex=0.4, parmar=c(1.2, 2.65, 1.5, 0))
     dev.off()
-
   })
 })
 
 # Scatterplots of oligogenicity index vs number of genes in segment for all deletions & duplications
 abline.slopes <- c(1/2, 1/4, 1/10)
 abline.labels <- c("50%", "25%", "10%")
-sapply(c("asc", "ddd"), function(cohort){
+sapply(c("ASC", "DDD"), function(cohort){
   sapply(csqs, function(csq){
     pdf(paste(out.prefix, "sig_plus_litGDs", cohort, csq, "oligogenicity_index_vs_ngenes.NDD_only.pdf", sep="."),
         height=2, width=2.2)
-    segs.scatter(segs, x=segs$n_genes,
-                 y=segs[, paste(cohort, csq, "oligo", sep=".")],
-                 subset_to_regions=NDD.region_ids,
-                 ylims=c(0, ceiling(0.5*max(segs$n_genes, na.rm=T))),
+    segs.scatter(ndd.segs, x=ndd.segs$n_genes, add.cor=F,
+                 y=ndd.segs[, paste(cohort, csq, "oligo", sep=".")],
+                 ylims=c(0, ceiling(0.5*max(ndd.segs$n_genes, na.rm=T))),
                  xtitle="Genes in Segment", x.title.line=1.3,
                  ytitle="Oligogenicity Index", y.title.line=1.5,
                  abline.a=rep(1, length(abline.slopes)),
@@ -310,16 +308,14 @@ sapply(c("asc", "ddd"), function(cohort){
 # Swarmplot of DDD oligogenicity indexes vs. mechanism
 pdf(paste(out.prefix, "sig_plus_litGDs.segs_by_mechanism.ddd_lof_oligogenicity_index.NDD_only.pdf", sep="."),
     height=2.25, width=2.6)
-segs.swarm(segs, x.bool=segs$nahr, y=segs$ddd.lof.oligo,
-           subset_to_regions=NDD.region_ids,
+segs.swarm(ndd.segs, x.bool=ndd.segs$nahr, y=ndd.segs$ddd.lof.oligo,
            x.labs=c("Non-NAHR", "NAHR"), violin=T, add.pvalue=T,
            add.y.axis=T, ytitle="Oligogenicity Index", pt.cex=0.4,
            parmar=c(1.2, 3, 2.5, 0))
 dev.off()
 pdf(paste(out.prefix, "sig_plus_litGDs.segs_by_mechanism.ddd_mis_oligogenicity_index.NDD_only.pdf", sep="."),
     height=2.25, width=2.6)
-segs.swarm(segs, x.bool=segs$nahr, y=segs$ddd.mis.oligo,
-           subset_to_regions=NDD.region_ids,
+segs.swarm(ndd.segs, x.bool=ndd.segs$nahr, y=ndd.segs$ddd.mis.oligo,
            x.labs=c("Non-NAHR", "NAHR"), violin=T, add.pvalue=T,
            add.y.axis=T, ytitle="Oligogenicity Index", pt.cex=0.4,
            parmar=c(1.2, 3, 2.5, 0))
@@ -328,24 +324,22 @@ dev.off()
 # Swarmplot of ASC oligogenicity indexes vs. mechanism
 pdf(paste(out.prefix, "sig_plus_litGDs.segs_by_mechanism.asc_lof_oligogenicity_index.NDD_only.pdf", sep="."),
     height=2.25, width=2.6)
-segs.swarm(segs, x.bool=segs$nahr, y=segs$asc.lof.oligo,
-           subset_to_regions=NDD.region_ids,
+segs.swarm(ndd.segs, x.bool=ndd.segs$nahr, y=ndd.segs$asc.lof.oligo,
            x.labs=c("Non-NAHR", "NAHR"), violin=T, add.pvalue=T,
            add.y.axis=T, ytitle="Oligogenicity Index", pt.cex=0.4,
            parmar=c(1.2, 3, 2.5, 0))
 dev.off()
 pdf(paste(out.prefix, "sig_plus_litGDs.segs_by_mechanism.asc_mis_oligogenicity_index.NDD_only.pdf", sep="."),
     height=2.25, width=2.6)
-segs.swarm(segs, x.bool=segs$nahr, y=segs$asc.mis.oligo,
-           subset_to_regions=NDD.region_ids,
+segs.swarm(ndd.segs, x.bool=ndd.segs$nahr, y=ndd.segs$asc.mis.oligo,
            x.labs=c("Non-NAHR", "NAHR"), violin=T, add.pvalue=T,
            add.y.axis=T, ytitle="Oligogenicity Index", pt.cex=0.4,
            parmar=c(1.2, 3, 2.5, 0))
 dev.off()
 
 # Distribution of excess DNMs across neuro segments
-sapply(c("ddd", "asc"), function(cohort){
-  if(cohort=="ddd"){
+sapply(names(dnms), function(cohort){
+  if(cohort %in% c("DDD", "DDD_plus_ASC")){
     min.excess <- 3
   }else{
     min.excess <- 1
@@ -366,40 +360,16 @@ sapply(c("ddd", "asc"), function(cohort){
     }
     pdf(paste(out.prefix, "sig_plus_litGDs", cohort, csq, "excess_dnm_distrib_bygene.NDD_only.pdf", sep="."),
         height=2, width=3)
-    dnm.excess.cdf.barplots(segs, dnms[[cohort]], csq=csq, norm=F, legend=T,
-                            subset_to_regions=NDD.region_ids,
+    dnm.excess.cdf.barplots(ndd.segs, dnms[[cohort]], csq=csq, norm=F, legend=T,
                             xtitle.suffix='"NDD rCNV Segments"',
                             ytitle=ytitle.1)
     dev.off()
     pdf(paste(out.prefix, "sig_plus_litGDs", cohort, csq, "excess_dnm_distrib_bygene.norm.NDD_only.pdf", sep="."),
         height=2, width=3)
-    dnm.excess.cdf.barplots(segs, dnms[[cohort]], csq=csq, norm=T, legend=F,
-                            subset_to_regions=NDD.region_ids,
+    dnm.excess.cdf.barplots(ndd.segs, dnms[[cohort]], csq=csq, norm=T, legend=F,
                             min.excess=min.excess, xtitle.suffix=xtitle.suffix.2,
                             ytitle=ytitle.2)
     dev.off()
   })
 })
-
-# Plot larger version of DNM excess distributions from DDD PTVs for main figure
-cohort <- "ddd"
-csq <- "lof"
-min.excess <- 3
-pdf(paste(out.prefix, "sig_plus_litGDs", cohort, csq, "excess_dnm_distrib_bygene.NDD_only.reshaped.pdf", sep="."),
-    height=2.2, width=3)
-dnm.excess.cdf.barplots(segs, dnms[[cohort]], csq=csq, norm=F, legend=T,
-                        subset_to_regions=NDD.region_ids,
-                        xtitle.suffix='"Neurodev. rCNV Segments"',
-                        ytitle=bquote("Excess" ~ italic("dn") * "PTVs"))
-dev.off()
-ytitle.2 <- bquote("Fraction of Excess")
-xtitle.suffix.2 <- paste('"Segs. w/" >= "', min.excess, ' Excess" ~ italic("dn") * "PTV"', sep="")
-pdf(paste(out.prefix, "sig_plus_litGDs", cohort, csq, "excess_dnm_distrib_bygene.norm.NDD_only.reshaped.pdf", sep="."),
-    height=1.8, width=2.8)
-dnm.excess.cdf.barplots(segs, dnms[[cohort]], csq=csq, norm=T, legend=F,
-                        subset_to_regions=NDD.region_ids,
-                        sort.firstwo.only=T, min.excess=min.excess,
-                        cnv.marker.wex=0.035*(2.2/1.8),
-                        xtitle.suffix=xtitle.suffix.2, ytitle=ytitle.2)
-dev.off()
 

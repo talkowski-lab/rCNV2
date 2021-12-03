@@ -9,8 +9,11 @@
   perms,
   feature,
   measure,
+  invert = F,
   norm = F,
   subset_to_regions = NULL,
+  return.stats = TRUE,
+  print.stats = !return.stats,
   n.bins = 100,
   min.bins = 10,
   x.title = NULL,
@@ -19,6 +22,7 @@
   xlims = NULL,
   xmin = NULL,
   xmax = NULL,
+  max.x.ticks = 6,
   diamond.pch = 23,
   diamond.cex = 1.25,
   parmar = c(2.25, 2, 0.5, 0.5)
@@ -33,9 +37,15 @@
 
 \item{measure}{statistic to evaluate [default: mean]}
 
+\item{invert}{invert orientation of X-axis [default: FALSE]}
+
 \item{norm}{normalize values before plotting [default: FALSE]}
 
 \item{subset_to_regions}{vector of region IDs to include [default: include all regions]}
+
+\item{return.stats}{return dataframe of summary stats [default: TRUE]}
+
+\item{print.stats}{print summary of stats [default: FALSE]}
 
 \item{n.bins}{ideal number of bins for histograms [default: 100]}
 
@@ -49,6 +59,8 @@
 
 \item{xmax}{maximum for X axis}
 
+\item{max.x.ticks}{maximum ticks for X axis}
+
 \item{diamond.pch}{shape for observed values}
 
 \item{diamond.cex}{expansion for observed values}
@@ -61,5 +73,5 @@
 Function to plot segment permutation test results
 }
 \seealso{
-\code{\link[=plot.viohist]{plot.viohist()}}
+\code{\link[=plot.viohist]{plot.viohist()}}, \code{\link[=perm.summary]{perm.summary()}}
 }

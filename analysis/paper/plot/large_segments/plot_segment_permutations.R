@@ -32,7 +32,8 @@ load.perms <- function(perm.res.in, subset_to_regions=NULL, constrained.genes=NU
   perms[, n_gnomAD_constrained_genes := posthoc.constr(genes), by=seq_len(nrow(perms))]
 
   # Drop unnecessary columns
-  cols.to.drop <- c("#chr", "start", "end", "coords", "size", "genes")
+  cols.to.drop <- c("#chr", "start", "end", "coords", "size", "genes",
+                    "hc_gd", "mc_gd", "lc_gd", "pathogenic")
   perms[, (cols.to.drop) := NULL]
   if(!is.null(subset_to_regions)){
     perms <- perms[region_id %in% subset_to_regions]
@@ -157,8 +158,7 @@ sig.ids <- segs$region_id[which(segs$any_sig)]
 gw.ids <- segs$region_id[which(segs$gw_sig)]
 fdr.ids <- segs$region_id[which(segs$fdr_sig)]
 lit.ids <- segs$region_id[which(segs$any_gd & !segs$any_sig)]
-all.lit.ids <- segs.all$region_id[which(segs.all$any_gd & !segs.all$any_sig)]
-nonsig.lit.ids <- segs.all$region_id[which(segs.all$region_id %in% all.lit.ids & !segs.all$any_sig)]
+nonsig.lit.ids <- segs.all$region_id[which(segs.all$any_gd & !segs.all$any_sig & !segs.all$bonf_sig_gd)]
 
 # Get list of developmental loci (analysis set of segs only)
 dev.seg.ids <- get.developmental.region_ids(loci, segs)
@@ -185,7 +185,7 @@ stats.df <- data.frame()
 
 # Set global plot properties
 pdf.dims.single <- c(2.2, 2.4)
-parmar.single <- c(2.25, 2, 0, 2)
+parmar.single <- c(2.25, 2, 0, 2.25)
 pdf.dims.multi <- c(4, 3.5)
 parmar.multi <- c(2.3, 6.05, 0, 1.5)
 parmar.mod.frac.any <- c(0, 0, 0, 0)
@@ -236,7 +236,7 @@ for(subset in c("all_sig", "gw_sig", "fdr_sig")){
               "gd_overlap", subset, cnv, "venn.pdf", sep="."),
         height=1.5, width=1.5)
     cnv.venn(segs.all, cnv, segs.all$region_id %in% region.ids,
-             perms, margin=0.05)
+             perms, margin=0.075)
     dev.off()
   })
 }
@@ -286,7 +286,7 @@ for(subset in c("all_segs", "strong", "weak", "developmental", "adult",
                                     parmar.single=parmar.single,
                                     pdf.dims.multi=pdf.dims.multi,
                                     parmar.multi=parmar.multi)
-  segs.df <- rbind(stats.df.tmp, new.stats.df)
+  stats.df.tmp <- rbind(stats.df.tmp, new.stats.df)
 
   # Fraction of segments with at least one gene
   new.stats.df <- plot.all.perm.res(segs.sub, perms, lit.perms,
@@ -355,6 +355,9 @@ for(subset in c("all_segs", "strong", "weak", "developmental", "adult",
                                     parmar.multi=parmar.multi + parmar.mod.frac.any)
   stats.df.tmp <- rbind(stats.df.tmp, new.stats.df)
 
+  # Reorganize all main plots
+  reorganize.perm.plots(outdir.sub)
+
   # Cleanup summary stats and append to existing log
   stats.df.tmp$segs <- subset
   stats.df <- rbind(stats.df, stats.df.tmp)
@@ -376,7 +379,8 @@ new.stats.df$feature <- "meta_best_P"
 new.stats.df$measure <- "mean"
 new.stats.df$sig <- "nonsig_litGDs"
 new.stats.df$segs <- "nonsig_litGDs"
-stats.df <- rbind(stats.df, stats.df.tmp)
+stats.df <- rbind(stats.df, new.stats.df)
+
 
 # Write permutation stat results to logfile
 write.table(stats.df[, c("feature", "measure", "sig", "segs", "CNV", "obs", "exp", "fold", "pval")],

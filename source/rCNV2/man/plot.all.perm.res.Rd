@@ -12,9 +12,12 @@
   measure,
   outdir,
   prefix,
+  invert = F,
   subset_to_regions = NULL,
   norm = F,
   norm.multi = F,
+  return.stats = TRUE,
+  print.stats = FALSE,
   n.bins.single = 100,
   n.bins.multi = 100,
   min.bins = 10,
@@ -22,7 +25,6 @@
   xlims = NULL,
   xmin = NULL,
   xmax = NULL,
-  diamond.cex = 1.25,
   pdf.dims.single = c(2.2, 2.4),
   parmar.single = c(2.25, 2, 0.5, 0.5),
   pdf.dims.multi = c(2.2, 4.8),
@@ -38,17 +40,23 @@
 
 \item{feature}{name of feature to evaluate}
 
-\item{measure}{statistic to evaluate [default: mean]}
+\item{measure}{statistic to evaluate}
 
 \item{outdir}{path to output directory}
 
 \item{prefix}{filename prefix for output plots}
+
+\item{invert}{invert orientation of X-axis [default: FALSE]}
 
 \item{subset_to_regions}{vector of region IDs to include [default: include all regions]}
 
 \item{norm}{normalize values before plotting [default: FALSE]}
 
 \item{norm.multi}{normalize values before plotting for multi-panel figure [default: FALSE]}
+
+\item{return.stats}{return dataframe of summary stats [default: TRUE]}
+
+\item{print.stats}{print summary of stats [default: FALSE]}
 
 \item{n.bins.single}{ideal number of bins for single-panel histograms [default: 100]}
 
@@ -61,8 +69,6 @@
 \item{xmin}{minimum for X axis}
 
 \item{xmax}{maximum for X axis}
-
-\item{diamond.cex}{expansion for observed values}
 
 \item{pdf.dims.single}{dimensionf of pdf for single-panel plots}
 
