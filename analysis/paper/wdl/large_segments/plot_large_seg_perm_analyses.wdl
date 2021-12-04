@@ -70,7 +70,8 @@ task PlotPermBySize {
     gzip perm_test_plots/${prefix}.segment_perms.permBySize.stats.tsv
 
     # Copy results to rCNV bucket
-    gsutil -m cp perm_test_plots/* ${rCNV_bucket}/analysis/paper/plots/large_segments/perm_test_plots/
+    gsutil -m cp -r perm_test_plots/* \
+      ${rCNV_bucket}/analysis/paper/plots/large_segments/perm_test_plots/
 
     # Rename & compress for local review
     mv perm_test_plots PermBySizePlots
@@ -85,8 +86,8 @@ task PlotPermBySize {
     docker: "${rCNV_docker}"
     preemptible: 1
     memory: "40 GB"
+    cpu: 8
   }
-
 }
 
 
@@ -118,7 +119,8 @@ task PlotPermByGene {
     gzip perm_test_plots/${prefix}.segment_perms_bygene.permByGene.stats.tsv
 
     # Copy results to rCNV bucket
-    gsutil -m cp perm_test_plots/* ${rCNV_bucket}/analysis/paper/plots/large_segments/perm_test_plots/
+    gsutil -m cp -r perm_test_plots/* \
+      ${rCNV_bucket}/analysis/paper/plots/large_segments/perm_test_plots/
 
     # Rename & compress for local review
     mv perm_test_plots PermByGenePlots
@@ -133,6 +135,6 @@ task PlotPermByGene {
     docker: "${rCNV_docker}"
     preemptible: 1
     memory: "40 GB"
+    cpu: 8
   }
-
 }

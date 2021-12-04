@@ -373,6 +373,58 @@ get.gd.overlap <- function(chrom, start, end, segs){
                              & segs$start<=end)]))
 }
 
+#' Load gene-based permutation data
+#'
+#' Load all permuted segments matched on the number of genes
+#'
+#' @param perm.res.in path to .tsv of all permutation results
+#' @param subset_to_regions optional vector of region IDs to keep \[default: keep all regions\]
+#'
+#' @return data.table() of permutation results
+#'
+#' @export
+load.perms.bygene <- function(perm.res.in, subset_to_regions=NULL){
+  # Read full permutation table
+  perms <- data.table::fread(perm.res.in, header=T, sep="\t", check.names=F)
+  perms[, perm_idx := as.numeric(perms$perm_idx)]
+  colnames(perms)[1] <- gsub("#", "", colnames(perms)[1], fixed=T)
+  if(!is.null(subset_to_regions)){
+    perms <- subset(perms, region_id %in% subset_to_regions)
+  }
+
+  # Add normalized columns
+  perms[, gnomAD_constrained_prop := n_gnomAD_constrained_genes / n_genes]
+  if("n_ubiquitously_expressed_genes" %in% colnames(perms)){
+    perms[, prop_ubiquitously_expressed := n_ubiquitously_expressed_genes / n_genes]
+  }
+
+  # Normalize DNM excess per permutation
+  perms <- normalize.dnms(perms, is.data.table=TRUE,
+                          dnm.cohorts=c("DDD", "ASC", "ASC_unaffected",
+                                        "DDD_noSig", "ASC_noSig",
+                                        "ASC_unaffected_noSig"))
+
+  # Add columns for combined DNM excess between DDD and ASC
+  dnm.base.cols <- sapply(colnames(perms)[grep("^DDD_", colnames(perms))],
+                          gsub, pattern="^DDD_", replacement="")
+  for(col.base in dnm.base.cols){
+    new.col <- paste("DDD_plus_ASC", col.base, sep="_")
+    ddd.col <- paste("DDD", col.base, sep="_")
+    asc.col <- paste("ASC", col.base, sep="_")
+    perms[, eval(new.col) := get(ddd.col) + get(asc.col)]
+  }
+
+  # Drop unnecessary columns
+  extra.dnm.col.idxs <- setdiff(grep("_dnm_", colnames(perms)),
+                                grep("_norm_excess_per_gene", colnames(perms)))
+  cols.to.drop <- c(colnames(perms)[extra.dnm.col.idxs],
+                    "syn.d", "dam.d")
+  perms[, (cols.to.drop) := NULL]
+
+  return(perms)
+}
+
+
 #' Summarize segment permutation results
 #'
 #' Summarize permutation results across all permutations for a single feature
