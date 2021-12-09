@@ -104,6 +104,13 @@ load.segment.table <- function(segs.in){
   segs[, boolcol.idxs] <- apply(segs[, boolcol.idxs], 2, function(vals){
     sapply(vals, function(val){if(val==1){TRUE}else{FALSE}})})
 
+  # Extract cytoband column from region identifier
+  segs[, "cytoband"] <- unlist(sapply(segs$region_id, function(region.id){
+    lab.parts <- unlist(strsplit(region.id, split="_"))
+    lab.parts <- lab.parts[grep("[A-Z]", lab.parts, invert=T)]
+    lab.parts[length(lab.parts)]
+  }))
+
   # Add normalized columns
   segs$gnomAD_constrained_prop <- segs$n_gnomAD_constrained_genes / segs$n_genes
   segs$prop_ubiquitously_expressed <- segs$n_ubiquitously_expressed_genes / segs$n_genes
@@ -266,64 +273,71 @@ split.regions.by.effect.size <- function(segs, quantiles=2,
 
 #' Normalize DNM counts
 #'
-#' Normalize segment DNM counts vs. synonymous inflation
+#' Normalize segment DNM counts vs. expected and (optional) synonymous inflation
 #'
 #' @param segs segment dataframe (imported with [load.segment.table()])
 #' @param dnm.cohorts vector of cohorts to evaluate (default: DDD, ASC, ASC_unaffected)
+#' @param synonymous.adjustment indicator to perform outlier-robust linear regression
+#' for inflation in synonymous counts \[default: TRUE\]
 #' @param is.data.table indicator that `segs` is a data.table \[default: FALSE\]
 #'
 #' @return data.frame
 #'
 #' @export
 normalize.dnms <- function(segs, dnm.cohorts=c("DDD", "ASC", "ASC_unaffected"),
-                           is.data.table=FALSE){
+                           synonymous.adjustment=TRUE, is.data.table=FALSE){
   for(cohort in dnm.cohorts){
     syn.obs.colname <- paste(cohort, "dnm_syn_obs_wMu", sep="_")
     syn.exp.colname <- paste(cohort, "dnm_syn_exp_wMu", sep="_")
     if(syn.obs.colname %in% colnames(segs) & syn.exp.colname %in% colnames(segs)){
+      new.colname <- paste(cohort, "dnm_syn_raw_excess_per_gene", sep="_")
       if(is.data.table){
-      segs[, syn.d := (get(syn.obs.colname) - get(syn.exp.colname)) / n_genes]
+        segs[, eval(new.colname) := (get(syn.obs.colname) - get(syn.exp.colname)) / n_genes]
       }else{
         syn.obs <- segs[, which(colnames(segs)==syn.obs.colname)]
         syn.exp <- segs[, which(colnames(segs)==syn.exp.colname)]
         syn.d <- (syn.obs - syn.exp) / segs$n_genes
+        segs[, new.colname] <- syn.d
       }
       for(csq in c("lof", "mis")){
         dam.obs.colname <- paste(cohort, "dnm", csq, "obs_wMu", sep="_")
         dam.exp.colname <- paste(cohort, "dnm", csq, "exp_wMu", sep="_")
         if(dam.obs.colname %in% colnames(segs) & dam.exp.colname %in% colnames(segs)){
+          new.colname <- paste(cohort, "dnm", csq, "raw_excess_per_gene", sep="_")
           if(is.data.table){
-            segs[, dam.d := (get(dam.obs.colname) - get(dam.exp.colname)) / n_genes]
+            segs[, eval(new.colname) := (get(dam.obs.colname) - get(dam.exp.colname)) / n_genes]
           }else{
             dam.obs <- segs[, which(colnames(segs)==dam.obs.colname)]
             dam.exp <- segs[, which(colnames(segs)==dam.exp.colname)]
             dam.d <- (dam.obs - dam.exp) / segs$n_genes
+            segs[, new.colname] <- dam.d
           }
+
           # Outlier-robust linear fit of obs-exp damaging ~ obs-exp synonymous
-          new.colname <- paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_")
-          if(is.data.table){
-            adj.dam.d <- function(dt){
-              fit <- robust.lm(dt$syn.d, dt$dam.d)$fit
+          if(synonymous.adjustment){
+            new.colname <- paste(cohort, "dnm", csq, "norm_excess_per_gene", sep="_")
+            if(is.data.table){
+              syn.colname <- paste(cohort, "dnm_syn_raw_excess_per_gene", sep="_")
+              dam.colname <- paste(cohort, "dnm", csq, "raw_excess_per_gene", sep="_")
+              adj.dam.d <- function(dt){
+                fit <- robust.lm(dt[, get(syn.colname)], dt[, get(dam.colname)])$fit
+                coeffs <- as.numeric(fit$coefficients)
+                dt[, get(dam.colname) - coeffs[1] - (coeffs[2] * get(syn.colname))]
+              }
+              segs[, (new.colname) := numeric()]
+              sapply(1:max(segs$perm_idx), function(i){
+                segs[perm_idx == i, (new.colname) := adj.dam.d(segs[perm_idx == i])]
+              })
+            }else{
+              fit <- robust.lm(syn.d, dam.d)$fit
               coeffs <- as.numeric(fit$coefficients)
-              dt[, dam.d - coeffs[1] - (coeffs[2] * syn.d)]
+              dam.d.adj <- dam.d - coeffs[1] - (coeffs[2] * syn.d)
+              segs[new.colname] <- dam.d.adj
             }
-            segs[, (new.colname) := numeric()]
-            sapply(1:max(segs$perm_idx), function(i){
-              segs[perm_idx == i, (new.colname) := adj.dam.d(segs[perm_idx == i])]
-            })
-          }else{
-            fit <- robust.lm(syn.d, dam.d)$fit
-            coeffs <- as.numeric(fit$coefficients)
-            dam.d.adj <- dam.d - coeffs[1] - (coeffs[2] * syn.d)
-            segs[new.colname] <- dam.d.adj
           }
         }
       }
     }
-  }
-  if(is.data.table){
-    segs[, syn.d := NULL]
-    segs[, dam.d := NULL]
   }
   return(segs)
 }
@@ -417,8 +431,7 @@ load.perms.bygene <- function(perm.res.in, subset_to_regions=NULL){
   # Drop unnecessary columns
   extra.dnm.col.idxs <- setdiff(grep("_dnm_", colnames(perms)),
                                 grep("_norm_excess_per_gene", colnames(perms)))
-  cols.to.drop <- c(colnames(perms)[extra.dnm.col.idxs],
-                    "syn.d", "dam.d")
+  cols.to.drop <- c(colnames(perms)[extra.dnm.col.idxs])
   perms[, (cols.to.drop) := NULL]
 
   return(perms)

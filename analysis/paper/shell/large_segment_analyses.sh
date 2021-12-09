@@ -34,7 +34,7 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/misc/redin_bca_breakpoints.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/misc/gene_mutation_rates.tsv.gz \
   ${rCNV_bucket}/cleaned_data/genes/annotations/gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
-  ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
+  ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.genomic_features.bed.gz \
   ${rCNV_bucket}/cleaned_data/cnv/mega.rCNV.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/loose_unclustered_nahr_regions.bed.gz \
@@ -291,6 +291,7 @@ mkdir dnm_distributions
   refs/asc_dnm_counts.tsv.gz \
   refs/asc_dnm_counts.unaffecteds.tsv.gz \
   refs/gene_mutation_rates.tsv.gz \
+  refs/gencode.v19.canonical.pext_filtered.genomic_features.bed.gz \
   dnm_distributions/${prefix}
 
 

@@ -133,7 +133,6 @@ load.pval.matrix <- function(matrix.in, has.coords=T, ncols.coords=3, p.is.neg.l
 }
 
 
-
 #' Load gene features BED
 #'
 #' Load a BED4+ formatted .tsv of gene features
@@ -213,5 +212,72 @@ load.genelist <- function(path){
   }else{
     NULL
   }
+}
+
+
+#' Load mutation rates
+#'
+#' Load a table of gene-specific mutation rates
+#'
+#' @param mutrates.in .tsv of mutation rates per gene
+#'
+#' @return data.frame of mutation rates
+#'
+#' @export
+load.mutrates <- function(mutrates.in){
+  mutrates <- read.table(mutrates.in, header=T, sep="\t", check.names=F, comment.char="")
+  colnames(mutrates)[1] <- "gene"
+  return(mutrates)
+}
+
+
+#' Load dnm counts
+#'
+#' Load count of de novo mutations for a single study and residualize vs. expected
+#'
+#' @param dnms.in .tsv of dnms per gene
+#' @param mutrates data.frame of gene specific mutation rates as loaded by [load.mutrates()]
+#'
+#' @return data.frame of raw and normalized dnms per gene
+#'
+#' @seealso  [load.mutrates()]
+#'
+#' @export
+load.dnms <- function(dnms.in, mutrates){
+  dnms <- read.table(dnms.in, header=T, sep="\t", check.names=F, comment.char="")
+  colnames(dnms)[1] <- "gene"
+  dnms <- merge(dnms, mutrates, all.x=T, all.y=F, sort=F, by="gene")
+  for(csq in csqs){
+    counts <- dnms[, which(colnames(dnms) == csq)]
+    mus <- dnms[, which(colnames(dnms) == paste("mu", csq, sep="_"))]
+    n.dnms <- sum(counts, na.rm=T)
+    scaled.mus <- (mus / sum(mus, na.rm=T)) * n.dnms
+    residuals <- counts - scaled.mus
+    dnms[paste("excess", csq, sep="_")] <- residuals
+  }
+  return(dnms)
+}
+
+
+
+#' Combine dnm data from two cohorts
+#'
+#' Pool dnm data from two cohorts and update all residualized values
+#'
+#' @param d1 dnm data from first cohort as read by [load.dnms()]
+#' @param d2 dnm data from second cohort as read by [load.dnms()]
+#' @param mutrates gene-specific mutation rates as read by [load.mutrates()]
+#'
+#' @return data.frame of merged dnm data
+#'
+#' @seealso [load.dnms()], [load.mutrates()]
+#'
+#' @export combine.dnms
+#' @export
+combine.dnms <- function(d1, d2, mutrates){
+  d12 <- aggregate(. ~ gene, rbind(d1, d2), sum)
+  d12[, grep("^mu_", colnames(d12))] <- NULL
+  d12 <- merge(d12, mutrates, by="gene", all.x=T, all.y=F, sort=F)
+  d12[, colnames(d1)]
 }
 
