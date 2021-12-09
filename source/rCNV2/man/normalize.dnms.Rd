@@ -7,7 +7,7 @@
 normalize.dnms(
   segs,
   dnm.cohorts = c("DDD", "ASC", "ASC_unaffected"),
-  synonymous.adjustment = FALSE,
+  synonymous.adjustment = TRUE,
   is.data.table = FALSE
 )
 }
@@ -17,7 +17,7 @@ normalize.dnms(
 \item{dnm.cohorts}{vector of cohorts to evaluate (default: DDD, ASC, ASC_unaffected)}
 
 \item{synonymous.adjustment}{indicator to perform outlier-robust linear regression
-for inflation in synonymous counts [default: FALSE]}
+for inflation in synonymous counts [default: TRUE]}
 
 \item{is.data.table}{indicator that \code{segs} is a data.table [default: FALSE]}
 }
