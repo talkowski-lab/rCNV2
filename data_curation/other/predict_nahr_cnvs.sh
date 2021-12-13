@@ -68,7 +68,23 @@ cut -f1-4,7-8 clustered_nahr_regions.w_genes.bed \
 | bgzip -c > clustered_nahr_regions.bed.gz
 
 
+# Separately, for labeling individual CNVs as NAHR, create a looser list
+# Find pairs of segdups meeting the following criteria:
+# 1. Same chromosome
+# 2. Distance ≤ 20Mb
+# 3. Direct orientation
+zcat genomicSuperDups.txt.gz \
+| awk -v FS="\t" -v OFS="\t" \
+  '{ if ($2==$8 && $7=="+" && $9-$4<=10000000) printf "%s\t%i\t%i\n", $2, ($3+$4)/2, ($9+$10)/2 }' \
+| awk -v FS="\t" -v OFS="\t" '{ if ($3<$2) print $1, $3, $2; else print $1, $2, $3 }' \
+| sed 's/chr//g' | grep -e '^[0-9]' \
+| sort -Vk1,1 -k2,2n -k3,3n -k5,5n -k6,6n \
+| uniq | bgzip -c \
+> loose_unclustered_nahr_regions.bed.gz
+
+
 # Copy to Google bucket (note: requires permissions)
 gsutil -m cp \
   clustered_nahr_regions.bed.gz \
+  loose_unclustered_nahr_regions.bed.gz \
   gs://rcnv_project/analysis/paper/data/large_segments/

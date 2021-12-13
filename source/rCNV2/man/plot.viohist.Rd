@@ -17,6 +17,7 @@
   border = blueblack,
   diamond.cex = 4,
   y.title = NULL,
+  y.title.color = blueblack,
   left.ax.line = F
 )
 }
@@ -44,6 +45,8 @@
 \item{diamond.cex}{expansion factor for observed value}
 
 \item{y.title}{title for Y axis}
+
+\item{y.title.color}{color for Y-axis title [default: blueblack]}
 
 \item{left.ax.line}{add line to left axis [default: FALSE]}
 }

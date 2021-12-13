@@ -22,6 +22,7 @@
 #' @param xlims X axis limits
 #' @param ylims Y axis limits
 #' @param add.lm add linear trendline \[default: TRUE\]
+#' @param add.cor add correlation coefficients & P-values for linear model \[default: TRUE\]
 #' @param pt.cex expansion factor for points \[default: 1\]
 #' @param blue.bg add light blue background \[default: TRUE\]
 #' @param horiz.lines.at numeric vector indicating where to draw horizontal lines \[default: no lines\]
@@ -36,6 +37,8 @@
 #' @param x.labs labels for X axis ticks
 #' @param x.labs.at if different from `x.at`, specify locations of `x.labs`
 #' @param parse.x.labs format X axis labels with [parse()] \[default: FALSE\]
+#' @param x.labs.line line for X axis labels \[default: -0.6\]
+#' @param max.x.ticks maximum number of X axis ticks to display \[default: 6\]
 #' @param x.title.cex expansion factor for X axis title \[default: 1\]
 #' @param ytitle title of Y axis
 #' @param y.title.line line of Y axis title
@@ -43,6 +46,8 @@
 #' @param y.labs labels for Y axis ticks
 #' @param y.labs.at if different from `y.at`, specify locations of `y.labs`
 #' @param parse.y.labs format Y axis labels with [parse()] \[default: FALSE\]
+#' @param y.labs.line line for Y axis labels \[default: -0.6\]
+#' @param max.y.ticks maximum number of Y axis ticks to display \[default: 6\]
 #' @param y.title.cex expansion factor for Y axis title \[default: 1\]
 #' @param parmar numeric vector of margins passed to [par()]
 #'
@@ -51,11 +56,16 @@
 #' @export segs.scatter
 #' @export
 segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
-                         xlims=NULL, ylims=NULL, add.lm=T, pt.cex=1, blue.bg=TRUE,
+                         xlims=NULL, ylims=NULL, add.lm=T, add.cor=add.lm,
+                         pt.cex=1, blue.bg=TRUE,
                          horiz.lines.at=NULL, horiz.lines.lty=1, horiz.lines.color=NULL,
                          abline.a=NULL, abline.b=NULL, abline.lty=1,
-                         xtitle=NULL, x.title.line=1.75, x.at=NULL, x.labs=NULL, x.labs.at=NULL, parse.x.labs=FALSE, x.title.cex=1,
-                         ytitle=NULL, y.title.line=1.75, y.at=NULL, y.labs=NULL, y.labs.at=NULL, parse.y.labs=FALSE, y.title.cex=1,
+                         xtitle=NULL, x.title.line=1.75, x.at=NULL, x.labs=NULL,
+                         x.labs.at=NULL, parse.x.labs=FALSE, x.labs.line=-0.6,
+                         max.x.ticks=6, x.title.cex=1,
+                         ytitle=NULL, y.title.line=1.75, y.at=NULL, y.labs=NULL,
+                         y.labs.at=NULL, parse.y.labs=FALSE, y.labs.line=-0.6,
+                         max.y.ticks=6, y.title.cex=1,
                          parmar=c(3, 3, 0.8, 0.8)){
   # Get plot values
   if(!is.null(subset_to_regions)){
@@ -94,9 +104,15 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
   # Add gridlines
   if(is.null(x.at)){
     x.at <- axTicks(1)
+    if(length(x.at) > max.x.ticks){
+      x.at <- x.at[seq(1, length(x.at), by=2)]
+    }
   }
   if(is.null(y.at)){
     y.at <- axTicks(2)
+    if(length(y.at) > max.y.ticks){
+      y.at <- y.at[seq(1, length(y.at), by=2)]
+    }
   }
   abline(v=x.at, h=y.at, col=grid.col)
   if(!is.null(horiz.lines.at)){
@@ -126,16 +142,45 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
             border=NA, col=adjustcolor(cnv.colors[2], alpha=0.2))
     abline(del.fit$fit, lwd=2, col=cnv.colors[1])
     abline(dup.fit$fit, lwd=2, col=cnv.colors[2])
+    if(add.cor){
+      del.cor <- cor.test(x[del.idx], y[del.idx])
+      dup.cor <- cor.test(x[dup.idx], y[dup.idx])
+      cor.coeffs <- c(del.cor$estimate, dup.cor$estimate)^2
+      cor.pvals <- c(del.cor$p.value, dup.cor$p.value)
+      x.sds <- sapply(list(x[del.idx], x[dup.idx]), sd, na.rm=T)
+      cor.betas <- c(del.fit$fit$coefficients[2] * x.sds[1],
+                     dup.fit$fit$coefficients[2] * x.sds[2])
+      lm.y.ends <- sapply(list(del.fit$fit, dup.fit$fit), predict,
+                          newdata=data.frame("X"=par("usr")[2]))
+      plot.height <- diff(par("usr")[3:4])
+      cor.text.ybuf <- 0.1 * plot.height
+      cor.text.y <- (c(0.9, 0.4) * plot.height) + par("usr")[3]
+      if(lm.y.ends[1] < lm.y.ends[2]){
+        cor.text.y <- cor.text.y[2:1]
+      }
+      sapply(1:2, function(i){
+        axis(4, at=cor.text.y[i], line=-0.75, tick=F, las=2,
+             label=names(cnv.colors)[i], col.axis=cnv.colors[i])
+        axis(4, at=cor.text.y[i]-cor.text.ybuf, line=-0.6, tick=F, las=2,
+             label=bquote(beta == .(format(round(cor.betas[i], 2), nsmall=2))),
+             cex.axis=5/6)
+        axis(4, at=cor.text.y[i]-(2*cor.text.ybuf), line=-0.6, tick=F, las=2,
+             label=bquote(R^2 == .(format(round(cor.coeffs[i], 2), nsmall=2))),
+             cex.axis=5/6)
+        axis(4, at=cor.text.y[i]-(3*cor.text.ybuf), line=-0.6, tick=F, las=2,
+             label=format.pval(cor.pvals[i], max.decimal=2), cex.axis=5/6)
+      })
+    }
   }
 
   # Add points (always add gw-sig last)
   gw.idx <- which(segs$gw_sig)
   points(x[-gw.idx], y[-gw.idx], pch=segs$pt.pch[-gw.idx],
          bg=segs$pt.bg[-gw.idx], col=segs$pt.border[-gw.idx],
-         cex=pt.cex)
+         cex=pt.cex, lwd=pt.cex, xpd=T)
   points(x[gw.idx], y[gw.idx], pch=segs$pt.pch[gw.idx],
          bg=segs$pt.bg[gw.idx], col=segs$pt.border[gw.idx],
-         cex=pt.cex)
+         cex=pt.cex, lwd=pt.cex, xpd=T)
 
   # Add axis ticks
   axis(1, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
@@ -158,16 +203,17 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
   }
   sapply(1:length(x.labs.at), function(i){
     if(parse.x.labs==TRUE){
-      axis(1, at=x.labs.at[i], labels=parse(text=x.labs[i]), tick=F, line=-0.6)
+      axis(1, at=x.labs.at[i], labels=parse(text=x.labs[i]), tick=F, line=x.labs.line)
     }else{
-      axis(1, at=x.labs.at[i], labels=x.labs[i], tick=F, line=-0.6)
+      axis(1, at=x.labs.at[i], labels=x.labs[i], tick=F, line=x.labs.line)
     }
   })
   sapply(1:length(y.labs.at), function(i){
     if(parse.y.labs==TRUE){
-      axis(2, at=y.labs.at[i], labels=parse(text=y.labs[i]), tick=F, line=-0.6, las=2)
+      axis(2, at=y.labs.at[i], labels=parse(text=y.labs[i]), tick=F,
+           line=y.labs.line, las=2)
     }else{
-      axis(2, at=y.labs.at[i], labels=y.labs[i], tick=F, line=-0.6, las=2)
+      axis(2, at=y.labs.at[i], labels=y.labs[i], tick=F, line=y.labs.line, las=2)
     }
   })
 
@@ -202,6 +248,8 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
 #' @param parse.y.labs format Y axis labels with [parse()] \[default: FALSE\]
 #' @param violin plot violins instead of boxes \[default: FALSE\]
 #' @param pt.cex expansion factor for points\[default: 1\]
+#' @param boxplot.colors border colors for boxplots (or violins)
+#' @param boxplot.fill fill colors for boxplots (or violins)
 #' @param parmar numeric vector of margins passed to [par()]
 #'
 #' @export segs.swarm
@@ -212,6 +260,7 @@ segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL, subset_to_re
                        add.y.axis=TRUE, ytitle=NULL, y.title.line=1.75,
                        y.at=NULL, y.labs=NULL, y.labs.at=NULL,
                        parse.y.labs=FALSE, violin=FALSE, pt.cex=1,
+                       boxplot.colors=NULL, boxplot.fill=NULL,
                        parmar=c(2.3, 3, 0.5, 0.5)){
 
   require(beeswarm, quietly=T)
@@ -264,8 +313,12 @@ segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL, subset_to_re
                            segs$pt.border[intersect(which(!x.bool), dup.idx)],
                            segs$pt.border[intersect(which(x.bool), del.idx)],
                            segs$pt.border[intersect(which(x.bool), dup.idx)])
-    boxplot.colors <- rep(cnv.blacks[1:2], 2)
-    boxplot.fill <- rep(cnv.whites[1:2], 2)
+    if(is.null(boxplot.colors)){
+      boxplot.colors <- rep(cnv.blacks[1:2], 2)
+    }
+    if(is.null(boxplot.fill)){
+      boxplot.fill <- rep(cnv.whites[1:2], 2)
+    }
   }else{
     x.at <- c(0.5, 1.5)
     width <- 0.4
@@ -282,8 +335,12 @@ segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL, subset_to_re
                           segs$pt.bg[which(x.bool)])
     pt.border.list <- list(segs$pt.border[which(!x.bool)],
                            segs$pt.border[which(x.bool)])
-    boxplot.colors <- rep(blueblack, 2)
-    boxplot.fill <- rep(bluewhite, 2)
+    if(is.null(boxplot.colors)){
+      boxplot.colors <- rep(blueblack, 2)
+    }
+    if(is.null(boxplot.fill)){
+      boxplot.fill <- rep(bluewhite, 2)
+    }
   }
 
   # Prep plot area
@@ -310,7 +367,7 @@ segs.swarm <- function(segs, x.bool, y, cnv.split=TRUE, ylims=NULL, subset_to_re
   sapply(1:length(y.vals), function(i){
     beeswarm(y.vals[[i]], add=T, at=x.at[i],
              pwbg=pt.color.list[[i]], pwcol=pt.border.list[[i]],
-             pwpch=pt.pch.list[[i]], cex=pt.cex,
+             pwpch=pt.pch.list[[i]], cex=pt.cex, lwd=pt.cex,
              corral="random", corralWidth=width)
   })
 
@@ -436,7 +493,8 @@ segs.simple.vioswarm <- function(segs, y, subset_to_regions=NULL,
     # boxplot(plot.dat[[x]], at=x-0.5, col=cnv.blacks[x], lty=1, outline=F,
     #         staplewex=0, add=T, boxwex=0.2)
     beeswarm(plot.dat[[x]], at=x-0.5, add=T, corralWidth=0.8, corral="wrap",
-             pwcol=pt.color[[x]], pwbg=pt.bg[[x]], pwpch=pt.pch[[x]], cex=pt.cex)
+             pwcol=pt.color[[x]], pwbg=pt.bg[[x]], pwpch=pt.pch[[x]],
+             cex=pt.cex, lwd=pt.cex)
   })
 
   # Add x-axis
@@ -484,6 +542,7 @@ segs.simple.vioswarm <- function(segs, y, subset_to_regions=NULL,
 #' @param border border for permuted distribution
 #' @param diamond.cex expansion factor for observed value
 #' @param y.title title for Y axis
+#' @param y.title.color color for Y-axis title \[default: blueblack\]
 #' @param left.ax.line add line to left axis \[default: FALSE\]
 #'
 #' @seealso [plot.seg.perms()]
@@ -493,7 +552,8 @@ segs.simple.vioswarm <- function(segs, y, subset_to_regions=NULL,
 plot.viohist <- function(perm.dat.vals, bins, y.at, width=0.8,
                          obs.val=NA, obs.color=NA, obs.border=NA, obs.pch=23,
                          color=bluewhite, border=blueblack,
-                         diamond.cex=4, y.title=NULL, left.ax.line=F){
+                         diamond.cex=4, y.title=NULL, y.title.color=blueblack,
+                         left.ax.line=F){
   perm.hist <- hist(perm.dat.vals, breaks=bins, plot=F)
   perm.mean <- mean(as.numeric(perm.dat.vals[which(!is.infinite(perm.dat.vals))]), na.rm=T)
   values <- perm.hist$counts
@@ -517,18 +577,48 @@ plot.viohist <- function(perm.dat.vals, bins, y.at, width=0.8,
            col=border)
   segments(x0=perm.mean, x1=perm.mean,
            y0=y.at - 0.2, y1=y.at + 0.2,
-           col=blueblack, lwd=3, lend="round")
+           col=border, lwd=3, lend="round")
   segments(x0=obs.val, x1=obs.val,
            y0=y.at - 0.2, y1=y.at + 0.2,
            col=obs.color, lwd=3, lend="round")
   points(x=obs.val, y=y.at, pch=obs.pch, bg=obs.color,
          col=obs.border, cex=diamond.cex)
   if(!is.null(y.title)){
-    axis(2, at=y.at, line=-0.8, tick=F, las=2, labels=y.title)
+    axis(2, at=y.at, line=-0.8, tick=F, las=2, labels=y.title, col.axis=y.title.color)
     if(left.ax.line==T){
       axis(2, at=c(y.at-(width/2), y.at+(width/2)), tck=0, labels=NA, col=blueblack)
     }
   }
+}
+
+
+#' X-axis for permutation plot
+#'
+#' Helper function to add an X-axis to a permutation test result plot
+#'
+#' @param xlims limits for X axis labels
+#' @param hard.min hard limit for lower end of X-axis \[default: -10e10\]
+#' @param hard.max hard limit for all components of X-axis \[default: 10e10\]
+#' @param max.x.ticks maximum ticks for X axis \[default: 6\]
+#' @param abs.labels print absolute value of axis labels \[default: FALSE\]
+#'
+#' @seealso [plot.seg.perms()], [plot.seg.perms.multi()], [plot.viohist()]
+add.xaxis.to.perm.plot <- function(xlims, hard.min=-10e10, hard.max=10e10,
+                                   max.x.ticks=6, abs.labels=FALSE){
+  x.at <- unique(c(0, axTicks(1), hard.max))
+  x.at <- x.at[which(x.at >= hard.min & x.at <= hard.max)]
+  if(length(x.at) > max.x.ticks){
+    x.at <- x.at[seq(1, length(x.at), 2)]
+  }
+  axis(1, at=c(hard.min, hard.max), labels=NA, col=blueblack, tck=0)
+  axis(1, at=x.at, labels=NA, col=blueblack, tck=-0.03)
+  sapply(x.at, function(x){
+    if(abs.labels){
+      axis(1, at=x, labels=prettyNum(abs(x), big.mark=","), line=-0.65, tick=F)
+    }else{
+      axis(1, at=x, labels=prettyNum(x, big.mark=","), line=-0.65, tick=F)
+    }
+  })
 }
 
 
@@ -537,11 +627,14 @@ plot.viohist <- function(perm.dat.vals, bins, y.at, width=0.8,
 #' Function to plot segment permutation test results
 #'
 #' @param segs segment dataframe (imported with [load.segment.table()])
-#' @param perms list of permutation results
+#' @param perms data.table of permutation results
 #' @param feature name of feature to evaluate
 #' @param measure statistic to evaluate \[default: mean\]
+#' @param invert invert orientation of X-axis \[default: FALSE\]
 #' @param norm normalize values before plotting \[default: FALSE\]
 #' @param subset_to_regions vector of region IDs to include \[default: include all regions\]
+#' @param return.stats return dataframe of summary stats \[default: TRUE\]
+#' @param print.stats print summary of stats \[default: FALSE\]
 #' @param n.bins ideal number of bins for histograms \[default: 100\]
 #' @param min.bins minimum number of bins \[default: 10\]
 #' @param xtitle title of X axis
@@ -549,26 +642,35 @@ plot.viohist <- function(perm.dat.vals, bins, y.at, width=0.8,
 #' @param xlims limits for X axis
 #' @param xmin minimum for X axis
 #' @param xmax maximum for X axis
+#' @param max.x.ticks maximum ticks for X axis
 #' @param diamond.pch shape for observed values
 #' @param diamond.cex expansion for observed values
 #' @param parmar numeric vector of margins passed to [par()]
 #'
-#' @seealso [plot.viohist()]
+#' @seealso [plot.viohist()], [perm.summary()]
 #'
 #' @export plot.seg.perms
 #' @export
-plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
-                           subset_to_regions=NULL, n.bins=100, min.bins=10,
+plot.seg.perms <- function(segs, perms, feature, measure, invert=F, norm=F,
+                           subset_to_regions=NULL, return.stats=TRUE, print.stats=!return.stats,
+                           n.bins=100, min.bins=10,
                            x.title=NULL, x.title.line=1.2, x.title.cex=1,
-                           xlims=NULL, xmin=NULL, xmax=NULL,
+                           xlims=NULL, xmin=NULL, xmax=NULL, max.x.ticks=6,
                            diamond.pch=23, diamond.cex=1.25, parmar=c(2.25, 2, 0.5, 0.5)){
   # Get plot data
   if(!is.null(subset_to_regions)){
     segs <- segs[which(segs$region_id %in% subset_to_regions), ]
-    perms <- lapply(perms, function(df){df[which(df$region_id %in% subset_to_regions), ]})
   }
-  perm.dat <- perm.summary(perms, feature, measure)
+  perm.dat <- perm.summary(perms, feature, measure, subset_to_regions)
   segs.dat <- calc.segs.dat(segs, feature, measure)
+  if(invert){
+    perm.dat <- -perm.dat
+    segs.dat <- -segs.dat
+  }
+
+  # Reorder plot data to match labeling
+  perm.dat <- perm.dat[, c("DUP", "ALL", "DEL")]
+  segs.dat <- segs.dat[c("DUP", "ALL", "DEL")]
 
   # Normalize data, if optioned
   perm.dat.raw <- perm.dat
@@ -598,7 +700,12 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
   bin.width <- bins[2]-bins[1]
   if(is.null(xlims)){
     xrange <- range(rbind(perm.dat, segs.dat), na.rm=T)
-    xlims <- c(xrange[1], 1.25 * xrange[2])
+    if(invert){
+      x.buffer <- 0.2 * diff(xrange)
+      xlims <- c(xrange[1] - x.buffer, xrange[2] + x.buffer)
+    }else{
+      xlims <- c(xrange[1], 1.25 * xrange[2])
+    }
   }
   if(!is.null(xmin)){
     xlims[1] <- xmin
@@ -606,19 +713,30 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
   if(!is.null(xmax)){
     xlims[2] <- xmax
   }
+  if(measure == "frac.any" & !invert){
+    xlims[2] <- min(c(100, xlims[2]))
+  }
 
   # Gather more misc data for plotting
   perm.means <- apply(perm.dat, 2, mean, na.rm=T)
   perm.pvals <- sapply(1:3, function(i){calc.perm.p(perm.vals=perm.dat[, i], obs.val=segs.dat[i])})
-  vio.colors <- rep(bluewhite, 3)
-  vio.borders <- rep(blueblack, 3)
-  # vio.colors <- c(purplewhite, redwhite, bluewhite)
-  # vio.borders <- c(purpleblack, redblack, blueblack)
-  row.colors <- c(cnv.colors[c(3, 1:2)])
+  # vio.colors <- rep(bluewhite, 3)
+  # vio.borders <- rep(blueblack, 3)
+  vio.colors <- cnv.whites[c(2:3, 1)]
+  vio.borders <- cnv.blacks[c(2:3, 1)]
+  row.colors <- cnv.colors[c(2:3, 1)]
+  viohist.y.at <- c(2, 1, 3)
   row.borders <- rep("black", 3)
   # row.borders <- c(purpleblack, redblack, blueblack)
-  row.labels <- c("All\nCNV", "DEL", "DUP")
+  row.labels <- c("DUP", "All\nCNV", "DEL")
   stats.cex <- 0.85
+
+  # Determine if right margin modification is necessary
+  if(!all(is.nan(segs.dat))){
+    if(measure=="frac.any" & any(segs.dat[which(!is.nan(segs.dat))] > 99)){
+      parmar <- parmar + c(0, 0, 0, 1.25)
+    }
+  }
 
   # Prep global plot area
   par(bty="n", mar=parmar)
@@ -626,35 +744,59 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
        xaxt="n", yaxt="n", xlab="", ylab="")
 
   # Add viohists
-  sapply(1:3, function(i){
+  stats.df <- data.frame()
+  for(i in 1:3){
+    ### TODO: ADD CONTINGENCY FOR WHEN GROUP IS EMPTY
     plot.viohist(perm.dat[, i], bins, i-0.5,
                  color=vio.colors[i], border=vio.borders[i],
-                 y.title=row.labels[i], diamond.cex=diamond.cex, obs.val=segs.dat[i],
+                 y.title=row.labels[i], y.title.color="black",
+                 diamond.cex=diamond.cex, obs.val=segs.dat[i],
                  obs.color=row.colors[i], obs.border=row.borders[i], obs.pch=diamond.pch)
-    # segments(x0=perm.means[i], x1=perm.means[i],
-    #          y0=i-0.7, y1=i-0.3, lwd=3,
-    #          col=vio.borders[i], lend="round")
-    if(segs.dat[i] >= perm.means[i]){
-      text(x=segs.dat[i]-(0.03*(par("usr")[2]-par("usr")[1])), y=i-0.7, pos=4,
-           labels=perm.pvals[2, ][[i]], xpd=T, cex=stats.cex)
-    }else{
-      text(x=perm.means[i]-(0.03*(par("usr")[2]-par("usr")[1])), y=i-0.7, pos=4,
-           labels=perm.pvals[2, ][[i]], xpd=T, cex=stats.cex)
+    if(!is.nan(segs.dat[i])){
+      if(segs.dat[i] >= perm.means[i]){
+        text(x=segs.dat[i]-(0.03*(par("usr")[2]-par("usr")[1])), y=i-0.7, pos=4,
+             labels=perm.pvals[2, ][[i]], xpd=T, cex=stats.cex)
+      }else{
+        text(x=perm.means[i]-(0.03*(par("usr")[2]-par("usr")[1])), y=i-0.7, pos=4,
+             labels=perm.pvals[2, ][[i]], xpd=T, cex=stats.cex)
+      }
     }
     perm.mean <- mean(perm.dat.raw[, i], na.rm=T)
     fold <- round(segs.dat.raw[i]/perm.mean, 2)
-    cat(paste(prettyNum(fold, small.interval=2), "-fold; obs=",
-              prettyNum(segs.dat.raw[i], small.interval=4), "; exp=",
-              prettyNum(perm.mean, small.interval=4), "\n", sep=""))
-  })
+    if(invert){
+      stats.df <- rbind(stats.df,
+                        c(colnames(perm.dat)[i], abs(segs.dat[i]), abs(perm.mean),
+                          abs(fold), perm.pvals[1, ][[i]]))
+      if(print.stats){
+        cat(paste(prettyNum(abs(fold), small.interval=2), "-fold; obs=",
+                  prettyNum(abs(segs.dat.raw[i]), small.interval=4), "; exp=",
+                  prettyNum(abs(perm.mean), small.interval=4), "\n", sep=""))
+      }
+    }else{
+      stats.df <- rbind(stats.df,
+                        c(colnames(perm.dat)[i], segs.dat[i], perm.mean,
+                          fold, perm.pvals[1, ][[i]]))
+      if(print.stats){
+        cat(paste(prettyNum(fold, small.interval=2), "-fold; obs=",
+                  prettyNum(segs.dat.raw[i], small.interval=4), "; exp=",
+                  prettyNum(perm.mean, small.interval=4), "\n", sep=""))
+      }
+    }
+  }
 
   # Axes & cleanup
-  axis(1, at=c(-10e10, 10e10), labels=NA, col=blueblack, tck=0)
-  axis(1, at=unique(c(0, axTicks(1))), labels=NA, col=blueblack, tck=-0.03)
-  sapply(1:length(axTicks(1)), function(i){
-    axis(1, at=axTicks(1)[i], labels=prettyNum(axTicks(1)[i], big.mark=","), line=-0.65, tick=F)
-  })
+  if(measure == "frac.any"){
+    rCNV2:::add.xaxis.to.perm.plot(xlims, 0, 100, max.x.ticks, abs.labels=invert)
+  }else{
+    rCNV2:::add.xaxis.to.perm.plot(xlims, max.x.ticks=max.x.ticks, abs.labels=invert)
+  }
   mtext(1, text=x.title, line=x.title.line, cex=x.title.cex)
+
+  # Return dataframe of perm test stats, if optioned
+  if(return.stats){
+    colnames(stats.df) <- c("CNV", "obs", "exp", "fold", "pval")
+    return(stats.df)
+  }
 }
 
 
@@ -663,11 +805,12 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
 #' Multi-panel plot of permutation results for segment subsets
 #'
 #' @param segs segment dataframe (imported with [load.segment.table()])
-#' @param gw.perms list of permutation results for empirical segments
-#' @param lit.perms list of permutation results for literature segments
-#' @param union.perms list of permutation results for all combined segments
+#' @param gw.perms data.table of permutation results for empirical segments
+#' @param lit.perms data.table of permutation results for literature segments
+#' @param union.perms data.table of permutation results for all combined segments
 #' @param feature name of feature to evaluate
 #' @param measure statistic to evaluate \[default: mean\]
+#' @param invert invert orientation of X-axis \[default: FALSE\]
 #' @param subset_to_regions vector of region IDs to include \[default: include all regions\]
 #' @param norm normalize values before plotting \[default: FALSE\]
 #' @param n.bins ideal number of bins for histograms \[default: 100\]
@@ -677,20 +820,20 @@ plot.seg.perms <- function(segs, perms, feature, measure, norm=F,
 #' @param xlims limits for X axis
 #' @param xmin minimum for X axis
 #' @param xmax maximum for X axis
-#' @param max.x.ticks maxmimum ticks for X axis
+#' @param max.x.ticks maximum ticks for X axis
 #' @param inner.axis.cex expansion of inner axis
 #' @param diamond.cex expansion for observed values
 #' @param parmar numeric vector of margins passed to [par()]
 #'
-#' @seealso [plot.seg.perms()]
+#' @seealso [plot.seg.perms()], [perm.summary()]
 #'
 #' @export plot.seg.perms.multi
 #' @export
 plot.seg.perms.multi <- function(segs, gw.perms, lit.perms, union.perms,
-                                 feature, measure, subset_to_regions=NULL,
+                                 feature, measure, invert=F, subset_to_regions=NULL,
                                  norm=F, n.bins=100, min.bins=10,
-                                 x.title=NULL, xlims=NULL, xmin=NULL, xmax=NULL, max.x.ticks=5,
-                                 outer.axis.cex=1, inner.axis.cex=0.85, diamond.cex=1.25,
+                                 x.title=NULL, xlims=NULL, xmin=NULL, xmax=NULL, max.x.ticks=6,
+                                 outer.axis.cex=1, inner.axis.cex=0.85, diamond.cex=1.1,
                                  parmar=c(2.25, 6, 0.5, 0.5)){
   # Get ID subsets
   if(is.null(subset_to_regions)){
@@ -701,28 +844,38 @@ plot.seg.perms.multi <- function(segs, gw.perms, lit.perms, union.perms,
   all.fdr.ids <- intersect(subset_to_regions, segs$region_id[which(segs$fdr_sig)])
   all.gd.ids <- intersect(subset_to_regions, segs$region_id[which(segs$any_gd)])
   gd.nonsig.ids <- intersect(subset_to_regions, setdiff(all.gd.ids, all.sig.ids))
-  union.ids <- intersect(subset_to_regions, segs$region_id[which(segs$gw_sig | segs$any_gd)])
+  union.ids <- intersect(subset_to_regions, segs$region_id[which(segs$any_sig | (segs$any_gd & segs$bonf_sig_gd))])
+
+  # Set CNV order for all downstream data generation
+  cnv.order <- c("DUP", "ALL", "DEL")
 
   # Get permutation plot data
   perm.dat <- list("union"=perm.summary(union.perms, feature=feature, measure=measure,
-                                        subset_to_regions=union.ids),
+                                        subset_to_regions=union.ids)[, cnv.order],
                    "gw"=perm.summary(gw.perms, feature=feature, measure=measure,
-                                     subset_to_regions=all.gw.ids),
+                                     subset_to_regions=all.gw.ids)[, cnv.order],
                    "fdr"=perm.summary(gw.perms, feature=feature, measure=measure,
-                                     subset_to_regions=all.fdr.ids),
+                                      subset_to_regions=all.fdr.ids)[, cnv.order],
                    "gd.nonsig"=perm.summary(lit.perms, feature=feature, measure=measure,
-                                            subset_to_regions=gd.nonsig.ids))
+                                            subset_to_regions=gd.nonsig.ids)[, cnv.order])
   n.cats <- length(perm.dat)
 
   # Get observed plot data, and convert boolean valueas back to numeric, if needed
   segs.dat <- list("union"=calc.segs.dat(segs, feature, measure,
-                                         subset_to_regions=union.ids),
+                                         subset_to_regions=union.ids)[cnv.order],
                    "gw"=calc.segs.dat(segs, feature, measure,
-                                      subset_to_regions=all.gw.ids),
+                                      subset_to_regions=all.gw.ids)[cnv.order],
                    "fdr"=calc.segs.dat(segs, feature, measure,
-                                      subset_to_regions=all.fdr.ids),
+                                       subset_to_regions=all.fdr.ids)[cnv.order],
                    "gd.nonsig"=calc.segs.dat(segs, feature, measure,
-                                             subset_to_regions=gd.nonsig.ids))
+                                             subset_to_regions=gd.nonsig.ids)[cnv.order])
+
+  # Invert data, if optioned
+  if(invert){
+    perm.dat <- lapply(perm.dat, function(df){-df})
+    segs.dat <- lapply(segs.dat, function(vals){-vals})
+  }
+
   # Normalize data, if optioned
   perm.dat.raw <- perm.dat
   segs.dat.raw <- segs.dat
@@ -745,15 +898,18 @@ plot.seg.perms.multi <- function(segs, gw.perms, lit.perms, union.perms,
     bins <- seq(val.range[1], val.range[2], length.out=min.bins)
   }else if(unique.vals <= n.bins){
     bins <- seq(val.range[1], val.range[2], length.out=floor(unique.vals/2))
-    # }else if(val.range[2] - val.range[1] <= n.bins){
-    #   bins <- val.range[1]:val.range[2]
   }else{
     bins <- seq(val.range[1], val.range[2], length.out=n.bins)
   }
   bin.width <- bins[2]-bins[1]
   if(is.null(xlims)){
     xrange <- range(rbind(do.call("rbind", perm.dat), do.call("rbind", segs.dat)), na.rm=T)
-    xlims <- c(xrange[1], 1.25 * xrange[2])
+    if(invert){
+      x.buffer <- 0.2 * diff(xrange)
+      xlims <- c(xrange[1] - x.buffer, xrange[2] + x.buffer)
+    }else{
+      xlims <- c(xrange[1], 1.25 * xrange[2])
+    }
   }
   if(!is.null(xmin)){
     xlims[1] <- xmin
@@ -767,12 +923,11 @@ plot.seg.perms.multi <- function(segs, gw.perms, lit.perms, union.perms,
   perm.pvals <- lapply(1:n.cats, function(i){
     sapply(1:3, function(j){calc.perm.p(perm.vals=perm.dat[[i]][, j], obs.val=segs.dat[[i]][j])})
   })
-  vio.colors <- rep(bluewhite, n.cats)
-  vio.borders <- rep(blueblack, n.cats)
-  row.colors <- c(cnv.colors[c(3, 1:2)])
+  vio.colors <- c(bluewhite, purplewhite, redwhite)
+  vio.borders <- c(blueblack, purpleblack, redblack)
+  row.colors <- c(cnv.colors[c(2:3, 1)])
   row.borders <- rep("black", 3)
-  # row.borders <- c(purpleblack, redblack, blueblack)
-  outer.row.labels <- c("All\nCNV", "DEL", "DUP")
+  outer.row.labels <- c("DUP", "All\nCNV", "DEL")
   inner.row.labels <- c("All Segs.", "GW Sig.", "FDR Sig.", "Lit. Only")
   stats.cex <- 0.85
   obs.pch <- c(23, 22, 23, 21)
@@ -788,37 +943,35 @@ plot.seg.perms.multi <- function(segs, gw.perms, lit.perms, union.perms,
       y.at <- (n.cats*j)-(n.cats-i)-0.5+(0.5*(j-1))
       plot.viohist(perm.dat[[i]][, j], bins, y.at,
                    color=vio.colors[j], border=vio.borders[j],
-                   y.title=inner.row.labels[i], diamond.cex=diamond.cex, obs.val=segs.dat[[i]][j],
+                   y.title=inner.row.labels[i], y.title.color="black",
+                   diamond.cex=diamond.cex, obs.val=segs.dat[[i]][j],
                    obs.pch=obs.pch[i], obs.color=row.colors[j], obs.border=row.borders[j],
                    left.ax.line=T)
-      # segments(x0=perm.means[[i]][j], x1=perm.means[[i]][j],
-      #          y0=y.at-0.2, y1=y.at+0.2, lwd=3,
-      #          col=vio.borders[j], lend="round")
-      if(segs.dat[[i]][j] >= perm.means[[i]][j]){
-        text(x=segs.dat[[i]][j]-(0.015*(par("usr")[2]-par("usr")[1])), y=y.at-0.2, pos=4,
-             labels=perm.pvals[[i]][2, ][[j]], xpd=T, cex=stats.cex)
-      }else{
-        text(x=perm.means[[i]][j]-(0.015*(par("usr")[2]-par("usr")[1])), y=y.at-0.2, pos=4,
-             labels=perm.pvals[[i]][2, ][[j]], xpd=T, cex=stats.cex)
+      if(!is.nan(segs.dat[[i]][j])){
+        if(segs.dat[[i]][j] >= perm.means[[i]][j]){
+          text(x=segs.dat[[i]][j]-(0.015*(par("usr")[2]-par("usr")[1])), y=y.at-0.2, pos=4,
+               labels=perm.pvals[[i]][2, ][[j]], xpd=T, cex=stats.cex)
+        }else{
+          text(x=perm.means[[i]][j]-(0.015*(par("usr")[2]-par("usr")[1])), y=y.at-0.2, pos=4,
+               labels=perm.pvals[[i]][2, ][[j]], xpd=T, cex=stats.cex)
+        }
       }
     })
   })
 
   # Axes & cleanup
-  x.at <- axTicks(1)
-  if(length(x.at) > max.x.ticks){
-    x.at <- x.at[seq(1, length(x.at), 2)]
+  if(measure == "frac.any"){
+    rCNV2:::add.xaxis.to.perm.plot(xlims, 0, 100, max.x.ticks, abs.labels=invert)
+  }else{
+    rCNV2:::add.xaxis.to.perm.plot(xlims, max.x.ticks=max.x.ticks, abs.labels=invert)
   }
-  axis(1, at=c(-10e10, 10e10), labels=NA, col=blueblack, tck=0)
-  axis(1, at=x.at, labels=NA, col=blueblack, tck=-0.03)
-  sapply(1:length(x.at), function(i){
-    axis(1, at=x.at[i], labels=prettyNum(x.at[i], big.mark=","), line=-0.65, tick=F)
-  })
   mtext(1, text=x.title, line=1.3)
   sapply(1:3, function(i){
     ax.at <- ((n.cats*i)+(0.5*(i-1)))-c(n.cats-0.1, 0.1)
     axis(2, at=ax.at, tck=0, labels=NA, col=blueblack, line=4)
-    axis(2, at=mean(ax.at), tick=F, line=3.25, las=2, labels=outer.row.labels[i], cex.axis=outer.axis.cex)
+    axis(2, at=mean(ax.at), tick=F, line=3.25, las=2,
+         labels=outer.row.labels[i], col.axis="black",
+         cex.axis=outer.axis.cex)
   })
   segments(x0=rep(par("usr")[1], 2), x1=rep(par("usr")[2], 2),
            y0=c(4.25, 8.75), y1=c(4.25, 8.75),
@@ -834,12 +987,15 @@ plot.seg.perms.multi <- function(segs, gw.perms, lit.perms, union.perms,
 #' @param gw.perms list of permutation results for empirical segments
 #' @param lit.perms list of permutation results for literature segments
 #' @param feature name of feature to evaluate
-#' @param measure statistic to evaluate \[default: mean\]
+#' @param measure statistic to evaluate
 #' @param outdir path to output directory
 #' @param prefix filename prefix for output plots
+#' @param invert invert orientation of X-axis \[default: FALSE\]
 #' @param subset_to_regions vector of region IDs to include \[default: include all regions\]
 #' @param norm normalize values before plotting \[default: FALSE\]
 #' @param norm.multi normalize values before plotting for multi-panel figure \[default: FALSE\]
+#' @param return.stats return dataframe of summary stats \[default: TRUE\]
+#' @param print.stats print summary of stats \[default: FALSE\]
 #' @param n.bins.single ideal number of bins for single-panel histograms \[default: 100\]
 #' @param n.bins.multi ideal number of bins for multi-panel histograms \[default: 100\]
 #' @param min.bins minimum number of bins \[default: 10\]
@@ -848,23 +1004,21 @@ plot.seg.perms.multi <- function(segs, gw.perms, lit.perms, union.perms,
 #' @param xlims limits for X axis
 #' @param xmin minimum for X axis
 #' @param xmax maximum for X axis
-#' @param diamond.cex expansion for observed values
 #' @param pdf.dims.single dimensionf of pdf for single-panel plots
 #' @param parmar.single numeric vector of margins passed to [par()] for single-panel plots
 #' @param pdf.dims.multi dimensions for multi-panel plots
 #' @param parmar.multi numeric vector of margins passed to [par()] for multi-panel plots
-
 #'
 #' @seealso [plot.seg.perms.multi()]
 #'
 #' @export plot.all.perm.res
 #' @export
 plot.all.perm.res <- function(segs, gw.perms, lit.perms,
-                              feature, measure, outdir, prefix,
+                              feature, measure, outdir, prefix, invert=F,
                               subset_to_regions=NULL, norm=F, norm.multi=F,
+                              return.stats=TRUE, print.stats=FALSE,
                               n.bins.single=100, n.bins.multi=100, min.bins=10,
                               x.title=NULL, xlims=NULL, xmin=NULL, xmax=NULL,
-                              diamond.cex=1.25,
                               pdf.dims.single=c(2.2, 2.4),
                               parmar.single=c(2.25, 2, 0.5, 0.5),
                               pdf.dims.multi=c(2.2, 4.8),
@@ -874,6 +1028,8 @@ plot.all.perm.res <- function(segs, gw.perms, lit.perms,
     subset_to_regions <- segs$region_id
   }
   segs <- segs[which(segs$region_id %in% subset_to_regions), ]
+  gw.perms <- copy(gw.perms[region_id %in% subset_to_regions])
+  lit.perms <- copy(lit.perms[region_id %in% subset_to_regions])
 
   # Get ID subsets
   all.sig.ids <- intersect(subset_to_regions, segs$region_id[which(segs$any_sig)])
@@ -881,13 +1037,11 @@ plot.all.perm.res <- function(segs, gw.perms, lit.perms,
   all.fdr.ids <- intersect(subset_to_regions, segs$region_id[which(segs$fdr_sig)])
   all.gd.ids <- intersect(subset_to_regions, segs$region_id[which(segs$any_gd)])
   gd.nonsig.ids <- intersect(subset_to_regions, setdiff(all.gd.ids, all.sig.ids))
-  union.ids <- intersect(subset_to_regions, segs$region_id[which(segs$any_sig | segs$any_gd)])
+  union.ids <- intersect(subset_to_regions, segs$region_id[which(segs$any_sig | (segs$any_gd & segs$bonf_sig_gd))])
 
   # Merge perm results
-  union.perms <- lapply(1:length(gw.perms), function(i){
-    shared.columns <- intersect(colnames(gw.perms[[i]]), colnames(lit.perms[[i]]))
-    as.data.frame(rbind(gw.perms[[i]][shared.columns], lit.perms[[i]][shared.columns]))
-  })
+  shared.columns <- intersect(colnames(gw.perms), colnames(lit.perms))
+  union.perms <- rbind(gw.perms[, ..shared.columns], lit.perms[, ..shared.columns])
 
   # Prep output directory
   subdir <- paste(outdir, "/", prefix, "_", feature, "_", measure, sep="")
@@ -896,68 +1050,126 @@ plot.all.perm.res <- function(segs, gw.perms, lit.perms,
   }
 
   # Plot union of all segments
-  cat("Union of all segments:\n")
-  pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".union_all_segs.pdf", sep=""),
-      height=pdf.dims.single[1], width=pdf.dims.single[2])
-  plot.seg.perms(segs, union.perms, feature=feature, measure=measure,
-                 subset_to_regions=union.ids,
-                 n.bins=n.bins.single, min.bins=min.bins, norm=norm,
-                 x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
-                 parmar=parmar.single)
-  dev.off()
+  if(length(union.ids) > 0){
+    if(print.stats){
+      cat("Union of all segments:\n")
+    }
+    pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".union_all_segs.pdf", sep=""),
+        height=pdf.dims.single[1], width=pdf.dims.single[2])
+    union.stats <- plot.seg.perms(segs, union.perms, feature=feature, measure=measure,
+                                  invert=invert, subset_to_regions=union.ids,
+                                  return.stats=return.stats, print.stats=print.stats,
+                                  n.bins=n.bins.single, min.bins=min.bins, norm=norm,
+                                  x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
+                                  parmar=parmar.single)
+    dev.off()
+    union.stats$sig <- "union"
+  }
 
   # Plot gw + FDR alone
-  cat("Genome-wide + FDR significant:\n")
-  pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".gw_plus_fdr.pdf", sep=""),
-      height=pdf.dims.single[1], width=pdf.dims.single[2])
-  plot.seg.perms(segs, gw.perms, feature=feature, measure=measure,
-                 subset_to_regions=all.sig.ids,
-                 n.bins=n.bins.single, min.bins=min.bins, norm=norm,
-                 x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
-                 diamond.pch=23, parmar=parmar.single)
-  dev.off()
+  if(length(all.sig.ids) > 0){
+    if(print.stats){
+      cat("Genome-wide + FDR significant:\n")
+    }
+    pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".gw_plus_fdr.pdf", sep=""),
+        height=pdf.dims.single[1], width=pdf.dims.single[2])
+    sig.stats <- plot.seg.perms(segs, gw.perms, feature=feature, measure=measure,
+                                invert=invert, subset_to_regions=all.sig.ids,
+                                return.stats=return.stats, print.stats=print.stats,
+                                n.bins=n.bins.single, min.bins=min.bins, norm=norm,
+                                x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
+                                diamond.pch=23, parmar=parmar.single)
+    dev.off()
+    sig.stats$sig <- "sig"
+  }
 
   # Plot gw-sig alone
-  cat("Genome-wide significant alone:\n")
-  pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".gw_sig.pdf", sep=""),
-      height=pdf.dims.single[1], width=pdf.dims.single[2])
-  plot.seg.perms(segs, gw.perms, feature=feature, measure=measure,
-                 subset_to_regions=all.gw.ids,
-                 n.bins=n.bins.single, min.bins=min.bins, norm=norm,
-                 x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
-                 diamond.pch=22, parmar=parmar.single)
-  dev.off()
+  if(length(all.gw.ids) > 0){
+    if(print.stats){
+      cat("Genome-wide significant alone:\n")
+    }
+    pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".gw_sig.pdf", sep=""),
+        height=pdf.dims.single[1], width=pdf.dims.single[2])
+    gw.stats <- plot.seg.perms(segs, gw.perms, feature=feature, measure=measure,
+                               invert=invert, subset_to_regions=all.gw.ids,
+                               return.stats=return.stats, print.stats=print.stats,
+                               n.bins=n.bins.single, min.bins=min.bins, norm=norm,
+                               x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
+                               diamond.pch=22, parmar=parmar.single)
+    dev.off()
+    gw.stats$sig <- "GW"
+  }
 
   # Plot FDR-sig alone
-  cat("FDR significant alone:\n")
-  pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".fdr_sig.pdf", sep=""),
-      height=pdf.dims.single[1], width=pdf.dims.single[2])
-  plot.seg.perms(segs, gw.perms, feature=feature, measure=measure,
-                 subset_to_regions=all.fdr.ids,
-                 n.bins=n.bins.single, min.bins=min.bins, norm=norm,
-                 x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
-                 diamond.pch=23, parmar=parmar.single)
-  dev.off()
+  if(length(all.fdr.ids) > 0){
+    if(print.stats){
+      cat("FDR significant alone:\n")
+    }
+    pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".fdr_sig.pdf", sep=""),
+        height=pdf.dims.single[1], width=pdf.dims.single[2])
+    fdr.stats <- plot.seg.perms(segs, gw.perms, feature=feature, measure=measure,
+                                invert=invert, subset_to_regions=all.fdr.ids,
+                                return.stats=return.stats, print.stats=print.stats,
+                                n.bins=n.bins.single, min.bins=min.bins, norm=norm,
+                                x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
+                                diamond.pch=23, parmar=parmar.single)
+    dev.off()
+    fdr.stats$sig <- "FDR"
+  }
 
   # Plot non-significant lit GDs alone
-  cat("Literature GDs below genome-wide or FDR significance:\n")
-  pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".lit_gds_nogw_noFDR.pdf", sep=""),
-      height=pdf.dims.single[1], width=pdf.dims.single[2])
-  plot.seg.perms(segs, lit.perms, feature=feature, measure=measure,
-                 subset_to_regions=gd.nonsig.ids,
-                 n.bins=n.bins.single, min.bins=min.bins, norm=norm,
-                 x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
-                 diamond.pch=21, parmar=parmar.single)
-  dev.off()
+  if(length(gd.nonsig.ids) > 0){
+    if(print.stats){
+      cat("Literature GDs below genome-wide or FDR significance:\n")
+    }
+    pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".lit_gds_nogw_noFDR.pdf", sep=""),
+        height=pdf.dims.single[1], width=pdf.dims.single[2])
+    lit.stats <- plot.seg.perms(segs, lit.perms, feature=feature, measure=measure,
+                                invert=invert, subset_to_regions=gd.nonsig.ids,
+                                return.stats=return.stats, print.stats=print.stats,
+                                n.bins=n.bins.single, min.bins=min.bins, norm=norm,
+                                x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
+                                diamond.pch=21, parmar=parmar.single)
+    dev.off()
+    lit.stats$sig <- "litGDs"
+  }
 
   # Plot combined analysis of all subsets
   pdf(paste(subdir, "/", prefix, ".", feature, ".", measure, ".multipanel.pdf", sep=""),
       height=pdf.dims.multi[1], width=pdf.dims.multi[2])
-  plot.seg.perms.multi(segs, gw.perms, lit.perms, union.perms,
-                       feature, measure, subset_to_regions=subset_to_regions,
+  plot.seg.perms.multi(segs, gw.perms, lit.perms, union.perms, feature, measure,
+                       invert=invert, subset_to_regions=subset_to_regions,
                        n.bins=n.bins.multi, min.bins=min.bins, norm=norm.multi,
                        x.title=x.title, xlims=xlims, xmin=xmin, xmax=xmax,
-                       diamond.cex=1, parmar=parmar.multi)
+                       diamond.cex=0.9, parmar=parmar.multi)
   dev.off()
+
+  # Clean up summary stats dataframe
+  if(return.stats){
+    stats.df <- do.call("rbind", list(union.stats, sig.stats, gw.stats, fdr.stats, lit.stats))
+    stats.df$feature <- feature
+    stats.df$measure <- measure
+    return(stats.df[, c("feature", "measure", "sig", "CNV", "obs", "exp", "fold", "pval")])
+  }
+}
+
+
+#' Reorganize permutation plots
+#'
+#' Reorganize all key permutation plots for a single subset of segments
+#'
+#' @param parent.dir Parent directory containing all permutation plots
+#'
+#' @export reorganize.perm.plots
+#' @export
+reorganize.perm.plots <- function(parent.dir){
+  system(paste("mkdir ", parent.dir, "/all_multipanel_plots", sep=""), wait=T)
+  system(paste("mkdir ", parent.dir, "/all_main_plots", sep=""), wait=T)
+  system(paste("find ", parent.dir, " -name \"*.multipanel.pdf\"",
+               " | xargs -I {} cp {} ", parent.dir, "/all_multipanel_plots/",
+               sep=""), wait=T)
+  system(paste("find ", parent.dir, " -name \"*.union_all_segs.pdf\"",
+               " | xargs -I {} cp {} ", parent.dir, "/all_main_plots/",
+               sep=""), wait=T)
 }
 

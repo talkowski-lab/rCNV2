@@ -15,6 +15,7 @@ import re
 import pybedtools as pbt
 import gzip
 import numpy as np
+import warnings
 from pysam import TabixFile
 from scipy.stats import norm
 import argparse
@@ -98,7 +99,8 @@ def calc_all_effects(cs_dict, phenos, ssdir):
     Returns: flattened pd.DataFrame (one row per segment-phenotype-CNV pair)
     """
 
-    outcols = 'region_id hpo cnv lnor lnor_lower lnor_upper pvalue pvalue_secondary'
+    outcols = 'region_id hpo cnv lnor lnor_lower lnor_upper ' + \
+              'pvalue pvalue_secondary peak_lnor'
     fx_df = pd.DataFrame(columns=outcols.split())
 
     for seg_id, seg_bt in cs_dict.items():
@@ -124,6 +126,11 @@ def calc_all_effects(cs_dict, phenos, ssdir):
                     lnor_vars = [ci2se(ci) for ci in lnor_cis]
                     iv_lnor, (iv_lnor_lower, iv_lnor_upper) = iv_mean(lnors, lnor_vars)
 
+                # Computes peak effect size
+                with warnings.catch_warnings():
+                    warnings.filterwarnings('ignore', 'All-NaN slice encountered')
+                    best_lnor = np.nanmax(lnors)
+
                 # Gathers peak primary and secondary p-values
                 if np.all(np.isnan(wdf.meta_neg_log10_p)):
                     best_p_primary = 0
@@ -136,7 +143,7 @@ def calc_all_effects(cs_dict, phenos, ssdir):
 
                 # Add OR estimate and peak pvalues to fx_df
                 newvals = [seg_id, hpo, cnv, iv_lnor, iv_lnor_lower, iv_lnor_upper,
-                           best_p_primary, best_p_secondary]
+                           best_p_primary, best_p_secondary, best_lnor]
                 fx_df = fx_df.append(pd.Series(newvals, index=fx_df.columns),
                                                ignore_index=True)
 

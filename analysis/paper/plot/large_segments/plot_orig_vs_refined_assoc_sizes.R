@@ -17,14 +17,11 @@ options(stringsAsFactors=F, scipen=1000, check.names=F)
 ######################
 ### DATA FUNCTIONS ###
 ######################
-# Load table of new/old sizes
-load.sizes <- function(tsv.in){
+# Append old size onto segments
+load.sizes <- function(tsv.in, segs){
   x <- read.table(tsv.in, header=T, sep="\t", comment.char="")
-  x$bg <- as.character(cnv.colors[x$cnv])
-  x$border <- as.character(cnv.blacks[x$cnv])
-  x$original_size <- log10(x$original_size)
-  x$refined_size <- log10(x$refined_size)
-  return(x)
+  merge(segs, x[, c("region_id", "original_size")],
+                by="region_id", all.x=T, all.y=F, sort=F)
 }
 
 
@@ -59,7 +56,8 @@ sizes.scatter <- function(sizes, blue.bg=TRUE, parmar=c(3.2, 3.2, 0.75, 0.75)){
   abline(0, 1, col=blueblack)
 
   # Add points
-  points(sizes$original_size, sizes$refined_size, pch=22, bg=sizes$bg, col=sizes$border)
+  points(sizes$original_size, sizes$refined_size,
+         pch=sizes$pt.pch, bg=sizes$pt.bg, col=sizes$pt.border)
 
   # Add axes
   sapply(1:2, function(i){
@@ -87,28 +85,41 @@ require(rCNV2, quietly=T)
 option_list <- list()
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage="%prog sizes.tsv output_prefix", option_list=option_list),
+args <- parse_args(OptionParser(usage="%prog sizes.tsv segs.tsv output_prefix",
+                                option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Checks for appropriate positional arguments
-if(length(args$args) != 2){
-  stop("Two positional arguments required: sizes.tsv and output_prefix\n")
+if(length(args$args) != 3){
+  stop("Three positional arguments required: sizes.tsv, segs.tsv and output_prefix\n")
 }
 
 # Writes args & opts to vars
 tsv.in <- args$args[1]
-out.prefix <- args$args[2]
+segs.in <- args$args[2]
+out.prefix <- args$args[3]
 
 # # DEV PARAMETERS
-# tsv.in <- "~/scratch/rCNV2_analysis_d2.associations.old_vs_new_size.tsv.gz"
+# tsv.in <- "~/scratch/rCNV2_analysis_d2.segments.old_vs_new_size.tsv.gz"
+# segs.in <- "~/scratch/rCNV2_analysis_d2.master_segments.bed.gz"
 # out.prefix <- "~/scratch/new_old_sizes"
 
-# Load table of sizes
-sizes <- load.sizes(tsv.in)
+# Load table of all segments & annotate with original size
+segs <- load.segment.table(segs.in)
+segs <- segs[which(segs$any_sig), ]
+segs <- load.sizes(tsv.in, segs)
 
 # Plot correlation of sizes
 pdf(paste(out.prefix, "original_vs_refined_sizes.pdf", sep="."),
-    height=2.65, width=2.65)
-sizes.scatter(sizes, blue.bg=FALSE)
+    height=2.5, width=2.8)
+segs.scatter(segs, x=log10(segs$original_size), y=log10(segs$size),
+             xlims=log10(c(100000, max(segs$size))),
+             ylims=log10(c(100000, max(segs$size))),
+             blue.bg=FALSE, add.cor=F, add.lm=F, abline.a=0, abline.b=1, pt.cex=0.65,
+             x.at=log10(logscale.demi.bp), x.labs.at=log10(logscale.major.bp), x.labs=logscale.major.bp.labels,
+             y.at=log10(logscale.demi.bp), y.labs=logscale.demi.bp.labels,
+             xtitle=bquote(log[10]("Original Size")), x.title.line=1.55,
+             ytitle=bquote(log[10]("Refined Size")), y.title.line=2.65,
+             parmar=c(2.5, 3.9, 0.5, 1))
 dev.off()

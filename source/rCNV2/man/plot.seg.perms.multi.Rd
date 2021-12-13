@@ -11,6 +11,7 @@
   union.perms,
   feature,
   measure,
+  invert = F,
   subset_to_regions = NULL,
   norm = F,
   n.bins = 100,
@@ -19,25 +20,27 @@
   xlims = NULL,
   xmin = NULL,
   xmax = NULL,
-  max.x.ticks = 5,
+  max.x.ticks = 6,
   outer.axis.cex = 1,
   inner.axis.cex = 0.85,
-  diamond.cex = 1.25,
+  diamond.cex = 1.1,
   parmar = c(2.25, 6, 0.5, 0.5)
 )
 }
 \arguments{
 \item{segs}{segment dataframe (imported with \code{\link[=load.segment.table]{load.segment.table()}})}
 
-\item{gw.perms}{list of permutation results for empirical segments}
+\item{gw.perms}{data.table of permutation results for empirical segments}
 
-\item{lit.perms}{list of permutation results for literature segments}
+\item{lit.perms}{data.table of permutation results for literature segments}
 
-\item{union.perms}{list of permutation results for all combined segments}
+\item{union.perms}{data.table of permutation results for all combined segments}
 
 \item{feature}{name of feature to evaluate}
 
 \item{measure}{statistic to evaluate [default: mean]}
+
+\item{invert}{invert orientation of X-axis [default: FALSE]}
 
 \item{subset_to_regions}{vector of region IDs to include [default: include all regions]}
 
@@ -53,7 +56,7 @@
 
 \item{xmax}{maximum for X axis}
 
-\item{max.x.ticks}{maxmimum ticks for X axis}
+\item{max.x.ticks}{maximum ticks for X axis}
 
 \item{inner.axis.cex}{expansion of inner axis}
 
@@ -69,5 +72,5 @@
 Multi-panel plot of permutation results for segment subsets
 }
 \seealso{
-\code{\link[=plot.seg.perms]{plot.seg.perms()}}
+\code{\link[=plot.seg.perms]{plot.seg.perms()}}, \code{\link[=perm.summary]{perm.summary()}}
 }

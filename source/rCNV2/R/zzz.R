@@ -10,7 +10,6 @@
 
 # Actions to perform upon loading rCNV2 package
 
-
 .onLoad <- function(libname, pkgname){
   options(scipen=1000, stringsAsFactors=F, family="sans")
 }

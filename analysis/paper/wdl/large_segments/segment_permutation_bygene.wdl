@@ -231,8 +231,8 @@ task annotate_shard {
       ${rCNV_bucket}/analysis/paper/data/misc/*.gw_sig.genes.list \
       ${rCNV_bucket}/analysis/paper/data/misc/gene_mutation_rates.tsv.gz \
       ${rCNV_bucket}/cleaned_data/genes/annotations/gtex_stats/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
-      ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
       refs/
+    wget -P refs/ https://storage.googleapis.com/gcp-public-data--gnomad/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
     gsutil -m cp \
       ${rCNV_bucket}/results/segment_association/* \
       ./
@@ -247,8 +247,8 @@ task annotate_shard {
     echo -e "OMIM\tgene_lists/HP0000118.HPOdb.genes.list" >> genelists_to_annotate.tsv
 
     # Build DNM input
-    echo -e "ASC\trefs/asc_dnm_counts.tsv.gz\trefs/ASC_2020.gw_sig.genes.list" > dnm_counts_to_annotate.tsv
-    echo -e "ASC_unaffected\trefs/asc_dnm_counts.unaffecteds.tsv.gz\trefs/ASC_2020.gw_sig.genes.list" >> dnm_counts_to_annotate.tsv
+    echo -e "ASC\trefs/fu_asc_spark_dnm_counts.tsv.gz\trefs/ASC_2021.gw_sig.genes.list" > dnm_counts_to_annotate.tsv
+    echo -e "ASC_unaffected\trefs/fu_asc_spark_dnm_counts.unaffecteds.tsv.gz\trefs/ASC_2021.gw_sig.genes.list" >> dnm_counts_to_annotate.tsv
     echo -e "DDD\trefs/ddd_dnm_counts.tsv.gz\trefs/DDD_2020.gw_sig.genes.list" >> dnm_counts_to_annotate.tsv
 
     # Build HPO-matched gene lists
@@ -267,7 +267,7 @@ task annotate_shard {
         --gene-sets genelists_to_annotate.tsv \
         --hpo-genelists hpo_genelists.tsv \
         --segment-hpos segment_hpos.tsv \
-        --gene-constraint-metadata refs/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
+        --gnomad-constraint-tsv refs/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz  \
         --dnm-tsvs dnm_counts_to_annotate.tsv \
         --snv-mus refs/gene_mutation_rates.tsv.gz \
         --gtex-matrix refs/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
@@ -277,7 +277,7 @@ task annotate_shard {
     else
       /opt/rCNV2/analysis/paper/scripts/large_segments/annotate_shuffled_seg_gene_blocks.py \
         --gene-sets genelists_to_annotate.tsv \
-        --gene-constraint-metadata refs/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
+        --gnomad-constraint-tsv refs/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz  \
         --dnm-tsvs dnm_counts_to_annotate.tsv \
         --snv-mus refs/gene_mutation_rates.tsv.gz \
         --gtex-matrix refs/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
