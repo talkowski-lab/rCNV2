@@ -75,6 +75,9 @@ plot.fdrs <- function(fdrs, hpos, cnv, fdr.target,
        bty=plot.bty, border=plot.border, col=plot.bg)
   abline(h=axTicks(2), v=log10(logscale.major), col=grid.col)
 
+  # Add line for Bonferroni
+  abline(h=fdr.target, col=graphabs.green, lty=5, lwd=1.5)
+  
   # Add points
   sapply(hpos[, 1], function(hpo){
     n <- log10(hpos$n[which(hpos$hpo==hpo)])
@@ -90,9 +93,6 @@ plot.fdrs <- function(fdrs, hpos, cnv, fdr.target,
     points(x=n, y=medians[hpo.idx], pch=22,
            bg=cnv.colors[cnv], col=cnv.blacks[cnv])
   })
-
-  # Add line for Bonferroni
-  abline(h=fdr.target, col=blueblack, lty=2, lwd=1.5)
 
   # Add X-axis
   axis(1, at=log10(logscale.minor), tck=-0.015, col=blueblack, labels=NA)

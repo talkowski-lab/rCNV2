@@ -80,7 +80,7 @@ mini.qq <- function (del, dup, hpo, ymax=NULL, blue.bg=TRUE,
   points(plot.dat$DEL, pch=19, cex=pt.cex, col=cnv.colors[1])
 
   # Add title & axes
-  mtext(3, line=0.1, text=hpo, cex=title.cex, font=2)
+  mtext(3, line=0.1, text=hpo.abbrevs[hpo], cex=title.cex, xpd=T)
   axis(1, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
   axis(1, at=x.ax.at, tck=-0.05, labels=NA, col=blueblack)
   sapply(x.ax.at, function(x){
@@ -196,6 +196,16 @@ lambda.scatter <- function(del, dup, hpo.n, blue.bg=TRUE, pt.cex=0.85,
           border=NA, bty="n", col=adjustcolor(cnv.colors[2], alpha=0.15))
   abline(dup.fit$fit, lwd=2, col=cnv.colors[2])
 
+  # Add P-values
+  x.length <- par("usr")[2] - par("usr")[1]
+  y.length <- ylims[2] - ylims[1]
+  text(x=par("usr")[1] - 0.03 * x.length,
+       y=par("usr")[4] - 0.15 * y.length,
+       xpd=T, pos=4, col=cnv.colors[1], labels=bquote(.(del.fit.p)))
+  text(x=par("usr")[1] - 0.03 * x.length,
+       y=par("usr")[4] - 0.05 * y.length,
+       xpd=T, pos=4, col=cnv.colors[2], labels=bquote(.(dup.fit.p)))
+
   # Add points
   sapply(1:nrow(plot.dat), function(i){
     points(x=log10(plot.dat$n)[i], y=plot.dat$dup[i], pch=21, cex=pt.cex,
@@ -213,16 +223,6 @@ lambda.scatter <- function(del, dup, hpo.n, blue.bg=TRUE, pt.cex=0.85,
   axis(2, at=y.ax.at, tck=-0.025, labels=NA, col=blueblack)
   axis(2, at=y.ax.at, tick=F, line=-0.65, las=2)
   mtext(2, line=1.75, text=bquote("Genomic Inflation," ~ lambda["GC"]))
-
-  # Add P-values
-  x.length <- par("usr")[2] - par("usr")[1]
-  y.length <- ylims[2] - ylims[1]
-  text(x=par("usr")[2] + 0.05 * x.length,
-       y=par("usr")[3] + 0.15 * y.length,
-       pos=2, col=cnv.colors[1], labels=bquote(.(del.fit.p)))
-  text(x=par("usr")[2] + 0.05 * x.length,
-       y=par("usr")[3] + 0.05 * y.length,
-       pos=2, col=cnv.colors[2], labels=bquote(.(dup.fit.p)))
 }
 
 # Primary vs. secondary P-value scatterplot
@@ -245,9 +245,10 @@ primary.vs.secondary.scatter <- function(pvals.1, pvals.2, keep.idx=NULL,
   # Gather plot data
   pvals <- data.frame("primary"=-log10(as.vector(as.matrix(pvals.1))),
                       "secondary"=-log10(as.vector(as.matrix(pvals.2))))
-  pvals <- pvals[which(apply(pvals, 1, function(ps){max(ps, na.rm=T) >= min.point.plot})), ]
   pvals <- pvals[which(!is.na(pvals$primary) & !is.na(pvals$secondary) &
                          !is.infinite(pvals$primary) & !is.infinite(pvals$secondary)), ]
+  cor.res <- cor.test(pvals$primary, pvals$secondary, use="complete.obs")
+  pvals <- pvals[which(apply(pvals, 1, function(ps){max(ps, na.rm=T) >= min.point.plot})), ]
   ax.lims <- range(pvals, na.rm=T)
   pt.colors <- apply(pvals, 1, function(vals){
     vals <- as.numeric(vals)
@@ -289,7 +290,7 @@ primary.vs.secondary.scatter <- function(pvals.1, pvals.2, keep.idx=NULL,
   points(pvals, pch=19, cex=pt.cex, col=pt.colors)
 
   # Add annotation lines
-  abline(v=cutoff.1, h=cutoff.2, lty=2, col=blueblack)
+  abline(v=cutoff.1, h=cutoff.2, lty=5, col=graphabs.green)
 
   # Add axes
   axis(1, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
@@ -300,6 +301,17 @@ primary.vs.secondary.scatter <- function(pvals.1, pvals.2, keep.idx=NULL,
   axis(2, tck=-0.03, labels=NA, col=blueblack)
   axis(2, tick=F, line=-0.65, las=2)
   mtext(2, line=1.25, text=bquote("-log"[10] * "(" * italic("P")["Secondary"] * ")"))
+
+  # Annotate with P-value and correlation coefficient
+  y.length <- diff(par("usr")[3:4])
+  text(x=mean(par("usr")[1:2]),
+       y=par("usr")[4] - 0.025 * y.length,
+       xpd=T, pos=1, cex=5/6,
+       labels=bquote(R^2 == .(as.numeric(formatC(cor.res$estimate ^ 2, digits=3)))))
+  text(x=mean(par("usr")[1:2]),
+       y=par("usr")[4] - 0.125 * y.length,
+       xpd=T, pos=1, cex=5/6,
+       labels=format.pval(cor.res$p.value))
 }
 
 
@@ -393,7 +405,7 @@ png(paste(out.prefix, "qq_grid_byHPO.png", sep="."),
     res=300)
 par(mfrow=c(n.plots.tall, n.plots.wide))
 for(hpo in hpos){
-  mini.qq(del.1, dup.1, hpo, title.cex=0.5, axis.cex=0.7, blue.bg=FALSE)
+  mini.qq(del.1, dup.1, hpo, title.cex=0.42, axis.cex=0.7, blue.bg=FALSE)
 }
 dev.off()
 
@@ -405,7 +417,7 @@ dev.off()
 
 # Scatterplot of lambdas vs sample size
 pdf(paste(out.prefix, "primary_lambdas_vs_sampleSize.pdf", sep="."),
-    height=2.3, width=2.4)
+    height=2.4, width=2.6)
 lambda.scatter(del.1, dup.1, hpo.n, blue.bg=FALSE)
 dev.off()
 
@@ -422,4 +434,3 @@ primary.vs.secondary.scatter(dup.1$pvals, dup.2$pvals, cutoff.1=dup.cutoff,
                              sig.color=cnv.colors[2], nonsig.color=control.cnv.colors[2],
                              pt.cex=0.175, blue.bg=FALSE, parmar=c(2.5, 2.5, 0.15, 0.15))
 dev.off()
-

@@ -382,13 +382,13 @@ done
   refs/${prefix}.reordered_hpos.txt \
   refs/HPOs_by_metacohort.table.tsv \
   assoc_stat_plots/${prefix}
-# Calculate fraction of genome with nominal association with at least one phenotype
-searchspace=$( zcat meta_stats/matrices/${prefix}.DEL.meta_neg_log10_p.all_hpos.bed.gz \
-               | cut -f1-3 | fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n \
-               | bedtools merge -i - | awk '{ sum+=$3-$2 }END{ print sum }' )
-zcat ./nomsig_windows.*.bed.gz \
-| sort -Vk1,1 -k2,2n -k3,3n | bedtools merge -i - \
-| awk -v denom=$searchspace '{ sum+=$3-$2 }END{ print sum/denom }'
+# # Calculate fraction of genome with nominal association with at least one phenotype
+# searchspace=$( zcat meta_stats/matrices/${prefix}.DEL.meta_neg_log10_p.all_hpos.bed.gz \
+#                | cut -f1-3 | fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n \
+#                | bedtools merge -i - | awk '{ sum+=$3-$2 }END{ print sum }' )
+# zcat ./nomsig_windows.*.bed.gz \
+# | sort -Vk1,1 -k2,2n -k3,3n | bedtools merge -i - \
+# | awk -v denom=$searchspace '{ sum+=$3-$2 }END{ print sum/denom }'
 
 
 # Plot correlation of sizes for original significant regions and fine-mapped reigons
@@ -416,14 +416,9 @@ while read nocolon hpo; do
       --secondary-p-cutoff 0.05 \
       --min-nominal 2 \
       --secondary-or-nominal \
-      --fdr-q-cutoff 0.05 \
+      --fdr-q-cutoff 0.01 \
       meta_stats/$nocolon.rCNV.$cnv.sliding_window.meta_analysis.stats.bed.gz \
       meta_stats/sigbins/$nocolon.$cnv.sig_windows.bed
-    # fgrep -v "#" meta_stats/sigbins/$nocolon.$cnv.sig_windows.bed \
-    # | sort -Vk1,1 -k2,2n -k3,3n \
-    # | bedtools merge -d 1000000 -i - \
-    # | bgzip -c \
-    # > meta_stats/sigbins/$nocolon.$cnv.sig_windows.merged.bed.gz
   done
 done < refs/test_phenotypes.list
 # Cluster all significant windows to determine maximal segment size
@@ -435,27 +430,29 @@ for cnv in DEL DUP; do
   > meta_stats/sigbins/all_HPOs.$cnv.sig_windows.merged.bed.gz
 done
 # Match final significant refined segments with their original significant windows
-# TODO: UPDATE THIS TO MATCH ONE SEGMENT TO ONE ORIGINAL CANDIDATE REGION
-# while read nocolon hpo; do
-#   for cnv in DEL DUP; do
-#     zcat rCNV.final_segments.associations.bed.gz \
-#     | fgrep -w $hpo \
-#     | fgrep -w $cnv \
-#     | cut -f1-4 \
-#     | bedtools intersect -wa -wb -a - \
-#       -b meta_stats/sigbins/$nocolon.$cnv.sig_windows.merged.bed.gz \
-#     | awk -v FS="\t" -v OFS="\t" -v hpo=$hpo -v cnv=$cnv \
-#       '{ print $4, cnv, hpo, $7-$6, $3-$2 }'
-#   done
-# done < refs/test_phenotypes.list \
-# | sort -Vk1,1 -k2,2n -k3,3n -k4,4V -k5,5V \
-# | cat <( echo -e "region_id\tcnv\thpo\toriginal_size\trefined_size" ) - \
-# | gzip -c \
-# > ${prefix}.associations.old_vs_new_size.tsv.gz
-# # Scatterplot of original segment size (total sig bp) & finemapped size
-# /opt/rCNV2/analysis/paper/plot/large_segments/plot_orig_vs_refined_assoc_sizes.R \
-#   ${prefix}.associations.old_vs_new_size.tsv.gz \
-#   assoc_stat_plots/${prefix}
+for cnv in DEL DUP; do
+  zcat rCNV.final_segments.loci.bed.gz \
+  | fgrep -w $cnv \
+  | cut -f1-4,21 \
+  | bedtools intersect -wa -wb -a - \
+    -b meta_stats/sigbins/all_HPOs.$cnv.sig_windows.merged.bed.gz \
+  | cut -f4- \
+  > all_HPOs.$cnv.orig_vs_refined_hits.bed
+  while read seg_id size; do
+    fgrep -w $seg_id all_HPOs.$cnv.orig_vs_refined_hits.bed \
+    | awk -v seg_id=$seg_id -v cnv=$cnv -v size=$size -v OFS="\t" \
+      '{ sum+=$5-$4 }END{ print seg_id, cnv, sum, size }'
+  done < <( cut -f1-2 all_HPOs.$cnv.orig_vs_refined_hits.bed | sort | uniq )
+done \
+| sort -Vk1,1 -k2,2V -k3,3V -k4,4n -k5,5n \
+| cat <( echo -e "region_id\tcnv\toriginal_size\trefined_size" ) - \
+| gzip -c \
+> ${prefix}.segments.old_vs_new_size.tsv.gz
+# Scatterplot of original segment size (total sig bp) & finemapped size
+/opt/rCNV2/analysis/paper/plot/large_segments/plot_orig_vs_refined_assoc_sizes.R \
+  ${prefix}.segments.old_vs_new_size.tsv.gz \
+  ${prefix}.master_segments.bed.gz \
+  assoc_stat_plots/${prefix}
 
 
 # Plot master grid summarizing segment association across all phenotypes
@@ -463,29 +460,14 @@ if [ -e association_grid ]; then
   rm -rf association_grid
 fi
 mkdir association_grid
-# Collapse overlapping DEL/DUP segments for sake of plotting
-while read intervals rid; do
-  echo "$intervals" | sed -e 's/\;/\n/g' -e 's/\:\|\-/\t/g' \
-  | awk -v OFS="\t" -v rid=$rid '{ print $0, rid }' \
-  | bedtools merge -i - -c 4 -o distinct -d 10000000
-done < <( zcat rCNV.final_segments.loci.bed.gz | grep -ve '^#' \
-          | awk -v FS="\t" -v OFS="\t" '{ print $(NF-3), $4 }' ) \
-| sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
-| bedtools merge -i - -d 200000 -c 4 -o distinct \
-| cut -f4 \
-| uniq \
-> locus_clusters.gw_sig.txt
-while read intervals rid; do
-  echo "$intervals" | sed -e 's/\;/\n/g' -e 's/\:\|\-/\t/g' \
-  | awk -v OFS="\t" -v rid=$rid '{ print $0, rid }' \
-  | bedtools merge -i - -c 4 -o distinct -d 10000000
-done < <( zcat all_gds.bed.gz | grep -ve '^#' \
-          | awk -v FS="\t" -v OFS="\t" '{ print $8, $4 }' ) \
-| sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
-| bedtools merge -i - -d 200000 -c 4 -o distinct \
-| cut -f4 \
-| uniq \
-> locus_clusters.all_gds.txt
+# Collapse overlapping genome-DEL/DUP segments for sake of plotting
+# Do this separately for GW-sig and FDR-sig
+for sig in genome_wide FDR; do
+  /opt/rCNV2/analysis/paper/scripts/large_segments/cluster_segments_before_plotting.py \
+    --s $sig \
+    -o locus_clusters.$sig.txt \
+    rCNV.final_segments.loci.bed.gz 
+done
 # Merge all sumstats for gw-sig and lit GDs
 cat <( zcat ${prefix}.final_segments.loci.all_sumstats.tsv.gz ) \
     <( zcat ${prefix}.lit_gds.all_sumstats.tsv.gz | grep -ve '^#' ) \
@@ -493,10 +475,12 @@ cat <( zcat ${prefix}.final_segments.loci.all_sumstats.tsv.gz ) \
 > ${prefix}.all_segs.all_sumstats.tsv.gz
 # Generate master locus grid plot
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_association_grid.R \
-  --gw-clusters locus_clusters.gw_sig.txt \
-  --lit-clusters locus_clusters.all_gds.txt \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --gw-clusters locus_clusters.genome_wide.txt \
+  --fdr-clusters locus_clusters.FDR.txt \
+  --hpo-jaccard ${prefix}.hpo_jaccard_matrix.tsv \
+  --hpo-sample-sizes refs/HPOs_by_metacohort.table.tsv \
   rCNV.final_segments.loci.bed.gz \
+  rCNV.final_segments.associations.bed.gz \
   ${prefix}.master_segments.bed.gz \
   ${prefix}.all_segs.all_sumstats.tsv.gz \
   refs/${prefix}.reordered_hpos.txt \

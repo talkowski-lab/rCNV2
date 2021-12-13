@@ -98,3 +98,56 @@ fit.exp.decay <- function(x, y){
              control=nls.control(maxiter=1000, warnOnly=T)))
 }
 
+
+#' Prune HPO Jaccard matrix
+#'
+#' Prune a matrix of Jaccard indexes for all HPO pairs based on maximum Jaccard index
+#'
+#' @param hpo.jac square matrix of Jaccard indexes for all HPOs
+#' @param sample.sizes named vector of sample sizes for each HPO
+#' @param max.jac maximum Jaccard index to retain \[default: 0.5\]
+#' @param ignore.hpos vector of HPOs to ignore \[default: "HP:0000118" & "UNKNOWN"\]
+#'
+#' @return data.frame filtered on `max.jac`
+#'
+#' @details Pairs will be pruned while retaining the HPO with the larger sample size
+#'
+#' @seealso [load.hpo.jaccard.matrix]
+#'
+#' @export
+prune.hpo.jaccard.matrix <- function(hpo.jac, sample.sizes, max.jac=0.5,
+                                     ignore.hpos=c("HP:0000118", "UNKNOWN")){
+  # Get lists of HPOs to process
+  all.hpos <- union(colnames(hpo.jac), names(sample.sizes))
+  elig.hpos <- all.hpos[which(!(all.hpos %in% ignore.hpos)
+                              & all.hpos %in% colnames(hpo.jac))]
+
+  # Melt matrix & order by decreasing Jaccard index
+  jac <- as.data.frame(do.call("rbind", lapply(elig.hpos, function(ha){
+    do.call("rbind", lapply(elig.hpos, function(hb){
+      if(sample.sizes[ha] > sample.sizes[hb]){
+        c(ha, hb, hpo.jac[ha, hb])
+      }
+    }))
+  })))
+  colnames(jac) <- c("hpo.A", "hpo.B", "jac")
+  jac$jac <- as.numeric(jac$jac)
+  jac <- jac[order(jac$jac, decreasing=T), ]
+
+  # Prune HPOs sequentially by Jaccard index
+  drop.hpos <- c()
+  for(i in which(jac$jac > max.jac)){
+    if(length(intersect(drop.hpos, as.vector(jac[i, c("hpo.A", "hpo.B")]))) == 0){
+      drop.hpos <- union(drop.hpos, jac$hpo.B[i])
+    }
+  }
+
+  # Return pruned Jaccard matrix
+  if(length(drop.hpos) > 0){
+    return(hpo.jac[-which(rownames(hpo.jac) %in% drop.hpos),
+                   -which(colnames(hpo.jac) %in% drop.hpos)])
+  }else{
+    return(hpo.jac)
+  }
+}
+

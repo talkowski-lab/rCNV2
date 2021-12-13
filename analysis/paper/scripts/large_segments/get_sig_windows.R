@@ -38,7 +38,8 @@ filter.sumstats <- function(sumstats, primary.cutoff=6, secondary.cutoff=-log10(
     hits <- intersect(primary.hits, intersect(secondary.hits, nominal.hits))
   }
   if(!is.null(fdr.cutoff)){
-    fdr.hits <- which(sumstats$meta_neg_log10_fdr_q >= fdr.cutoff)
+    fdr.hits <- intersect(which(sumstats$meta_neg_log10_fdr_q >= fdr.cutoff),
+                          secondary.hits)
     hits <- unique(sort(c(hits, fdr.hits)))
   }
   sumstats[hits, ]

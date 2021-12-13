@@ -281,3 +281,20 @@ combine.dnms <- function(d1, d2, mutrates){
   d12[, colnames(d1)]
 }
 
+
+#' Load HPO Jaccard matrix
+#'
+#' Load a square matrix of Jaccard indexes for all HPO pairs
+#'
+#' @param hpo.jac.in Tab-delimited matrix of Jaccard indexes for all HPO pairs
+#'
+#' @return data.frame
+#'
+#' @export load.hpo.jaccard.matrix
+#' @export
+load.hpo.jaccard.matrix <- function(hpo.jac.in){
+  hpo.jac <- read.table(hpo.jac.in, header=T, sep="\t", check.names=F)
+  rnames <- hpo.jac[, 1]
+  vals <- as.matrix(hpo.jac[, -1])
+  data.frame(vals, row.names=rnames, check.names=F)
+}

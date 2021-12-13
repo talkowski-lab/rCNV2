@@ -59,6 +59,33 @@ assign.excess.pct <- function(segs, enumerated.excesses){
   return(segs)
 }
 
+# Quantify enrichment of segments in high percentiles of DNM excess
+quantify.excesses <- function(segs, outfile, quantiles=c(0.5, 0.75, 0.9, 0.95)){
+  res <- do.call("rbind", lapply(colnames(segs)[grep("_excess_pct", colnames(segs), fixed=T)],
+                          function(cname){
+    do.call("rbind", lapply(list(c("DEL"), c("DUP"), c("DEL", "DUP")), function(cnv.types){
+      n.segs <- length(which(segs$cnv %in% cnv.types))
+
+      # Compute enrichments per quantile
+      res <- do.call("rbind", lapply(quantiles, function(q){
+        n.pass <- length(which(segs[, cname] >= q & segs$cnv %in% cnv.types))
+        stats <- binom.test(n.pass, n.segs, p=(1-q), alternative="greater")
+        c(cname, paste(cnv.types, collapse="_"), "binomial", q, n.segs, (1-q)*n.segs, n.pass,
+          stats$p.value, stats$estimate / (1-q))
+      }))
+
+      # Perform K-S test to evaluate overall deviation from expectation (uniform)
+      stats <- ks.test(segs[which(segs$cnv %in% cnv.types), cname], "punif")
+      rbind(res, c(cname, paste(cnv.types, collapse="_"), "K-S", NA, n.segs,
+                   NA, NA, stats$p.value, NA))
+    }))
+  }))
+  res <- as.data.frame(res)
+  colnames(res) <- c("feature", "cnv", "test", "quantile", "n_segs", "expected",
+                     "observed", "p_value", "fold_enrichment")
+  write.table(res, outfile, sep="\t", col.names=T, row.names=F, quote=F)
+}
+
 # Gather ordered vector of DNM excesses for a single segment
 get.dnm.excess.byGene <- function(segs, dnms, csq, region.id){
   genes <- segs$genes[[which(segs$region_id == region.id)]]
@@ -323,6 +350,7 @@ dnm.excess.cdf.barplots <- function(segs, dnms, cohort, csq, n.max.genes=5, norm
   }
   # Helper function for fancy sorting
   fancy.order <- function(res){
+    n <- ncol(res)
     order(apply(res, 1, function(vals){
       vals <- rev(rev(vals) - c(rev(vals)[-1], 0))
       vals <- vals / sum(vals)
@@ -366,7 +394,6 @@ dnm.excess.cdf.barplots <- function(segs, dnms, cohort, csq, n.max.genes=5, norm
   par(bty="n", mar=parmar)
   plot(NA, xlim=c(-1, nrow(res)+1), ylim=c(-cnv.marker.wex*ymax, ymax),
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
-  abline(h=axTicks(2), col="white", lwd=0.5)
 
   # Add rectangles
   sapply(1:nrow(res), function(i){
@@ -487,13 +514,16 @@ names(enumerated.excesses) <- names(dnms)
 # Annotate each segment with its relative excess percentile
 ndd.segs <- assign.excess.pct(segs, enumerated.excesses)
 
+# Quantify deletion and duplication excesses and write to file
+quantify.excesses(ndd.segs, paste(out.prefix, "quantified_dnm_excesses.tsv", sep="."))
+
 # Scatterplots of observed vs. expected excess DNMs per segment
 sapply(names(dnms), function(cohort){
   sapply(c("lof", "mis"), function(csq){
     cnvtype <- c("lof" = "DEL", "mis" = "DUP")[csq]
     pdf(paste(out.prefix, cohort, csq, "observed_vs_expected_excess.pdf", sep="."),
         height=2.75, width=3.3)
-    plot.excess.dnms.vs.expected(ndd.segs[which(ndd.segs$cnv == cnvtype), ],
+    plot.excess.dnms.vs.expected(ndd.segs[which(ndd.segs$cnv == cnvtype), ], label.top.n=12,
                                  enumerated.excesses, cohort, csq, min.label.quantile=0.5)
     dev.off()
   })
