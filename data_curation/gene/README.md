@@ -98,10 +98,15 @@ We collected the following gene features related to evolutionary constraint:
 | gnomAD loss-of-function obs:exp (upper 90% CI) | `gnomad_oe_lof_upper` | Upper 90% confidence interval of obs:exp ratio for loss-of-function SNVs in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _Nature_, 2020)](https://pubmed.ncbi.nlm.nih.gov/32461654) |  
 | gnomAD missense Z-score | `gnomad_mis_z` | Z-score for missense obs:exp ratio in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _Nature_, 2020)](https://pubmed.ncbi.nlm.nih.gov/32461654) |  
 | gnomAD loss-of-function Z-score | `gnomad_lof_z` | Z-score for loss-of-function obs:exp ratio in gnomAD | gnomAD v2.1 [(Karczewski _et al._, _Nature_, 2020)](https://pubmed.ncbi.nlm.nih.gov/32461654) |  
+| ExAC deletion intolerance Z-score | `exac_del_z` | Z-score for obs:exp ratio of coding deletions in ExAC | ExAC v1.0 [(Ruderfer _et al._, _Nat. Genet._, 2016)](https://www.ncbi.nlm.nih.gov/pubmed/27533299) |  
+| ExAC duplication intolerance Z-score | `exac_dup_z` | Z-score for obs:exp ratio of coding duplications in ExAC | ExAC v1.0 [(Ruderfer _et al._, _Nat. Genet._, 2016)](https://www.ncbi.nlm.nih.gov/pubmed/27533299) |  
 | ExAC CNV intolerance Z-score | `exac_cnv_z` | Z-score for obs:exp ratio of coding CNVs in ExAC | ExAC v1.0 [(Ruderfer _et al._, _Nat. Genet._, 2016)](https://www.ncbi.nlm.nih.gov/pubmed/27533299) |  
 | Haploinsufficiency score | `hurles_hi` | Haploinsufficiency scores predicted based on haplosufficient genes | [Huang _et al._, _PLOS Genetics_, 2010](https://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1001154) |  
 | RVIS | `rvis` | Residual variation intolerance score (RVIS) computed on gnomAD v2.0 | [Petrovski _et al._, _PLOS Genetics_, 2013](https://www.ncbi.nlm.nih.gov/pubmed/23990802) |  
 | RVIS percentile | `rvis_pct` | RVIS percentile computed on gnomAD v2.0 | [Petrovski _et al._, _PLOS Genetics_, 2013](https://www.ncbi.nlm.nih.gov/pubmed/23990802) |  
+| sHet | `sHet` | Estimated selection coefficient on heterozygous loss-of-function mutations in ExAC | [Casssa _et al._, _Nat. Genet., 2017](https://pubmed.ncbi.nlm.nih.gov/28369035) |  
+| CCDG deletion sensitivity score | `ccdg_del` | Deletion sensitivity score estimated from population CNV data in 17,795 individuals | [Abel _et al._, _Nature_, 2020](https://pubmed.ncbi.nlm.nih.gov/32460305) |  
+| CCDG duplication sensitivity score | `ccdg_dup` | Duplication sensitivity score estimated from population CNV data in 17,795 individuals | [Abel _et al._, _Nature_, 2020](https://pubmed.ncbi.nlm.nih.gov/32460305) |  
 | Promoter GC content | `promoter_gc_pct` | Percentage of C/G nucleotides in gene promoter | [UCSC Genome Browser](http://genome.ucsc.edu) |  
 | Promoter CpG count | `promoter_cpg_count` | Count of CpG dinucleotides in gene promoter | [UCSC Genome Browser](http://genome.ucsc.edu) |  
 | Promoter conservation | `promoter_phastcons` | Mean 100-way phastCons score in gene promoter | [UCSC Genome Browser](http://genome.ucsc.edu) |  
@@ -151,6 +156,7 @@ We collected the following chromatin-based gene features:
 | Mean quiescent/low coverage | chromhmm_18_Quies_mean | Mean gene coverage by quiescent/low from ChromHMM across 98 tissues from the Roadmap Epigenomics Project | Roadmap Epigenomics Project [(Kundaje _et al._, _Nature_, 2015)](https://www.nature.com/articles/nature14248) |  
 | Standard deviation of quiescent/low coverage | chromhmm_18_Quies_sd | Standard deviation of gene coverage by quiescent/low from ChromHMM across 98 tissues from the Roadmap Epigenomics Project | Roadmap Epigenomics Project [(Kundaje _et al._, _Nature_, 2015)](https://www.nature.com/articles/nature14248) |  
 | Chromatin components 1-20 | `chromatin_component_1` ... `chromatin_component_20` | Top 20 principal components of gene X ChromHMM state matrix across 98 tissues from the Roadmap Epigenomics Project | Roadmap Epigenomics Project [(Kundaje _et al._, _Nature_, 2015)](https://www.nature.com/articles/nature14248) |  
+| Episcore | `episcore` | A predictive score for haploinsufficient genes based on their epigenetic signatures across tissues | [Han _et al._, _Nat. Commun._, 2018](https://pubmed.ncbi.nlm.nih.gov/29849042) |  
 
 All chromatin data was based on the [Roadmap Epigenomics dataset](https://www.nature.com/articles/nature14248) using the expanded 18-state ChromHMM model on 98 tissues [as described here](https://egg2.wustl.edu/roadmap/web_portal/chr_state_learning.html).  
 
@@ -160,7 +166,16 @@ We collected the following gene features related to the protein encoded by each 
 
 | Feature name | Abbreviation | Description | Source |  
 | :--- | :--- | :--- | :--- |  
-| Probability of loss-of-function intolerance | `gnomad_pLI` | Probability of loss-of-function intolerance calculated in gnomAD | Swissprot [Bairoch & Apweiler, _Nucleic Acids Research_, 2000)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC102476) |  
+| Amino acid length | `aa_length` | Length of canonical peptide sequence | Swissprot [Bairoch & Apweiler, _Nucleic Acids Research_, 2000)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC102476) |  
+| Molecular mass | `protein_mass` | Mass of protein in Daltons | Swissprot [Bairoch & Apweiler, _Nucleic Acids Research_, 2000)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC102476) |  
+| Number of protein interactors | `ppi_degree` | Number of proteins known to interact with this protein as per the Intact database | Swissprot [Bairoch & Apweiler, _Nucleic Acids Research_, 2000)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC102476) |  
+| Intramembrane domains | `intramembrane_domains` | Number of intramembrane domains | Swissprot [Bairoch & Apweiler, _Nucleic Acids Research_, 2000)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC102476) |  
+| Transmembrane domains | `transmembrane_domains` | Number of transmembrane domains | Swissprot [Bairoch & Apweiler, _Nucleic Acids Research_, 2000)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC102476) |  
+| Alpha helixes | `alpha_helixes` | Number of alpha helixes | Swissprot [Bairoch & Apweiler, _Nucleic Acids Research_, 2000)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC102476) |  
+| Beta sheets | `beta_sheets` | Number of beta sheets | Swissprot [Bairoch & Apweiler, _Nucleic Acids Research_, 2000)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC102476) |  
+| Metal binding sites | `metal_binding_sites` | Number of known binding sites for metal ions | Swissprot [Bairoch & Apweiler, _Nucleic Acids Research_, 2000)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC102476) |  
+| Nucleotide binding sites | `nucleotide_binding_sites` | Number of known nucleotide binding sites | Swissprot [Bairoch & Apweiler, _Nucleic Acids Research_, 2000)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC102476) |  
+| Active sites | `active_sites` | Number of known active sites | Swissprot [Bairoch & Apweiler, _Nucleic Acids Research_, 2000)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC102476) |  
 
 #### Gene features: human genetic variation
 
