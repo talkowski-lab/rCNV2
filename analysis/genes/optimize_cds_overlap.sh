@@ -34,11 +34,7 @@ gsutil -m cp -r \
 gsutil -m cp \
   gs://rcnv_project/analysis/gene_scoring/gene_lists/* \
   refs/gene_lists/
-
-
-# Note: must also localize probe-based conditional exclusion BED, either from
-# FireCloud or regenerated locally (see gene_burden_analysis.sh)
-export exclusion_bed=gencode.v19.canonical.cohort_exclusion.bed.gz
+export exclusion_bed=refs/gencode.v19.canonical.pext_filtered.cohort_exclusion.bed.gz
 
 
 # Subset GTF to genes of interest for deletions & duplications

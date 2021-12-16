@@ -301,7 +301,7 @@ while read prefix hpo; do
         echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz"
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt
-      /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
+      /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
         --model ${meta_model_prefix} \
         --conditional-exclusion ${exclusion_bed} \
         --p-is-neg-log10 \
@@ -309,6 +309,7 @@ while read prefix hpo; do
         --spa-exclude /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
         --winsorize ${winsorize_meta_z} \
         --min-cases ${meta_min_cases} \
+        --keep-n-columns 4 \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.perm_$i.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.perm_$i.bed
@@ -446,6 +447,7 @@ while read prefix hpo; do
       --spa-exclude /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
       --winsorize ${winsorize_meta_z} \
       --min-cases ${meta_min_cases} \
+      --keep-n-columns 4 \
       ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
       ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
     bgzip -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
