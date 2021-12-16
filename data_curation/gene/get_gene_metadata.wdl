@@ -636,7 +636,7 @@ task cat_metadata {
       --prefix ${eigen_prefix} \
       --bgzip \
       -o ${prefix}.eigenfeatures.bed.gz \
-      -o ${prefix}.bed.gz
+      ${prefix}.bed.gz
       
 
     gsutil -m cp \

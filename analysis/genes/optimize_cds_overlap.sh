@@ -36,6 +36,11 @@ gsutil -m cp \
   refs/gene_lists/
 
 
+# Note: must also localize probe-based conditional exclusion BED, either from
+# FireCloud or regenerated locally (see gene_burden_analysis.sh)
+export exclusion_bed=gencode.v19.canonical.cohort_exclusion.bed.gz
+
+
 # Subset GTF to genes of interest for deletions & duplications
 opt/rCNV2/utils/filter_gtf_by_genelist.py \
   -o gencode.v19.canonical.pext_filtered.DEL.gtf.gz \
@@ -60,8 +65,14 @@ done
 
 
 # Annotate gene & CNV overlap for developmental HPOs while excluding known NAHR-mediated GDs
+# Also apply cohort-specific probe-based conditional exclusion at this step (rather than meta step)
 mkdir cnv_counts
 while read meta cohorts; do
+  # Extract genes to be excluded from this cohort
+  zcat ${exclusion_bed} | fgrep -w $meta | cut -f1-3 \
+  | sort -Vk1,1 -k2,2n -k3,3n | bedtools merge -i - | bgzip -c \
+  > conditional_exclusion.$meta.bed.gz
+  # Count deletions & duplications separately
   for CNV in DEL DUP; do
     /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
       --min-cds-ovr 0 \
@@ -71,6 +82,7 @@ while read meta cohorts; do
       --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
       --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
       --blacklist refs/lit_GDs.all.$CNV.NAHR_only.bed.gz \
+      --blacklist conditional_exclusion.$meta.bed.gz \
       -z \
       --verbose \
       -o /dev/null \
@@ -108,6 +120,7 @@ for CNV in DEL DUP; do
     --model "fe" \
     --keep-n-columns 4 \
     --p-is-neg-log10 \
+    --min-cases 300 \
     ${CNV}.meta_analysis.input.txt \
     /dev/stdout \
   | cut -f4- | sed -e 's/^mincds_//g' -e 's/^min_cds/#min_cds/g' \

@@ -21,12 +21,14 @@ workflow gene_burden_analysis {
   Int pad_controls
   Int min_probes_per_gene
   Float min_frac_controls_probe_exclusion
-  String meta_model_prefix
   Float min_cds_ovr_del
   Float min_cds_ovr_dup
   Int max_genes_per_cnv
   Float p_cutoff
   Int max_manhattan_neg_log10_p
+  String meta_model_prefix
+  Float winsorize_meta_z
+  Int meta_min_cases
   Float meta_secondary_p_cutoff
   Int meta_nominal_cohorts_cutoff
   Float FDR_cutoff
@@ -39,6 +41,7 @@ workflow gene_burden_analysis {
   File finemap_genomic_features
   File finemap_expression_features
   File finemap_chromatin_features
+  File finemap_protein_features
   File finemap_constraint_features
   File finemap_variation_features
   File finemap_merged_no_variation_features
@@ -46,13 +49,13 @@ workflow gene_burden_analysis {
   File raw_finemap_genomic_features
   File raw_finemap_expression_features
   File raw_finemap_chromatin_features
+  File raw_finemap_protein_features
   File raw_finemap_constraint_features
   File raw_finemap_variation_features
   File raw_finemap_merged_no_variation_features
   File raw_finemap_merged_features
   String rCNV_bucket
-  String rCNV_docker_fisher    # Note: strictly for dev/caching convenience; can collapse into a single docker at a later date
-  String rCNV_docker_meta      # Note: strictly for dev/caching convenience; can collapse into a single docker at a later date
+  String rCNV_docker_assoc     # Note: strictly for dev/caching convenience; can collapse into a single docker at a later date
   String rCNV_docker_finemap   # Note: strictly for dev/caching convenience; can collapse into a single docker at a later date
   String athena_cloud_docker
   String fisher_cache_string
@@ -80,7 +83,7 @@ workflow gene_burden_analysis {
         p_cutoff=p_cutoff,
         max_manhattan_neg_log10_p=max_manhattan_neg_log10_p,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_fisher,
+        rCNV_docker=rCNV_docker_assoc,
         prefix=pheno[0],
         cache_string=fisher_cache_string
     }
@@ -116,8 +119,10 @@ workflow gene_burden_analysis {
         p_cutoff=p_cutoff,
         n_pheno_perms=n_pheno_perms,
         meta_model_prefix=meta_model_prefix,
+        winsorize_meta_z=winsorize_meta_z,
+        meta_min_cases=meta_min_cases,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_fisher,
+        rCNV_docker=rCNV_docker_assoc,
         prefix=pheno[0],
         cache_string=perm_cache_string
     }
@@ -135,7 +140,7 @@ workflow gene_burden_analysis {
         n_pheno_perms=n_pheno_perms,
         fdr_target=p_cutoff,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_fisher,
+        rCNV_docker=rCNV_docker_assoc,
         dummy_completion_markers=rCNV_perm_test.completion_marker,
         fdr_table_suffix="empirical_genome_wide_pval",
         p_val_column_name="meta_neg_log10_p"
@@ -157,7 +162,7 @@ workflow gene_burden_analysis {
         max_manhattan_neg_log10_p=max_manhattan_neg_log10_p,
         meta_model_prefix=meta_model_prefix,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_meta,
+        rCNV_docker=rCNV_docker_assoc,
         prefix=pheno[0],
         cache_string=meta_cache_string
     }
@@ -232,6 +237,30 @@ workflow gene_burden_analysis {
         finemap_vconf_pip=finemap_vconf_pip,
         finemap_output_label="chromatin_features",
         gene_features=finemap_chromatin_features,
+        FDR_cutoff=FDR_cutoff,
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker_finemap
+    }
+    
+    # Protein features
+    call finemap_genes as finemap_protein {
+      input:
+        completion_tokens=rCNV_meta_analysis.completion_token,
+        phenotype_list=phenotype_list,
+        metacohort_sample_table=metacohort_sample_table,
+        freq_code="rCNV",
+        CNV=cnv,
+        meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
+        meta_secondary_p_cutoff=meta_secondary_p_cutoff,
+        meta_nominal_cohorts_cutoff=meta_nominal_cohorts_cutoff,
+        finemap_elnet_alpha=finemap_elnet_alpha,
+        finemap_elnet_l1_l2_mix=finemap_elnet_l1_l2_mix,
+        finemap_cluster_distance=finemap_cluster_distance,
+        finemap_nonsig_distance=finemap_nonsig_distance,
+        finemap_conf_pip=finemap_conf_pip,
+        finemap_vconf_pip=finemap_vconf_pip,
+        finemap_output_label="protein_features",
+        gene_features=finemap_protein_features,
         FDR_cutoff=FDR_cutoff,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker_finemap
@@ -349,12 +378,16 @@ workflow gene_burden_analysis {
   scatter( cnv in cnv_types ) {
     call plot_finemap_res as plot_finemap_res {
       input:
-        completion_tokens=[finemap_genomic.completion_token, finemap_expression.completion_token, finemap_chromatin.completion_token, finemap_constraint.completion_token, finemap_variation.completion_token, finemap_merged_no_variation.completion_token, finemap_merged.completion_token],
+        completion_tokens=[finemap_genomic.completion_token, finemap_expression.completion_token, 
+                           finemap_chromatin.completion_token, finemap_protein.completion_token, 
+                           finemap_constraint.completion_token, finemap_variation.completion_token, 
+                           finemap_merged_no_variation.completion_token, finemap_merged.completion_token],
         freq_code="rCNV",
         CNV=cnv,
         raw_features_genomic=raw_finemap_genomic_features,
         raw_features_expression=raw_finemap_expression_features,
         raw_features_chromatin=raw_finemap_chromatin_features,
+        raw_features_protein=raw_finemap_protein_features,
         raw_features_constraint=raw_finemap_constraint_features,
         raw_features_variation=raw_finemap_variation_features,
         raw_features_merged_no_variation=raw_finemap_merged_no_variation_features,
@@ -476,7 +509,7 @@ task burden_test {
           --max-neg-log10-p ${max_manhattan_neg_log10_p} \
           --cutoff ${p_cutoff} \
           --highlight-bed "${prefix}.highlight_regions.bed" \
-          --highlight-name "Constrained genes associated with this phenotype" \
+          --highlight-name "Constrained genes associated with ${hpo}" \
           --label-prefix "$CNV" \
           --title "$title" \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz" \
@@ -491,10 +524,10 @@ task burden_test {
         --max-neg-log10-p ${max_manhattan_neg_log10_p} \
         --cutoff ${p_cutoff} \
         --highlight-bed "${prefix}.highlight_regions.bed" \
-        --highlight-name "Constrained genes associated with this phenotype" \
+        --highlight-name "Constrained genes associated with ${hpo}" \
         --label-prefix "DUP" \
         --highlight-bed-2 "${prefix}.highlight_regions.bed" \
-        --highlight-name-2 "Constrained genes associated with this phenotype" \
+        --highlight-name-2 "Constrained genes associated with ${hpo}" \
         --label-prefix-2 "DEL" \
         --title "$title" \
         "$meta.${prefix}.${freq_code}.DUP.gene_burden.stats.bed.gz" \
@@ -690,6 +723,8 @@ task meta_analysis {
   Array[File] meta_p_cutoff_tables
   Int max_manhattan_neg_log10_p
   String meta_model_prefix
+  Float winsorize_meta_z
+  Int meta_min_cases
   String rCNV_bucket
   String rCNV_docker
   String prefix
@@ -708,23 +743,28 @@ task meta_analysis {
     gsutil -m cp ${rCNV_bucket}/refs/GRCh37.*.bed.gz refs/
     gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
-    # Get metadata for meta-analysis
-    mega_idx=$( head -n1 "${metacohort_sample_table}" \
-                | sed 's/\t/\n/g' \
-                | awk '{ if ($1=="mega") print NR }' )
+    # Get metadata for meta-analysis (while accounting for cohorts below inclusion criteria)
+    last_cohort_col=$( head -n1 "${metacohort_sample_table}" | awk '{ print NF-1 }' )
+    keep_cols=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+                 | cut -f4-$last_cohort_col \
+                 | sed 's/\t/\n/g' \
+                 | awk -v min_n=${meta_min_cases} '{ if ($1>=min_n) print NR+3 }' \
+                 | paste -s -d, )
     ncase=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
-             | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
-             | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+             | cut -f$keep_cols \
+             | sed 's/\t/\n/g' \
+             | awk '{ sum+=$1 }END{ print sum }' )
     nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
-             | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
-             | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+             | cut -f$keep_cols \
+             | sed 's/\t/\n/g' \
+             | awk '{ sum+=$1 }END{ print sum }' )
     descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
                | awk -v FS="\t" '{ print $2 }' )
     title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
     DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
                     gene_burden.${freq_code}.DEL.bonferroni_pval.hpo_cutoffs.tsv )
     DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
-                    gene_burden.${freq_code}.DUP.bonferroni_pval.hpo_cutoffs.tsv )
+                      gene_burden.${freq_code}.DUP.bonferroni_pval.hpo_cutoffs.tsv )
 
     # Set HPO-specific parameters
     descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
@@ -753,13 +793,13 @@ task meta_analysis {
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt
       /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
-        --or-corplot ${prefix}.${freq_code}.$CNV.gene_burden.or_corplot_grid.jpg \
         --model ${meta_model_prefix} \
         --conditional-exclusion ${exclusion_bed} \
-        --keep-n-columns 4 \
         --p-is-neg-log10 \
         --spa \
-        --adjust-biobanks \
+        --spa-exclude /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
+        --winsorize ${winsorize_meta_z} \
+        --min-cases ${meta_min_cases} \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed
@@ -772,7 +812,7 @@ task meta_analysis {
         --max-neg-log10-p ${max_manhattan_neg_log10_p} \
         --cutoff $meta_p_cutoff \
         --highlight-bed "${prefix}.highlight_regions.bed" \
-        --highlight-name "Constrained genes associated with this phenotype" \
+        --highlight-name "Constrained genes associated with ${hpo}" \
         --label-prefix "$CNV" \
         --title "$title" \
         "${prefix}.${freq_code}.$CNV.gene_burden.meta_analysis.stats.bed.gz" \
@@ -787,11 +827,11 @@ task meta_analysis {
       --max-neg-log10-p ${max_manhattan_neg_log10_p} \
       --cutoff $DUP_p_cutoff \
       --highlight-bed "${prefix}.highlight_regions.bed" \
-      --highlight-name "Constrained genes associated with this phenotype" \
+      --highlight-name "Constrained genes associated with ${hpo}" \
       --label-prefix "DUP" \
       --cutoff-2 $DEL_p_cutoff \
       --highlight-bed-2 "${prefix}.highlight_regions.bed" \
-      --highlight-name-2 "Constrained genes associated with this phenotype" \
+      --highlight-name-2 "Constrained genes associated with ${hpo}" \
       --label-prefix-2 "DEL" \
       --title "$title" \
       "${prefix}.${freq_code}.DUP.gene_burden.meta_analysis.stats.bed.gz" \
@@ -1074,6 +1114,7 @@ task plot_finemap_res {
   File raw_features_genomic
   File raw_features_expression
   File raw_features_chromatin
+  File raw_features_protein
   File raw_features_constraint
   File raw_features_variation
   File raw_features_merged_no_variation
@@ -1094,22 +1135,24 @@ task plot_finemap_res {
     for wrapper in 1; do
       echo -e "Prior\tgrey70\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.tsv"
       echo -e "Posterior\t'#264653'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genetics_only.tsv"
-      echo -e "Genomic features\t'#331C8C'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.tsv"
-      echo -e "Gene expression\t'#87C9F2'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.tsv"
-      echo -e "Chromatin\t'#3DAB9C'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.chromatin_features.tsv"
-      echo -e "Gene constraint\t'#027831'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.tsv"
-      echo -e "Variation\t'#E0CC70'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.variation_features.tsv"
-      echo -e "Full (no var.)\t'#CF6576'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_no_variation_features.tsv"
-      echo -e "Full model\t'#AE3F9D'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.tsv"
+      echo -e "Genomic features\t'#490C65'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.genomic_features.tsv"
+      echo -e "Gene expression\t'#BA7FD0'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.expression_features.tsv"
+      echo -e "Chromatin\t'#001588'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.chromatin_features.tsv"
+      echo -e "Protein\t'#0180C9'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.protein_features.tsv"
+      echo -e "Gene constraint\t'#F6313E'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.constraint_features.tsv"
+      echo -e "Variation\t'#FFA300'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.variation_features.tsv"
+      echo -e "Full (no var.)\t'#46A040'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_no_variation_features.tsv"
+      echo -e "Full model\t'#00441B'\t1\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.merged_features.tsv"
     done > finemap_roc_input.tsv
     for wrapper in 1; do
-      echo -e "Genomic features\t'#331C8C'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.genomic_features.tsv\t${raw_features_genomic}"
-      echo -e "Gene expression\t'#87C9F2'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.expression_features.tsv\t${raw_features_expression}"
-      echo -e "Chromatin\t'#3DAB9C'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.chromatin_features.tsv\t${raw_features_chromatin}"
-      echo -e "Gene constraint\t'#027831'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.constraint_features.tsv\t${raw_features_constraint}"
-      echo -e "Variation\t'#E0CC70'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.variation_features.tsv\t${raw_features_variation}"
-      echo -e "Full (no var.)\t'#CF6576'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_no_variation_features.tsv\t${raw_features_merged_no_variation}"
-      echo -e "Full model\t'#AE3F9D'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_features.tsv\t${raw_features_merged}"
+      echo -e "Genomic features\t'#490C65'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.genomic_features.tsv\t${raw_features_genomic}"
+      echo -e "Gene expression\t'#BA7FD0'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.expression_features.tsv\t${raw_features_expression}"
+      echo -e "Chromatin\t'#001588'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.chromatin_features.tsv\t${raw_features_chromatin}"
+      echo -e "Protein\t'#0180C9'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.protein_features.tsv\t${raw_features_protein}"
+      echo -e "Gene constraint\t'#F6313E'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.constraint_features.tsv\t${raw_features_constraint}"
+      echo -e "Variation\t'#FFA300'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.variation_features.tsv\t${raw_features_variation}"
+      echo -e "Full (no var.)\t'#46A040'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_no_variation_features.tsv\t${raw_features_merged_no_variation}"
+      echo -e "Full model\t'#00441B'\tfinemap_stats/${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_features.tsv\t${raw_features_merged}"
     done > finemap_feature_cor_input.tsv
 
     # Make all gene truth sets
