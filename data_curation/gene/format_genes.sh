@@ -258,6 +258,13 @@ wget https://doi.org/10.1371/journal.pgen.1001154.s002
   gencode.v19.canonical.pext_filtered.gtf.gz
 
 
+# Note: for parallelizing on the cloud, copy gnomAD data to rCNV bucket for convenience
+gsutil -m cp \
+  gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
+  exac-final-cnv.gene.scores071316 \
+  ${rCNV_bucket}/cleaned_data/genes/annotations/
+
+
 # Gather per-gene variation metadata
 /opt/rCNV2/data_curation/gene/get_gene_features.py \
   --get-variation \

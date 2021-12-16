@@ -383,8 +383,8 @@ def get_genomic_features(genes, txbt, exonbt, tx_stats, gnomad_tsv, min_intron_s
             reader = csv.reader(tsv, delimiter='\t')
             for track, action, tname in reader:
                 add_header_cols.append(tname)
-                newanno = {x[3]: float(x[4]) for x in \
-                           add_local_track(tx_bed, track, action, 8, True)}
+                newanno_vals = add_local_track(tx_bed, track, action, True)
+                newanno = {g : v for g, v in zip([x.name for x in tx_bed], newanno_vals)}
                 for gene, val in newanno.items():
                     gfeats_tmp[gene].append(val)
         header_cols = header_cols + add_header_cols
