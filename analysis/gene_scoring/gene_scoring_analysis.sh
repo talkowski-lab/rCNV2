@@ -49,7 +49,7 @@ min_cds_ovr_del=1.0
 min_cds_ovr_dup=1.0
 max_genes_per_cnv=28
 meta_model_prefix="fe"
-min_cnvs_per_gene_training=3
+min_cnvs_per_gene_training=10
 cen_tel_dist=5000000
 exclusion_bed=refs/gencode.v19.canonical.pext_filtered.cohort_exclusion.bed.gz
 winsorize_meta_z=1.0
@@ -185,22 +185,20 @@ done
 gsutil -m cp ${rCNV_bucket}/analysis/gene_scoring/data/** ./
 for CNV in DEL DUP; do
   /opt/rCNV2/analysis/gene_scoring/variance_vs_counts.R \
-    rCNV2_analysis_d1.rCNV.$CNV.gene_burden.meta_analysis.stats.bed.gz \
-    rCNV2_analysis_d1.rCNV.$CNV.counts_per_gene.tsv \
+    rCNV2_analysis_d2.rCNV.$CNV.gene_burden.meta_analysis.stats.bed.gz \
+    rCNV2_analysis_d2.rCNV.$CNV.counts_per_gene.tsv \
     variance_vs_cnvs.$CNV.pdf
 done
 
 
 # Recompute association stats per cohort
-export training_hpo_list=refs/rCNV2.hpos_by_severity.developmental.list
-export effective_case_sample_sizes=refs/rCNV2.hpos_by_severity.developmental.counts.tsv
 for contig in $( seq 1 22 ); do
 
   # Extract contig of interest from GTF
   tabix ${gtf} ${contig} | bgzip -c > ${contig}.gtf.gz
 
   # Create string of HPOs to keep
-  keep_hpos=$( cat $training_hpo_list | paste -s -d\; )
+  keep_hpos=$( cat refs/rCNV2.hpos_by_severity.developmental.list | paste -s -d\; )
 
   # Iterate over metacohorts to compute single-cohort stats
   while read meta cohorts; do
@@ -208,7 +206,7 @@ for contig in $( seq 1 22 ); do
 
     # Set metacohort-specific parameters
     cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
-    effective_case_n=$( fgrep -w $meta $effective_case_sample_sizes | cut -f2 )
+    effective_case_n=$( fgrep -w $meta refs/rCNV2.hpos_by_severity.developmental.counts.tsv | cut -f2 )
 
     # Iterate over CNV types
     for CNV in DEL DUP; do
@@ -288,7 +286,7 @@ for CNV in DEL DUP; do
     --conditional-exclusion $exclusion_bed \
     --p-is-neg-log10 \
     --spa \
-    --spa-exclude /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
+    --spa-exclude /opt/rCNV2/refs/lit_GDs.all.${CNV}.bed.gz \
     --winsorize ${winsorize_meta_z} \
     --min-cases ${meta_min_cases} \
     --keep-n-columns 4 \
@@ -317,8 +315,8 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/gene_scoring/data/**.gene_burden.meta_analysis.stats.bed.gz \
   ${rCNV_bucket}/analysis/gene_scoring/data/*.gene_burden.underpowered_genes.bed.gz \
   ./
-del_meta_stats="rCNV2_analysis_d1.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz"
-dup_meta_stats="rCNV2_analysis_d1.rCNV.DUP.gene_burden.meta_analysis.stats.bed.gz"
+del_meta_stats="rCNV2_analysis_d2.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz"
+dup_meta_stats="rCNV2_analysis_d2.rCNV.DUP.gene_burden.meta_analysis.stats.bed.gz"
 
 
 # Create CNV-type-specific gene excludelists
@@ -408,7 +406,7 @@ rCNV_bucket="${rCNV_bucket}"
 CNV="DEL"
 BFDP_stats="${freq_code}.${CNV}.gene_abfs.tsv"
 excludelist="${freq_code}.gene_scoring.training_gene_excludelist.bed.gz"
-underpowered_genes="rCNV2_analysis_d1.rCNV.DEL.gene_burden.underpowered_genes.bed.gz"
+underpowered_genes="rCNV2_analysis_d2.rCNV.DEL.gene_burden.underpowered_genes.bed.gz"
 gene_features="gencode.v19.canonical.pext_filtered.all_features.no_variation.eigenfeatures.bed.gz"
 raw_gene_features="gencode.v19.canonical.pext_filtered.all_features.no_variation.bed.gz"
 max_true_bfdp=0.5

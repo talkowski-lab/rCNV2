@@ -8,7 +8,7 @@
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Plot mini version of pHI & pTS scores for graphical abstract of rCNV2 paper
+# Plot mini version of pHaplo & pTriplo scores for graphical abstract of rCNV2 paper
 
 
 options(stringsAsFactors=F, scipen=1000)
@@ -28,10 +28,10 @@ make.color.grid <- function(){
   }))
 }
 
-# Get gene color based on (pHI, pTS) x,y pairs
+# Get gene color based on (pHaplo, pTriplo) x,y pairs
 query.color.grid <- function(gene, scores, color.grid){
-  x <- round(100*as.numeric(scores$pHI[which(scores$gene==gene)]))
-  y <- round(100*as.numeric(scores$pTS[which(scores$gene==gene)]))
+  x <- round(100*as.numeric(scores$pHaplo[which(scores$gene==gene)]))
+  y <- round(100*as.numeric(scores$pTriplo[which(scores$gene==gene)]))
   color.grid[y+1, x+1]
 }
 
@@ -94,7 +94,7 @@ plot.mini.scatter <- function(scores, n.points=1000, shading=TRUE, pt.cex=0.25, 
   }
   
   # Add points
-  points(x=scores$pHI, y=scores$pTS, pch=19, cex=pt.cex, 
+  points(x=scores$pHaplo, y=scores$pTriplo, pch=19, cex=pt.cex, 
          col=scores$color)
   # Axes
   # axis(2, labels=NA, tck=-0.03, col=blueblack)

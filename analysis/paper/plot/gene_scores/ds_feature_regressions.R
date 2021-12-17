@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -28,7 +28,7 @@ gene.glm <- function(scores, feats, response.name, glm.alpha=NULL, seed=2020){
   }))
   Y <- as.vector(as.numeric(scale(Y)))
   glm.df <- apply(glm.df[, -1], 2, function(vals){as.vector(as.numeric(unlist(vals)))})
-  
+
   # Use caret::train to determine the optimal alpha if none is provided
   if(is.null(glm.alpha)){
     glm.df <- as.data.frame(cbind(Y, glm.df))
@@ -53,7 +53,7 @@ gene.glm <- function(scores, feats, response.name, glm.alpha=NULL, seed=2020){
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Barplot of top N regression coefficients
-plot.top.coefs <- function(coefs, feat.meta, colors, borders, 
+plot.top.coefs <- function(coefs, feat.meta, colors, borders,
                            lab.subscripts, N=10, parmar=c(0.1, 0.5, 3, 0.5)){
   # Get plotting data
   coefs <- coefs[which(names(coefs) != "(Intercept)")]
@@ -71,26 +71,26 @@ plot.top.coefs <- function(coefs, feat.meta, colors, borders,
     feat.meta$name[which(feat.meta$feature==fname)]
   })
   xlims <- c(-1, 1)*max(abs(top.coefs), na.rm=T)
-  
+
   # Prep plot area
   par(bty="n", mar=parmar)
   plot(NA, xlim=xlims, ylim=c(N, 0),
        xaxt="n", yaxt="n", xlab="", ylab="", yaxs="i")
-  
+
   # Add gridlines
   x.ax.at <- axTicks(3)
   abline(v=x.ax.at, col="white")
-  
+
   # Add rectangles
   rect(xleft=rep(0, N), xright=top.coefs,
        ybottom=(1:N)-0.85, ytop=(1:N)-0.15,
        bty="o", border=bar.borders, col=bar.colors)
   text(x=rep(0, N), y=(1:N)-0.5, pos=lab.pos, labels=lab.names, xpd=T, cex=5/6)
-  
+
   # Add top axis
   axis(3, at=c(-100, 100), labels=NA, tck=0, col=blueblack)
   axis(3, at=x.ax.at, labels=NA, col=blueblack, tck=-0.025)
-  
+
   if(length(lab.subscripts) == 2){
     axis(3, at=x.ax.at, labels=abs(x.ax.at), tick=F, line=-0.65)
     axis(3, at=mean(c(0, par("usr")[1])), tick=F, line=0.4,
@@ -109,15 +109,13 @@ plot.top.coefs <- function(coefs, feat.meta, colors, borders,
 #####################
 ### RSCRIPT BLOCK ###
 #####################
+require(rCNV2, quietly=T)
 require(optparse, quietly=T)
-require(funr, quietly=T)
 require(glmnet, quietly=T)
 require(caret, quietly=T)
 
 # List of command-line options
-option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
-)
+option_list <- list()
 
 # Get command-line arguments & options
 args <- parse_args(OptionParser(usage=paste("%prog scores.tsv features.bed feature.meta.tsv out_prefix", sep=" "),
@@ -135,34 +133,22 @@ scores.in <- args$args[1]
 features.in <- args$args[2]
 feature.meta.in <- args$args[3]
 out.prefix <- args$args[4]
-rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
 # scores.in <- "~/scratch/rCNV.gene_scores.tsv.gz"
 # features.in <- "~/scratch/gencode.v19.canonical.pext_filtered.all_features.no_variation.transformed.bed.gz"
 # feature.meta.in <- "~/scratch/gene_feature_metadata.tsv"
 # out.prefix <- "~/scratch/test_gene_score_feature_regressions"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/gene_scores/"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
-
-# Source common functions
-script.dir <- funr::get_script_path()
-source(paste(script.dir, "common_functions.R", sep="/"))
 
 # Load scores & classify genes into subgroups based on scores
 scores <- load.scores(scores.in)
-ds.groups <- classify.genes(scores, hc.cutoff=0.9, lc.cutoff=0.5)
+ds.groups <- classify.genes.by.score(scores, hc.cutoff=0.9, lc.cutoff=0.5)
 
 # Compute regression gradients
 scores$ds.gradient <- apply(scores[, -1], 1, function(vals){
   min(as.numeric(vals), na.rm=T)
 })
-scores$hits.gradient <- scores$pTS - scores$pHI
+scores$hits.gradient <- scores$pTriplo - scores$pHaplo
 
 # Load & normalize features
 feats <- load.features(features.in, fill="mean", norm=T)
@@ -179,12 +165,12 @@ coefs.to.plot <- 16
 pdf(paste(out.prefix, "gradient_regression.top_coefs.ds.pdf", sep="."),
     height=3.7, width=4)
 plot.top.coefs(ds.coefs, feat.meta, colors=c(ns.color, cnv.colors[3]),
-               borders=c("gray30", cnv.blacks[3]), lab.subscripts=c("min(pHI, pTS)"),
+               borders=c("gray30", cnv.blacks[3]), lab.subscripts=c("min(pHaplo, pTriplo)"),
                N=coefs.to.plot)
 dev.off()
 pdf(paste(out.prefix, "gradient_regression.top_coefs.hits.pdf", sep="."),
     height=3.7, width=4)
 plot.top.coefs(hits.coefs, feat.meta, colors=cnv.colors[1:2],
-               borders=cnv.blacks[1:2], N=coefs.to.plot, lab.subscripts=c("pTS-pHI"))
+               borders=cnv.blacks[1:2], N=coefs.to.plot, lab.subscripts=c("pTriplo-pHaplo"))
 dev.off()
 

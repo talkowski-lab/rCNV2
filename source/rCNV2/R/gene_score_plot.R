@@ -4,214 +4,39 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2021-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Common functions for gene dosage sensitivity score analyses in rCNV2 paper
+# Plotting functions used for gene scoring analyses
 
 
-options(stringsAsFactors=F, scipen=1000)
-
-
-######################
-### DATA FUNCTIONS ###
-######################
-# Load dataframe of all gene scores
-load.scores <- function(scores.in){
-  scores <- read.table(scores.in, header=T, sep="\t", comment.char="", check.names=F)
-  colnames(scores) <- c("gene", "pHI", "pTS")
-  scores[, -1] <- apply(scores[, -1], 2, as.numeric)
-  return(scores)
-}
-
-# Load gene metadata from .bed
-load.gene.metadata <- function(cov.in){
-  cov <- read.table(cov.in, header=T, sep="\t", comment.char="")[, -c(1:3)]
-  cov[, -1] <- apply(cov[, -1], 2, as.numeric)
-  return(cov)
-}
-
-# Load gene feature category metadata from .tsv
-load.gene.feature.metadata <- function(meta.in){
-  feat.meta <- read.table(meta.in, header=T, sep="\t", comment.char="")
-  colnames(feat.meta)[1] <- gsub("X.", "", colnames(feat.meta)[1], fixed=T)
-  return(feat.meta)
-}
-
-# Partition genes into subgroups based on scores
-classify.genes <- function(scores, hc.cutoff=0.9, lc.cutoff=0.5){
-  ds.hc <- scores$gene[which(scores$pHI>=hc.cutoff & scores$pTS>=hc.cutoff)]
-  ds.lc <- scores$gene[which(scores$pHI>=lc.cutoff & scores$pTS>=lc.cutoff & !(scores$gene %in% ds.hc))]
-  hi.hc <- scores$gene[which(scores$pHI>=hc.cutoff & scores$pTS<lc.cutoff)]
-  hi.lc <- scores$gene[which(scores$pHI>=lc.cutoff & scores$pTS<lc.cutoff & !(scores$gene %in% hi.hc))]
-  ts.hc <- scores$gene[which(scores$pHI<lc.cutoff & scores$pTS>=hc.cutoff)]
-  ts.lc <- scores$gene[which(scores$pHI<lc.cutoff & scores$pTS>=lc.cutoff & !(scores$gene %in% ts.hc))]
-  ns <- scores$gene[which(scores$pHI<lc.cutoff & scores$pTS<lc.cutoff)]
-  list("ds.hc" = ds.hc, "ds.lc" = ds.lc,
-       "hi.hc" = hi.hc, "hi.lc" = hi.lc,
-       "ts.hc" = ts.hc, "ts.lc" = ts.lc,
-       "ns" = ns)
-}
-
-# Get gene color based on membership in ds.groups
-get.gene.color.byscore <- function(gene, ds.groups){
-  if(gene %in% ds.groups$ds.hc){
-    cnv.colors[3]
-  }else if(gene %in% ds.groups$ds.lc){
-    control.cnv.colors[3]
-  }else if(gene %in% ds.groups$hi.hc){
-    cnv.colors[1]
-  }else if(gene %in% ds.groups$hi.lc){
-    control.cnv.colors[1]
-  }else if(gene %in% ds.groups$ts.hc){
-    cnv.colors[2]
-  }else if(gene %in% ds.groups$ts.lc){
-    control.cnv.colors[2]
-  }else{
-    ns.color
-  }
-}
-
-# Get gene color based on gradient of possible x,y values for score pairs
-get.gene.color.byxy <- function(vals){
-  phi <- 100*round(as.numeric(vals)[1])
-  pts <- 100*round(as.numeric(vals)[1])
-  
-}
-
-# Compute ROC of a single score vs. predefined true/false genes
-roc <- function(stats, score, true.genes, false.genes, steps=seq(1, 0, -0.001)){
-  x <- data.frame("score" = stats[, which(colnames(stats) == score)],
-                  "true" = stats$gene %in% true.genes,
-                  "false" = stats$gene %in% false.genes)
-  roc_res <- as.data.frame(t(sapply(steps, function(k){
-    idxs <- which(x$score >= k)
-    ftrue <- length(which(x$true[idxs])) / length(which(x$true))
-    ffalse <- length(which(x$false[idxs])) / length(which(x$false))
-    fother <- length(which(!x$true[idxs])) / length(which(!x$true))
-    fall <- length(idxs) / nrow(x)
-    return(c(k, fall, fother, ftrue, ffalse))
-  })))
-  roc_res <- rbind(c(-Inf, 0, 0, 0, 0),
-                   roc_res,
-                   c(Inf, 1, 1, 1, 1))
-  colnames(roc_res) <- c("min_score", "frac_all", "frac_other", "frac_true", "frac_false")
-  return(roc_res)
-}
-
-# Compute PRC of a single score vs. predefined true/false genes
-prc <- function(stats, score, true.genes, false.genes, steps=seq(1, 0, -0.001)){
-  x <- data.frame("score" = stats[, which(colnames(stats) == score)],
-                  "true" = stats$gene %in% true.genes,
-                  "false" = stats$gene %in% false.genes)
-  prc_res <- as.data.frame(t(sapply(steps, function(k){
-    idxs <- which(x$score >= k)
-    prec <- length(which(x$true[idxs])) / (length(which(x$true[idxs])) + length(which(x$false[idxs])))
-    recall <- length(which(x$true[idxs])) / length(which(x$true))
-    fall <- length(idxs) / nrow(x)
-    return(c(k, fall, prec, recall))
-  })))
-  prc_res <- rbind(c(-Inf, 0, 1, 0),
-                   prc_res)
-  colnames(prc_res) <- c("min_score", "frac_all", "precision", "recall")
-  return(prc_res)
-}
-
-# Wrapper to calculate all performance stats a single score
-evaluate.score <- function(stats, score, true.genes, false.genes){
-  roc.res <- roc(stats, score, true.genes, false.genes)
-  roc.auc <- flux::auc(roc.res$frac_false, roc.res$frac_true)
-  prc.res <- prc(stats, score, true.genes, false.genes)
-  prc.auc <- flux::auc(prc.res$recall, prc.res$precision)
-  return(list("roc"=roc.res,
-              "roc.auc"=roc.auc,
-              "prc"=prc.res,
-              "prc.auc"=prc.auc))
-}
-
-# Load & normalize other (non-rCNV) scores
-load.other.scores <- function(meta.in){
-  other.scores <- c("gnomad_pLI", "gnomad_oe_mis_upper", "gnomad_oe_lof_upper",
-                    "exac_cnv_z", "rvis_pct", "eds", "hurles_hi")
-  meta <- read.table(meta.in, header=T, sep="\t", comment.char="")[, c("gene", other.scores)]
-  oeuf.idxs <- grep("_upper", colnames(meta))
-  meta[, oeuf.idxs] <- apply(meta[, oeuf.idxs], 2, function(vals){
-    vals <- vals - min(vals, na.rm=T)
-    vals <- vals / max(vals, na.rm=T)
-    vals <- 1 - vals
-  })
-  meta$exac_cnv_z <- meta$exac_cnv_z - min(meta$exac_cnv_z, na.rm=T)
-  meta$exac_cnv_z <- meta$exac_cnv_z / max(meta$exac_cnv_z, na.rm=T)
-  meta$rvis_pct <- (100 - meta$rvis_pct) / 100
-  meta$eds <- meta$eds - min(meta$eds, na.rm=T)
-  meta$eds <- meta$eds / max(meta$eds, na.rm=T)
-  return(meta)
-}
-
-# Modify gene features to improve interpretability of regression coefficients
-mod.features <- function(feats){
-  # Remove PCA-based features (uninterpretable)
-  remove.feats <- colnames(feats)[grep("_component_", colnames(feats), fixed=T)]
-  if(length(remove.feats) > 0){
-    feats <- feats[, -which(colnames(feats) %in% remove.feats)]
-  }
-  
-  # Mirror some features where a smaller value = more important
-  reverse.feats <- c(colnames(feats)[grep("_oe_", colnames(feats), fixed=T)],
-                     "rvis", "rvis_pct")
-  feats[, reverse.feats] <- -feats[, reverse.feats]
-  
-  # Helper function to return list of highly correlated features (optional)
-  get.correlated.feat.pairs <- function(feats, min.cor=0.7){
-    feat.names <- colnames(feats)[-1]
-    cor.mat <- cor(feats[, -1])
-    cor.pairs <- data.frame("feat1"=character(), "feat2"=character(), "r"=numeric())
-    for(ridx in 1:nrow(cor.mat)){
-      for(cidx in 1:ncol(cor.mat)){
-        fname.r <- rownames(cor.mat)[ridx]
-        fname.c <- colnames(cor.mat)[cidx]
-        cor.stat <- as.numeric(cor.mat[ridx, cidx])
-        if(cor.stat >= min.cor &
-           fname.r != fname.c &
-           cidx > ridx){
-          cor.pairs <- rbind(cor.pairs, c(fname.r, fname.c, cor.stat))
-        }
-      }
-    }
-    colnames(cor.pairs) <- c("feat1", "feat2", "r")
-    return(cor.pairs)
-  }
-  
-  # Selectively remove highly correlated features
-  cor.feats.to.prune <- c("median_expression_q1", "median_expression_q3",
-                          "expression_mad_min", "expression_mad_q1", 
-                          "expression_mad_q3", "expression_mad_max", 
-                          "expression_mad_sd", 
-                          intersect(colnames(feats)[grep("chromhmm_", colnames(feats), fixed=T)],
-                                    colnames(feats)[grep("_sd", colnames(feats), fixed=T)]),
-                          colnames(feats)[grep("gnomad_mu", colnames(feats), fixed=T)],
-                          "cen_dist", "tel_dist",
-                          "gnomad_oe_mis", "gnomad_oe_lof", "rvis_pct")
-  feats <- feats[, which(!colnames(feats) %in% cor.feats.to.prune)]
-  
-  return(feats)
-}
-
-
-##########################
-### PLOTTING FUNCTIONS ###
-##########################
-# Plot distributions of values by gene score category
-plot.feature.bydsgroup <- function(feats, ds.groups, feat.idx=2, title=NULL, 
-                                   swarm.max=5000, max.ylim=6, blue.bg=TRUE,
+#' Plot gene feature distribution vs. scores
+#'
+#' Swarmplots of distributions for a single gene feature per gene score category
+#'
+#' @param feats matrix of gene features
+#' @param ds.groups list of genes split by score category as generated by [classify.genes.by.score()]
+#' @param feat.idx column index of feature to be plotted \[default: 2\]
+#' @param title title for plot \[default: NULL\]
+#' @param swarm.max maximum number of points for a swarmplot before rendering as a violin \[default: 5000\]
+#' @param max.ylim maximum Y axis value \[default: 6\]
+#' @param blue.bg add light blue background shading \[default: FALSE\]
+#' @param parmar plotting margins passed to `par(mar=...)`
+#'
+#' @seealso [load.scores()], [classify.genes.by.score()]
+#'
+#' @export plot.feature.bydsgroup
+#' @export
+plot.feature.bydsgroup <- function(feats, ds.groups, feat.idx=2, title=NULL,
+                                   swarm.max=5000, max.ylim=6, blue.bg=FALSE,
                                    parmar=c(2.25, 2.75, 1.25, 0.5)){
   # Get plot values
   vals <- lapply(ds.groups, function(genes){
     as.numeric(feats[which(feats$gene %in% genes), feat.idx])
   })
   names(vals) <- names(ds.groups)
-  vals <- list("hi.hc"=vals$hi.hc, "ds.hc"=vals$ds.hc, "ts.hc"=vals$ts.hc, 
+  vals <- list("hi.hc"=vals$hi.hc, "ds.hc"=vals$ds.hc, "ts.hc"=vals$ts.hc,
                "hi.lc"=vals$hi.lc, "ds.lc"=vals$ds.lc, "ts.lc"=vals$ts.lc,
                "ns"=vals$ns)
   ylims <- range(unlist(vals), na.rm=T)
@@ -237,7 +62,7 @@ plot.feature.bydsgroup <- function(feats, ds.groups, feat.idx=2, title=NULL,
     plot.bty <- "n"
     grid.col <- NA
   }
-  
+
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=c(0, 9), ylim=ylims,
@@ -250,11 +75,7 @@ plot.feature.bydsgroup <- function(feats, ds.groups, feat.idx=2, title=NULL,
     y.ax.at <- y.ax.at[seq(1, length(y.ax.at), 2)]
   }
   abline(h=0, col=blueblack, lty=5)
-  # rect(xleft=c(par("usr")[1], 3.1, 7.1, 9.1), 
-  #      xright=c(-0.1, 3.9, 7.9, par("usr")[2]), 
-  #      ybottom=par("usr")[3], ytop=par("usr")[4],
-  #      bty="n", border=NA, col="white")
-  
+
   # Add axes
   x.labs <- c(rep(c("HI", "DS", "TS"), 2), "NS")
   sapply(1:7, function(i){
@@ -272,7 +93,7 @@ plot.feature.bydsgroup <- function(feats, ds.groups, feat.idx=2, title=NULL,
   axis(2, at=y.ax.at, tick=F, las=2, line=-0.65)
   mtext(2, text="Feature Value (Z-Score)", line=1.7)
   mtext(3, text=title)
-  
+
   # Add values
   sapply(1:7, function(i){
     ivals <- vals[[i]][which(!is.na(vals[[i]]))]
@@ -285,22 +106,44 @@ plot.feature.bydsgroup <- function(feats, ds.groups, feat.idx=2, title=NULL,
                 add=T, drawRect=F, h=0.1)
       }
       vmed <- median(ivals)
-      segments(x0=x.at[i]+0.2, x1=x.at[i]-0.2, y0=vmed, y1=vmed, 
+      segments(x0=x.at[i]+0.2, x1=x.at[i]-0.2, y0=vmed, y1=vmed,
                lend="round", col=black.colors[i], lwd=2)
     }
   })
 }
 
-# Superimposed barplot of one statistic per category from evaluate.scores()
-superimposed.barplot <- function(values, colors, xleft, xright, ybottom, ytop, 
-                                 min.value=NULL, max.value=NULL, title=NULL, 
-                                 add.labels=TRUE, lab.cex=0.6, lab.colors=NULL, 
+
+#' Barplot inset for score performance
+#'
+#' Superimposed barplot of one statistic per category from [evaluate.scores()]
+#'
+#' @param values values to be plotted
+#' @param colors colors for each bar
+#' @param xleft leftmost position of inset on X axis
+#' @param xright rightmost position of inset on X axis
+#' @param ybottom bottommost position of inset on Y axis
+#' @param ytop topmost position of inset on Y axis
+#' @param min.value minimum value to plot
+#' @param max.value maximum value to plot
+#' @param title title of plot
+#' @param add.labels boolean indicator whether to label bars \[default: TRUE\]
+#' @param lab.cex cex value for bar labels \[default: 0.6\]
+#' @param lab.colors colors for bar labels
+#' @param buffer relative buffer between bars
+#'
+#' @seealso [evaluate.score()]
+#'
+#' @export superimposed.barplot
+#' @export
+superimposed.barplot <- function(values, colors, xleft, xright, ybottom, ytop,
+                                 min.value=NULL, max.value=NULL, title=NULL,
+                                 add.labels=TRUE, lab.cex=0.6, lab.colors=NULL,
                                  buffer=0.025){
   # Ådd subpanel
-  rect(xleft=xleft+buffer, xright=xright-buffer, ybottom=ybottom+buffer, ytop=ytop-buffer, 
+  rect(xleft=xleft+buffer, xright=xright-buffer, ybottom=ybottom+buffer, ytop=ytop-buffer,
        col=bluewhite, border=blueblack)
   text(x=mean(c(xleft, xright)), y=ytop-(2*buffer), labels=title, pos=3)
-  
+
   # Set parameters & get plot values
   inner.xleft <- xleft + (2*buffer)
   inner.xright <- xright - (2*buffer)
@@ -319,13 +162,13 @@ superimposed.barplot <- function(values, colors, xleft, xright, ybottom, ytop,
   scaled.values <- norm.values * max.bar.length
   bar.xleft <- rep(inner.xleft, times=n.bars)
   bar.xright <- inner.xleft + scaled.values
-  
+
   # Add background gridlines
   gridlines.x.at <- seq(inner.xleft, inner.xright, length.out=6)
   segments(x0=gridlines.x.at, x1=gridlines.x.at,
            y0=inner.ybottom, y1=inner.ytop,
            col="white")
-  
+
   # Add bars & labels
   rect(xleft=bar.xleft, xright=bar.xright, ybottom=bar.ybottom, ytop=bar.ytop, border=NA, col=colors)
   if(is.null(lab.colors)){
@@ -338,33 +181,48 @@ superimposed.barplot <- function(values, colors, xleft, xright, ybottom, ytop,
   }
   lab.x.adj <- sapply(norm.values, function(x){if(x>=0.5){2*buffer}else{-2*buffer}})
   lab.y.at <- (bar.y.breaks[1:n.bars]+bar.y.breaks[-1])/2
-  text(x=bar.xright+lab.x.adj, y=lab.y.at - (bar.buffer * bar.height), pos=lab.pos, 
+  text(x=bar.xright+lab.x.adj, y=lab.y.at - (bar.buffer * bar.height), pos=lab.pos,
        col=lab.colors, labels=round(values, 3), cex=lab.cex)
-  
+
   # Add cleanup line
   segments(x0=inner.xleft, x1=inner.xleft, y0=inner.ybottom, y1=inner.ytop, col=blueblack)
 }
 
-# Plot ROC curves from a list of evaluate.score() outputs
-plot.roc <- function(data, colors=NULL, nested.auc=TRUE, auc.text.colors=NULL, 
-                     grid.col=bluewhite, diag.col=bluewhite, 
+
+#' Plot ROC curve
+#'
+#' Plot receiver operating characteristic curves from a list of [evaluate.score()] outputs
+#'
+#' @param data list of outputs from [evaluate.score()]
+#' @param colors colors for each entry in `data` \[default: use viridis()\]
+#' @param nested.auc boolean indicator to add nested AUC barplot \[default: TRUE\]
+#' @param auc.text.colors colors for labels in nested AUC barplot
+#' @param grid.col color of gridlines for plot \[default: very light blue\]
+#' @param diag.col color of diagonal line \[default: very light blue\]
+#' @param ax.tick `tck` value for X and Y axes \[default: -0.025]
+#' @param parmar values passed to `par(mar=...)`
+#'
+#' @export plot.roc
+#' @export
+plot.roc <- function(data, colors=NULL, nested.auc=TRUE, auc.text.colors=NULL,
+                     grid.col=bluewhite, diag.col=bluewhite,
                      ax.tick=-0.025, parmar=c(2.5, 2.5, 0.75, 0.75)){
   # Get plot data
   if(is.null(colors)){
     colors <- rev(viridis(length(data)))
   }
-  
+
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=c(0, 1), ylim=c(0, 1), type="n",
        xaxt="n", yaxt="n", xaxs="i", yaxs="i", xlab="", ylab="")
-  rect(xleft=par("usr")[1], xright=par("usr")[2], 
+  rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
        border=NA, bty="n", col="white")
   abline(h=axTicks(2), v=axTicks(1), col=grid.col)
   abline(0, 1, col=diag.col, lwd=2, lty=5)
   box(col=bluewhite, bty="o", xpd=T)
-  
+
   # Add curves
   lorder <- order(-sapply(data, function(x){x$roc.auc}))
   sapply(rev(lorder), function(i){
@@ -372,15 +230,15 @@ plot.roc <- function(data, colors=NULL, nested.auc=TRUE, auc.text.colors=NULL,
     points(x$roc$frac_false, x$roc$frac_true,
            type="l", lwd=3, col=colors[i], xpd=T)
   })
-  
+
   # Add nested AUC subpanel
   if(nested.auc==TRUE){
     superimposed.barplot(rev(sapply(data, function(l){l$roc.auc})), rev(colors),
-                         xleft=0.5, xright=1, ybottom=0, ytop=0.5, 
+                         xleft=0.5, xright=1, ybottom=0, ytop=0.5,
                          min.value=0, max.value=1, title="AUC",
                          lab.colors=auc.text.colors, buffer=0.02)
   }
-  
+
   # Add axes
   axis(1, labels=NA, col=blueblack, tck=ax.tick)
   axis(1, tick=F, line=-0.6)
@@ -390,25 +248,39 @@ plot.roc <- function(data, colors=NULL, nested.auc=TRUE, auc.text.colors=NULL,
   mtext(2, line=1.65, text="True positive rate")
 }
 
-# Plot PRC curves from a list of evaluate.score() outputs
+
+#' Plot precision-recall curve
+#'
+#' Plot precision-recall curves from a list of [evaluate.score()] outputs
+#'
+#' @param data list of outputs from [evaluate.score()]
+#' @param colors colors for each entry in `data` \[default: use viridis()\]
+#' @param nested.auc boolean indicator to add nested AUC barplot \[default: TRUE\]
+#' @param auc.text.colors colors for labels in nested AUC barplot
+#' @param grid.col color of gridlines for plot \[default: very light blue\]
+#' @param ax.tick `tck` value for X and Y axes \[default: -0.025]
+#' @param parmar values passed to `par(mar=...)`
+#'
+#' @export plot.prc
+#' @export
 plot.prc <- function(data, colors=NULL, nested.auc=TRUE, auc.text.colors=NULL,
-                     grid.col=bluewhite, ax.tick=-0.025, 
+                     grid.col=bluewhite, ax.tick=-0.025,
                      parmar=c(2.5, 2.5, 0.75, 0.75)){
   # Get plot data
   if(is.null(colors)){
     colors <- rev(viridis(length(data)))
   }
-  
+
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=c(0, 1), ylim=c(0, 1), type="n",
        xaxt="n", yaxt="n", xaxs="i", yaxs="i", xlab="", ylab="")
-  rect(xleft=par("usr")[1], xright=par("usr")[2], 
+  rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
        border=NA, bty="n", col="white")
   abline(h=axTicks(2), v=axTicks(1), col=grid.col)
   box(col=bluewhite, bty="o", xpd=T)
-  
+
   # Add curves
   lorder <- order(-sapply(data, function(x){x$prc.auc}))
   sapply(rev(lorder), function(i){
@@ -416,15 +288,15 @@ plot.prc <- function(data, colors=NULL, nested.auc=TRUE, auc.text.colors=NULL,
     points(x$prc$recall, x$prc$precision,
            type="l", lwd=4, col=colors[i], xpd=T)
   })
-  
+
   # Add nested AUC subpanel
   if(nested.auc==TRUE){
     superimposed.barplot(rev(sapply(data, function(l){l$prc.auc})), rev(colors),
-                         xleft=0, xright=0.5, ybottom=0, ytop=0.5, 
+                         xleft=0, xright=0.5, ybottom=0, ytop=0.5,
                          min.value=0, max.value=1, title="AUC",
                          lab.colors=auc.text.colors, buffer=0.02)
   }
-  
+
   # Add axes & cleanup
   axis(1, labels=NA, col=blueblack, tck=ax.tick)
   axis(1, tick=F, line=-0.6)
@@ -434,17 +306,37 @@ plot.prc <- function(data, colors=NULL, nested.auc=TRUE, auc.text.colors=NULL,
   mtext(2, line=1.65, text="Recall")
 }
 
-# Plot simple color legend
+
+#' Plot simple legend
+#'
+#' Plot simple color legend
+#'
+#' @param labels vector of legend labels
+#' @param colors vector of legend colors
+#'
+#' @export simple.legend
+#' @export
 simple.legend <- function(labels, colors){
   par(mar=rep(0.25, 4), bty="n")
   plot(NA, xlim=c(0, 1), ylim=c(0, length(labels)),
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
-  points(x=rep(0.1, length(labels)), y=(1:length(labels))-0.5, pch=22, 
+  points(x=rep(0.1, length(labels)), y=(1:length(labels))-0.5, pch=22,
          col=blueblack, bg=colors, cex=1.8)
   text(x=rep(0.1, length(labels)), y=(1:length(labels))-0.58, pos=4, labels=labels, xpd=T)
 }
 
-# Plot metric stratified by CNV type and low/high pHI & pTS
+
+#' Plot metric stratified by gene scores
+#'
+#' Plot a metric stratified by CNV type and low/high pHaplo & pTriplo
+#'
+#' @param strat.dat list of values stratified as desired
+#' @param ylims limits for Y axis
+#' @param y.title title of Y axis
+#' @param parmar values passed to `par(mar=...)`
+#'
+#' @export plot.stratified.metric
+#' @export
 plot.stratified.metric <- function(strat.dat, ylims=NULL, y.title=NULL,
                                    parmar=c(1, 3, 0.5, 0.5)){
   # Get plot data
@@ -466,50 +358,50 @@ plot.stratified.metric <- function(strat.dat, ylims=NULL, y.title=NULL,
   x.right.border <- (1:4)-0.15
   del.x.at <- (1:4)-0.5-0.15
   dup.x.at <- (1:4)-0.5+0.15
-  
+
   # Prep plot area
   par(bty="n", mar=parmar)
   plot(NA, xlim=c(0, 4), ylim=ylims,
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
-  rect(xleft=x.left.border, xright=x.right.border, 
+  rect(xleft=x.left.border, xright=x.right.border,
        ybottom=min(ylims), ytop=max(ylims),
        xpd=T, border=NA, bty="n", col=bluewhite)
-  
+
   # Add lower x-axis annotation
-  axis(2, at=((y.rect.tops+y.rect.bottoms)/2)[1], tick=F, las=2, labels="pHI", line=-1.25)
-  axis(2, at=((y.rect.tops+y.rect.bottoms)/2)[2], tick=F, las=2, labels="pTS", line=-1.25)
+  axis(2, at=((y.rect.tops+y.rect.bottoms)/2)[1], tick=F, las=2, labels="pHaplo", line=-1.25)
+  axis(2, at=((y.rect.tops+y.rect.bottoms)/2)[2], tick=F, las=2, labels="pTriplo", line=-1.25)
   rect(xleft=x.left.border+0.1, xright=x.right.border-0.1,
-       ytop=c(rep(y.rect.tops[1], 4), rep(y.rect.tops[2], 4)), 
+       ytop=c(rep(y.rect.tops[1], 4), rep(y.rect.tops[2], 4)),
        ybottom=c(rep(y.rect.bottoms[1], 4), rep(y.rect.bottoms[2], 4)),
-       bty="n", border=NA, 
+       bty="n", border=NA,
        col=c(ns.color, cnv.colors[1], ns.color, cnv.colors[1],
              ns.color, ns.color, cnv.colors[2], cnv.colors[2]))
-  text(x=0.5:3.5, y=((y.rect.tops+y.rect.bottoms)/2)[1], 
+  text(x=0.5:3.5, y=((y.rect.tops+y.rect.bottoms)/2)[1],
        labels=c("Low", "High", "Low", "High"),
        col=c("gray30", "white", "gray30", "white"),
        cex=0.85)
-  text(x=0.5:3.5, y=((y.rect.tops+y.rect.bottoms)/2)[2], 
+  text(x=0.5:3.5, y=((y.rect.tops+y.rect.bottoms)/2)[2],
        labels=c("Low", "Low", "High", "High"),
        col=c("gray30", "gray30", "white", "white"),
        cex=0.85)
   axis(1, at=par("usr")[1:2], line=0, tck=0, col=bluewhite)
   sapply(1:4, function(i){
-    axis(1, at=c(x.left.border[i], x.right.border[i]), tck=0, col=blueblack, 
+    axis(1, at=c(x.left.border[i], x.right.border[i]), tck=0, col=blueblack,
          line=0, labels=NA)
   })
   axis(1, at=0.5:3.5, tick=F, line=-0.9, labels=c("NS", "HI", "TS", "DS"))
-  
+
   # Add points & CI bars
-  segments(x0=del.x.at, x1=del.x.at, y0=strat.dat[[1]][, 2], y1=strat.dat[[1]][, 3], 
+  segments(x0=del.x.at, x1=del.x.at, y0=strat.dat[[1]][, 2], y1=strat.dat[[1]][, 3],
            col=cnv.colors[1], lend="round", lwd=2)
-  segments(x0=dup.x.at, x1=dup.x.at, y0=strat.dat[[2]][, 2], y1=strat.dat[[2]][, 3], 
+  segments(x0=dup.x.at, x1=dup.x.at, y0=strat.dat[[2]][, 2], y1=strat.dat[[2]][, 3],
            col=cnv.colors[2], lend="round", lwd=2)
   points(x=del.x.at, y=strat.dat[[1]][, 1], pch=19, col=cnv.colors[1])
   points(x=dup.x.at, y=strat.dat[[2]][, 1], pch=19, col=cnv.colors[2])
-  
+
   # Add cleanup bar to X axis
   abline(h=y0.val, col=blueblack)
-  
+
   # Add y axis
   y.ax.at <- axTicks(2)[which(axTicks(2) >= y0.val)]
   axis(2, at=c(y0.val, 10e10), tck=0, labels=NA, col=blueblack)
@@ -517,4 +409,5 @@ plot.stratified.metric <- function(strat.dat, ylims=NULL, y.title=NULL,
   axis(2, at=y.ax.at, las=2, line=-0.65, tick=F)
   axis(2, at=mean(c(y0.val, par("usr")[4])), labels=parse(text=y.title), line=0.5, tck=F)
 }
+
 

@@ -4,11 +4,11 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Determine optimal pHI & pTS score cutoffs based on empirical odds ratios
+# Determine optimal pHaplo & pTriplo score cutoffs based on empirical odds ratios
 
 
 # Set parameters & define constants
@@ -40,7 +40,7 @@ inv.var.avg <- function(lnors, vars, conf=0.95){
 }
 
 # Compute average effect size per score bin
-avg.lnor.per.score.bin <- function(lnor.df, scores, score, bins=100, 
+avg.lnor.per.score.bin <- function(lnor.df, scores, score, bins=100,
                                    start=1, end=0){
   score.breaks <- seq(start, end, length.out=bins+1)
   res <- as.data.frame(t(sapply(1:bins, function(i){
@@ -54,7 +54,7 @@ avg.lnor.per.score.bin <- function(lnor.df, scores, score, bins=100,
                              lnor.df$meta_lnOR_var[which(lnor.df$gene %in% bin.genes)])
     return(c(score.breaks[i+1], n.upper.genes, upper.lnor, n.bin.genes, bin.lnor))
   })))
-  colnames(res) <- c("cutoff", 
+  colnames(res) <- c("cutoff",
                      "cumul_genes", "cumul_lnOR", "cumul_lnOR_lower", "cumul_lnOR_upper",
                      "margin_genes", "margin_lnOR", "margin_lnOR_lower", "margin_lnOR_upper")
   return(res)
@@ -77,9 +77,9 @@ get.cutoff <- function(score.lnor.full, score.lnor.fine, min.lnor){
 ##########################
 # Plot empirical effect sizes vs score bin
 plot.score.vs.or <- function(bins, baseline, score.cutoff, score,
-                             avg.pt.cex=1, avg.genes.per.bin=NULL, 
+                             avg.pt.cex=1, avg.genes.per.bin=NULL,
                              x.ax.at=NULL, ylims=NULL, xtitle=NULL, ytitle=NULL,
-                             blue.bg=TRUE, ax.tck=-0.025, 
+                             blue.bg=TRUE, ax.tck=-0.025,
                              parmar=c(2.4, 2.4, 0.25, 0.25)){
   # Get plot values
   x <- bins$cutoff
@@ -87,7 +87,7 @@ plot.score.vs.or <- function(bins, baseline, score.cutoff, score,
   line.y <- bins$cumul_lnOR
 
   # Set plot parameters
-  if(score == "pHI"){
+  if(score == "pHaplo"){
     col.idx <- 1
     cnv.label <- "Deletion"
   }else{
@@ -125,7 +125,7 @@ plot.score.vs.or <- function(bins, baseline, score.cutoff, score,
     plot.bty <- "n"
     grid.col <- NA
   }
-  
+
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=xlims, ylim=ylims,
@@ -139,16 +139,16 @@ plot.score.vs.or <- function(bins, baseline, score.cutoff, score,
   y.ax.at <- log(2^(-10:10))
   abline(h=y.ax.at, col=grid.col)
   abline(v=score.cutoff, lty=1, col=highlight.color)
-  
+
   # Add points & lines
   abline(h=baseline, lty=5, col=baseline.col)
   points(x, pt.y, col=pt.col, cex=pt.cex, pch=19)
   points(x, line.y, type="l", col=line.col, lwd=2)
-  points(x[highlight.idxs], line.y[highlight.idxs], 
+  points(x[highlight.idxs], line.y[highlight.idxs],
          type="l", col=highlight.line.col, lwd=2)
-  points(x=score.cutoff, y=baseline, pch=23, cex=1.5*avg.pt.cex, 
+  points(x=score.cutoff, y=baseline, pch=23, cex=1.5*avg.pt.cex,
          bg=highlight.color, col=baseline.col, lwd=2)
-  
+
   # Add axes
   if(is.null(x.ax.at)){
     x.ax.at <- axTicks(1)
@@ -168,13 +168,11 @@ plot.score.vs.or <- function(bins, baseline, score.cutoff, score,
 #####################
 ### RSCRIPT BLOCK ###
 #####################
+require(rCNV2, quietly=T)
 require(optparse, quietly=T)
-require(funr, quietly=T)
 
 # List of command-line options
-option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
-)
+option_list <- list()
 
 # Get command-line arguments & options
 args <- parse_args(OptionParser(usage=paste("%prog scores.tsv meta_stats.del.tsv meta_stats.dup.tsv constr.genes exclude.list out_prefix", sep=" "),
@@ -194,7 +192,6 @@ dup.meta.in <- args$args[3]
 constr.genes.in <- args$args[4]
 xlist.in <- args$args[5]
 out.prefix <- args$args[6]
-rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
 # scores.in <- "~/scratch/rCNV.gene_scores.tsv.gz"
@@ -203,17 +200,6 @@ rcnv.config <- opts$`rcnv-config`
 # constr.genes.in <- "~/scratch/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list"
 # xlist.in <- "~/scratch/rCNV.gene_scoring.training_gene_blacklist.bed.gz"
 # out.prefix <- "~/scratch/test_gene_score_empirical_cutoffs"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/gene_scores/"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
-
-# Source common functions
-script.dir <- funr::get_script_path()
-source(paste(script.dir, "common_functions.R", sep="/"))
 
 # Load scores
 scores <- load.scores(scores.in)
@@ -230,12 +216,12 @@ dup.lnors <- load.lnors(dup.meta.in, xlist)
 del.constr.idxs <- which(del.lnors$gene %in% constr.genes & !(del.lnors$gene %in% xlist))
 del.constr.lnor <- inv.var.avg(del.lnors$meta_lnOR[del.constr.idxs], del.lnors$meta_lnOR_var[del.constr.idxs])
 
-# Compute lnOR estimates for genes by pHI & pTS bin
-phi.lnor.full <- avg.lnor.per.score.bin(del.lnors, scores, "pHI", bins=100, start=1, end=0)
-phi.lnor.fine <- avg.lnor.per.score.bin(del.lnors, scores, "pHI", bins=100, start=1, end=0.9)
-pts.lnor.full <- avg.lnor.per.score.bin(dup.lnors, scores, "pTS", bins=100, start=1, end=0)
-pts.lnor.fine <- avg.lnor.per.score.bin(dup.lnors, scores, "pTS", bins=100, start=1, end=0.9)
-pts.lnor.fine.forplot <- avg.lnor.per.score.bin(dup.lnors, scores, "pTS", bins=50, start=1, end=0.95)
+# Compute lnOR estimates for genes by pHaplo & pTriplo bin
+phi.lnor.full <- avg.lnor.per.score.bin(del.lnors, scores, "pHaplo", bins=100, start=1, end=0)
+phi.lnor.fine <- avg.lnor.per.score.bin(del.lnors, scores, "pHaplo", bins=100, start=1, end=0.9)
+pts.lnor.full <- avg.lnor.per.score.bin(dup.lnors, scores, "pTriplo", bins=100, start=1, end=0)
+pts.lnor.fine <- avg.lnor.per.score.bin(dup.lnors, scores, "pTriplo", bins=100, start=1, end=0.9)
+pts.lnor.fine.forplot <- avg.lnor.per.score.bin(dup.lnors, scores, "pTriplo", bins=50, start=1, end=0.95)
 
 # Derive cutoffs
 phi.cutoff <- get.cutoff(phi.lnor.full, phi.lnor.fine, del.constr.lnor[1])
@@ -244,15 +230,15 @@ pts.cutoff <- get.cutoff(pts.lnor.full, pts.lnor.fine, del.constr.lnor[1])
 # Print derived cutoffs
 cat(paste("\nAverage rare deletion of constrained gene confers odds ratio =",
             round(exp(del.constr.lnor[1]), 4), "\n"))
-cat(paste("\nComparable pHI cutoff >=", phi.cutoff, "(includes",
-          prettyNum(length(which(scores$pHI>=phi.cutoff)), big.mark=","), 
+cat(paste("\nComparable pHaplo cutoff >=", phi.cutoff, "(includes",
+          prettyNum(length(which(scores$pHaplo>=phi.cutoff)), big.mark=","),
           "genes)\n"))
-cat(paste("\nComparable pTS cutoff >=", pts.cutoff, "(includes",
-          prettyNum(length(which(scores$pTS>=pts.cutoff)), big.mark=","), 
+cat(paste("\nComparable pTriplo cutoff >=", pts.cutoff, "(includes",
+          prettyNum(length(which(scores$pTriplo>=pts.cutoff)), big.mark=","),
           "genes)\n"))
 
 # Set standardized parameters for all plots
-ylims <- quantile(c(phi.lnor.full$margin_lnOR, pts.lnor.full$margin_lnOR, pts.lnor.fine$margin_lnOR), 
+ylims <- quantile(c(phi.lnor.full$margin_lnOR, pts.lnor.full$margin_lnOR, pts.lnor.fine$margin_lnOR),
                   probs=c(0.005, 0.995), na.rm=T)
 pt.cex <- 3/4
 avg.genes.per.bin <- mean(c(phi.lnor.full$margin_genes, pts.lnor.full$margin_genes), na.rm=T)
@@ -260,30 +246,30 @@ pdf.height <- 2.25
 pdf.width <- 2.75
 pdf.parmar <- c(2.3, 2.3, 0.3, 0.3)
 
-# Plot full pHI vs lnOR
+# Plot full pHaplo vs lnOR
 pdf(paste(out.prefix, "phi_vs_effect_size.full.pdf", sep="."),
     height=pdf.height, width=pdf.width)
-plot.score.vs.or(phi.lnor.full, del.constr.lnor[1], phi.cutoff, "pHI", 
+plot.score.vs.or(phi.lnor.full, del.constr.lnor[1], phi.cutoff, "pHaplo",
                  ylims=ylims, avg.pt.cex=pt.cex, avg.genes.per.bin=avg.genes.per.bin,
                  blue.bg=FALSE, parmar=pdf.parmar)
 dev.off()
 
-# Plot full pTS vs lnOR
+# Plot full pTriplo vs lnOR
 pdf(paste(out.prefix, "pts_vs_effect_size.full.pdf", sep="."),
     height=pdf.height, width=pdf.width)
-plot.score.vs.or(pts.lnor.full, del.constr.lnor[1], pts.cutoff, "pTS", 
+plot.score.vs.or(pts.lnor.full, del.constr.lnor[1], pts.cutoff, "pTriplo",
                  ylims=ylims, avg.pt.cex=pt.cex, avg.genes.per.bin=avg.genes.per.bin,
                  blue.bg=FALSE, parmar=pdf.parmar)
-# text(x=par("usr")[1], y=del.constr.lnor[1]+(0.08*diff(par("usr")[3:4])), 
+# text(x=par("usr")[1], y=del.constr.lnor[1]+(0.08*diff(par("usr")[3:4])),
 #      labels="Rare deletions of\nall constrained genes",
 #      font=3, cex=5/6, col=graphabs.green, pos=4)
 dev.off()
 
-# Plot fine pTS vs lnOR
+# Plot fine pTriplo vs lnOR
 pdf(paste(out.prefix, "pts_vs_effect_size.fine.pdf", sep="."),
     height=(5/6)*pdf.height, width=(1/2)*pdf.width)
-plot.score.vs.or(pts.lnor.fine.forplot, del.constr.lnor[1], pts.cutoff, "pTS", 
-                 ylims=ylims, avg.pt.cex=pt.cex, xtitle="pTS", ytitle=NA, 
+plot.score.vs.or(pts.lnor.fine.forplot, del.constr.lnor[1], pts.cutoff, "pTriplo",
+                 ylims=ylims, avg.pt.cex=pt.cex, xtitle="pTriplo", ytitle=NA,
                  blue.bg=FALSE, parmar=c(pdf.parmar[1], 1.3, pdf.parmar[3:4]))
 axis(1, at=1, tick=F, line=-0.7)
 dev.off()

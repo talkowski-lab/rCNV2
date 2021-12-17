@@ -844,8 +844,6 @@ task meta_analysis {
     # Copy results to output bucket
     gsutil -m cp *.gene_burden.*meta_analysis.stats.bed.gz* \
       "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/stats/"
-    gsutil -m cp *.gene_burden.*or_corplot_grid.jpg \
-      "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/plots/"
     gsutil -m cp *.gene_burden.*meta_analysis.*.png \
       "${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/plots/"
 

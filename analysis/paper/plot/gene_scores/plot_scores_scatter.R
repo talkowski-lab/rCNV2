@@ -4,11 +4,11 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Plot pHI/pTS score scatterplot for gene score analyses in rCNV2 paper
+# Plot pHaplo/pTriplo score scatterplot for gene score analyses in rCNV2 paper
 
 
 options(stringsAsFactors=F, scipen=1000, family="sans")
@@ -28,10 +28,10 @@ make.color.grid <- function(){
   }))
 }
 
-# Get gene color based on (pHI, pTS) x,y pairs
+# Get gene color based on (pHaplo, pTriplo) x,y pairs
 query.color.grid <- function(gene, scores, color.grid){
-  x <- round(100*as.numeric(scores$pHI[which(scores$gene==gene)]))
-  y <- round(100*as.numeric(scores$pTS[which(scores$gene==gene)]))
+  x <- round(100*as.numeric(scores$pHaplo[which(scores$gene==gene)]))
+  y <- round(100*as.numeric(scores$pTriplo[which(scores$gene==gene)]))
   color.grid[y+1, x+1]
 }
 
@@ -45,14 +45,14 @@ marginal.density <- function(vals, colors, scale=0.25, bw=0.02, rotate=F,
   h <- d$y
   h <- scale*(1/max(h, na.rm=T))*h
   h <- h + 1
-  
+
   # Split indexes into bins
   if(gradient==FALSE){
     ns.idx <- which(idx<lc.cutoff)
     lc.idx <- which(idx>=lc.cutoff & idx<hc.cutoff)
     hc.idx <- which(idx>=hc.cutoff)
   }
-  
+
   # Compute polygon coordinate vectors based on rotation
   if(rotate==T){
     x <- h; y <- idx
@@ -77,7 +77,7 @@ marginal.density <- function(vals, colors, scale=0.25, bw=0.02, rotate=F,
     }
     all.df <- data.frame("x"=c(x, rev(x)), "y"=c(y, rep(1, length(y))))
   }
-  
+
   # Plot polygons in ascending order
   if(gradient==FALSE){
     polygon(x=ns.df$x, y=ns.df$y, border=colors[3], col=colors[3], xpd=T)
@@ -100,13 +100,13 @@ marginal.density <- function(vals, colors, scale=0.25, bw=0.02, rotate=F,
 }
 
 # Scatterplot of genes by scores with options for coloring and marginal densities
-scores.scatterplot <- function(scores, pt.colors, add.cor=TRUE, 
+scores.scatterplot <- function(scores, pt.colors, add.cor=TRUE,
                                hc.cutoff=0.9, lc.cutoff=0.5,
                                margin.dens.height=0.175, margin.dens.gradient=FALSE,
                                pt.cex=0.1, pt.alpha=1, ax.tick=-0.03,
                                bg.col="white", gridlines.col=bluewhite,
-                               x.ax.title="Haploinsufficiency Score (pHI)",
-                               y.ax.title="Triplosensitivity Score (pTS)",
+                               x.ax.title="Haploinsufficiency Score (pHaplo)",
+                               y.ax.title="Triplosensitivity Score (pTriplo)",
                                parmar=c(2.7, 2.7, 1, 1)){
   # Prep plot area
   ax.at <- seq(0, 1, 0.2)
@@ -120,32 +120,32 @@ scores.scatterplot <- function(scores, pt.colors, add.cor=TRUE,
            y0=par("usr")[3], y1=1, col=gridlines.col)
   segments(x0=par("usr")[1], x1=1,
            y0=ax.at, y1=ax.at, col=gridlines.col)
-  
+
   # Add points
   if(pt.alpha < 1){
     pt.colors <- sapply(pt.colors, adjustcolor, alpha=pt.alpha)
-    points(scores$pHI, scores$pTS, cex=pt.cex, col=pt.colors, pch=19)
+    points(scores$pHaplo, scores$pTriplo, cex=pt.cex, col=pt.colors, pch=19)
   }else{
-    points(scores$pHI, scores$pTS, cex=pt.cex, col=pt.colors, pch=19)
+    points(scores$pHaplo, scores$pTriplo, cex=pt.cex, col=pt.colors, pch=19)
   }
-  
+
   # Add marginal densities
   if(margin.dens.height > 0){
     if(margin.dens.gradient==TRUE){
-      marginal.density(scores$pHI, colors=cnv.colors[1], gradient=TRUE,
+      marginal.density(scores$pHaplo, colors=cnv.colors[1], gradient=TRUE,
                        pal=colorRampPalette(c(ns.color.light, cnv.whites[1], control.cnv.colors[1], cnv.colors[1])),
                        bw=0.01, scale=margin.dens.height)
-      marginal.density(scores$pTS, colors=cnv.colors[2], gradient=TRUE,
+      marginal.density(scores$pTriplo, colors=cnv.colors[2], gradient=TRUE,
                        pal=colorRampPalette(c(ns.color.light, cnv.whites[2], control.cnv.colors[2], cnv.colors[2])),
                        bw=0.01, scale=margin.dens.height, rotate=T)
     }else{
-      marginal.density(scores$pHI, colors=c(cnv.colors[1], control.cnv.colors[1], redwhite),
+      marginal.density(scores$pHaplo, colors=c(cnv.colors[1], control.cnv.colors[1], redwhite),
                        bw=0.01, scale=margin.dens.height)
-      marginal.density(scores$pTS, colors=c(cnv.colors[2], control.cnv.colors[2], bluewhite), 
+      marginal.density(scores$pTriplo, colors=c(cnv.colors[2], control.cnv.colors[2], bluewhite),
                        bw=0.01, scale=margin.dens.height, rotate=T)
     }
   }
-  
+
   # Add delimiting lines
   segments(x0=c(hc.cutoff, lc.cutoff, hc.cutoff, lc.cutoff),
            x1=c(hc.cutoff, lc.cutoff, hc.cutoff, lc.cutoff),
@@ -157,7 +157,7 @@ scores.scatterplot <- function(scores, pt.colors, add.cor=TRUE,
            x0=c(hc.cutoff, lc.cutoff, rep(par("usr")[3], 2)),
            x1=c(1, 1, rep(lc.cutoff, 2)),
            lwd=1, lend="round", col=blueblack, lty=2)
-  
+
   # Add axes
   axis(1, at=ax.at, col=blueblack, labels=NA, tck=ax.tick)
   axis(2, at=ax.at, col=blueblack, labels=NA, tck=ax.tick)
@@ -167,17 +167,17 @@ scores.scatterplot <- function(scores, pt.colors, add.cor=TRUE,
   })
   axis(1, at=0.5, tick=F, line=0.3, labels=x.ax.title)
   axis(2, at=0.5, tick=F, line=0.75, labels=y.ax.title)
-  
+
   # Add correlation coefficient
   if(add.cor==TRUE){
-    r2 <- cor(scores$pHI, scores$pTS)^2
+    r2 <- cor(scores$pHaplo, scores$pTriplo)^2
     r2.fmt <- formatC(round(r2, 2), small.interval=2)
-    text(x=1.05+(margin.dens.height/2), 
-         y=1.065+(margin.dens.height/2), 
+    text(x=1.05+(margin.dens.height/2),
+         y=1.065+(margin.dens.height/2),
          xpd=T, cex=0.9, srt=45,
          labels=bquote(italic(R)^2 * "=" * .(r2.fmt)))
   }
-  
+
   # Cleanup
   rect(xleft=par("usr")[1], xright=1,
        ybottom=par("usr")[3], ytop=1,
@@ -191,15 +191,15 @@ plot.scores.scatter.legend <- function(scores, ds.groups){
               cnv.colors[1], control.cnv.colors[1],
               cnv.colors[2], control.cnv.colors[2],
               ns.color)
-  
+
   # Prep plot area
   par(mar=c(0, 0.1, 1.1, 0.1), bty="n")
   plot(NA, xlim=c(0, 1), ylim=c(7, 0),
        xaxt="n", xaxs="i", xlab="", yaxt="n", yaxs="i", ylab="")
-  
+
   # Add points
   points(x=rep(0.05, 7), y=0.5:6.5, pch=18, col=colors, cex=2.25, xpd=T)
-  
+
   # Add N genes
   gene.ax.at <- c(0.175, 0.35)
   axis(3, at=gene.ax.at, tck=0, labels=NA, col=blueblack)
@@ -207,19 +207,19 @@ plot.scores.scatter.legend <- function(scores, ds.groups){
   sapply(1:length(ds.groups), function(i){
     text(x=0.4, y=i-0.5, pos=2, labels=prettyNum(length(ds.groups[[i]]), big.mark=","))
   })
-  
+
   # Add labels
   cat.ax.at <- c(0.4, 0.95)
   axis(3, at=cat.ax.at, tck=0, labels=NA, col=blueblack)
   axis(3, at=cat.ax.at[1], tick=F, line=-1, labels="Classification", hadj=0)
-  text(x=rep(0.35, 7), y=0.5:6.5, pos=4, xpd=T, 
-       labels=c(as.vector(sapply(c("DS", "HI", "TS"), 
+  text(x=rep(0.35, 7), y=0.5:6.5, pos=4, xpd=T,
+       labels=c(as.vector(sapply(c("DS", "HI", "TS"),
                                  function(x){paste(x, " (", c("high", "low"), " conf.)", sep="")})),
                 "NS"))
 }
 
 # Plot histogram for color gradient
-gradient.hist <- function(gradient, palette, x.ax.title="Gradient", y.ax.title="\"# Genes\"", 
+gradient.hist <- function(gradient, palette, x.ax.title="Gradient", y.ax.title="\"# Genes\"",
                           outline.lwd=1, parmar=c(1, 1, 0.1, 0.1)){
   h <- hist(gradient, breaks=seq(0, 100, 1), plot=F)
   par(bty="n", mar=parmar)
@@ -258,12 +258,12 @@ plot.gradients <- function(scores, gradient.norm, gradient.pal, null.x=NA, null.
       height=2, width=2)
   scores.scatterplot(scores, pt.colors.gradient, add.cor=F,
                      hc.cutoff=NA, lc.cutoff=NA,
-                     margin.dens.height=0, pt.cex=0.125, 
-                     x.ax.title="pHI", y.ax.title="pTS",
+                     margin.dens.height=0, pt.cex=0.125,
+                     x.ax.title="pHaplo", y.ax.title="pTriplo",
                      parmar=c(2.7, 2.7, 0.4, 0.4))
   if(!is.na(null.x) & !is.na(null.y)){
-    null.pt.idxs <- which(scores$pHI<null.x & scores$pTS<null.y)
-    points(x=scores$pHI[null.pt.idxs], y=scores$pTS[null.pt.idxs],
+    null.pt.idxs <- which(scores$pHaplo<null.x & scores$pTriplo<null.y)
+    points(x=scores$pHaplo[null.pt.idxs], y=scores$pTriplo[null.pt.idxs],
            cex=0.125, col="gray95")
     segments(x0=c(0, 0), x1=c(null.x, null.x),
              y0=c(0, null.y), y1=c(null.y, 0),
@@ -274,7 +274,7 @@ plot.gradients <- function(scores, gradient.norm, gradient.pal, null.x=NA, null.
     box(bty="o", col=blueblack, xpd=T)
   }
   dev.off()
-  
+
   # Histogram
   pdf(paste(out.prefix, "gene_scores_scatterplot", sub.out.prefix, "hist.pdf", sep="."),
       height=1.2, width=1.8)
@@ -283,9 +283,9 @@ plot.gradients <- function(scores, gradient.norm, gradient.pal, null.x=NA, null.
   }else{
     gradient.hist(gradient.norm, gradient.pal, x.ax.title=hist.x.ax.title)
   }
-  
+
   dev.off()
-  
+
   # Legend
   pdf(paste(out.prefix, "gene_scores_scatterplot", sub.out.prefix, "legend.pdf", sep="."),
       height=0.2, width=1.5)
@@ -297,13 +297,11 @@ plot.gradients <- function(scores, gradient.norm, gradient.pal, null.x=NA, null.
 #####################
 ### RSCRIPT BLOCK ###
 #####################
+require(rCNV2, quietly=T)
 require(optparse, quietly=T)
-require(funr, quietly=T)
 
 # List of command-line options
-option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
-)
+option_list <- list()
 
 # Get command-line arguments & options
 args <- parse_args(OptionParser(usage=paste("%prog scores.tsv out_prefix", sep=" "),
@@ -319,26 +317,14 @@ if(length(args$args) != 2){
 # Writes args & opts to vars
 scores.in <- args$args[1]
 out.prefix <- args$args[2]
-rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
 # scores.in <- "~/scratch/rCNV.gene_scores.tsv.gz"
 # out.prefix <- "~/scratch/test_gene_score_feature_regressions"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/gene_scores/"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
-
-# Source common functions
-script.dir <- funr::get_script_path()
-source(paste(script.dir, "common_functions.R", sep="/"))
 
 # Load scores & classify genes into subgroups based on scores
 scores <- load.scores(scores.in)
-ds.groups <- classify.genes(scores, hc.cutoff=0.9, lc.cutoff=0.5)
+ds.groups <- classify.genes.by.score(scores, hc.cutoff=0.9, lc.cutoff=0.5)
 pt.colors.groupwise <- sapply(scores$gene, get.gene.color.byscore, ds.groups)
 
 # Plot scores colored by category
@@ -359,7 +345,7 @@ dev.off()
 # color.grid <- make.color.grid()
 # pt.colors.xybasis <- sapply(scores$gene, query.color.grid, scores, color.grid)
 # Color by density
-pt.colors.density.df.unsorted <- color.points.by.density(scores$pHI, scores$pTS)
+pt.colors.density.df.unsorted <- color.points.by.density(scores$pHaplo, scores$pTriplo)
 pt.colors.density <- pt.colors.density.df.unsorted$col[order(as.numeric(rownames(pt.colors.density.df.unsorted)))]
 pdf(paste(out.prefix, "gene_scores_scatterplot.no_categories.pdf", sep="."),
     height=2.75, width=2.75)
@@ -375,14 +361,14 @@ ds.gradient <- apply(scores[, -1], 1, function(vals){
   min(as.numeric(vals))
 })
 ds.gradient.norm <- round(100*ds.gradient)
-plot.gradients(scores, ds.gradient.norm, ds.gradient.pal, 
-               hist.x.ax.title="italic(min) * \"(pHI, pTS)\"",
+plot.gradients(scores, ds.gradient.norm, ds.gradient.pal,
+               hist.x.ax.title="italic(min) * \"(pHaplo, pTriplo)\"",
                sub.out.prefix="ds_gradient")
 
 # Plot scores colored by HI/TS gradient
-hits.gradient <- scores$pTS - scores$pHI
+hits.gradient <- scores$pTriplo - scores$pHaplo
 hits.gradient.norm <- round(((100*hits.gradient) + 100) / 2)
-plot.gradients(scores, hits.gradient.norm, hits.gradient.pal, 
+plot.gradients(scores, hits.gradient.norm, hits.gradient.pal,
                null.x=0.5, null.y=0.5,
-               hist.x.ax.title="\"pTS\" - \"pHI\"",
+               hist.x.ax.title="\"pTriplo\" - \"pHaplo\"",
                sub.out.prefix="hi_ts_gradient")

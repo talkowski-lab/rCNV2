@@ -53,7 +53,7 @@ calc.expected <- function(dat, cov){
 
 
 # Compute obs/exp SVs in gnomAD-SV across bins of rCNV score
-gnomad.by.score.bin <- function(dat, score="pHI", var="gnomad_sv_lof_del", n.bins=10){
+gnomad.by.score.bin <- function(dat, score="pHaplo", var="gnomad_sv_lof_del", n.bins=10){
   x <- as.numeric(dat[, score])
   y.obs <- as.numeric(dat[, var])
   y.exp <- as.numeric(dat[, paste("exp", var, sep=".")])
@@ -78,10 +78,10 @@ gnomad.by.score.bin <- function(dat, score="pHI", var="gnomad_sv_lof_del", n.bin
   return(data.frame("score"=mids, "mean"=avgs, "oe"=oe))
 }
 
-# Plot pTS & pHI for a single gnomAD-SV metric
+# Plot pTriplo & pHaplo for a single gnomAD-SV metric
 plot.oe <- function(dat, var, metric="oe", n.bins=10, title=NULL){
-  phi <- gnomad.by.score.bin(dat, "pHI", var, n.bins)
-  pts <- gnomad.by.score.bin(dat, "pTS", var, n.bins)
+  phi <- gnomad.by.score.bin(dat, "pHaplo", var, n.bins)
+  pts <- gnomad.by.score.bin(dat, "pTriplo", var, n.bins)
   if(metric=="oe"){
     y.del <- phi$oe
     y.dup <- pts$oe
@@ -93,7 +93,7 @@ plot.oe <- function(dat, var, metric="oe", n.bins=10, title=NULL){
   }
   ylims <- range(c(y.del, y.dup))
   plot(NA, xlim=c(0, 1), ylim=ylims,
-       xlab="Score Bin (pHI or pTS)", ylab=ylab, main=title)
+       xlab="Score Bin (pHaplo or pTriplo)", ylab=ylab, main=title)
   if(metric=="oe"){
     abline(h=1, lty=2, col="gray40")
   }
@@ -101,7 +101,7 @@ plot.oe <- function(dat, var, metric="oe", n.bins=10, title=NULL){
   points(x=pts$score+0.01, y=y.dup, type="l", col=colors[2])
   points(x=phi$score-0.01, y=y.del, pch=19, col=colors[1])
   points(x=pts$score+0.01, y=y.dup, pch=19, col=colors[2])
-  legend("bottomleft", legend=c("pHI", "pTS"), fill=colors[1:2])
+  legend("bottomleft", legend=c("pHaplo", "pTriplo"), fill=colors[1:2])
 }
 
 
