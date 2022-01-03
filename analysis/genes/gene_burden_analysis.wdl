@@ -17,6 +17,7 @@ workflow gene_burden_analysis {
   File metacohort_list
   File metacohort_sample_table
   File gtf
+  File contiglist
   Int n_pheno_perms
   Int pad_controls
   Int min_probes_per_gene
@@ -63,6 +64,8 @@ workflow gene_burden_analysis {
   String meta_cache_string
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
+
+  Array[Array[String]] contigs = read_tsv(contigfile)
 
   Array[String] cnv_types = ["DEL", "DUP"]
 
@@ -168,6 +171,28 @@ workflow gene_burden_analysis {
         prefix=pheno[0],
         cache_string=meta_cache_string
     }
+  }
+
+  # Compute CNV covariance between pairs of genes
+  scatter ( contig in contigs ) {
+    call calc_covariance {
+      input:
+        gtf=gtf,
+        contig=contig[0],
+        min_cds_ovr_del=min_cds_ovr_del,
+        min_cds_ovr_dup=min_cds_ovr_dup,
+        freq_code="rCNV",
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker,
+        prefix=prefix
+    }
+  }
+  call merge_covariance_tsv {
+    input:
+      covariance_shards=calc_covariance.covariance_shards,
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker,
+      prefix=prefix
   }
 
   # Fine-map significant genes
@@ -860,6 +885,118 @@ task meta_analysis {
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
+  }
+}
+
+
+# Compute CNV covariance for pairs of genes for a single contig
+task calc_covariance {
+  File gtf
+  String contig
+  Float min_cds_ovr_del
+  Float min_cds_ovr_dup
+  String freq_code
+  String rCNV_bucket
+  String rCNV_docker
+  String prefix
+
+  command <<<
+    set -e
+
+    # Copy necessary files
+    mkdir refs/
+    gsutil -m cp ${rCNV_bucket}/refs/GRCh37.*.bed.gz refs/
+    gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/* refs/
+    mkdir cleaned_cnv/
+    gsutil -m cp -r ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
+
+    for CNV in DEL DUP; do
+      # Set CNV-specific parameters
+      case "$CNV" in
+        DEL)
+          min_cds_ovr=${min_cds_ovr_del}
+          ;;
+        DUP)
+          min_cds_ovr=${min_cds_ovr_dup}
+          ;;
+      esac
+
+      # Subset files to contig of interest
+      tabix -h ${gtf} ${contig} | bgzip -c > ${contig}.gtf.gz
+      tabix -h cleaned_cnv/mega.${freq_code}.bed.gz ${contig} | bgzip -c > ${contig}_cnvs.bed.gz
+
+      # Compute covariance
+      /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
+        --min-cds-ovr $min_cds_ovr \
+        --max-genes 20000 \
+        -t ${CNV} \
+        --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
+        --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+        --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
+        --covariance ${prefix}.${CNV}.gene_covariance.${contig}.tsv.gz \
+        --verbose \
+        -o /dev/null \
+        ${contig}_cnvs.bed.gz \
+        ${contig}.gtf.gz
+    done
+  >>>
+
+  output {
+    File covariance_shards = glob("${prefix}.*.gene_covariance.tsv.gz")
+  }
+
+  runtime {
+    docker: "${rCNV_docker}"
+    preemptible: 1
+    memory: "8 GB"
+    bootDiskSizeGb: "20"
+    disks: "local-disk 50 HDD"
+  }
+}
+
+
+# Merge CNV covariance shards across chromosomes
+task merge_covariance_tsv {
+  Array[Array[File]] covariance_shards
+  String prefix
+  String rCNV_bucket
+  String rCNV_docker
+
+  command <<<
+    set -e
+
+    for CNV in DEL DUP; do
+      # Find all shards
+      find / -name "${prefix}.$CNV.gene_covariance.*.tsv.gz" \
+      > covariance_shards.$CNV.txt
+
+      # Write header
+      zcat $( head -n1 covariance_shards.$CNV.txt ) | head -n1 \
+      > ${prefix}.$CNV.gene_covariance.tsv
+      
+      # Merge & sort shards
+      cat covariance_shards.$CNV.txt | zcat - | fgrep -v "#" | sort -Vk1,1 -k2,2V \
+      >> ${prefix}.$CNV.gene_covariance.tsv
+      gzip -f ${prefix}.$CNV.gene_covariance.tsv
+    done
+
+    # Copy to Google bucket for storage
+    gsutil -m cp \
+      ${prefix}.*.gene_covariance.tsv.gz \
+      ${rCNV_bucket}/analysis/analysis_refs/
+  >>>
+
+  output {
+    File DEL_covariance_tsv = "${prefix}.DEL.gene_covariance.tsv.gz"
+    File DUP_covariance_tsv = "${prefix}.DUP.gene_covariance.tsv.gz"
+  }
+
+  runtime {
+    docker: "${rCNV_docker}"
+    preemptible: 1
+    memory: "4 GB"
+    bootDiskSizeGb: "20"
+    disks: "local-disk 50 HDD"
   }
 }
 

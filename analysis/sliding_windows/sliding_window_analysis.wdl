@@ -35,7 +35,6 @@ workflow sliding_window_analysis {
   Float refine_window_jaccard
   Float FDR_cutoff
   File gtf
-  File contigfile
   String rCNV_bucket
   String rCNV_docker
   String rCNV_docker_refine # This is specified separately for convenience, but could be converted to the same docker for final run
@@ -45,8 +44,6 @@ workflow sliding_window_analysis {
   String meta_cache_string
 
   Array[Array[String]] phenotypes = read_tsv(phenotype_list)
-
-  Array[Array[String]] contigs = read_tsv(contigfile)
 
   Array[String] cnv_types = ["DEL", "DUP"]
 

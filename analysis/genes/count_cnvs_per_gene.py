@@ -19,6 +19,7 @@ from sys import stdout
 from os import path
 import subprocess
 import gzip
+from itertools import combinations
 
 
 def process_cnvs(bedpath, pad_controls, case_hpos, control_hpo, max_size=None):
@@ -334,6 +335,47 @@ def write_annotated_cnvs(cnvbt, cnvs_out, case_cnv_weights, control_cnv_weights,
         cnvs_out.write('\t'.join(outfields) + '\n')
 
 
+def gather_cnv_covariance(case_cnv_weights, control_cnv_weights, outfile):
+    """
+    Compute CNV covariance for all pairs of genes sharing at least one CNV
+    Gene pairs not included in outfile have zero covariance
+    """
+
+    counts_per_gene = {}
+    counts_per_pair = {}
+    cov_df = pd.DataFrame(columns='geneA geneB n_geneA n_geneB n_both jaccard'.split())
+
+    # Iterate over every CNV that hits at least one gene
+    for cnv_dict in [case_cnv_weights, control_cnv_weights]:
+        for weights in cnv_dict.values():
+            genes = weights.keys()
+
+            # Update counts_per_gene for each gene
+            for gene in genes:
+                if gene not in counts_per_gene.keys():
+                    counts_per_gene[gene] = 0
+                counts_per_gene[gene] += 1
+
+            # Process all nonredundant pairs of genes
+            for gene_pair in combinations(genes, 2):
+                geneA, geneB = sorted(gene_pair)
+                if (geneA, geneB, ) not in counts_per_pair.keys():
+                    counts_per_pair[(geneA, geneB, )] = 0
+                counts_per_pair[(geneA, geneB, )] += 1
+
+    for gene_pair, nAB in counts_per_pair.items():
+        geneA, geneB = sorted(gene_pair)
+        nA, nB = [counts_per_gene.get(g, 0) for g in [geneA, geneB]]
+        U = nA + nB - nAB
+        jac = nAB / U
+        pair_dat = pd.Series([geneA, geneB, nA, nB, nAB, jac], index=cov_df.columns)
+        cov_df = cov_df.append(pair_dat, ignore_index=True)
+
+    cov_df.sort_values(by='geneA geneB'.split()).\
+           rename(columns={'geneA' : '#geneA'}).\
+           to_csv(outfile, sep='\t', na_rep='NA', index=False)
+
+
 def main():
     """
     Main block
@@ -381,6 +423,8 @@ def main():
                         '[default: stdout]')
     parser.add_argument('--cnvs-out', help='Path to output BED file for CNVs ' + 
                         'annotated with genes disrupted.')
+    parser.add_argument('--covariance', help='Path to output .tsv with CNV covariance ' + 
+                        'for all genes sharing at least one CNV.')
     parser.add_argument('--annotate-cds-per-gene', default=False, action='store_true',
                         help='Append CDS overlapped per gene to CNV BED output file.')
     parser.add_argument('-z', '--bgzip', dest='bgzip', action='store_true',
@@ -467,6 +511,10 @@ def main():
                              args.annotate_cds_per_gene)
         if bgzip_cnvs_out:
             subprocess.run(['bgzip', '-f', cnvs_outpath])
+
+    # If optioned, compute CNV covariance and write to args.covariance
+    if args.covariance is not None:
+        gather_cnv_covariance(case_cnv_weights, control_cnv_weights, args.covariance)
 
 
 if __name__ == '__main__':
