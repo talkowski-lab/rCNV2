@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2020 Ryan L. Collins <rlcollins@g.harvard.edu> 
+# Copyright (c) 2020-Present Ryan L. Collins <rlcollins@g.harvard.edu> 
 # and the Talkowski Laboratory
 # Distributed under terms of the MIT license.
 
@@ -149,7 +149,7 @@ def finemap(gene_priors, gene_info, null_variance=0.42 ** 2):
     return finemap_res_bma
 
 
-def average_finemap_results(finemap_res, ncase_df=None):
+def average_finemap_results(finemap_res, ncase_df=None, uniform_weights=False):
     """
     Perform Bayesian model averaging across multiple sets of finemapping results
 
@@ -159,6 +159,9 @@ def average_finemap_results(finemap_res, ncase_df=None):
     For averaging across HPOs, computes weighted mean of PIPs while weighting by 
     sqrt(N_cases). If any genes are missing from any of the entities in finemap_res, 
     those genes are treated as 0 for the purposes of calculating per-gene mean PIPs
+
+    Providing both ncase_df and uniform_weights=True will average PIPs without 
+    weighting by sample size
     """
 
     finemap_res_bma = {}
@@ -190,7 +193,10 @@ def average_finemap_results(finemap_res, ncase_df=None):
 
             for gene, stats in subres.items():
                 finemap_res_bma[gene]['PIP'].append(stats['PIP'])
-                weight = np.sqrt(ncase_df.Total[ncase_df['#HPO'] == hpo].values[0])
+                if uniform_weights:
+                    weight = 1
+                else:
+                    weight = np.sqrt(ncase_df.Total[ncase_df['#HPO'] == hpo].values[0])
                 finemap_res_bma[gene]['weights'].append(weight)
 
         # Compute weighted PIP per gene
@@ -298,13 +304,84 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_neg_log10=True,
     return stats_dict
 
 
+def _get_genes_in_ld(baits_list, cov_df, min_covariance=0.2):
+    """
+    Extract a list of all genes with covariance >= min_covariance
+    vs. at least one gene in baits_list
+    """
+
+    hits = (cov_df.jaccard >= min_covariance) & \
+           ((cov_df.geneA.isin(baits_list)) | (cov_df.geneB.isin(baits_list)))
+    ld_friends = set(list(cov_df.geneA[hits]) + list(cov_df.geneB[hits]))
+    ld_friends.update(baits_list)
+
+    return sorted(list(ld_friends))
+
+
+def cluster_genes_by_cov(hpo_info, all_genes_bt, cov_df, min_covariance=0.2, 
+                         block_merge_dist=1000000):
+    """
+    Make clusters of genes for fine-mapping based on covariance and distance
+    """
+
+    sig_genes = list(hpo_info['sig_genes'].keys())
+
+    # Make graph of all significant genes
+    gg = nx.Graph()
+    gg.add_nodes_from(sig_genes)
+
+    # Add edges to all genes "in LD" with at least one significant gene
+    for sg in sig_genes:
+        for og in _get_genes_in_ld([sg], cov_df, min_covariance):
+            if og != sg:
+                if og not in gg.nodes:
+                    gg.add_node(og)
+                gg.add_edge(sg, og)
+
+    # Add edges to all genes within block_merge_dist of a gene already in gg
+    genes_in_gg_bt = all_genes_bt.filter(lambda x: x[3] in gg.nodes).saveas()
+    other_genes_bt = all_genes_bt.filter(lambda x: x[3] not in gg.nodes).saveas()
+    other_near_gg = other_genes_bt.closest(genes_in_gg_bt, d=True, 
+                                           t='first', k=1, N=True).\
+                                   filter(lambda x: float(x[-1]) <= block_merge_dist and \
+                                                    float(x[-1]) >= 0).\
+                                   cut(range(4))
+    for hit in other_near_gg.closest(genes_in_gg_bt, d=True, k=10e10, N=True):
+        dist = float(hit[-1])
+        og = hit[3]
+        sg = hit[7]
+        if dist <= block_merge_dist and dist >= 0:
+            if og not in gg.nodes:
+                gg.add_node(og)
+            gg.add_edge(og, sg)
+
+    # Convert clustered genes into a pbt.BedTool of blocks
+    blocks_bt_str = ''
+    for cluster in nx.connected_components(gg):
+        # Only process clusters that have at least one significant gene
+        if len(cluster.intersection(set(sig_genes))) == 0:
+            continue
+
+        # Get chromosome and min/max coordinates
+        gdf = all_genes_bt.filter(lambda x: x[3] in cluster).saveas().\
+                           to_dataframe(names='chrom start end gene'.split())
+        chrom = str(gdf.chrom[0])
+        start = str(gdf.start.min())
+        end = str(gdf.end.max())
+        genes_str = ','.join(cluster)
+        blocks_bt_str += '\t'.join([chrom, start, end, genes_str]) + '\n'
+
+    return pbt.BedTool(blocks_bt_str, from_string=True).sort()
+
+
 def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_neg_log10=True, 
                 secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
                 secondary_or_nominal=True, fdr_q_cutoff=0.05, 
                 secondary_for_fdr=False, block_merge_dist=1000000, 
-                nonsig_distance=1000000, block_prefix='gene_block', 
-                null_variance=0.42 ** 2, finemap_secondary=False, 
-                include_non_sig=True):
+                nonsig_distance=1000000, cov_df=None, min_covariance=0.2,
+                block_prefix='gene_block', null_variance=0.42 ** 2, 
+                finemap_secondary=False, include_non_sig=True,
+                force_load_genes=[]):
     """
     Loads & processes all necessary data for a single phenotype
     Returns a dict with the following entries:
@@ -325,8 +402,14 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_neg_log10=True,
                                         secondary_for_fdr, sig_only=True, 
                                         finemap_secondary=finemap_secondary)
 
-    # Second pass: parse data for all genes within block_merge_dist of sig_genes
+    # Second pass: parse data for all genes within nonsig_distance of sig_genes
+    # (Or, if specified, will treat all genes with at least min_covariance of a 
+    #  significant gene as significant before loading more gene stats)
     if len(hpo_info['sig_genes']) > 0:
+
+        # Make pbt.BedTool of gene coordinates, for reference
+        all_genes_bt = pbt.BedTool(stats_in).cut(range(4)).sort()
+
         if include_non_sig:
             # Make bt of significant genes
             sig_gene_bts = [g['gene_bt'] for g in hpo_info['sig_genes'].values()]
@@ -336,12 +419,18 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_neg_log10=True,
                 sig_genes_bt = sig_gene_bts[0]
 
             # Intersect sig genes with all genes
-            all_genes_bt = pbt.BedTool(stats_in).cut(range(4)).sort()
+            if cov_df is not None and len(sig_gene_bts) > 0:
+                # If CNV covariance is provided, supplement sig_genes_bt with all
+                # other genes >= min_covariance with at least one sig gene
+                sig_genes = list(hpo_info['sig_genes'].keys())
+                all_cov_genes = _get_genes_in_ld(sig_genes, cov_df, min_covariance)
+                sig_genes_bt = all_genes_bt.filter(lambda x: x[3] in all_cov_genes).saveas()
+
             nearby_genes = all_genes_bt.closest(sig_genes_bt.sort(), d=True).\
                                filter(lambda x: int(x[8]) > -1 and \
                                                 int(x[8]) <= nonsig_distance).\
                                saveas().to_dataframe().loc[:, 'name'].values.tolist()
-            nearby_genes = list(set(nearby_genes)) # Deduplicates
+            nearby_genes = list(set(nearby_genes + list(force_load_genes))) # Deduplicates
 
             # Gather gene stats
             hpo_info['all_genes'] = parse_stats(stats_in, primary_p_cutoff, p_is_neg_log10, 
@@ -361,7 +450,12 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_neg_log10=True,
             genes_bt = gene_bts[0].cat(*gene_bts[1:], postmerge=False).sort()
         else:
             genes_bt = gene_bts[0]
-        blocks = genes_bt.merge(d=block_merge_dist, c=4, o='distinct')
+        # Cluster by distance or covariance if cov_df provided
+        if cov_df is None:
+            blocks = genes_bt.merge(d=block_merge_dist, c=4, o='distinct')
+        else:
+            blocks = cluster_genes_by_cov(hpo_info, all_genes_bt, cov_df, min_covariance,
+                                          block_merge_dist)
 
         # Ensure each block has at least one significant gene
         sig_set = set(hpo_info['sig_genes'].keys())
@@ -382,16 +476,15 @@ def process_hpo(hpo, stats_in, primary_p_cutoff, p_is_neg_log10=True,
     else:
         hpo_info['all_genes'] = {}
 
-
-
     return hpo_info
 
 
 def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2, 
                   secondary_or_nominal=True, fdr_q_cutoff=0.05, 
                   secondary_for_fdr=False, block_merge_dist=1000000, 
-                  nonsig_distance=1000000, block_prefix='gene_block', 
-                  finemap_secondary=False, include_non_sig=True):
+                  nonsig_distance=1000000, cov_df=None, min_covariance=0.2,
+                  block_prefix='gene_block', finemap_secondary=False, 
+                  include_non_sig=True, force_load_genes=[], verbose=True):
     """
     Wrapper function to process each HPO with process_hpo()
     Returns a dict with one entry per HPO
@@ -402,6 +495,8 @@ def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2,
     with open(statslist) as infile:
         reader = csv.reader(infile, delimiter='\t')
         for hpo, stats_in, pval, in reader:
+            if verbose:
+                print('Loading association statistics from {}'.format(hpo))
             primary_p_cutoff = float(pval)
             hpo_data[hpo] = process_hpo(hpo, stats_in, primary_p_cutoff, 
                                         p_is_neg_log10=True, 
@@ -412,9 +507,12 @@ def load_all_hpos(statslist, secondary_p_cutoff=0.05, n_nominal_cutoff=2,
                                         secondary_for_fdr=secondary_for_fdr,
                                         block_merge_dist=block_merge_dist,
                                         nonsig_distance=nonsig_distance,
+                                        cov_df=cov_df,
+                                        min_covariance=min_covariance,
                                         block_prefix=block_prefix,
                                         finemap_secondary=finemap_secondary,
-                                        include_non_sig=include_non_sig)
+                                        include_non_sig=include_non_sig,
+                                        force_load_genes=force_load_genes)
 
     return hpo_data
 
@@ -469,8 +567,7 @@ def estimate_null_variance_gs(gs_lists, statslist, finemap_secondary=False):
 
     # Iterate over lists of known causal genes and compute mean variance
     var = []
-    for gslist in gs_lists:
-        gs_genes = open(gslist).read().splitlines()
+    for gs_genes in gs_lists.values():
         gs_vars = (stats.lnOR[stats.gene.isin(gs_genes)].astype(float) / 1.96) ** 2
         var.append(float(np.nanmean(gs_vars)))
 
@@ -773,6 +870,8 @@ def output_assoc_bed(hpo_data, sig_df, prejoint_sig_df, outfile,
            'top_gene credible_set_id'
     outfile.write('#' + '\t'.join(cols.split()) + '\n')
 
+    outlines_presort = []
+
     # Iterate over each significant gene with PIP >= conf_pip
     for gdict in sig_df.loc[sig_df.PIP >= conf_pip, :].to_dict(orient='index').values():
         # Skip if gene wasn't at least FDR significant in original analysis
@@ -809,14 +908,17 @@ def output_assoc_bed(hpo_data, sig_df, prejoint_sig_df, outfile,
         if pval == 0:
             pval = norm.sf(hpo_data[hpo]['all_genes'][gene]['zscore'])
 
-        # Write gene-phenotype pair to file
+        # Prepare line to be written out and add keys to be sorted
         outline = '\t'.join([chrom, start, end, gene, cnv, hpo, sig_level])
         outnums_fmt = '\t{:.3E}\t{:.3E}\t{:.3}\t{:.3}\t{:.3}\t{:.3E}\t{:.3}\t{:.3}\t{}'
         outline += outnums_fmt.format(control_freq, case_freq, lnor, lnor_lower, 
                                       lnor_upper, pval, pip, prejoint_pip, top_gene)
         outline += '\t' + cred + '\n'
-        outfile.write(outline)
-
+        outlines_presort.append([int(chrom), int(start), hpo, outline])
+        
+    # Sort lines by coordinate and write to outfile
+    for vals in sorted(outlines_presort, key=lambda x: x[:3]):
+        outfile.write(vals[3])
     outfile.close()
 
 
@@ -854,6 +956,8 @@ def output_credsets_bed(hpo_data, sig_df, outfile, conf_pip=0.1, vconf_pip=0.9, 
            'mean_case_freq pooled_ln_or pooled_ln_or_ci_lower pooled_ln_or_ci_upper ' + \
            'best_pvalue n_genes all_genes top_gene vconf_genes conf_genes'
     outfile.write('#' + '\t'.join(cols.split()) + '\n')
+
+    outlines_presort = []
 
     for cred in [x for x in set(sig_df.credible_set.tolist()) if x is not None]:
         # Get basic credible set info
@@ -904,7 +1008,7 @@ def output_credsets_bed(hpo_data, sig_df, outfile, conf_pip=0.1, vconf_pip=0.9, 
         if len(top_gene) == 0:
             top_gene = ['NA']
 
-        # Write gene stats to file
+        # Prepare lines to be sorted and written to outfile
         outline = '\t'.join([chrom, start, end, cred, cnv, hpo, best_sig_level])
         outnums_fmt = '\t{:.3E}\t{:.3E}\t{:.3}\t{:.3}\t{:.3}\t{:.3E}'
         outline += outnums_fmt.format(control_freq, case_freq, lnor, lnor_lower, 
@@ -912,8 +1016,11 @@ def output_credsets_bed(hpo_data, sig_df, outfile, conf_pip=0.1, vconf_pip=0.9, 
         outline += '\t' + '\t'.join([str(n_genes), ';'.join(genes), ';'.join(top_gene),
                                      ';'.join(vconf_genes), ';'.join(conf_genes)]) + \
                    '\n'
-        outfile.write(outline)
-
+        outlines_presort.append([int(chrom), int(start), hpo, outline])
+        
+    # Sort lines by coordinate and write to outfile
+    for vals in sorted(outlines_presort, key=lambda x: x[:3]):
+        outfile.write(vals[3])
     outfile.close()
 
 
@@ -944,7 +1051,7 @@ def cluster_credsets(hpo_data, sig_only=False, seed=2021):
     return sorted([sorted(x) for x in nx.connected_components(csg)])
 
 
-def joint_finemap(hpo_data, cred_clusters, ncase_df, seed=2021):
+def joint_finemap(hpo_data, cred_clusters, ncase_df, uniform_weights=False, seed=2021):
     """
     Average finemapping results across all HPOs per cluster of credsets
     """
@@ -964,7 +1071,7 @@ def joint_finemap(hpo_data, cred_clusters, ncase_df, seed=2021):
 
         # Re-finemap each cluster based on average ABFs across all credible sets
         all_finemap_res = {cs : info['finemap_res'] for cs, info in cs_info.items()}
-        avg_finemap_res = average_finemap_results(all_finemap_res, ncase_df)
+        avg_finemap_res = average_finemap_results(all_finemap_res, ncase_df, uniform_weights)
 
         # Update each credible set in hpo_data with new finemapping results
         used_hpos = set()
@@ -1281,9 +1388,9 @@ def main():
     parser.add_argument('--finemap-secondary', action='store_true', default=False,
                         help='Use secondary P-values for fine-mapping priors ' + 
                         '[default: use primary P-values]')
-    parser.add_argument('-o', '--outfile', default='stdout', help='Output tsv of ' +
-                        'final fine-mapping results for significant genes and ' + 
-                        'phenotypes in any credible set.')
+    parser.add_argument('-o', '--outfile', help='Output tsv of final fine-mapping ' +
+                        'results for significant genes and phenotypes in any ' +
+                        'credible set.')
     parser.add_argument('--all-genes-outfile', help='Output tsv of final ' +
                         'fine-mapping results for all genes and phenotypes.')
     parser.add_argument('--naive-outfile', help='Output tsv of naive results ' +
@@ -1311,12 +1418,6 @@ def main():
     if args.nonsig_distance is None:
         args.nonsig_distance = args.distance
 
-    # Open connections to output files
-    if args.outfile in 'stdout - /dev/stdout'.split():
-        outfile = stdout
-    else:
-        outfile = open(args.outfile, 'w')
-
     # Set block prefix
     if args.prefix is None:
         block_prefix = '{}_gene_block'.format(args.cnv)
@@ -1328,22 +1429,39 @@ def main():
     ncase_df.index = ncase_df.iloc[:, 0]
     ncase_dict = ncase_df.drop(columns='#HPO').transpose().to_dict(orient='records')[0]
 
+    # Load CNV covariance, if optioned
+    if args.covariance_tsv is not None:
+        cov_df = pd.read_csv(args.covariance_tsv, sep='\t').\
+                    rename(columns={"#geneA" : 'geneA'})
+    else:
+        cov_df = None
+
+    # Load gold-standard causal gene lists to ensure their summary stats are loaded
+    if args.gs_list is not None:
+        gs_lists = {}
+        all_gs_genes = set()
+        with open(args.gs_list) as gsf:
+            for gslist in gsf.read().splitlines():
+                gs_genes = open(gslist).read().splitlines()
+                gs_lists[gslist] = gs_genes
+                all_gs_genes.update(gs_genes)
+
     # Process data per hpo
     hpo_data = load_all_hpos(args.statslist, args.secondary_p_cutoff, 
                              args.min_nominal, args.secondary_or_nom, 
                              args.fdr_q_cutoff, args.secondary_for_fdr,
                              args.distance, args.nonsig_distance,
+                             cov_df, args.min_covariance,
                              block_prefix, args.finemap_secondary, 
-                             not args.no_non_significant)
+                             not args.no_non_significant, all_gs_genes)
 
     # Estimate null variance based on:
-    #   1. most significant gene from each block
-    #   2. all significant genes
+    #   1. all significant genes
+    #   2. most significant gene from each block
     #   3. known causal genes (optional; can be multiple lists)
     Wsq = estimate_null_variance_basic(hpo_data)
     if args.gs_list is not None:
-        with open(args.gs_list) as gsf:
-            Wsq += estimate_null_variance_gs(gsf.read().splitlines(), args.statslist)
+        Wsq += estimate_null_variance_gs(gs_lists, args.statslist)
     Wsq = sorted(Wsq)
     print('Null variance estimates: ' + ', '.join([str(round(x, 3)) for x in Wsq]))
 
@@ -1352,20 +1470,18 @@ def main():
 
     # Write naive and/or genetics-only fine-mapping results (for ROC comparisons)
     if args.naive_outfile is not None:
-        naive_outfile = open(args.naive_outfile, 'w')
         # Note: cs_val set to 1.0 fixed value here such that all genes will be assigned to their original credible set
         # rather than randomly throwing out ~5% of genes
         make_sig_genes_df(hpo_data, naive=True, sig_only=True, cs_val=1.0).\
+            sort_values(by='PIP gene HPO'.split(), ascending=(False, True, True, )).\
             rename(columns={'HPO' : '#HPO'}).\
-            to_csv(naive_outfile, sep='\t', index=False, na_rep='NA')
-        naive_outfile.close()
+            to_csv(args.naive_outfile, sep='\t', index=False, na_rep='NA')
 
     if args.genetic_outfile is not None:
-        genetic_outfile = open(args.genetic_outfile, 'w')
         make_sig_genes_df(hpo_data, sig_only=True, cs_val=args.cs_val).\
+            sort_values(by='PIP gene HPO'.split(), ascending=(False, True, True, )).\
             rename(columns={'HPO' : '#HPO'}).\
-            to_csv(genetic_outfile, sep='\t', index=False, na_rep='NA')
-        genetic_outfile.close()
+            to_csv(args.genetic_outfile, sep='\t', index=False, na_rep='NA')
 
     # Perform functional fine-mapping separately for each null variance estimate
     hpo_df, logit_coeffs = functional_finemap(hpo_data, args.gene_features, 
@@ -1375,10 +1491,8 @@ def main():
 
     # If optioned, write average of logit coefficients to --coeffs-out
     if args.coeffs_out is not None:
-        coeffs_out = open(args.coeffs_out, 'w')
         logit_coeffs.rename(columns={'feature' : '#feature'}).\
-                     to_csv(coeffs_out, sep='\t', index=False, na_rep='NA')
-        coeffs_out.close()
+                     to_csv(args.coeffs_out, sep='\t', index=False, na_rep='NA')
 
     # Prepare data for writing out HPO-specific association information prior to joint finemapping
     prejoint_sig_df = make_sig_genes_df(hpo_data, sig_only=True, cs_val=args.cs_val)
@@ -1390,39 +1504,30 @@ def main():
         output_credsets_bed(hpo_data, prejoint_sig_df, hpo_credsets_bed,
                             args.confident_pip, args.very_confident_pip, args.cnv)
 
-    # Temporary: pickle data for dev convenience
-    # TODO: REMOVE THIS
-    import pickle as pkl
-    pklout = open('dev_data.pkl', 'wb')
-    pkl.dump([hpo_data, Wsq, logit_coeffs, prejoint_sig_df], pklout)
-
     # Cluster credible sets across HPOs 
-    cred_clusters = cluster_credsets(hpo_data)
+    cred_clusters = cluster_credsets(hpo_data, sig_only=True)
 
     # Joint refinement of overlapping credible sets across HPOs
-    hpo_data, cred_clusters = joint_finemap(hpo_data, cred_clusters, ncase_df)
+    hpo_data, cred_clusters = joint_finemap(hpo_data, cred_clusters, ncase_df, uniform_weights=True)
 
     # Write out final finemapping results for significant genes with both prejoint and joint pips
     final_sig_df = make_sig_genes_df(hpo_data, naive=False, sig_only=True, 
                                      cs_val=args.cs_val)
     pd.merge(final_sig_df, prejoint_sig_df.drop(columns='credible_set'), 
              on='HPO gene'.split(), suffixes='_final _HPO_specific'.split()).\
-       sort_values(by='PIP_final', ascending=False).\
+       sort_values(by='PIP_final gene PIP_HPO_specific'.split(), ascending=False).\
        rename(columns={'HPO' : '#HPO'}).\
-       to_csv(outfile, sep='\t', index=False, na_rep='NA')
-    outfile.close()
+       to_csv(args.outfile, sep='\t', index=False, na_rep='NA')
 
     # Write out final finemapping results for all genes with both prejoint and joint pips
     final_allgenes_df = make_sig_genes_df(hpo_data, naive=False, sig_only=False, 
                                           cs_val=args.cs_val)
     if args.all_genes_outfile is not None:
-        all_genes_outfile = open(args.all_genes_outfile, 'w')
         pd.merge(final_allgenes_df, prejoint_sig_df.drop(columns='credible_set'), 
                  on='HPO gene'.split(), suffixes='_final _HPO_specific'.split()).\
-           sort_values(by='PIP_final', ascending=False).\
+           sort_values(by='PIP_final gene PIP_HPO_specific'.split(), ascending=False).\
            rename(columns={'HPO' : '#HPO'}).\
-           to_csv(all_genes_outfile, sep='\t', index=False, na_rep='NA')
-        all_genes_outfile.close()
+           to_csv(args.all_genes_outfile, sep='\t', index=False, na_rep='NA')
 
     # Write out significant gene-HPO associations, if optioned
     if args.sig_assoc_bed is not None:
