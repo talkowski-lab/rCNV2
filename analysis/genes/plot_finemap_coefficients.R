@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -12,7 +12,7 @@
 
 
 options(scipen=100000, stringsAsFactors=F)
-require(rCNV2)
+require(rCNV2, quietly=T)
 
 
 #################
@@ -21,7 +21,7 @@ require(rCNV2)
 # Load a single finemap stats .tsv
 load.stats.single <- function(path){
   x <- read.table(path, header=T, sep="\t", comment.char="")[, 1:4]
-  colnames(x)[1] <- "HPO"
+  colnames(x) <- c("HPO", "gene", "ABF", "PIP")
   x[, 3:4] <- apply(x[, 3:4], 2, as.numeric)
   return(x)
 }
@@ -182,7 +182,7 @@ out.prefix <- args$args[3]
 # # DEV PARAMTERS
 # setwd("~/scratch/")
 # statslist.in <- "finemap_feature_cor_input.tsv"
-# pheno.group <- "developmental"
+# pheno.group <- "all"
 # out.prefix <- "finemap_features"
 
 # Load stats & features, and calculate rhos/betas

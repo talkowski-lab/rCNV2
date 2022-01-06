@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -12,14 +12,13 @@
 
 
 options(stringsAsFactors=F, scipen=1000)
-require(rCNV2, quietly=T)
 
 
 # Constants
 case.phenos <- c("ASD")
 control.pheno <- "Control"
-all.score.names <- c("pHI" = "pHI",
-                     "pTS" = "pTS",
+all.score.names <- c("pHaplo" = "pHaplo",
+                     "pTriplo" = "pTriplo",
                      "gnomad_pLI" = "pLI (Karczewski 2020)",
                      "gnomad_oe_mis_upper" = "Mis. OEUF (Karczewski 2020)",
                      "gnomad_oe_lof_upper" = "LOEUF (Karczewski 2020)",
@@ -63,8 +62,8 @@ anno.cnv.single.score <- function(cnvs, score.data, score, operation="max"){
 
 # Annotate de novo CNVs with all scores
 anno.cnv.scores <- function(cnvs, scores.rCNV, scores.other){
-  cnvs$pHI <- anno.cnv.single.score(cnvs, scores.rCNV, "pHI")
-  cnvs$pTS <- anno.cnv.single.score(cnvs, scores.rCNV, "pTS")
+  cnvs$pHaplo <- anno.cnv.single.score(cnvs, scores.rCNV, "pHaplo")
+  cnvs$pTriplo <- anno.cnv.single.score(cnvs, scores.rCNV, "pTriplo")
   cnvs.others <- sapply(colnames(scores.other)[-1], function(score){
     anno.cnv.single.score(cnvs, scores.other, score)
   })
@@ -104,14 +103,14 @@ calc.or.by.scorebin <- function(cnvs, phenos, score, n.bins=3, cnv.pct=TRUE){
   return(ors)
 }
 
-# Calculate odds ratios for dnCNVs stratified by high/low pHI & pTS
+# Calculate odds ratios for dnCNVs stratified by high/low pHaplo & pTriplo
 calc.or.stratified <- function(cnvs, phenos, high.cutoff=0.8, low.cutoff=0.5,
                                log.trans=TRUE, norm.vs.baseline=TRUE){
   strat.ors <- lapply(c("DEL", "DUP"), function(cnvtype){
-    ors <- t(data.frame("low.low"=calc.or(cnvs[which(cnvs$pHI<=low.cutoff & cnvs$pTS<=low.cutoff & cnvs$cnv==cnvtype), ], phenos),
-    "high.low"=calc.or(cnvs[which(cnvs$pHI>=high.cutoff & cnvs$pTS<=low.cutoff & cnvs$cnv==cnvtype), ], phenos),
-    "low.high"=calc.or(cnvs[which(cnvs$pHI<=low.cutoff & cnvs$pTS>=high.cutoff & cnvs$cnv==cnvtype), ], phenos),
-    "high.high"=calc.or(cnvs[which(cnvs$pHI>=high.cutoff & cnvs$pTS>=high.cutoff & cnvs$cnv==cnvtype), ], phenos)))
+    ors <- t(data.frame("low.low"=calc.or(cnvs[which(cnvs$pHaplo<=low.cutoff & cnvs$pTriplo<=low.cutoff & cnvs$cnv==cnvtype), ], phenos),
+    "high.low"=calc.or(cnvs[which(cnvs$pHaplo>=high.cutoff & cnvs$pTriplo<=low.cutoff & cnvs$cnv==cnvtype), ], phenos),
+    "low.high"=calc.or(cnvs[which(cnvs$pHaplo<=low.cutoff & cnvs$pTriplo>=high.cutoff & cnvs$cnv==cnvtype), ], phenos),
+    "high.high"=calc.or(cnvs[which(cnvs$pHaplo>=high.cutoff & cnvs$pTriplo>=high.cutoff & cnvs$cnv==cnvtype), ], phenos)))
     colnames(ors) <- c("estimate", "lower", "upper")
     if(norm.vs.baseline==TRUE){
       baseline <- calc.or(cnvs[which(cnvs$cnv==cnvtype), ], phenos)[1]
@@ -282,15 +281,13 @@ plot.or.by.scorebin <- function(cnvs, phenos, score, n.bins=3, cnv.pct=TRUE, pri
 #####################
 ### RSCRIPT BLOCK ###
 #####################
+require(rCNV2, quietly=T)
 require(optparse, quietly=T)
-require(funr, quietly=T)
 require(epitools, quietly=T)
 require(flux, quietly=T)
 
 # List of command-line options
-option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
-)
+option_list <- list()
 
 # Get command-line arguments & options
 args <- parse_args(OptionParser(usage=paste("%prog rCNV_scores.tsv constraint.meta.bed asd_cnvs.tsv asd_phenos.tsv out.prefix", sep=" "),
@@ -309,7 +306,6 @@ constraint.meta.in <- args$args[2]
 asd_cnvs.in <- args$args[3]
 asd_phenos.in <- args$args[4]
 out.prefix <- args$args[5]
-rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
 # scores.in <- "~/scratch/rCNV.gene_scores.tsv.gz"
@@ -317,17 +313,6 @@ rcnv.config <- opts$`rcnv-config`
 # asd_cnvs.in <- "~/scratch/refs/asc_spark_denovo_cnvs.cleaned.b37.annotated.bed.gz"
 # asd_phenos.in <- "~/scratch/refs/asc_spark_child_phenotypes.list"
 # out.prefix <- "~/scratch/test_gene_score_dnCNV_analyses"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/gene_scores/"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
-
-# Source common functions
-script.dir <- funr::get_script_path()
-source(paste(script.dir, "common_functions.R", sep="/"))
 
 # Load rCNV scores and other (non-rCNV) scores
 scores.rCNV <- load.scores(scores.in)
@@ -341,10 +326,10 @@ cnvs <- load.cnvs(asd_cnvs.in, phenos)
 # Annotate CNVs with all scores
 cnvs <- anno.cnv.scores(cnvs, scores.rCNV, scores.other)
 
-# Plot odds ratios binned by pTS/pHI
+# Plot odds ratios binned by pTriplo/pHaplo
 pdf(paste(out.prefix, "asc_spark_denovo_cnvs.odds_ratios.del.pdf", sep="."),
     height=2.75, width=2.1)
-plot.or.by.scorebin(cnvs[which(cnvs$cnv=="DEL"), ], phenos, score="pHI", cnv.pct=T, n.bins=4,
+plot.or.by.scorebin(cnvs[which(cnvs$cnv=="DEL"), ], phenos, score="pHaplo", cnv.pct=T, n.bins=4,
                     x.label="italic(\"De Novo\") ~ Deletions",
                     parse.x.label=T, x.label.line=1.1,
                     x.ax.labels=paste("\"Q\"[", 1:4, "]", sep=""),
@@ -352,11 +337,11 @@ plot.or.by.scorebin(cnvs[which(cnvs$cnv=="DEL"), ], phenos, score="pHI", cnv.pct
                     pt.color=cnv.colors[1], baseline.color=control.cnv.colors[1],
                     null.color=blueblack, blue.bg=FALSE,
                     parmar=c(3.25, 2.75, 0.5, 0.5))
-mtext(1, line=2.1, text="in Quartiles by pHI")
+mtext(1, line=2.1, text="in Quartiles by pHaplo")
 dev.off()
 pdf(paste(out.prefix, "asc_spark_denovo_cnvs.odds_ratios.dup.pdf", sep="."),
     height=2.75, width=2.1)
-plot.or.by.scorebin(cnvs[which(cnvs$cnv=="DUP"), ], phenos, score="pTS", cnv.pct=T, n.bins=4,
+plot.or.by.scorebin(cnvs[which(cnvs$cnv=="DUP"), ], phenos, score="pTriplo", cnv.pct=T, n.bins=4,
                     x.label="italic(\"De Novo\") ~ Duplications",
                     parse.x.label=T, x.label.line=1.25,
                     x.ax.labels=paste("\"Q\"[", 1:4, "]", sep=""),
@@ -364,10 +349,10 @@ plot.or.by.scorebin(cnvs[which(cnvs$cnv=="DUP"), ], phenos, score="pTS", cnv.pct
                     pt.color=cnv.colors[2], baseline.color=control.cnv.colors[2],
                     null.color=blueblack, blue.bg=FALSE,
                     parmar=c(3.25, 2.75, 0.5, 0.5))
-mtext(1, line=2.1, text="in Quartiles by pTS")
+mtext(1, line=2.1, text="in Quartiles by pTriplo")
 dev.off()
 
-# Plot odds ratios stratified by high/low pHI & pTS
+# Plot odds ratios stratified by high/low pHaplo & pTriplo
 strat.ors <- calc.or.stratified(cnvs, phenos, high.cutoff=0.8, low.cutoff=0.5, norm.vs.baseline=F)
 pdf(paste(out.prefix, "asc_spark_denovo_cnvs.odds_ratios.stratified.pdf", sep="."),
     height=2.25, width=3)

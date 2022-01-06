@@ -21,9 +21,9 @@ require(rCNV2)
 # Load PIPs from gene stats .tsv
 load.stats <- function(stats.in){
   s <- read.table(stats.in, header=T, sep="\t", comment.char="")
-  s <- s[which(!is.na(s$credible_set)), c("gene", "PIP")]
+  s <- s[which(!is.na(s$credible_set)), c("gene", "PIP_final")]
   r <- as.data.frame(do.call("rbind", lapply(unique(s$gene), function(g){
-    c(g, max(s$PIP[which(s$gene == g)], na.rm=T))
+    c(g, max(s$PIP_final[which(s$gene == g)], na.rm=T))
   })))
   colnames(r) <- c("gene", "PIP")
   r$PIP <- as.numeric(r$PIP)

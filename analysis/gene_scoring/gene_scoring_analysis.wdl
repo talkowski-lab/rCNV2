@@ -2,7 +2,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -10,8 +10,6 @@
 
 
 workflow gene_burden_analysis {
-  File training_hpo_list
-  File effective_case_sample_sizes
   String prefix
   File metacohort_list
   File metacohort_sample_table
@@ -23,6 +21,8 @@ workflow gene_burden_analysis {
   Float min_cds_ovr_dup
   Int max_genes_per_cnv
   String meta_model_prefix
+  Float winsorize_meta_z
+  Int meta_min_cases
   Int min_cnvs_per_gene_training
   Float prior_frac
   Float prior_lnor_thresholding_pct
@@ -34,6 +34,7 @@ workflow gene_burden_analysis {
   Float elnet_alpha
   Float elnet_l1_l2_mix
   String rCNV_bucket
+  String rCNV_docker
   File contiglist
 
   Array[Array[String]] contigs = read_tsv(contiglist)
@@ -58,13 +59,12 @@ workflow gene_burden_analysis {
         pad_controls=pad_controls,
         min_cds_ovr_del=min_cds_ovr_del,
         min_cds_ovr_dup=min_cds_ovr_dup,
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     # Run assocation tests per cohort
     call burden_test as rCNV_burden_test {
       input:
-        training_hpo_list=training_hpo_list,
-        effective_case_sample_sizes=effective_case_sample_sizes,
         prefix=prefix,
         contig=contig[0],
         metacohort_list=metacohort_list,
@@ -77,7 +77,8 @@ workflow gene_burden_analysis {
         min_cds_ovr_del=min_cds_ovr_del,
         min_cds_ovr_dup=min_cds_ovr_dup,
         max_genes_per_cnv=max_genes_per_cnv,
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
   }
 
@@ -90,7 +91,8 @@ workflow gene_burden_analysis {
         metacohort_list=metacohort_list,
         CNV=cnv,
         freq_code="rCNV",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
   }
 
@@ -104,8 +106,11 @@ workflow gene_burden_analysis {
         CNV=CNV,
         metacohort_list=metacohort_list,
         meta_model_prefix=meta_model_prefix,
+        winsorize_meta_z=winsorize_meta_z,
+        meta_min_cases=meta_min_cases,
         freq_code="rCNV",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     call get_underpowered_genes {
       input:
@@ -116,7 +121,8 @@ workflow gene_burden_analysis {
         metacohort_list=metacohort_list,
         min_cnvs_per_gene_training=min_cnvs_per_gene_training,
         freq_code="rCNV",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
   }
 
@@ -128,6 +134,7 @@ workflow gene_burden_analysis {
       underpowered_genes=get_underpowered_genes.underpowered_genes,
       freq_code="rCNV",
       rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker,
       prior_frac=prior_frac,
       prior_lnor_thresholding_pct=prior_lnor_thresholding_pct
   }
@@ -147,7 +154,8 @@ workflow gene_burden_analysis {
         elnet_alpha=elnet_alpha,
         elnet_l1_l2_mix=elnet_l1_l2_mix,
         freq_code="rCNV",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
     call score_genes as score_genes_DUP {
       input:
@@ -162,7 +170,8 @@ workflow gene_burden_analysis {
         elnet_alpha=elnet_alpha,
         elnet_l1_l2_mix=elnet_l1_l2_mix,
         freq_code="rCNV",
-        rCNV_bucket=rCNV_bucket
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
     }
   }
 
@@ -172,14 +181,16 @@ workflow gene_burden_analysis {
       CNV="DEL",
       scores=score_genes_DEL.scores_tsv,
       freq_code="rCNV",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
   call score_ensemble as score_ensemble_DUP {
     input:
       CNV="DUP",
       scores=score_genes_DUP.scores_tsv,
       freq_code="rCNV",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
 
   # Determine best model & QC final scores
@@ -190,7 +201,8 @@ workflow gene_burden_analysis {
       models=models,
       raw_gene_features=raw_gene_features,
       freq_code="rCNV",
-      rCNV_bucket=rCNV_bucket
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
   }
 
   output {
@@ -213,6 +225,7 @@ task get_annotated_cnvs {
   Float min_cds_ovr_del
   Float min_cds_ovr_dup
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -274,7 +287,7 @@ task get_annotated_cnvs {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b88c6669695764493aa778498afc2df9407fe35d3e45aa127922c9701fe8f64c"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -289,8 +302,6 @@ task get_annotated_cnvs {
 
 # Run burden test for a single chromosome for all cohorts
 task burden_test {
-  File training_hpo_list
-  File effective_case_sample_sizes
   String prefix
   String contig
   File metacohort_list
@@ -304,6 +315,7 @@ task burden_test {
   Float min_cds_ovr_dup
   Int max_genes_per_cnv
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -320,7 +332,7 @@ task burden_test {
     tabix ${gtf} ${contig} | bgzip -c > ${contig}.gtf.gz
 
     # Create string of HPOs to keep
-    keep_hpos=$( cat ${training_hpo_list} | paste -s -d\; )
+    keep_hpos=$( cat refs/rCNV2.hpos_by_severity.developmental.list | paste -s -d\; )
 
     # Iterate over metacohorts to compute single-cohort stats
     while read meta cohorts; do
@@ -328,7 +340,7 @@ task burden_test {
 
       # Set metacohort-specific parameters
       cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
-      effective_case_n=$( fgrep -w $meta ${effective_case_sample_sizes} | cut -f2 )
+      effective_case_n=$( fgrep -w $meta refs/rCNV2.hpos_by_severity.developmental.counts.tsv | cut -f2 )
 
       # Iterate over CNV types
       for CNV in DEL DUP; do
@@ -362,11 +374,11 @@ task burden_test {
         tabix -f "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.${contig}.bed.gz"
 
         # Perform burden test
-        /opt/rCNV2/analysis/genes/gene_burden_test.R \
+        /opt/rCNV2/analysis/generic_scripts/fisher_test_single_cohort.R \
           --pheno-table ${metacohort_sample_table} \
           --cohort-name $meta \
-          --cnv $CNV \
           --effective-case-n $effective_case_n \
+          --keep-n-columns 4 \
           --bgzip \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.${contig}.bed.gz" \
           "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.${contig}.bed.gz"
@@ -376,7 +388,7 @@ task burden_test {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b88c6669695764493aa778498afc2df9407fe35d3e45aa127922c9701fe8f64c"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -397,6 +409,7 @@ task merge_annotated_cnvs {
   String freq_code
   String CNV
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -429,7 +442,7 @@ task merge_annotated_cnvs {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b88c6669695764493aa778498afc2df9407fe35d3e45aa127922c9701fe8f64c"
+    docker: "${rCNV_docker}"
     preemptible: 1
   }
 
@@ -445,17 +458,23 @@ task merge_and_meta_analysis {
   String CNV
   File metacohort_list
   String meta_model_prefix
+  Float winsorize_meta_z
+  Int meta_min_cases
   String freq_code
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
 
+    # Copy necessary reference files
+    mkdir refs/
+    gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/* refs/
+    export exclusion_bed=refs/gencode.v19.canonical.pext_filtered.cohort_exclusion.bed.gz
+
     # Make list of stats files to be considered
     find / -name "*.${prefix}.${freq_code}.${CNV}.gene_burden.stats.*.bed.gz" \
     > stats.paths.list
-    # Debug: print paths to stdout
-    cat stats.paths.list
 
     # Merge burden stats per cohort
     zcat $( sed -n '1p' stats.paths.list ) | sed -n '1p' > header.tsv
@@ -467,19 +486,24 @@ task merge_and_meta_analysis {
       | bgzip -c \
       > "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
       tabix -f "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
-    done < <( fgrep -v "mega" ${metacohort_list} )
+    done < <( fgrep -v mega ${metacohort_list} )
 
     # Make input for meta-analysis
     while read meta cohorts; do
       echo -e "$meta\t$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
-    done < <( fgrep -v "mega" ${metacohort_list} ) \
+    done < <( fgrep -v mega ${metacohort_list} ) \
     > ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt
     
     # Run meta-analysis
-    /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
+    /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
       --model ${meta_model_prefix} \
+      --conditional-exclusion $exclusion_bed \
       --p-is-neg-log10 \
       --spa \
+      --spa-exclude /opt/rCNV2/refs/lit_GDs.all.${CNV}.bed.gz \
+      --winsorize ${winsorize_meta_z} \
+      --min-cases ${meta_min_cases} \
+      --keep-n-columns 4 \
       ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt \
       ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed
     bgzip -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed
@@ -492,7 +516,7 @@ task merge_and_meta_analysis {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b88c6669695764493aa778498afc2df9407fe35d3e45aa127922c9701fe8f64c"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "30"
@@ -516,6 +540,7 @@ task get_underpowered_genes {
   Int min_cnvs_per_gene_training
   String freq_code
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -565,7 +590,7 @@ task get_underpowered_genes {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b27de66b70fee3590dbfe965e22456082b9ec735ea404720eeb25958eee9155e"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "30"
@@ -586,6 +611,7 @@ task calc_priors_bfdp {
   Array[File] underpowered_genes
   String freq_code
   String rCNV_bucket
+  String rCNV_docker
   Float prior_frac
   Float prior_lnor_thresholding_pct
 
@@ -689,7 +715,7 @@ task calc_priors_bfdp {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:b27de66b70fee3590dbfe965e22456082b9ec735ea404720eeb25958eee9155e"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -723,6 +749,7 @@ task score_genes {
   Float elnet_l1_l2_mix
   String freq_code
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -776,7 +803,7 @@ task score_genes {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:4b494ff5dde3eb5a453863f425b4a6d5994bc56b68448332979d26ce92c8ee50"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "8 GB"
     bootDiskSizeGb: "20"
@@ -794,6 +821,7 @@ task score_ensemble {
   Array[File] scores
   String freq_code
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -834,7 +862,7 @@ task score_ensemble {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:4b494ff5dde3eb5a453863f425b4a6d5994bc56b68448332979d26ce92c8ee50"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"
@@ -854,6 +882,7 @@ task qc_scores {
   File raw_gene_features
   String freq_code
   String rCNV_bucket
+  String rCNV_docker
 
   command <<<
     set -e
@@ -971,7 +1000,7 @@ task qc_scores {
   >>>
 
   runtime {
-    docker: "talkowski/rcnv@sha256:2fdd11e54719ab4c2ec1324e3785e7806c66b6e1cbf894588c286e72c45df75c"
+    docker: "${rCNV_docker}"
     preemptible: 1
     memory: "4 GB"
     bootDiskSizeGb: "20"

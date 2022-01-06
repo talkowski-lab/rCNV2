@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2019 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2019-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -12,12 +12,21 @@
 
 
 # Launch docker image
-docker run --rm -it gcr.io/gnomad-wgs-v2-sv/rcnv
+docker run --rm -it us.gcr.io/broad-dsmap/athena-cloud
 gcloud auth login
 
 
 # Set global parameters
 export rCNV_bucket="gs://rcnv_project"
+export rCNV_git_hash="fdac398a817bda8b23af5e9c26284495683fb63f"
+
+
+# Clone rCNV repo
+cd /opt/ && \
+git clone https://github.com/talkowski-lab/rCNV2.git && \
+cd rCNV2 && \
+git checkout "${rCNV_git_hash}" && \
+cd -
 
 
 # Add helper alias for formatting long integers
@@ -26,9 +35,11 @@ alias addcom="sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta'"
 
 # Download analysis references
 mkdir refs/
-gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/** refs/
-gsutil -m cp ${rCNV_bucket}/refs/** refs/
-gsutil -m cp ${rCNV_bucket}/analysis/paper/data/misc/** refs/
+gsutil -m cp \
+  ${rCNV_bucket}/analysis/analysis_refs/** \
+  ${rCNV_bucket}/refs/** \
+  ${rCNV_bucket}/analysis/paper/data/misc/** \
+  refs/
 
 
 # Download all gene data from Gencode v19
@@ -197,43 +208,70 @@ done > gene_features.athena_tracklist.tsv
   gencode.v19.canonical.pext_filtered.gtf.gz
 
 
-# Gather per-gene metadata (chromatin)
+# Gather per-gene chromatin metadata
+gsutil -m cp ${rCNV_bucket}/cleaned_data/genes/annotations/episcore.Han_2018.tsv.gz ./
 /opt/rCNV2/data_curation/gene/get_gene_features.py \
   --get-chromatin \
   --roadmap-means roadmap_stats/gencode.v19.canonical.pext_filtered.REP_chromatin_stats.mean.tsv.gz \
   --roadmap-sds roadmap_stats/gencode.v19.canonical.pext_filtered.REP_chromatin_stats.sd.tsv.gz \
   --roadmap-pca roadmap_stats/gencode.v19.canonical.pext_filtered.REP_chromatin_stats.pca.tsv.gz \
+  --episcore-tsv episcore.Han_2018.tsv.gz \
   --outbed gencode.v19.canonical.pext_filtered.chromatin_features.bed.gz \
   --bgzip \
   gencode.v19.canonical.pext_filtered.gtf.gz
 
 
+# Gather per-gene protein metadata
+gsutil -m cp \
+  ${rCNV_bucket}/cleaned_data/genes/annotations/UniProt_features.cleaned.tsv.gz \
+  ./
+/opt/rCNV2/data_curation/gene/get_gene_features.py \
+  --get-protein \
+  --uniprot-tsv UniProt_features.cleaned.tsv.gz \
+  --outbed gencode.v19.canonical.pext_filtered.protein_features.bed.gz \
+  --bgzip \
+  gencode.v19.canonical.pext_filtered.gtf.gz
+
+
 # Gather per-gene constraint metadata
-wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
+wget https://storage.googleapis.com/gcp-public-data--gnomad/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
 wget http://genic-intolerance.org/data/RVIS_Unpublished_ExACv2_March2017.txt
-gsutil -m cp ${rCNV_bucket}/cleaned_data/genes/annotations/EDS.Wang_2018.tsv.gz ./
-wget https://storage.googleapis.com/gnomad-public/legacy/exac_browser/forweb_cleaned_exac_r03_march16_z_data_pLI_CNV-final.txt.gz
+gsutil -m cp \
+  ${rCNV_bucket}/cleaned_data/genes/annotations/EDS.Wang_2018.tsv.gz \
+  ${rCNV_bucket}/cleaned_data/genes/annotations/sHet.Cassa_2017.tsv.gz \
+  ${rCNV_bucket}/cleaned_data/genes/annotations/CCDG_DS_scores.Abel_2020.tsv.gz \
+  gs://gcp-public-data--gnomad/legacy/exacv1_downloads/release0.3.1/cnv/exac-final-cnv.gene.scores071316 \
+  ./
 wget https://doi.org/10.1371/journal.pgen.1001154.s002
 /opt/rCNV2/data_curation/gene/get_gene_features.py \
   --get-constraint \
   --ref-fasta ${ref_fasta} \
   --gnomad-constraint gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
-  --exac-cnv forweb_cleaned_exac_r03_march16_z_data_pLI_CNV-final.txt.gz \
+  --exac-cnv exac-final-cnv.gene.scores071316 \
   --rvis-tsv RVIS_Unpublished_ExACv2_March2017.txt \
   --eds-tsv EDS.Wang_2018.tsv.gz \
   --hi-tsv journal.pgen.1001154.s002 \
+  --shet-tsv sHet.Cassa_2017.tsv.gz \
+  --ccdg-tsv CCDG_DS_scores.Abel_2020.tsv.gz \
   --outbed gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
   --bgzip \
   gencode.v19.canonical.pext_filtered.gtf.gz
 
 
-# Gather per-gene metadata (variation)
+# Note: for parallelizing on the cloud, copy gnomAD data to rCNV bucket for convenience
+gsutil -m cp \
+  gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
+  exac-final-cnv.gene.scores071316 \
+  ${rCNV_bucket}/cleaned_data/genes/annotations/
+
+
+# Gather per-gene variation metadata
 /opt/rCNV2/data_curation/gene/get_gene_features.py \
   --get-variation \
   --gnomad-constraint gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
   --ddd-dnms refs/ddd_dnm_counts.tsv.gz \
-  --asc-dnms refs/asc_dnm_counts.tsv.gz \
-  --asc-unaffected-dnms refs/asc_dnm_counts.unaffecteds.tsv.gz \
+  --asc-dnms refs/fu_asc_spark_dnm_counts.tsv.gz \
+  --asc-unaffected-dnms refs/fu_asc_spark_dnm_counts.unaffecteds.tsv.gz \
   --gnomad-svs refs/gnomad_sv_nonneuro_counts.tsv.gz \
   --redin-bcas refs/redin_bca_counts.tsv.gz \
   --outbed gencode.v19.canonical.pext_filtered.variation_features.bed.gz \
@@ -246,6 +284,7 @@ wget https://doi.org/10.1371/journal.pgen.1001154.s002
   gencode.v19.canonical.pext_filtered.genomic_features.bed.gz \
   gencode.v19.canonical.pext_filtered.expression_features.bed.gz \
   gencode.v19.canonical.pext_filtered.chromatin_features.bed.gz \
+  gencode.v19.canonical.pext_filtered.protein_features.bed.gz \
   gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
 | bgzip -c \
 > gencode.v19.canonical.pext_filtered.all_features.bed.gz

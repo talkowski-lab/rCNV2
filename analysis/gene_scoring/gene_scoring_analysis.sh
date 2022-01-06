@@ -45,16 +45,19 @@ gtf_index="genes/gencode.v19.canonical.gtf.gz.tbi"
 contig=18
 pad_controls=0
 max_cnv_size=300000000
-min_cds_ovr_del=0.8
-min_cds_ovr_dup=0.8
-max_genes_per_cnv=24
+min_cds_ovr_del=1.0
+min_cds_ovr_dup=1.0
+max_genes_per_cnv=28
 meta_model_prefix="fe"
-min_cnvs_per_gene_training=3
-cen_tel_dist=1000000
+min_cnvs_per_gene_training=10
+cen_tel_dist=5000000
+exclusion_bed=refs/gencode.v19.canonical.pext_filtered.cohort_exclusion.bed.gz
+winsorize_meta_z=1.0
+meta_min_cases=300
 prior_frac=0.12
 
 
-# Create training blacklist: Remove all genes within ±1Mb of a telomere/centromere, 
+# Create training excludelist: Remove all genes within ±3Mb of a telomere/centromere, 
 # or those within known genomic disorder regions
 zcat refs/GRCh37.centromeres_telomeres.bed.gz \
 | awk -v FS="\t" -v OFS="\t" -v d=${cen_tel_dist} \
@@ -64,19 +67,19 @@ zcat refs/GRCh37.centromeres_telomeres.bed.gz \
 | bedtools merge -i - \
 > ${freq_code}.gene_scoring.training_mask.bed.gz
 gsutil -m cp \
-  ${rCNV_bucket}/analysis/gene_burden/HP0000118/rCNV/stats/HP0000118.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz \
+  ${rCNV_bucket}/analysis/gene_burden/HP0000118/rCNV/stats/meta1.HP0000118.rCNV.DEL.gene_burden.stats.bed.gz \
   ./
 bedtools intersect -u \
-  -a HP0000118.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz \
+  -a meta1.HP0000118.rCNV.DEL.gene_burden.stats.bed.gz \
   -b ${freq_code}.gene_scoring.training_mask.bed.gz \
 | cut -f1-4 \
 | cat <( echo -e "#chr\tstart\tend\tgene" ) - \
 | bgzip -c \
-> ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz
+> ${freq_code}.gene_scoring.training_gene_excludelist.bed.gz
 
-# Copy training blacklist to project bucket (note: requires permissions)
+# Copy training excludelist to project bucket (note: requires permissions)
 gsutil -m cp \
-  ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+  ${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
   ${rCNV_bucket}/analysis/gene_scoring/refs/
 
 
@@ -85,7 +88,6 @@ gsutil -m cp \
 cat \
   genes/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
   <( cat genes/gene_lists/DDG2P.hc_lof.genes.list genes/gene_lists/ClinGen.hc_haploinsufficient.genes.list | sort | uniq ) \
-  genes/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.low_expression_invariant.genes.list \
 | sort | uniq -c \
 | awk '{ if ($1>=2) print $2 }' \
 | fgrep -wf - genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
@@ -96,7 +98,6 @@ cat \
   genes/gene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list \
   <( cat genes/gene_lists/HP0000118.HPOdb.genes.list genes/gene_lists/DDG2P*.genes.list genes/gene_lists/ClinGen*.genes.list \
      | fgrep -wvf - genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list | sort | uniq ) \
-  genes/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.low_expression_variable.genes.list \
 | sort | uniq -c \
 | awk '{ if ($1>=2) print $2 }' \
 | fgrep -wf - genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
@@ -106,7 +107,6 @@ cat \
 cat \
   genes/gene_lists/gnomad.v2.1.1.mis_constrained.genes.list \
   <( cat genes/gene_lists/DDG2P.hc_gof.genes.list genes/gene_lists/DDG2P.hc_other.genes.list genes/gene_lists/ClinGen.all_triplosensitive.genes.list | sort | uniq ) \
-  genes/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.high_expression_invariant.genes.list \
 | sort | uniq -c \
 | awk '{ if ($1>=2) print $2 }' \
 | fgrep -wf - genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
@@ -117,7 +117,6 @@ cat \
   genes/gene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list \
   <( cat genes/gene_lists/HP0000118.HPOdb.genes.list genes/gene_lists/DDG2P*.genes.list genes/gene_lists/ClinGen*.genes.list \
      | fgrep -wvf - genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list | sort | uniq ) \
-  genes/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.high_expression_variable.genes.list \
 | sort | uniq -c \
 | awk '{ if ($1>=2) print $2 }' \
 | fgrep -wf - genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
@@ -135,7 +134,9 @@ gsutil -m cp -r ${rCNV_bucket}/analysis/gene_scoring/optimization_data ./
 
 # Postprocess optimization data
 # Note: the --max-genes-for-summary parameter must be determined first by running the
-# subsequent code block (number of genes per CNV), then running this block a second time
+# subsequent code block (number of genes per CNV) with a very large --max-genes-for-summary, 
+# then running this block a second time after updating --max-genes-for-summary to
+# the optimal value determined by optimize_genes_per_cnv.R
 while read meta cohorts; do
   echo $meta
   # Process deletions
@@ -145,9 +146,9 @@ while read meta cohorts; do
     --hpos <( cut -f2 refs/test_phenotypes.list ) \
     --positive-truth-genes gold_standard.haploinsufficient.genes.list \
     --negative-truth-genes gold_standard.haplosufficient.genes.list \
-    --exclude-genes <( zcat ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+    --exclude-genes <( zcat ${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
                        | fgrep -v "#" | cut -f4 ) \
-    --max-genes-for-summary 24 \
+    --max-genes-for-summary 28 \
     --summary-counts ${meta}.optimization_data.counts_per_hpo.DEL.tsv \
     --cnv-stats ${meta}.optimization_data.counts_per_cnv.DEL.tsv \
     --gzip
@@ -158,9 +159,9 @@ while read meta cohorts; do
     --hpos <( cut -f2 refs/test_phenotypes.list ) \
     --positive-truth-genes gold_standard.triplosensitive.genes.list \
     --negative-truth-genes gold_standard.triploinsensitive.genes.list \
-    --exclude-genes <( zcat ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+    --exclude-genes <( zcat ${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
                        | fgrep -v "#" | cut -f4 ) \
-    --max-genes-for-summary 24 \
+    --max-genes-for-summary 28 \
     --summary-counts ${meta}.optimization_data.counts_per_hpo.DUP.tsv \
     --cnv-stats ${meta}.optimization_data.counts_per_cnv.DUP.tsv \
     --gzip
@@ -178,52 +179,26 @@ done
   optimize_genes_per_cnv.DUP.input.tsv \
   optimize_genes_per_cnv.results.pdf
 
-# Parameter optimization: phenotype selection
-for CNV in DEL DUP; do
-  while read meta cohorts; do
-    echo -e "${meta}\t${meta}.optimization_data.counts_per_hpo.${CNV}.tsv.gz"
-  done < <( fgrep -v mega refs/rCNV_metacohort_list.txt ) \
-  > select_hpos.${CNV}.input.tsv
-done
-/opt/rCNV2/analysis/gene_scoring/select_hpos.R \
-  select_hpos.DEL.input.tsv \
-  select_hpos.DUP.input.tsv \
-  gene_scoring.hpos_to_keep.list \
-  select_hpos.results.pdf
-while read meta cohorts; do
-  /opt/rCNV2/analysis/gene_scoring/determine_effective_case_n.py \
-    phenos/$meta.cleaned_phenos.txt \
-    gene_scoring.hpos_to_keep.list \
-    | paste <( echo $meta ) -
-done < <( fgrep -v mega refs/rCNV_metacohort_list.txt ) \
-> gene_scoring.effective_case_sample_sizes.tsv
-gsutil -m cp \
-  gene_scoring.hpos_to_keep.list \
-  gene_scoring.effective_case_sample_sizes.tsv \
-  ${rCNV_bucket}/analysis/gene_scoring/refs/
-
 
 # Parameter optimization: minimum number of CNVs per gene for training
 # NOTE: requires running meta-analysis and get_underpowered_genes tasks first in WDL
 gsutil -m cp ${rCNV_bucket}/analysis/gene_scoring/data/** ./
 for CNV in DEL DUP; do
   /opt/rCNV2/analysis/gene_scoring/variance_vs_counts.R \
-    rCNV2_analysis_d1.rCNV.$CNV.gene_burden.meta_analysis.stats.bed.gz \
-    rCNV2_analysis_d1.rCNV.$CNV.counts_per_gene.tsv \
+    rCNV2_analysis_d2.rCNV.$CNV.gene_burden.meta_analysis.stats.bed.gz \
+    rCNV2_analysis_d2.rCNV.$CNV.counts_per_gene.tsv \
     variance_vs_cnvs.$CNV.pdf
 done
 
 
 # Recompute association stats per cohort
-export training_hpo_list=gene_scoring.hpos_to_keep.list
-export effective_case_sample_sizes=gene_scoring.effective_case_sample_sizes.tsv
 for contig in $( seq 1 22 ); do
 
   # Extract contig of interest from GTF
   tabix ${gtf} ${contig} | bgzip -c > ${contig}.gtf.gz
 
   # Create string of HPOs to keep
-  keep_hpos=$( cat ${training_hpo_list} | paste -s -d\; )
+  keep_hpos=$( cat refs/rCNV2.hpos_by_severity.developmental.list | paste -s -d\; )
 
   # Iterate over metacohorts to compute single-cohort stats
   while read meta cohorts; do
@@ -231,7 +206,7 @@ for contig in $( seq 1 22 ); do
 
     # Set metacohort-specific parameters
     cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
-    effective_case_n=$( fgrep -w $meta ${effective_case_sample_sizes} | cut -f2 )
+    effective_case_n=$( fgrep -w $meta refs/rCNV2.hpos_by_severity.developmental.counts.tsv | cut -f2 )
 
     # Iterate over CNV types
     for CNV in DEL DUP; do
@@ -265,11 +240,11 @@ for contig in $( seq 1 22 ); do
       tabix -f "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.${contig}.bed.gz"
 
       # Perform burden test
-      /opt/rCNV2/analysis/genes/gene_burden_test.R \
+      /opt/rCNV2/analysis/generic_scripts/fisher_test_single_cohort.R \
         --pheno-table ${metacohort_sample_table} \
         --cohort-name $meta \
-        --cnv $CNV \
         --effective-case-n $effective_case_n \
+        --keep-n-columns 4 \
         --bgzip \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.counts.${contig}.bed.gz" \
         "$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.${contig}.bed.gz"
@@ -306,16 +281,21 @@ for CNV in DEL DUP; do
   > ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt
   
   # Run meta-analysis
-  /opt/rCNV2/analysis/genes/gene_meta_analysis.R \
+  /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
     --model ${meta_model_prefix} \
+    --conditional-exclusion $exclusion_bed \
     --p-is-neg-log10 \
     --spa \
+    --spa-exclude /opt/rCNV2/refs/lit_GDs.all.${CNV}.bed.gz \
+    --winsorize ${winsorize_meta_z} \
+    --min-cases ${meta_min_cases} \
+    --keep-n-columns 4 \
     ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt \
     ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed
   bgzip -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed
   tabix -p bed -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz
 
-  # Extract list of genes with < min_cnvs_per_gene_training (to be used as blacklist later for training)
+  # Extract list of genes with < min_cnvs_per_gene_training (to be used as excludelist later for training)
   # Note: this cutoff must be pre-determined with eval_or_vs_cnv_counts.R, but is not automated here
   /opt/rCNV2/analysis/gene_scoring/get_underpowered_genes.R \
     --min-cnvs ${min_cnvs_per_gene_training} \
@@ -335,16 +315,16 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/gene_scoring/data/**.gene_burden.meta_analysis.stats.bed.gz \
   ${rCNV_bucket}/analysis/gene_scoring/data/*.gene_burden.underpowered_genes.bed.gz \
   ./
-del_meta_stats="rCNV2_analysis_d1.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz"
-dup_meta_stats="rCNV2_analysis_d1.rCNV.DUP.gene_burden.meta_analysis.stats.bed.gz"
+del_meta_stats="rCNV2_analysis_d2.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz"
+dup_meta_stats="rCNV2_analysis_d2.rCNV.DUP.gene_burden.meta_analysis.stats.bed.gz"
 
 
-# Create CNV-type-specific gene blacklists
+# Create CNV-type-specific gene excludelists
 for CNV in DEL DUP; do
   zcat *.$CNV.gene_burden.underpowered_genes.bed.gz \
-    ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+    ${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
   | fgrep -v "#" | cut -f4 | sort -V | uniq \
-  > ${freq_code}.$CNV.training_blacklist.genes.list
+  > ${freq_code}.$CNV.training_excludelist.genes.list
 done
 
 # Compute prior effect sizes
@@ -353,8 +333,8 @@ prior_lnor_thresholding_pct=1
   --pct ${prior_lnor_thresholding_pct} \
   ${del_meta_stats} \
   ${dup_meta_stats} \
-  ${freq_code}.DEL.training_blacklist.genes.list \
-  ${freq_code}.DUP.training_blacklist.genes.list \
+  ${freq_code}.DEL.training_excludelist.genes.list \
+  ${freq_code}.DUP.training_excludelist.genes.list \
   genes/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
   gold_standard.haploinsufficient.genes.list \
   gold_standard.haplosufficient.genes.list \
@@ -408,7 +388,7 @@ for CNV in DEL DUP; do
     --theta1 $theta1 \
     --var0 1 \
     --prior ${prior_frac} \
-    --blacklist ${freq_code}.$CNV.training_blacklist.genes.list \
+    --blacklist ${freq_code}.$CNV.training_excludelist.genes.list \
     --outfile ${freq_code}.$CNV.gene_abfs.tsv \
     "$statsbed"
 done
@@ -425,8 +405,8 @@ freq_code="rCNV"
 rCNV_bucket="${rCNV_bucket}"
 CNV="DEL"
 BFDP_stats="${freq_code}.${CNV}.gene_abfs.tsv"
-blacklist="${freq_code}.gene_scoring.training_gene_blacklist.bed.gz"
-underpowered_genes="rCNV2_analysis_d1.rCNV.DEL.gene_burden.underpowered_genes.bed.gz"
+excludelist="${freq_code}.gene_scoring.training_gene_excludelist.bed.gz"
+underpowered_genes="rCNV2_analysis_d2.rCNV.DEL.gene_burden.underpowered_genes.bed.gz"
 gene_features="gencode.v19.canonical.pext_filtered.all_features.no_variation.eigenfeatures.bed.gz"
 raw_gene_features="gencode.v19.canonical.pext_filtered.all_features.no_variation.bed.gz"
 max_true_bfdp=0.5
@@ -441,14 +421,14 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/gene_scoring/gene_lists/*genes.list \
   ./
 
-# Merge blacklist and list of underpowered genes
-zcat ${blacklist} ${underpowered_genes} \
+# Merge excludelist and list of underpowered genes
+zcat ${excludelist} ${underpowered_genes} \
 | grep -ve '^#' \
 | sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
 | uniq \
-| cat <( zcat ${blacklist} | grep -e '^#' ) - \
+| cat <( zcat ${excludelist} | grep -e '^#' ) - \
 | bgzip -c  \
-> blacklist_plus_underpowered.bed.gz
+> excludelist_plus_underpowered.bed.gz
 
 # Set CNV type-specific parameters
 case ${CNV} in
@@ -465,7 +445,7 @@ esac
 # Score genes
 /opt/rCNV2/analysis/gene_scoring/score_genes.py \
   --centromeres GRCh37.centromeres_telomeres.bed.gz \
-  --blacklist blacklist_plus_underpowered.bed.gz \
+  --blacklist excludelist_plus_underpowered.bed.gz \
   --true-positives $true_pos \
   --true-negatives $true_neg \
   --model ${model} \

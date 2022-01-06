@@ -18,7 +18,7 @@ gcloud auth login
 
 # Set global parameters
 export rCNV_bucket="gs://rcnv_project"
-export prefix="rCNV2_analysis_d1"
+export prefix="rCNV2_analysis_d2"
 export finemap_dist=1000000
 alias addcom="sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta'"
 
@@ -27,10 +27,10 @@ alias addcom="sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta'"
 gsutil -m cp \
   ${rCNV_bucket}/results/gene_association/* \
   ${rCNV_bucket}/results/segment_association/* \
-  ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.naive_priors.merged_no_variation_features.tsv \
-  ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.genetics_only.merged_no_variation_features.tsv \
+  ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.naive_priors.tsv \
+  ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.genetics_only.tsv \
   ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.merged_no_variation_features.tsv \
-  ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv \
+  ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_no_variation_features.tsv \
   ./
 mkdir meta_stats/
 gsutil -m cp -r \
@@ -64,7 +64,6 @@ if ! [ -e feature_heatmap ]; then
   mkdir feature_heatmap
 fi
 /opt/rCNV2/analysis/paper/plot/gene_association/plot_gene_feature_cor_matrix.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
 	refs/gencode.v19.canonical.pext_filtered.all_features.no_variation.bed.gz \
   refs/gencode.v19.canonical.pext_filtered.all_features.no_variation.eigenfeatures.bed.gz \
   refs/gene_feature_metadata.tsv \
@@ -111,7 +110,6 @@ for cnv in DEL DUP; do
 done
 # Generate plots
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_sliding_window_pval_distribs.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   --del-cutoff ${del_cutoff} \
   --dup-cutoff ${dup_cutoff} \
   --del-nomsig-bed ./nomsig_genes.DEL.bed \
@@ -126,14 +124,13 @@ done
 
 
 # Generate mini Miami plot of example phenotype for supplementary figure panel
-if [ -e assoc_stat_plots ]; then
-  rm -rf assoc_stat_plots
+if ! [ -e assoc_stat_plots ]; then
+  mkdir assoc_stat_plots
 fi
 mkdir assoc_stat_plots
 ngenes=$( zcat meta_stats/${example_hpo}.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz \
           | cut -f1 | fgrep -v "#" | wc -l | addcom )
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_example_miami.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   --del-cutoff ${del_cutoff} \
   --dup-cutoff ${dup_cutoff} \
   --cutoff-label "Exome-wide significance" \
@@ -158,15 +155,15 @@ ngenes=$( zcat meta_stats/${example_hpo}.rCNV.DEL.gene_burden.meta_analysis.stat
 
 
 # Plot fine-mapping descriptive panels (number of genes per block, distribution of PIPs, etc)
-head -n1 rCNV.DEL.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv \
+head -n1 rCNV.DEL.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_no_variation_features.tsv \
 | awk -v OFS="\t" '{ print $0, "cnv" }' > pip_header.tsv
 for CNV in DEL DUP; do
-  fgrep -v "#" rCNV.$CNV.gene_fine_mapping.gene_stats.naive_priors.merged_no_variation_features.tsv \
+  fgrep -v "#" rCNV.$CNV.gene_fine_mapping.gene_stats.naive_priors.tsv \
   | awk -v OFS="\t" -v CNV=$CNV '{ print $0, CNV }'
 done  \
 | cat pip_header.tsv - > all_PIPs.prior.tsv
 for CNV in DEL DUP; do
-  fgrep -v "#" rCNV.$CNV.gene_fine_mapping.gene_stats.genetics_only.merged_no_variation_features.tsv \
+  fgrep -v "#" rCNV.$CNV.gene_fine_mapping.gene_stats.genetics_only.tsv \
   | awk -v OFS="\t" -v CNV=$CNV '{ print $0, CNV }'
 done  \
 | cat pip_header.tsv - > all_PIPs.posterior.tsv
@@ -179,7 +176,6 @@ if ! [ -e finemapping_distribs ]; then
   mkdir finemapping_distribs
 fi
 /opt/rCNV2/analysis/paper/plot/gene_association/plot_finemapping_distribs.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.final_genes.credible_sets.bed.gz \
   rCNV.final_genes.associations.bed.gz \
   all_PIPs.prior.tsv \
@@ -188,19 +184,22 @@ fi
   finemapping_distribs/${prefix}
 
 
-# Plot master annotated 2x2 table of fine-mapped genes
+# Plot annotated 2x2 tables of fine-mapped genes
+## TODO: ADD SPLITS BY SIGNIFICANCE & ADULT/DEV
+if ! [ -e finemapped_gene_grids ]; then
+  mkdir finemapped_gene_grids
+fi
 while read nocolon hpo; do
   echo -e "$hpo\trefs/gene_lists/$nocolon.HPOdb.genes.list"
 done < refs/test_phenotypes.list \
 > omim.gene_lists.tsv
 /opt/rCNV2/analysis/paper/plot/gene_association/plot_finemapped_gene_table.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.final_genes.credible_sets.bed.gz \
   rCNV.final_genes.associations.bed.gz \
   refs/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
   refs/gene_lists/gnomad.v2.1.1.mis_constrained.genes.list \
   omim.gene_lists.tsv \
-  ${prefix}
+  finemapped_gene_grids/${prefix}
 
 
 # Plot gene set enrichments for fine-mapped genes vs. various gene metadata
@@ -218,7 +217,6 @@ if ! [ -e finemapping_distribs ]; then
   mkdir finemapping_distribs
 fi
 /opt/rCNV2/analysis/paper/plot/gene_association/plot_finemapped_enrichments.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.final_genes.credible_sets.bed.gz \
   rCNV.final_genes.associations.bed.gz \
   refs/gencode.v19.canonical.pext_filtered.all_features.bed.gz \

@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -33,7 +33,7 @@ load.data.single <- function(path, max.eval){
     control.ratio <- control.signal/control.noise
     cc.ratio <- case.ratio / control.ratio
     cc.ratio.diff <- case.ratio - control.ratio
-    c(k, 
+    c(k,
       case.signal, case.noise, case.ratio,
       control.signal, control.noise, control.ratio,
       cc.ratio, cc.ratio.diff)
@@ -55,17 +55,18 @@ load.data <- function(infile, max.eval){
   return(dlist)
 }
 
-# Joint optimization of ratio differences 
-joint.opt <- function(dlist, max.eval){
-  # Compute joint ratio diff weighted by proportion of positive hits in cases
-  wdiffs <- sapply(1:max.eval, function(k){
+# Joint optimization of ratio differences for a single CNV type
+opt.single.cnvtype <- function(dlist, max.eval){
+  # Compute joint ratio diffs
+  wdiffs <- do.call("rbind", lapply(1:max.eval, function(k){
     case.hits <- sapply(dlist, function(df){df$case_pos[which(df$n_genes==k)]})
     weights <- case.hits / sum(case.hits)
     bests <- sapply(dlist, function(df){max(df$cc_ratio_diff, na.rm=T)})
     diffs <- sapply(dlist, function(df){df$cc_ratio_diff[which(df$n_genes==k)]})
-    sum(weights * (diffs-bests))
-  })
-  dlist[[1]]$n_genes[which(wdiffs==max(wdiffs, na.rm=T))]
+    c(sum(weights * diffs), mean(diffs), sum(case.hits))
+  }))
+  opt <- dlist[[1]]$n_genes[which(wdiffs[, 2]==max(wdiffs[, 2], na.rm=T))]
+  return(list("opt.data"=wdiffs, "opt"=opt))
 }
 
 # Plot case/control ratio diffs for a single cohort
@@ -77,10 +78,10 @@ plot.diffs <- function(dlist, cohort, ymax=NULL, color="red"){
   }
   best.idx <- which(x$cc_ratio_diff==max(x$cc_ratio_diff, na.rm=T))
   par(mar=c(4, 4, 3, 0.5), bty="n")
-  plot(x$n_genes, x$control_ratio, xlim=c(0, xmax), ylim=c(0, ymax), 
+  plot(x$n_genes, x$control_ratio, xlim=c(0, xmax), ylim=c(0, ymax),
        xaxs="i", yaxs="i", xpd=T,
        lwd=3, type="l", col="gray50",
-       xlab="Max. Genes per CNV", ylab="Signal-to-Noise Ratio", main=cohort,
+       xlab="Max. Genes / CNV", ylab="Signal-to-Noise Ratio", main=cohort,
        panel.first=c(polygon(x=c(x$n_genes, rev(x$n_genes)),
                              y=c(x$control_ratio, rev(x$case_ratio)),
                              col=adjustcolor(color, alpha=0.2), border=NA),
@@ -94,10 +95,10 @@ plot.all <- function(del, dup){
   # Get plot data
   ymax.del <- max(sapply(del, function(df){max(c(df$case_ratio, df$control_ratio), na.rm=T)}), na.rm=T)
   ymax.dup <- max(sapply(dup, function(df){max(c(df$case_ratio, df$control_ratio), na.rm=T)}), na.rm=T)
-  
+
   # Prep layout
   par(mfrow=c(2, length(del)))
-  
+
   # Plot signal:noise ratio for all cohorts
   sapply(names(del), function(cohort){
     plot.diffs(del, cohort, ymax.del)
@@ -116,6 +117,7 @@ plot.all <- function(del, dup){
 
 # Load required libraries
 require(optparse, quietly=T)
+require(rCNV2, quietly=T)
 
 # List of command-line options
 option_list <- list(
@@ -146,13 +148,14 @@ max.eval <- opts$`max-eval`
 del <- load.data(del.in, max.eval)
 dup <- load.data(dup.in, max.eval)
 
-# Run optimization
-del.opt <- joint.opt(del, max.eval)
-dup.opt <- joint.opt(dup, max.eval)
-print(paste("Optimal cutoffs:", del.opt, "(DEL);", dup.opt, "(DUP)"))
+# Run optimization per CNV type
+del.opt <- opt.single.cnvtype(del, max.eval)
+dup.opt <- opt.single.cnvtype(dup, max.eval)
+print(paste("Optimal cutoffs per CNV type:",
+            del.opt$opt, "(DEL);", dup.opt$opt, "(DUP)"))
 
 # Plot optimization
-pdf(out.pdf, height=4, width=8)
+pdf(out.pdf, height=4, width=10)
 plot.all(del, dup)
 dev.off()
 

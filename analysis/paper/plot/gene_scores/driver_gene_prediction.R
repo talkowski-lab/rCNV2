@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -24,9 +24,9 @@ score.segs <- function(segs, scores){
       genes <- unlist(segs$genes[i])
       cnvtype <- segs$cnv[i]
       if(cnvtype=="DUP"){
-        seg.score.df <- scores[which(scores$gene %in% genes), c("gene", "pTS")]
+        seg.score.df <- scores[which(scores$gene %in% genes), c("gene", "pTriplo")]
       }else{
-        seg.score.df <- scores[which(scores$gene %in% genes), c("gene", "pHI")]
+        seg.score.df <- scores[which(scores$gene %in% genes), c("gene", "pHaplo")]
       }
       colnames(seg.score.df) <- c("gene", "score")
       seg.score.df[order(-seg.score.df$score), ]
@@ -73,7 +73,7 @@ make.driver.table <- function(segs, seg.scores){
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Plot a single horizontal swarmplot of gene scores for a single segment
-horiz.swarm <- function(x, at, hc.color, lc.color, ns.color, x.add=0, end.buffer=0.05, 
+horiz.swarm <- function(x, at, hc.color, lc.color, ns.color, x.add=0, end.buffer=0.05,
                         hc.cutoff=0.9, lc.cutoff=0.5, height=0.8, pt.cex=1){
   pt.colors <- sapply(x, function(x){
     if(x>=hc.cutoff){
@@ -114,11 +114,11 @@ plot.all.seg.scores <- function(segs, seg.scores, cnv.type, hc.cutoff=0.9, lc.cu
   if(cnv.type=="DEL"){
     hc.color <- cnv.colors[1]
     lc.color <- control.cnv.colors[1]
-    ax.title <- "pHI"
+    ax.title <- "pHaplo"
   }else{
     hc.color <- cnv.colors[2]
     lc.color <- control.cnv.colors[2]
-    ax.title <- "pTS"
+    ax.title <- "pTriplo"
   }
   n.rows <- ceiling(length(plot.dat) / n.cols)
   x.buffer <- 1
@@ -126,12 +126,12 @@ plot.all.seg.scores <- function(segs, seg.scores, cnv.type, hc.cutoff=0.9, lc.cu
   x.left <- seq(0, 2*(n.cols-1), 1+x.buffer)
   y.bottom <- (0:(n.rows-1))+y.buffer
   y.top <- (1:n.rows)-y.buffer
-  
+
   # Prep plot area
   par(bty="n", mar=parmar)
   plot(NA, xlim=c(-x.buffer, max(x.left)+1), ylim=c(n.rows, 0),
        xaxt="n", yaxt="n", xlab="", ylab="", yaxs="i")
-  
+
   # Add plot areas, gridlines, and shading
   sapply(1:n.rows, function(ridx){
     sapply(1:n.cols, function(cidx){
@@ -150,7 +150,7 @@ plot.all.seg.scores <- function(segs, seg.scores, cnv.type, hc.cutoff=0.9, lc.cu
       }
     })
   })
-  
+
   # Add swarmplots & segment annotations
   sapply(1:n.rows, function(ridx){
     sapply(1:n.cols, function(cidx){
@@ -158,18 +158,18 @@ plot.all.seg.scores <- function(segs, seg.scores, cnv.type, hc.cutoff=0.9, lc.cu
       if(seg.idx <= length(plot.dat)){
         seg.name <- names(plot.dat)[seg.idx]
         orig.vals <- plot.dat[[seg.idx]]$score
-        horiz.swarm(orig.vals, at=ridx-0.5, height=1-(2*(y.buffer+0.025)), 
-                    hc.color=hc.color, lc.color=lc.color, ns.color=ns.color, 
+        horiz.swarm(orig.vals, at=ridx-0.5, height=1-(2*(y.buffer+0.025)),
+                    hc.color=hc.color, lc.color=lc.color, ns.color=ns.color,
                     x.add=x.left[cidx], hc.cutoff=hc.cutoff, lc.cutoff=lc.cutoff,
                     pt.cex=pt.cex)
         hc.idxs <- which(orig.vals>=hc.cutoff)
         if(length(hc.idxs) > 0 & length(hc.idxs) < 3){
-          text(x=orig.vals[hc.idxs[1]]+x.left[cidx]+0.04, y=ridx-0.5-0.2, 
-               pos=2, cex=0.85, font=3, col="black", 
+          text(x=orig.vals[hc.idxs[1]]+x.left[cidx]+0.04, y=ridx-0.5-0.2,
+               pos=2, cex=0.85, font=3, col="black",
                labels=plot.dat[[seg.idx]]$gene[hc.idxs[1]])
           if(length(hc.idxs) == 2){
-            text(x=orig.vals[hc.idxs[2]]+x.left[cidx]+0.04, y=ridx-0.5+0.2, 
-                 pos=2, cex=0.85, font=3, col="black", 
+            text(x=orig.vals[hc.idxs[2]]+x.left[cidx]+0.04, y=ridx-0.5+0.2,
+                 pos=2, cex=0.85, font=3, col="black",
                  labels=plot.dat[[seg.idx]]$gene[hc.idxs[2]])
           }
         }
@@ -178,7 +178,7 @@ plot.all.seg.scores <- function(segs, seg.scores, cnv.type, hc.cutoff=0.9, lc.cu
       }
     })
   })
-  
+
   # Add cleanup outer boxes
   sapply(1:n.rows, function(ridx){
     sapply(1:n.cols, function(cidx){
@@ -190,7 +190,7 @@ plot.all.seg.scores <- function(segs, seg.scores, cnv.type, hc.cutoff=0.9, lc.cu
       }
     })
   })
-  
+
   # Add top X axes
   x.ax.labs <- seq(0, 1, 0.2)
   sapply(1:n.cols, function(cidx){
@@ -207,14 +207,12 @@ plot.all.seg.scores <- function(segs, seg.scores, cnv.type, hc.cutoff=0.9, lc.cu
 #####################
 ### RSCRIPT BLOCK ###
 #####################
+require(rCNV2, quietly=T)
 require(optparse, quietly=T)
-require(funr, quietly=T)
 require(beeswarm, quietly=T)
 
 # List of command-line options
-option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
-)
+option_list <- list()
 
 # Get command-line arguments & options
 args <- parse_args(OptionParser(usage=paste("%prog scores.tsv segs.tsv out_prefix", sep=" "),
@@ -231,24 +229,11 @@ if(length(args$args) != 3){
 scores.in <- args$args[1]
 segs.in <- args$args[2]
 out.prefix <- args$args[3]
-rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
 # scores.in <- "~/scratch/rCNV.gene_scores.tsv.gz"
 # segs.in <- "~/scratch/rCNV2_analysis_d1.master_segments.bed.gz"
 # out.prefix <- "~/scratch/driver_gene_test"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/gene_scores/"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
-
-# Source common functions
-script.dir <- funr::get_script_path()
-source(paste(script.dir, "../large_segments/common_functions.R", sep="/"))
-source(paste(script.dir, "common_functions.R", sep="/"))
 
 # Load scores
 scores <- load.scores(scores.in)

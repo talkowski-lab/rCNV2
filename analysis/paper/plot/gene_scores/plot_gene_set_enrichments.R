@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -86,14 +86,14 @@ geneset.ks.tests <- function(gsets, scores, score){
 plot.enrichments <- function(enrich.df, score, max.pct=0.5, x.tck=-0.025,
                              parmar=c(0, 11.5, 2.15, 0.2)){
   # Set score-dependent plotting parameters
-  if(score == "pHI"){
+  if(score == "pHaplo"){
     score.pal <- colorRampPalette(c("white", cnv.colors[1]))(101)
     bonf.col <- cnv.blacks[1]
-  }else if(score == "pTS"){
+  }else if(score == "pTriplo"){
     score.pal <- colorRampPalette(c("white", cnv.colors[2]))(101)
     bonf.col <- cnv.blacks[2]
   }
-  
+
   # Collect plot parameters
   n.rows <- length(enrich.df)
   n.cols <- nrow(enrich.df[[1]]$enrich)
@@ -101,12 +101,12 @@ plot.enrichments <- function(enrich.df, score, max.pct=0.5, x.tck=-0.025,
   box.rights <- 1:n.cols
   x.ax.at <- seq(0, n.cols, length.out=6)
   x.ax.labels <- seq(0, 1, 0.2)
-  
+
   # Prep plot area
   par(bty="n", mar=parmar)
   plot(NA, xlim=c(0, n.cols), ylim=c(n.rows, 0),
        xaxt="n", yaxt="n", xlab="", ylab="")
-  
+
   # Add rectangles
   sapply(1:length(enrich.df), function(i){
     col.idxs <- (floor(100*enrich.df[[i]]$enrich$frac)+1)/max.pct
@@ -115,7 +115,7 @@ plot.enrichments <- function(enrich.df, score, max.pct=0.5, x.tck=-0.025,
          ybottom=i-1, ytop=i,
          border=bluewhite, col=score.pal[col.idxs])
   })
-  
+
   # Add significance markers
   sapply(1:length(enrich.df), function(i){
     up.idx <- which(enrich.df[[i]]$enrich$bonf & enrich.df[[i]]$enrich$fold > 1)
@@ -126,15 +126,15 @@ plot.enrichments <- function(enrich.df, score, max.pct=0.5, x.tck=-0.025,
     #   arrow.colors[maxed.idx] <- "white"
     # }
     if(length(up.idx) > 0){
-      Arrows(x0=up.idx-0.5, x1=up.idx-0.5, y0=i-0.25, y1=i-0.75, col=arrow.colors[up.idx], 
+      Arrows(x0=up.idx-0.5, x1=up.idx-0.5, y0=i-0.25, y1=i-0.75, col=arrow.colors[up.idx],
              arr.type="triangle", arr.length=0.12, arr.width=0.1, arr.adj=1)
     }
     if(length(down.idx) > 0){
-      Arrows(x0=down.idx-0.5, x1=down.idx-0.5, y0=i-0.75, y1=i-0.25, col=arrow.colors[down.idx], 
+      Arrows(x0=down.idx-0.5, x1=down.idx-0.5, y0=i-0.75, y1=i-0.25, col=arrow.colors[down.idx],
              arr.type="triangle", arr.length=0.12, arr.width=0.1, arr.adj=1)
     }
   })
-  
+
   # Add labels
   sapply(1:n.rows, function(i){
     y.label <- names(enrich.df)[i]
@@ -145,7 +145,7 @@ plot.enrichments <- function(enrich.df, score, max.pct=0.5, x.tck=-0.025,
     y.label <- paste(y.label, " (n=", prettyNum(n.genes, big.mark=","), ")", sep="")
     axis(2, at=i-0.5, tick=F, line=-1, las=2, cex=5.5/6, labels=y.label)
   })
-  
+
   # Add x-axis label
   axis(3, at=x.ax.at, labels=NA, tck=x.tck, col=blueblack)
   sapply(1:length(x.ax.at), function(i){
@@ -157,15 +157,15 @@ plot.enrichments <- function(enrich.df, score, max.pct=0.5, x.tck=-0.025,
 # Plot color gradient legend
 plot.gradient.legend <- function(score, max.pct=0.5){
   # Set score-dependent plotting parameters
-  if(score == "pHI"){
+  if(score == "pHaplo"){
     score.pal <- colorRampPalette(c("white", cnv.colors[1]))(101)
-  }else if(score == "pTS"){
+  }else if(score == "pTriplo"){
     score.pal <- colorRampPalette(c("white", cnv.colors[2]))(101)
   }else if(score == "both"){
     score.pal <- list(colorRampPalette(c("white", cnv.colors[1]))(101),
                        colorRampPalette(c("white", cnv.colors[2]))(101))
   }
-  
+
   # Plot legend
   par(bty="n", mar=c(0.05, 1.2, 1, 2.1))
   plot(NA, xlim=c(0, 100), ylim=c(0, 1),
@@ -177,7 +177,7 @@ plot.gradient.legend <- function(score, max.pct=0.5){
     rect(xleft=0:99, xright=1:100, ybottom=0, ytop=1, col=score.pal, border=score.pal, lwd=0.5)
   }
   box(bty="o", col=blueblack, xpd=T)
-  
+
   # Add labels
   # axis(3, at=c(0, 100), tck=-0.25, col=blueblack, labels=NA)
   axis(2, at=0.5, line=-0.9, tick=F, labels="0%", cex.axis=5/6, las=2)
@@ -189,18 +189,17 @@ plot.gradient.legend <- function(score, max.pct=0.5){
 #####################
 ### RSCRIPT BLOCK ###
 #####################
+require(rCNV2, quietly=T)
 require(optparse, quietly=T)
-require(funr, quietly=T)
 require(shape, quietly=T)
 
 # List of command-line options
 option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced."),
   make_option(c("--height"), help="Height of output pdf, in inches.", default=2)
 )
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage=paste("%prog scores.tsv genesets.tsv score", 
+args <- parse_args(OptionParser(usage=paste("%prog scores.tsv genesets.tsv score",
                                             "out_prefix"),
                                 option_list=option_list),
                    positional_arguments=TRUE)
@@ -208,7 +207,7 @@ opts <- args$options
 
 # Checks for appropriate positional arguments
 if(length(args$args) != 4){
-  stop(paste("Four positional arguments required: scores.tsv, genesets.tsv,", 
+  stop(paste("Four positional arguments required: scores.tsv, genesets.tsv,",
              "score, and out_prefix\n"))
 }
 
@@ -218,25 +217,13 @@ genesets.in <- args$args[2]
 score <- args$args[3]
 out.prefix <- args$args[4]
 pdf.height <- opts$height
-rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
 # scores.in <- "~/scratch/rCNV.gene_scores.tsv.gz"
 # genesets.in <- "~/scratch/phi_vs_gene_sets.input.tsv"
-# score <- "pHI"
+# score <- "pHaplo"
 # out.prefix <- "~/scratch/geneset_enrichments_test"
 # pdf.height <- 1.8
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/gene_scores/"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
-
-# Source common functions
-script.dir <- funr::get_script_path()
-source(paste(script.dir, "common_functions.R", sep="/"))
 
 # Load scores
 scores <- load.scores(scores.in)
@@ -262,8 +249,8 @@ pdf(paste(out.prefix, score, "geneset_enrichments.legend.pdf", sep="."),
 plot.gradient.legend(score)
 dev.off()
 
-# Plot split legend only for pHI
-if(score=="pHI"){
+# Plot split legend only for pHaplo
+if(score=="pHaplo"){
   pdf(paste(out.prefix, score, "geneset_enrichments.double_legend.pdf", sep="."),
       height=0.35, width=1.8)
   plot.gradient.legend("both")

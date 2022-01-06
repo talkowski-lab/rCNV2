@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -66,10 +66,10 @@ summed.oe <- function(obs.exp.df, indexes=NULL){
 
 # Compute obs/exp DNMs for a single consequence & cohort for a set of genes
 calc.dnm.oe.single <- function(genes, meta, cohort, csq){
-  obs.exp.df <- meta[which(meta$gene %in% genes), 
+  obs.exp.df <- meta[which(meta$gene %in% genes),
                      grep(paste(cohort, "dn", csq, sep="_"), colnames(meta))]
   oe <- summed.oe(obs.exp.df)
-  ci <- boot.ci(boot(data=obs.exp.df, statistic=summed.oe, R=1000), 
+  ci <- boot.ci(boot(data=obs.exp.df, statistic=summed.oe, R=1000),
                 conf=0.95, type="norm")$normal[, -1]
   as.numeric(c(oe, ci))
 }
@@ -107,7 +107,7 @@ calc.frac.bcas <- function(gene.groups, meta){
   res <- data.frame(t(sapply(gene.groups, function(genes){
     idxs <- which(meta$gene %in% genes)
     frac <- frac.disrupted(bca.counts[idxs])
-    ci <- boot.ci(boot(data=bca.counts[idxs], statistic=frac.disrupted, R=1000), 
+    ci <- boot.ci(boot(data=bca.counts[idxs], statistic=frac.disrupted, R=1000),
                   conf=0.95, type="norm")$normal[, -1]
     as.numeric(c(frac, ci))
   })))
@@ -126,7 +126,7 @@ plot.dnm.oe <- function(scores, score, meta, cohort, csqs, n.bins=10,
   # Collect plot data
   gene.groups <- bin.genes(scores, score, n.bins)
   plot.dat <- calc.dnm.oe.cohort(gene.groups, meta, cohort, csqs)
-  
+
   # Set parameters
   if(is.null(ymax)){
     ymax <- max(unlist(lapply(plot.dat, range, na.rm=T)), na.rm=T)
@@ -149,28 +149,28 @@ plot.dnm.oe <- function(scores, score, meta, cohort, csqs, n.bins=10,
     plot.bty <- "n"
     grid.col <- NA
   }
-  
+
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=c(0, 1), ylim=ylims,
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
-  rect(xleft=par("usr")[1], xright=par("usr")[2], 
+  rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
        border=plot.border, bty=plot.bty, col=plot.bg)
   abline(h=axTicks(2), v=axTicks(1), col=grid.col)
   abline(h=1, col=blueblack, lty=2)
-  
+
   # Add points
   x.breaks <- seq(0, 1, length.out=n.bins+1)
   x.at <- (x.breaks[-1] + x.breaks[-length(x.breaks)])/2
   x.mod <- 0.015
   sapply(length(plot.dat):1, function(i){
-    segments(x0=x.at+(x.mod*(2-i)), x1=x.at+(x.mod*(2-i)), 
+    segments(x0=x.at+(x.mod*(2-i)), x1=x.at+(x.mod*(2-i)),
              y0=plot.dat[[i]][, 2], y1=plot.dat[[i]][, 3],
              col=snv.colors[i], lend="round", lwd=1.5)
     points(x=x.at+(x.mod*(2-i)), y=plot.dat[[i]][, 1], pch=19, col=snv.colors[i])
   })
-  
+
   # Add axes
   x.ax.at <- axTicks(1)
   axis(1, at=c(-100, 100), col=blueblack, tck=0, labels=NA)
@@ -195,7 +195,7 @@ plot.bca.fracs <- function(scores, score, meta, n.bins=10,
   all.plot.dat <- calc.frac.bcas(gene.groups, meta)
   plot.dat <- all.plot.dat$bins
   baseline <- all.plot.dat$baseline
-  
+
   # Set parameters
   if(is.null(ymax)){
     ymax <- max(plot.dat, na.rm=T)
@@ -204,9 +204,9 @@ plot.bca.fracs <- function(scores, score, meta, n.bins=10,
   if(is.null(xlab)){
     xlab <- paste("Genes Binned by", score)
   }
-  if(score=="pHI"){
+  if(score=="pHaplo"){
     color <- cnv.colors[1]
-  }else if(score=="pTS"){
+  }else if(score=="pTriplo"){
     color <- cnv.colors[2]
   }else{
     color <- blueblack
@@ -222,28 +222,28 @@ plot.bca.fracs <- function(scores, score, meta, n.bins=10,
     plot.bty <- "n"
     grid.col <- NA
   }
-  
+
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=c(0, 1), ylim=ylims,
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
-  rect(xleft=par("usr")[1], xright=par("usr")[2], 
+  rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
        border=plot.border, bty=plot.bty, col=plot.bg)
   abline(h=axTicks(2), v=axTicks(1), col=grid.col)
   abline(h=baseline, col=blueblack, lty=2)
   text(x=par("usr")[1]-(0.05*(par("usr")[2]-par("usr")[1])),
-       y=baseline+(0.04*(par("usr")[4]-par("usr")[3])), 
+       y=baseline+(0.04*(par("usr")[4]-par("usr")[3])),
        labels="Baseline", cex=0.85, font=3, pos=4, col=blueblack)
-  
+
   # Add points
   x.breaks <- seq(0, 1, length.out=n.bins+1)
   x.at <- (x.breaks[-1] + x.breaks[-length(x.breaks)])/2
-  segments(x0=x.at, x1=x.at, 
+  segments(x0=x.at, x1=x.at,
            y0=plot.dat[, 2], y1=plot.dat[, 3],
            col=color, lend="round", lwd=1.5)
   points(x=x.at, y=plot.dat[, 1], pch=19, col=color)
-  
+
   # Add axes
   x.ax.at <- axTicks(1)
   axis(1, at=c(-100, 100), col=blueblack, tck=0, labels=NA)
@@ -264,14 +264,12 @@ plot.bca.fracs <- function(scores, score, meta, n.bins=10,
 #####################
 ### RSCRIPT BLOCK ###
 #####################
+require(rCNV2, quietly=T)
 require(optparse, quietly=T)
-require(funr, quietly=T)
 require(boot, quietly=T)
 
 # List of command-line options
-option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
-)
+option_list <- list()
 
 # Get command-line arguments & options
 args <- parse_args(OptionParser(usage=paste("%prog rCNV_scores.tsv gene.meta.bed neutral.genes out.prefix", sep=" "),
@@ -289,24 +287,12 @@ scores.in <- args$args[1]
 meta.in <- args$args[2]
 neutral.genes.in <- args$args[3]
 out.prefix <- args$args[4]
-rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
 # scores.in <- "~/scratch/rCNV.gene_scores.tsv.gz"
 # meta.in <- "~/scratch/gencode.v19.canonical.pext_filtered.all_features.bed.gz"
 # neutral.genes.in <- "~/scratch/gene_lists/gnomad.v2.1.1.likely_unconstrained.genes.list"
 # out.prefix <- "~/scratch/test_gene_score_dnm_analyses"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/gene_scores/"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
-
-# Source common functions
-script.dir <- funr::get_script_path()
-source(paste(script.dir, "common_functions.R", sep="/"))
 
 # Load gene scores & divide genes by score
 scores <- load.scores(scores.in)
@@ -319,8 +305,8 @@ meta <- load.gene.metadata(meta.in)
 meta <- meta[which(meta$gene %in% scores$gene), ]
 meta <- calc.exp.dnms(meta, dnm.cohorts, csqs, neutral.genes)
 
-# Plot DNM enrichment per score per exome cohort 
-sapply(c("pHI", "pTS"), function(score){
+# Plot DNM enrichment per score per exome cohort
+sapply(c("pHaplo", "pTriplo"), function(score){
   sapply(dnm.cohorts, function(cohort){
     pdf(paste(out.prefix, "dnm_enrichments", cohort, score, "pdf", sep="."),
         height=2, width=3)
@@ -330,7 +316,7 @@ sapply(c("pHI", "pTS"), function(score){
 })
 
 # Plot fraction of genes disrupted by de novo BCA
-sapply(c("pHI", "pTS"), function(score){
+sapply(c("pHaplo", "pTriplo"), function(score){
   pdf(paste(out.prefix, "dnm_enrichments.BCA", score, "pdf", sep="."),
       height=2, width=2.6)
   plot.bca.fracs(scores, score, meta, blue.bg=FALSE)

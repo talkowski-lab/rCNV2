@@ -272,6 +272,7 @@ load.rcnv.env <- function(load.strings=TRUE, load.colors=TRUE, load.scales=TRUE)
       gene.feat.category.colors = c("genomic" = "#027831",
                                     "expression" = "#FFA300",
                                     "chromatin" = "#6D3D84",
+                                    "protein" = "#30D5C8",
                                     "constraint" = "#F6313E"),
       h3k27ac.color = "#FFC34D",
       nc.anno.family.colors = c("chromhmm" = "#490C65",

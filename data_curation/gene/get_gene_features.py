@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2019 Ryan L. Collins <rlcollins@g.harvard.edu> 
+# Copyright (c) 2019-Present Ryan L. Collins <rlcollins@g.harvard.edu> 
 # and the Talkowski Laboratory
 # Distributed under terms of the MIT license.
 
@@ -383,8 +383,8 @@ def get_genomic_features(genes, txbt, exonbt, tx_stats, gnomad_tsv, min_intron_s
             reader = csv.reader(tsv, delimiter='\t')
             for track, action, tname in reader:
                 add_header_cols.append(tname)
-                newanno = {x[3]: float(x[4]) for x in \
-                           add_local_track(tx_bed, track, action, 8, True)}
+                newanno_vals = add_local_track(tx_bed, track, action, True)
+                newanno = {g : v for g, v in zip([x.name for x in tx_bed], newanno_vals)}
                 for gene, val in newanno.items():
                     gfeats_tmp[gene].append(val)
         header_cols = header_cols + add_header_cols
@@ -547,7 +547,8 @@ def get_expression_features(genes, ensg_ids, gtex_medians, gtex_mads, gtex_pca):
     return header, expression_features
 
 
-def get_chromatin_features(genes, ensg_ids, roadmap_means, roadmap_sds, roadmap_pca):
+def get_chromatin_features(genes, ensg_ids, roadmap_means, roadmap_sds, 
+                           roadmap_pca, episcore_tsv):
     """
     Collect various chromatin features per gene
     """
@@ -594,6 +595,19 @@ def get_chromatin_features(genes, ensg_ids, roadmap_means, roadmap_sds, roadmap_
                     cfeats_tmp[gene].append(0)
         header_cols += pca_cols
 
+    # Add Episcore, if optioned
+    if episcore_tsv is not None:
+        episcore = pd.read_csv(episcore_tsv, delimiter='\t', 
+                               names='gene episcore'.split(), skiprows=1)
+        episcore = episcore.loc[episcore.gene.isin(cfeats_tmp.keys()), :]
+        episcore_mean = np.nanmean(episcore.episcore)
+        for gene in genes:
+            if any(episcore.gene == gene):
+                cfeats_tmp[gene].append(episcore.episcore[episcore.gene == gene].values[0])
+            else:
+                cfeats_tmp[gene].append(episcore_mean)
+        header_cols.append('episcore')
+
     # Format output string of all chromatin features per gene
     header = '\t'.join(header_cols)
     chromatin_features = {}
@@ -604,9 +618,42 @@ def get_chromatin_features(genes, ensg_ids, roadmap_means, roadmap_sds, roadmap_
     return header, chromatin_features
 
 
+def get_protein_features(genes, uniprot_tsv):
+    """
+    Collect various protein features per gene
+    """
+
+    pfeats_tmp = {g : [] for g in genes}
+    header_cols = []
+
+    # Load UniProt data
+    pdat = pd.read_csv(uniprot_tsv, delimiter='\t')
+    pdat.index = pdat.gene
+    pdat.drop('gene', axis=1, inplace=True)
+    header_cols = list(pdat.columns)
+    pdat_meds = pdat.apply(np.median).tolist()
+
+    # Extract features for each gene
+    for gene in genes:
+        if gene in pdat.index:
+            pfeats_tmp[gene] = pdat.loc[gene].tolist()
+        else:
+            pfeats_tmp[gene] = pdat_meds
+
+    # Format output string of all protein features per gene
+    header = '\t'.join(header_cols)
+    protein_features = {}
+    for gene in genes:
+        pfeats_str = '\t'.join([str(x) for x in pfeats_tmp[gene]])
+        protein_features[gene] = pfeats_str
+
+    return header, protein_features
+
+
 def get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ensg,
                             gnomad_tsv, exac_cnv_tsv, rvis_tsv, eds_tsv, hi_tsv, 
-                            ref_fasta, phastcons_url, promoter_size=1000):
+                            shet_tsv, ccdg_tsv, ref_fasta, phastcons_url, 
+                            promoter_size=1000):
     """
     Collect various evolutionary constraint features per gene
     """
@@ -640,12 +687,14 @@ def get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ens
     # Add ExAC CNV Z-score
     if exac_cnv_tsv is not None:
         # Load ExAC CNV data
-        exac = pd.read_csv(exac_cnv_tsv, delimiter='\t')
-        exac_vals = exac.set_index(exac.gene).loc[:, 'cnv_z'].fillna(0).to_dict()
-        # Add values to cfeats per gene
-        for gene in genes:
-            cfeats_tmp[gene].append(exac_vals.get(gene, 0))
-        header_cols.append('exac_cnv_z')
+        exac = pd.read_csv(exac_cnv_tsv, delimiter=' ')
+
+        # Add all three scores
+        for prefix in 'del dup cnv'.split():
+            exac_vals = exac.set_index(exac.gene_symbol).loc[:, prefix + '.score'].fillna(0).to_dict()
+            for gene in genes:
+                cfeats_tmp[gene].append(exac_vals.get(gene, 0))
+            header_cols.append('exac_' + prefix + '_z')
 
     # Add RVIS, if optioned. Assumes RVIS March 2017 release corresponding to gnomAD v2.0
     if rvis_tsv is not None:
@@ -682,6 +731,31 @@ def get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ens
             cfeats_tmp[gene].append(hi_dat.get(gene, hi_avg))
         header_cols.append('hurles_hi')
 
+    # Add Cassa sHet scores, if optioned
+    if shet_tsv is not None:
+        shet = pd.read_csv(shet_tsv, delimiter='\t', names='gene sHet'.split(), skiprows=1)
+        shet = shet.loc[shet.gene.isin(cfeats_tmp.keys()), :]
+        shet_mean = np.nanmean(shet.sHet)
+        for gene in genes:
+            if any(shet.gene == gene):
+                cfeats_tmp[gene].append(shet.sHet[shet.gene == gene].values[0])
+            else:
+                cfeats_tmp[gene].append(shet_mean)
+        header_cols.append('sHet')
+
+    # Add CCDG CNV sensitivity scores, if optioned
+    if ccdg_tsv is not None:
+        ccdg = pd.read_csv(ccdg_tsv, delimiter='\t', skiprows=1, 
+                           names='gene del dup'.split())
+        ccdg = ccdg.loc[ccdg.gene.isin(cfeats_tmp.keys()), :]
+        
+        for cnv in 'del dup'.split():
+            ccdg_mean = np.nanmean(ccdg[cnv])
+            ccdg_vals = ccdg.set_index(ccdg.gene).loc[:, cnv].fillna(ccdg_mean).to_dict()
+            for gene in genes:
+                cfeats_tmp[gene].append(ccdg_vals.get(gene, ccdg_mean))
+            header_cols.append('ccdg_' + cnv)
+
     # Make dictionary of promoter coordinates
     promoters = {}
     for gene in genes:
@@ -711,25 +785,29 @@ def get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ens
 
     # Get promoter, exon, and gene body conservation if phastcons_url is provided
     if phastcons_url is not None:
-        # Make master pbt.BedTool of all promoters for one-shot conservation calculation
+        # Make single pbt.BedTool of all promoters for one-shot conservation calculation
         all_prom_str = ''.join([str(v['prom_bt'][0]) for v in promoters.values()])
         all_prom_bt = pbt.BedTool(all_prom_str, from_string=True)
-        all_prom_cons = add_local_track(all_prom_bt, phastcons_url, 'map-mean', 8, True)
-        all_prom_cons_df = \
-            all_prom_cons.to_dataframe(names='chr start end gene cons'.split())
+        all_prom_cons = add_local_track(all_prom_bt, phastcons_url, 'map-mean', True)
+        all_prom_cons_dict = {g : v for g, v in zip([x.name for x in all_prom_bt], all_prom_cons)}
+        all_prom_cons_mean = np.nanmean(list(all_prom_cons_dict.values()))
+
         # Calculate conservation for all exons
-        all_ex_cons = add_local_track(exonbt, phastcons_url, 'map-mean', 8, True)
-        all_ex_cons_df = all_ex_cons.to_dataframe().iloc[:, np.r_[0, 3:5, 8:10]]
+        all_ex_cons = add_local_track(exonbt, phastcons_url, 'map-mean', True)
+        exondf = exonbt.to_dataframe()
+        exondf['cons'] = all_ex_cons
+        all_ex_cons_df = exondf.iloc[:, np.r_[0, 3:5, 8:10]]
         all_ex_cons_df.columns = 'chr start end info cons'.split()
         all_ex_cons_df['size'] = all_ex_cons_df['end'] - all_ex_cons_df['start']
+        
         # Calculate conservation for all gene bodies
-        all_tx_cons = add_local_track(txbt, phastcons_url, 'map-mean', 8, True)
-        all_tx_cons_df = all_tx_cons.\
-                             to_dataframe(names='chr x y start end sc st z info cons'.split()).\
-                             iloc[:, np.r_[0, 3:5, 8:10]]
+        all_tx_cons = add_local_track(txbt, phastcons_url, 'map-mean', True)
+        txdf = txbt.to_dataframe(names='chr x y start end sc st z info cons'.split())
+        txdf['cons'] = all_tx_cons
+        all_tx_cons_df = txdf.iloc[:, np.r_[0, 3:5, 8:10]]
         # Annotate for each gene
         for gene in genes:
-            prom_cons = all_prom_cons_df.loc[all_prom_cons_df.gene == gene]['cons'].iloc[0]
+            prom_cons = all_prom_cons_dict.get(gene, all_prom_cons_mean)
             ex_keep = all_ex_cons_df['info'].str.contains('gene_name "{}"'.format(gene))
             if ex_keep.sum() > 0:
                 ex_cons_df = all_ex_cons_df.loc[ex_keep, 'size cons'.split()]
@@ -872,8 +950,8 @@ def get_variation_features(genes, ensg_ids, tx_stats, txbt, exonbt, gene_to_ensg
 
 
 def write_outbed(outbed, header, genes, txbt, tx_stats, genomic_features,
-                 expression_features, chromatin_features, constraint_features,
-                 variation_features):
+                 expression_features, chromatin_features, protein_features,
+                 constraint_features, variation_features):
     """
     Format output table of features and write to output BED file
     """
@@ -897,6 +975,9 @@ def write_outbed(outbed, header, genes, txbt, tx_stats, genomic_features,
 
         if chromatin_features is not None:
             outstr = outstr + '\t' + chromatin_features[gene]
+
+        if protein_features is not None:
+            outstr = outstr + '\t' + protein_features[gene]
 
         if constraint_features is not None:
             outstr = outstr + '\t' + constraint_features[gene]            
@@ -926,6 +1007,8 @@ def main():
                         'gene expression features. [default: False]')
     parser.add_argument('--get-chromatin', action='store_true', help='Collect ' +
                         'chromatin features. [default: False]')
+    parser.add_argument('--get-protein', action='store_true', help='Collect ' +
+                        'protein features. [default: False]')
     parser.add_argument('--get-constraint', action='store_true', help='Collect ' +
                         'evolutionary constraint features. [default: False]')
     parser.add_argument('--get-variation', action='store_true', help='Collect ' +
@@ -949,6 +1032,10 @@ def main():
                         'Only used if --get-chromatin is specified.')
     parser.add_argument('--roadmap-pca', help='Roadmap gene X tissue X state principal components. ' +
                         'Only used if --get-chromatin is specified.')
+    parser.add_argument('--episcore-tsv', help='Episcore tsv. Only used if ' +
+                        '--get-chromatin is specified.')
+    parser.add_argument('--uniprot-tsv', help='tsv of protein features from UniProt. ' +
+                        'Only used if --get-protein is specified.')
     parser.add_argument('--gnomad-constraint', help='gnomAD constraint tsv. Only ' +
                         'used if --get-genomic, --get-constraint, or --get-variation ' +
                         'are specified.')
@@ -960,6 +1047,10 @@ def main():
                         'is specified.')
     parser.add_argument('--hi-tsv', help='Hurles HI scores tsv. Only used if ' +
                         '--get-constraint is specified.')
+    parser.add_argument('--shet-tsv', help='Cassa sHet scores tsv. Only used if ' +
+                        '--get-constraint is specified.')
+    parser.add_argument('--ccdg-tsv', help='CCDG CNV sensitivity scores tsv. ' +
+                        'Only used if --get-constraint is specified.')
     parser.add_argument('--phastcons-bw-url', help='URL to phastCons bigWig.',
                         default='http://hgdownload.soe.ucsc.edu/goldenPath/hg19/phastCons100way/hg19.100way.phastCons.bw')
     parser.add_argument('--ddd-dnms', help='DDD de novo mutation counts per gene. ' +
@@ -1035,10 +1126,19 @@ def main():
     if args.get_chromatin:
         header_add, chromatin_features = \
             get_chromatin_features(genes, ensg_ids, args.roadmap_means, 
-                                   args.roadmap_sds, args.roadmap_pca)
+                                   args.roadmap_sds, args.roadmap_pca,
+                                   args.episcore_tsv)
         outbed_header = outbed_header + '\t' + header_add
     else:
         chromatin_features = None
+
+    # Get protein stats, if optioned
+    if args.get_protein:
+        header_add, protein_features = \
+            get_protein_features(genes, args.uniprot_tsv)
+        outbed_header = outbed_header + '\t' + header_add
+    else:
+        protein_features = None
 
     # Get constraint stats, if optioned
     if args.get_constraint:
@@ -1046,8 +1146,8 @@ def main():
             get_constraint_features(genes, ensg_ids, tx_stats, txbt, exonbt, 
                                     gene_to_ensg, args.gnomad_constraint, 
                                     args.exac_cnv, args.rvis_tsv, args.eds_tsv, 
-                                    args.hi_tsv, args.ref_fasta, 
-                                    args.phastcons_bw_url)
+                                    args.hi_tsv, args.shet_tsv, args.ccdg_tsv,
+                                    args.ref_fasta, args.phastcons_bw_url)
         outbed_header = outbed_header + '\t' + header_add
     else:
         constraint_features = None
@@ -1065,8 +1165,8 @@ def main():
 
     # Format output table of features
     write_outbed(outbed, outbed_header, genes, txbt, tx_stats, genomic_features,
-                 expression_features, chromatin_features, constraint_features,
-                 variation_features)
+                 expression_features, chromatin_features, protein_features, 
+                 constraint_features, variation_features)
     if args.outbed is not None \
     and args.outbed not in 'stdout -'.split() \
     and args.bgzip:

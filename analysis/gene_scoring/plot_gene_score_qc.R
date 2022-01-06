@@ -208,28 +208,28 @@ del.false <- read.table(del_false.in, header=F)[, 1]
 dup.false <- read.table(dup_false.in, header=F)[, 1]
 
 # Compute plot stats for DEL & DUP
-del.data <- calc.plot.data(stats, "pHI", del.truth, del.false)
-dup.data <- calc.plot.data(stats, "pTS", dup.truth, dup.false)
+del.data <- calc.plot.data(stats, "pHaplo", del.truth, del.false)
+dup.data <- calc.plot.data(stats, "pTriplo", dup.truth, dup.false)
 
-# Generate all DEL/pHI plots
-pdf(paste(out.prefix, "pHI.roc.pdf", sep="."), height=4, width=4)
+# Generate all DEL/pHaplo plots
+pdf(paste(out.prefix, "pHaplo.roc.pdf", sep="."), height=4, width=4)
 plot.roc(del.data)
 dev.off()
-pdf(paste(out.prefix, "pHI.prc.pdf", sep="."), height=4, width=4)
+pdf(paste(out.prefix, "pHaplo.prc.pdf", sep="."), height=4, width=4)
 plot.prc(del.data)
 dev.off()
-pdf(paste(out.prefix, "pHI.enrich.pdf", sep="."), height=4, width=4)
+pdf(paste(out.prefix, "pHaplo.enrich.pdf", sep="."), height=4, width=4)
 plot.enrichment(del.data)
 dev.off()
 
-# Generate all DUP/pTS plots
-pdf(paste(out.prefix, "pTS.roc.pdf", sep="."), height=4, width=4)
+# Generate all DUP/pTriplo plots
+pdf(paste(out.prefix, "pTriplo.roc.pdf", sep="."), height=4, width=4)
 plot.roc(dup.data)
 dev.off()
-pdf(paste(out.prefix, "pTS.prc.pdf", sep="."), height=4, width=4)
+pdf(paste(out.prefix, "pTriplo.prc.pdf", sep="."), height=4, width=4)
 plot.prc(dup.data)
 dev.off()
-pdf(paste(out.prefix, "pTS.enrich.pdf", sep="."), height=4, width=4)
+pdf(paste(out.prefix, "pTriplo.enrich.pdf", sep="."), height=4, width=4)
 plot.enrichment(dup.data)
 dev.off()
 

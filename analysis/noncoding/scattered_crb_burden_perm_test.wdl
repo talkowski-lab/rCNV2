@@ -29,8 +29,8 @@ workflow scattered_crb_burden_perm_test {
   String prefix
   String cache_string
   # Note: passing cache_string as a WDL variable is required to manually 
-  # override caching since rCNV data is drawn directly from GCP bucket (and not)
-  # read as WDL input
+  # override caching since rCNV data is drawn directly from GCP bucket (and not
+  # read as WDL input)
 
   scatter ( idx in range(n_pheno_perms) ) {
     call permuted_burden_test as rCNV_perm_test {

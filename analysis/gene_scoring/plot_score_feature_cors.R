@@ -72,7 +72,7 @@ plot.feat.cors <- function(stats, features, score, logit=F, top.N=10, center.buf
   new.order <- order(vals)
   vals <- vals[new.order]
   labs <- labs[new.order]
-  if(score == "pHI"){
+  if(score == "pHaplo"){
     color <- colors[1]
   }else{
     color <- colors[2]
@@ -164,7 +164,7 @@ stats <- load.stats(stats.in)
 features <- load.features(stats, features.in)
 
 # Plot correlations with raw features
-for(score in c("pHI", "pTS")){
+for(score in c("pHaplo", "pTriplo")){
   pdf(paste(out.prefix, score, "rhos.pdf", sep="."),
       height=6, width=6)
   plot.feat.cors(stats, features, score=score, logit=F)
@@ -172,7 +172,7 @@ for(score in c("pHI", "pTS")){
 }
 
 # Plot logit betas
-for(score in c("pHI", "pTS")){
+for(score in c("pHaplo", "pTriplo")){
   pdf(paste(out.prefix, score, "betas.pdf", sep="."),
       height=6, width=6)
   plot.feat.cors(stats, features, score=score, logit=T)
