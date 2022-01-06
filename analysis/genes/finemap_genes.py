@@ -16,6 +16,7 @@ import csv
 import pybedtools as pbt
 import numpy as np
 import pandas as pd
+from copy import deepcopy
 from sklearn.preprocessing import scale
 from statsmodels.genmod.generalized_linear_model import GLM
 from statsmodels.genmod import families
@@ -149,67 +150,53 @@ def finemap(gene_priors, gene_info, null_variance=0.42 ** 2):
     return finemap_res_bma
 
 
-def average_finemap_results(finemap_res, ncase_df=None, uniform_weights=False):
+def average_finemap_results(finemap_res, ncase_df=None):
     """
     Perform Bayesian model averaging across multiple sets of finemapping results
 
-    By default, averages ABFs. This works fine for multiple finemapping results 
-    for the same HPO (i.e., fixed sample sizes)
+    By default, computes arithmetic mean of PIPs
 
-    For averaging across HPOs, computes weighted mean of PIPs while weighting by 
-    sqrt(N_cases). If any genes are missing from any of the entities in finemap_res, 
-    those genes are treated as 0 for the purposes of calculating per-gene mean PIPs
-
-    Providing both ncase_df and uniform_weights=True will average PIPs without 
-    weighting by sample size
+    For averaging across HPOs, computes weighted mean of ABFs and PIPs while 
+    weighting by sqrt(N_cases)
     """
-
-    finemap_res_bma = {}
 
     genes = set()
     for subres in finemap_res.values():
         genes.update(subres.keys())
 
-    # Average ABFs if ncase_df is not supplied
-    if ncase_df is None:
-        
+    finemap_res_bma = {g : {'ABF' : [], 'PIP': [], 'weights': []} for g in genes}
+    
+    for key, subres in finemap_res.items():
+
+        # Collect information for all genes, and fill with zeros if not included in credset
         for gene in genes:
-            avg_abf = np.nanmean([v.get(gene, {'ABF' : np.nan})['ABF'] \
-                                  for v in finemap_res.values()])
-            finemap_res_bma[gene] = {'ABF' : avg_abf}
-        
-        abf_sum = np.nansum([x['ABF'] for x in finemap_res_bma.values()])
-        for gene in genes:
-            finemap_res_bma[gene]['PIP'] = finemap_res_bma[gene]['ABF'] / abf_sum
+            for field in 'ABF PIP'.split():
+                finemap_res_bma[gene][field].append(subres.get(gene, {field : 0})[field])
 
-    # Average PIPs by sqrt(N_case) if ncase_df supplied
-    else:
+            # Average PIPs by sqrt(N_case) if ncase_df supplied
+            if ncase_df is not None:
+                # Assumes HPO for each individual result is the first underscore-delimited element of the key
+                hpo = key.split('_')[0]
+                weight = np.sqrt(ncase_df.Total[ncase_df['#HPO'] == hpo].values[0])
 
-        finemap_res_bma = {g : {'ABF' : np.nan, 'PIP': [], 'weights': []} for g in genes}
-        
-        for key, subres in finemap_res.items():
-            # Assumes HPO for each individual result is the first underscore-delimited element of the key
-            hpo = key.split('_')[0]
+            # Otherwise, use uniform weights
+            else:
+                weight = 1
 
-            for gene, stats in subres.items():
-                finemap_res_bma[gene]['PIP'].append(stats['PIP'])
-                if uniform_weights:
-                    weight = 1
-                else:
-                    weight = np.sqrt(ncase_df.Total[ncase_df['#HPO'] == hpo].values[0])
-                finemap_res_bma[gene]['weights'].append(weight)
+            finemap_res_bma[gene]['weights'].append(weight)
 
-        # Compute weighted PIP per gene
-        for gene in genes:
-            newpip = np.average(finemap_res_bma[gene]['PIP'], 
+    # Compute weighted PIP per gene
+    for gene in genes:
+        for field in 'ABF PIP'.split():
+            newval = np.average(finemap_res_bma[gene][field], 
                                 weights=finemap_res_bma[gene]['weights'])
-            finemap_res_bma[gene]['PIP'] = newpip
-            finemap_res_bma[gene].pop('weights')
+            finemap_res_bma[gene][field] = newval
+        finemap_res_bma[gene].pop('weights')
 
-        # Normalize PIPs after weighting
-        pip_sum = np.nansum([x['PIP'] for x in finemap_res_bma.values()])
-        for gene in genes:
-            finemap_res_bma[gene]['PIP'] = finemap_res_bma[gene]['PIP'] / pip_sum
+    # Re-scale PIPs after weighting
+    pip_sum = np.nansum([x['PIP'] for x in finemap_res_bma.values()])
+    for gene in genes:
+        finemap_res_bma[gene]['PIP'] = finemap_res_bma[gene]['PIP'] / pip_sum
 
     return finemap_res_bma
 
@@ -692,16 +679,17 @@ def functional_finemap(hpo_data_orig, gene_features_in, l1_l2_mix, logit_alpha,
     if isinstance(null_variance, float):
         null_variance = [null_variance]
 
-    finemap_res = {W : {'hpo_data' : hpo_data_orig.copy()} for W in null_variance}
+    finemap_res = {}
 
     for W in null_variance:
+
+        # Make a deep copy of HPO data prior to finemapping
+        hpo_data = deepcopy(hpo_data_orig)
 
         if not quiet:
             msg = '\nStarting fine-mapping with null variance (W) = {:.5}\n' + \
                   '  Iter.\tPIP RMSE\tCoeff. RMSE'
             print(msg.format(W))
-
-        hpo_data = finemap_res[W]['hpo_data']
 
         # Re-finemap each block with specified null variance (for BMA)
         for hpo in hpo_data.keys():
@@ -752,8 +740,7 @@ def functional_finemap(hpo_data_orig, gene_features_in, l1_l2_mix, logit_alpha,
                     # Normalize new priors within each block such that sum(priors) = 1
                     sum_priors = np.sum(list(gene_priors.values()))
                     gene_priors = {g : p / sum_priors for g, p in gene_priors.items()}
-                    new_finemap_res = finemap(gene_priors, hpo_data[hpo]['all_genes'],
-                                              W)
+                    new_finemap_res = finemap(gene_priors, hpo_data[hpo]['all_genes'], W)
                     hpo_data[hpo]['blocks'][block_id]['finemap_res'] = new_finemap_res
 
             # Compute RMSE for PIPs and coefficients
@@ -800,7 +787,8 @@ def functional_finemap(hpo_data_orig, gene_features_in, l1_l2_mix, logit_alpha,
             tab_out = logit.params
         finemap_res[W] = {'hpo_data' : hpo_data, 'coeffs' : tab_out}
 
-    # Average results for each block across null variance estimates
+    # Update original copy of hpo_data by averaging results for each block 
+    # across null variance estimates
     for hpo, hdat in hpo_data_orig.items():
         for bid in hdat['blocks'].keys():
             finemap_res_dict = {W : finemap_res[W]['hpo_data'][hpo]['blocks'][bid]['finemap_res'] \
@@ -954,7 +942,8 @@ def output_credsets_bed(hpo_data, sig_df, outfile, conf_pip=0.1, vconf_pip=0.9, 
     
     cols = 'chr start end credible_set_id cnv hpo best_sig_level mean_control_freq ' + \
            'mean_case_freq pooled_ln_or pooled_ln_or_ci_lower pooled_ln_or_ci_upper ' + \
-           'best_pvalue n_genes all_genes top_gene vconf_genes conf_genes'
+           'best_pvalue n_genes all_genes n_sig_genes sig_genes top_gene ' +\
+           'vconf_genes conf_genes'
     outfile.write('#' + '\t'.join(cols.split()) + '\n')
 
     outlines_presort = []
@@ -963,20 +952,31 @@ def output_credsets_bed(hpo_data, sig_df, outfile, conf_pip=0.1, vconf_pip=0.9, 
         # Get basic credible set info
         cred_df = sig_df.loc[sig_df.credible_set == cred, :]
         hpo = cred_df.HPO.tolist()[0]
+        hpo_res_df = sig_df[sig_df.HPO == hpo]
         genes = sorted(list(set(cred_df.gene.tolist())))
+
+        # Gather lists of sig genes *IN* credible set and list of all sig genes
+        # (including those who were fine-mapped out of the credible set)
+        sig_genes = [g for g in genes if g in hpo_data[hpo]['sig_genes'].keys()]
+        all_sig_genes = [g for g in hpo_data[hpo]['blocks'][cred]['finemap_res'].keys() \
+                         if g in hpo_data[hpo]['sig_genes'].keys()]
         if any([hpo_data[hpo]['all_genes'][g]['ew_sig'] for g in genes]):
             best_sig_level = 'exome_wide'
         elif any([hpo_data[hpo]['all_genes'][g]['fdr_sig'] for g in genes]):
             best_sig_level = 'FDR'
         else:
             best_sig_level = 'not_significant'
-        vconf_genes = sorted(list(set(cred_df.gene[cred_df.PIP >= vconf_pip].tolist())))
-        conf_genes = sorted(list(set(cred_df.gene[(cred_df.PIP < vconf_pip) & \
+
+        # Candidate genes must be significantly associated with HPO in question
+        vconf_genes = sorted(list(set(cred_df.gene[(cred_df.gene.isin(sig_genes)) & \
+                                                   (cred_df.PIP >= vconf_pip)].tolist())))
+        conf_genes = sorted(list(set(cred_df.gene[(cred_df.gene.isin(sig_genes)) & \
+                                                  (cred_df.PIP < vconf_pip) & \
                                                   (cred_df.PIP >= conf_pip)].tolist())))
-        top_pip = np.nanmax(cred_df.PIP)
-        top_gene = sorted(list(set(cred_df.gene[cred_df.PIP == top_pip].tolist())))
-        top_gene = [g for g in top_gene if g in vconf_genes + conf_genes]
+        top_pip = np.nanmax(hpo_res_df.PIP[(hpo_res_df.gene.isin(all_sig_genes))])
+        top_gene = sorted(list(set(hpo_res_df.gene[hpo_res_df.PIP == top_pip].tolist())))
         n_genes = len(genes)
+        n_sig_genes = len(sig_genes)
         gdat = hpo_data[hpo]['all_genes']
         chrom = str(gdat[genes[0]]['gene_bt'][0].chrom)
         start = str(np.nanmin([gdat[g]['gene_bt'][0].start for g in genes]))
@@ -1013,9 +1013,9 @@ def output_credsets_bed(hpo_data, sig_df, outfile, conf_pip=0.1, vconf_pip=0.9, 
         outnums_fmt = '\t{:.3E}\t{:.3E}\t{:.3}\t{:.3}\t{:.3}\t{:.3E}'
         outline += outnums_fmt.format(control_freq, case_freq, lnor, lnor_lower, 
                                       lnor_upper, best_p)
-        outline += '\t' + '\t'.join([str(n_genes), ';'.join(genes), ';'.join(top_gene),
-                                     ';'.join(vconf_genes), ';'.join(conf_genes)]) + \
-                   '\n'
+        outline += '\t' + '\t'.join([str(n_genes), ';'.join(genes), str(n_sig_genes),
+                                     ';'.join(sig_genes), ';'.join(top_gene),
+                                     ';'.join(vconf_genes), ';'.join(conf_genes)]) + '\n'
         outlines_presort.append([int(chrom), int(start), hpo, outline])
         
     # Sort lines by coordinate and write to outfile
@@ -1051,7 +1051,7 @@ def cluster_credsets(hpo_data, sig_only=False, seed=2021):
     return sorted([sorted(x) for x in nx.connected_components(csg)])
 
 
-def joint_finemap(hpo_data, cred_clusters, ncase_df, uniform_weights=False, seed=2021):
+def joint_finemap(hpo_data, cred_clusters, ncase_df, seed=2021):
     """
     Average finemapping results across all HPOs per cluster of credsets
     """
@@ -1071,7 +1071,7 @@ def joint_finemap(hpo_data, cred_clusters, ncase_df, uniform_weights=False, seed
 
         # Re-finemap each cluster based on average ABFs across all credible sets
         all_finemap_res = {cs : info['finemap_res'] for cs, info in cs_info.items()}
-        avg_finemap_res = average_finemap_results(all_finemap_res, ncase_df, uniform_weights)
+        avg_finemap_res = average_finemap_results(all_finemap_res, ncase_df)
 
         # Update each credible set in hpo_data with new finemapping results
         used_hpos = set()
@@ -1105,7 +1105,8 @@ def output_joint_credsets_bed(hpo_data, sig_df, cs_clusters, genes_bt, outfile,
     
     cols = 'chr start end credible_set_id cnv best_sig_level mean_control_freq ' + \
            'mean_case_freq pooled_ln_or pooled_ln_or_ci_lower pooled_ln_or_ci_upper ' + \
-           'best_pvalue n_genes all_genes top_gene vconf_genes conf_genes n_hpos hpos'
+           'best_pvalue n_genes all_genes n_sig_genes sig_genes top_gene ' + \
+           'vconf_genes conf_genes n_hpos hpos'
     cols = cols.split()
 
     if prefix is None:
@@ -1123,7 +1124,7 @@ def output_joint_credsets_bed(hpo_data, sig_df, cs_clusters, genes_bt, outfile,
         # Assign a single member of the cluster as a "proxy" (since all finemap results have already been averaged)
         all_cs_data = {cs : hpo_data[hpo]['blocks'].get(cs, None) for cs, hpo in cs_hpo_dict.items()}
         cs_proxy, cs_proxy_data = [(cs, dat) for cs, dat in all_cs_data.items() \
-                                   if dat is not None and any(sig_df.credible_set.isin([cs]))][0]
+                                   if any(sig_df.credible_set == cs)][0]
 
         # Slice sig_df to supserset of all genes from any HPO
         # This is necessary since some genes will be significant in certain HPOs but not others
@@ -1132,12 +1133,26 @@ def output_joint_credsets_bed(hpo_data, sig_df, cs_clusters, genes_bt, outfile,
         # Use proxy to get more credible set info
         genes = sorted(list(set(cred_df.gene.tolist())))
         n_genes = len(genes)
-        vconf_genes = sorted(list(set(cred_df.gene[cred_df.PIP >= vconf_pip].tolist())))
-        conf_genes = sorted(list(set(cred_df.gene[(cred_df.PIP < vconf_pip) & \
+        sig_genes = set()
+        for hpo in hpos:
+            sig_genes.update(set(hpo_data[hpo]['sig_genes'].keys()).intersection(set(genes)))
+        n_sig_genes = len(sig_genes)
+        all_sig_genes = set()
+        for hpo in hpos:
+            all_sig_genes.update([g for g in hpo_data[hpo]['sig_genes'].keys() \
+                                  if g in cs_proxy_data['finemap_res'].keys()])
+
+        # Candidate genes must be significant in at least one HPO
+        vconf_genes = sorted(list(set(cred_df.gene[(cred_df.gene.isin(sig_genes)) & \
+                                                   (cred_df.PIP >= vconf_pip)].tolist())))
+        conf_genes = sorted(list(set(cred_df.gene[(cred_df.gene.isin(sig_genes)) & \
+                                                  (cred_df.PIP < vconf_pip) & \
                                                   (cred_df.PIP >= conf_pip)].tolist())))
-        top_pip = np.nanmax(cred_df.PIP)
-        top_gene = sorted(list(set(cred_df.gene[cred_df.PIP == top_pip].tolist())))
-        top_gene = [g for g in top_gene if g in vconf_genes + conf_genes]
+        top_pip = np.nanmax(sig_df.PIP[(sig_df.gene.isin(all_sig_genes)) & \
+                                        (sig_df.HPO.isin(hpos))])
+        top_gene = sorted(list(set(sig_df.gene[(sig_df.PIP == top_pip) & \
+                                               (sig_df.gene.isin(all_sig_genes) & \
+                                               (sig_df.HPO.isin(hpos)))].tolist())))
         cred_genes_bt = genes_bt.filter(lambda x: x.name in genes).saveas()
         chrom = str(cred_genes_bt[0].chrom)
         start = str(np.nanmin([x.start for x in cred_genes_bt]))
@@ -1195,9 +1210,9 @@ def output_joint_credsets_bed(hpo_data, sig_df, cs_clusters, genes_bt, outfile,
         # Add stats to out_df
         outvals = [chrom, start, end, 'tmp', cnv, best_sig_level, control_freq, 
                    case_freq, lnor, lnor_lower, lnor_upper, best_p, n_genes, 
-                   ';'.join(sorted(genes)), ';'.join(sorted(top_gene)), 
-                   ';'.join(sorted(vconf_genes)), ';'.join(sorted(conf_genes)), 
-                   n_hpos, ';'.join(sorted(hpos))]
+                   ';'.join(sorted(genes)), n_sig_genes, ';'.join(sorted(sig_genes)), 
+                   ';'.join(sorted(top_gene)), ';'.join(sorted(vconf_genes)), 
+                   ';'.join(sorted(conf_genes)), n_hpos, ';'.join(sorted(hpos))]
         out_df = out_df.append(pd.DataFrame([outvals], columns=cols), ignore_index=True)
 
     # Sort entries in out_df and write to file
@@ -1483,7 +1498,7 @@ def main():
             rename(columns={'HPO' : '#HPO'}).\
             to_csv(args.genetic_outfile, sep='\t', index=False, na_rep='NA')
 
-    # Perform functional fine-mapping separately for each null variance estimate
+    # Perform functional fine-mapping
     hpo_df, logit_coeffs = functional_finemap(hpo_data, args.gene_features, 
                                               args.l1_l2_mix, args.logit_alpha, 
                                               1.0, Wsq, args.training_exclusion,
@@ -1496,19 +1511,20 @@ def main():
 
     # Prepare data for writing out HPO-specific association information prior to joint finemapping
     prejoint_sig_df = make_sig_genes_df(hpo_data, sig_only=True, cs_val=args.cs_val)
-    prejoint_hpo_data = hpo_data.copy()
+    prejoint_allgenes_df = make_sig_genes_df(hpo_data, sig_only=False, cs_val=args.cs_val)
+    prejoint_hpo_data = deepcopy(hpo_data)
 
     # Write out initial credible sets per HPO prior to joint finemapping, if optioned
     if args.hpo_credsets_bed is not None:
         hpo_credsets_bed = open(args.hpo_credsets_bed, 'w')
-        output_credsets_bed(hpo_data, prejoint_sig_df, hpo_credsets_bed,
+        output_credsets_bed(hpo_data, prejoint_allgenes_df, hpo_credsets_bed,
                             args.confident_pip, args.very_confident_pip, args.cnv)
 
     # Cluster credible sets across HPOs 
     cred_clusters = cluster_credsets(hpo_data, sig_only=True)
 
     # Joint refinement of overlapping credible sets across HPOs
-    hpo_data, cred_clusters = joint_finemap(hpo_data, cred_clusters, ncase_df, uniform_weights=True)
+    hpo_data, cred_clusters = joint_finemap(hpo_data, cred_clusters, ncase_df)
 
     # Write out final finemapping results for significant genes with both prejoint and joint pips
     final_sig_df = make_sig_genes_df(hpo_data, naive=False, sig_only=True, 
@@ -1544,7 +1560,7 @@ def main():
         # Format & output final joint credsets
         joint_credsets_bed = open(args.joint_credsets_bed, 'w')
         joint_gene_cs_map = \
-            output_joint_credsets_bed(hpo_data, final_sig_df, cred_clusters, genes_bt, 
+            output_joint_credsets_bed(hpo_data, final_allgenes_df, cred_clusters, genes_bt, 
                                       joint_credsets_bed, ncase_dict, args.confident_pip, 
                                       args.very_confident_pip, args.cnv, block_prefix)
 

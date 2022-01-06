@@ -58,8 +58,9 @@ workflow gene_burden_analysis {
   File raw_finemap_merged_no_variation_features
   File raw_finemap_merged_features
   String rCNV_bucket
-  String rCNV_docker_assoc     # Note: strictly for dev/caching convenience; can collapse into a single docker at a later date
-  String rCNV_docker_finemap   # Note: strictly for dev/caching convenience; can collapse into a single docker at a later date
+  String rCNV_docker_assoc        # Note: strictly for dev/caching convenience; can collapse into a single docker at a later date
+  String rCNV_docker_covariance   # Note: strictly for dev/caching convenience; can collapse into a single docker at a later date
+  String rCNV_docker_finemap      # Note: strictly for dev/caching convenience; can collapse into a single docker at a later date
   String athena_cloud_docker
   String fisher_cache_string
   String perm_cache_string
@@ -186,7 +187,7 @@ workflow gene_burden_analysis {
         min_cds_ovr_dup=min_cds_ovr_dup,
         freq_code="rCNV",
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_finemap,
+        rCNV_docker=rCNV_docker_covariance,
         prefix=basename(gtf, '.gtf.gz')
     }
   }
@@ -437,9 +438,9 @@ workflow gene_burden_analysis {
   }
 
   output {
-    # File final_sig_genes = merge_finemap_res.final_genes
-    # File final_sig_associations = merge_finemap_res.final_associations
-    # File final_credible_sets = merge_finemap_res.final_credsets
+    File final_sig_genes = merge_finemap_res.final_genes
+    File final_sig_associations = merge_finemap_res.final_associations
+    File final_credible_sets = merge_finemap_res.final_credsets
   }
 }
 
@@ -1049,6 +1050,8 @@ task finemap_genes {
     gsutil -m cp \
       ${rCNV_bucket}/analysis/gene_burden/**.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz \
       stats/
+    mkdir refs/
+    gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/* refs/
     gsutil -m cp -r \
       ${rCNV_bucket}/cleaned_data/genes/gene_lists \
       ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
@@ -1057,9 +1060,6 @@ task finemap_genes {
     gsutil -m cp \
       ${rCNV_bucket}/analysis/gene_scoring/gene_lists/* \
       ./gene_lists/
-    gsutil -m cp -r \
-      ${rCNV_bucket}/cleaned_data/cnv/* \
-      cleaned_cnv/
 
     # Make list of genes from predicted NAHR-mediated CNV regions for training exclusion
     zcat clustered_nahr_regions.bed.gz | fgrep -v "#" \
@@ -1121,7 +1121,8 @@ task finemap_genes {
 
     # Copy results to output bucket
     gsutil -m cp \
-      ${freq_code}.${CNV}.gene_fine_mapping.*tsv \
+      ${freq_code}.${CNV}.gene_fine_mapping.*.tsv \
+      ${freq_code}.${CNV}.gene_fine_mapping.*.bed \
       ${rCNV_bucket}/analysis/gene_burden/fine_mapping/
 
     # Make completion token to track caching

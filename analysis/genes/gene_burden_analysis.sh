@@ -604,9 +604,9 @@ meta_nominal_cohorts_cutoff=2
 FDR_cutoff=0.01
 gene_features="gencode.v19.canonical.pext_filtered.all_features.no_variation.eigenfeatures.bed.gz"
 finemap_output_label="all_features"
-finemap_elnet_alpha=0.05
+finemap_elnet_alpha=0.01
 finemap_elnet_l1_l2_mix=0.75
-finemap_cluster_distance=100000
+finemap_cluster_distance=200000
 finemap_nonsig_distance=1000000
 finemap_min_cnv_covariance=0.2
 finemap_conf_pip=0.15
@@ -617,6 +617,8 @@ mkdir stats
 gsutil -m cp \
   ${rCNV_bucket}/analysis/gene_burden/**.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz \
   stats/
+mkdir refs/
+gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/* refs/
 gsutil -m cp -r \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists \
   ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
@@ -625,9 +627,6 @@ gsutil -m cp -r \
 gsutil -m cp \
   ${rCNV_bucket}/analysis/gene_scoring/gene_lists/* \
   ./gene_lists/
-gsutil -m cp -r \
-  ${rCNV_bucket}/cleaned_data/cnv/* \
-  cleaned_cnv/
 
 # Make list of genes from predicted NAHR-mediated CNV regions for training exclusion
 zcat clustered_nahr_regions.bed.gz | fgrep -v "#" \
