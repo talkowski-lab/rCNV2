@@ -19,8 +19,10 @@ gcloud auth login
 # Copy all filtered CNV data, gene coordinates, and other references 
 # from the project Google Bucket (note: requires permissions)
 mkdir cleaned_cnv/
-gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/noncoding/* cleaned_cnv/
-gsutil -m cp gs://rcnv_project/cleaned_data/cnv/*bed.gz* cleaned_cnv/
+gsutil -m cp -r \
+  gs://rcnv_project/cleaned_data/cnv/noncoding/* \
+  gs://rcnv_project/cleaned_data/cnv/*bed.gz* \
+  cleaned_cnv/
 gsutil -m cp -r gs://rcnv_project/cleaned_data/genome_annotations/*bed.gz* ./
 mkdir refs/
 gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
@@ -44,18 +46,19 @@ rCNV_bucket="gs://rcnv_project"
 pad_controls=0
 min_element_ovr=1.0
 min_frac_all_elements=0.05
-p_cutoff=0.000003226431
-meta_p_cutoff=0.000003226431
+p_cutoff=0.000005076658
+meta_p_cutoff=0.000005076658
 max_manhattan_neg_log10_p=30
 n_pheno_perms=50
 meta_model_prefix="fe"
 i=1
-
-
+winsorize_meta_z=0.99
+meta_min_cases=300
 
 
 
 ### Determine probe density-based conditional exclusion list
+# NOTE: This code must be run using a DIFFERENT DOCKER: us.gcr.io/broad-dsmap/athena-cloud
 # Test/dev parameters
 crbs_prefix="rCNV.crbs" #Note: this can be inferred in WDL as basename(crbs, ".bed.gz")
 min_probes_per_crb=10
@@ -250,7 +253,7 @@ while read prefix hpo; do
       > shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz
       tabix -f shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz
 
-    done < ${metacohort_list}
+    done < <( fgrep -v "mega" ${metacohort_list} )
 
     # Iterate over CNV types
     for CNV in DEL DUP; do
@@ -298,9 +301,11 @@ while read prefix hpo; do
         --model ${meta_model_prefix} \
         --conditional-exclusion ${exclusion_bed} \
         --p-is-neg-log10 \
-        --keep-n-columns 4 \
         --spa \
-        --adjust-biobanks \
+        --spa-exclude /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
+        --winsorize ${winsorize_meta_z} \
+        --min-cases ${meta_min_cases} \
+        --keep-n-columns 4 \
         ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.perm_$i.bed
       bgzip -f ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.perm_$i.bed
@@ -334,7 +339,7 @@ paste perm_res/*.crb_burden.meta_analysis.permuted_p_values.*.txt \
 # Analyze p-values and compute FDR
 /opt/rCNV2/analysis/sliding_windows/calc_empirical_fdr.R \
   --cnv ${CNV} \
-  --fdr-target ${fdr_target} \
+  --fdr-target ${meta_p_cutoff} \
   --linear-fit \
   --flat-ladder \
   --plot crb_burden.${freq_code}.${noncoding_filter}_noncoding.${CNV}.${fdr_table_suffix}_permutation_results.png \
@@ -342,6 +347,10 @@ paste perm_res/*.crb_burden.meta_analysis.permuted_p_values.*.txt \
   ${metacohort_sample_table} \
   crb_burden.${freq_code}.${noncoding_filter}_noncoding.${CNV}.${fdr_table_suffix}
 
+# Also produce an optional table of flat Bonferroni P-value cutoffs
+awk -v pval=${meta_p_cutoff} -v FS="\t" -v OFS="\t" \
+  '{ print $1, pval }' ${phenotype_list} \
+> crb_burden.${freq_code}.${noncoding_filter}_noncoding.${CNV}.bonferroni_pval.hpo_cutoffs.tsv
 
 
 
@@ -351,16 +360,21 @@ gsutil -m cp ${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/stats/met
 exclusion_bed="rCNV.crbs.cohort_exclusion.bed.gz" #Note: this file must be generated above
 while read prefix hpo; do
 
-  # Get metadata for meta-analysis
-  mega_idx=$( head -n1 "${metacohort_sample_table}" \
-              | sed 's/\t/\n/g' \
-              | awk '{ if ($1=="mega") print NR }' )
+  # Get metadata for meta-analysis (while accounting for cohorts below inclusion criteria)
+  last_cohort_col=$( head -n1 "${metacohort_sample_table}" | awk '{ print NF-1 }' )
+  keep_cols=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+               | cut -f4-$last_cohort_col \
+               | sed 's/\t/\n/g' \
+               | awk -v min_n=${meta_min_cases} '{ if ($1>=min_n) print NR+3 }' \
+               | paste -s -d, )
   ncase=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
-           | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
-           | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+           | cut -f$keep_cols \
+           | sed 's/\t/\n/g' \
+           | awk '{ sum+=$1 }END{ print sum }' )
   nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
-           | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
-           | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+           | cut -f$keep_cols \
+           | sed 's/\t/\n/g' \
+           | awk '{ sum+=$1 }END{ print sum }' )
   descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
              | awk -v FS="\t" '{ print $2 }' )
   title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
@@ -391,12 +405,13 @@ while read prefix hpo; do
     done < <( fgrep -v mega ${metacohort_list} ) \
     > ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt
     /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
-      --or-corplot ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.or_corplot_grid.jpg \
       --model ${meta_model_prefix} \
       --conditional-exclusion ${exclusion_bed} \
       --p-is-neg-log10 \
       --spa \
-      --adjust-biobanks \
+      --spa-exclude /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
+      --winsorize ${winsorize_meta_z} \
+      --min-cases ${meta_min_cases} \
       --keep-n-columns 4 \
       ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt \
       ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed
@@ -506,13 +521,14 @@ while read prefix hpo; do
     > ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.input.txt
     
     /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
-      --or-corplot ${prefix}.${freq_code}.$CNV.crb_burden.or_corplot_grid.jpg \
       --model ${meta_model_prefix} \
       --conditional-exclusion ${exclusion_bed} \
       --p-is-neg-log10 \
-      --keep-n-columns 4 \
       --spa \
-      --adjust-biobanks \
+      --spa-exclude /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
+      --winsorize ${winsorize_meta_z} \
+      --min-cases ${meta_min_cases} \
+      --keep-n-columns 4 \
       ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.input.txt \
       ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed
     bgzip -f ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed
@@ -526,6 +542,7 @@ done < refs/test_phenotypes.list
 
 
 # Extract CRBs meeting all significance criteria
+# TODO: NEED TO ADD FDR SUBSET TO THIS
 mkdir meta_res/
 # Download data
 while read prefix hpo; do

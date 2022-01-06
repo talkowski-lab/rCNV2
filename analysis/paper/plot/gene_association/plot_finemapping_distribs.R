@@ -24,13 +24,6 @@ load.pips <- function(path){
   return(pips)
 }
 
-# Compute number of originally significant genes per credible set
-get.n.orig.sig.genes <- function(credsets, prior.pips){
-  apply(credsets[, c("credible_set_id", "cnv")], 1, function(vals){
-    length(which(prior.pips$credible_set==vals[1] & prior.pips$cnv==vals[2]))
-  })
-}
-
 
 ##########################
 ### PLOTTING FUNCTIONS ###
@@ -262,12 +255,11 @@ pips <- list("Prior" = load.pips(prior.pips.in),
              "Posterior" = load.pips(posterior.pips.in),
              "Full Model" = load.pips(final.pips.in))
 
-# Annotate all credible sets with number of originally significant genes prior to fine-mapping
-credsets$n_genes.prior <- get.n.orig.sig.genes(credsets, pips[[1]])
+### TODO: UPDATE EVERYTHING BELOW THIS WITH THE MODIFIED NUMBER OF SIGNIFICANT GENES BEFORE/AFTER FINEMAPPING
 
-# Compute average decrease in # of genes per credset due to fine-mapping
-finemap.decrease.pct <- 100*(mean(credsets$n_genes.prior) - mean(credsets$n_genes)) / mean(credsets$n_genes.prior)
-cat(paste("Fine-mapping reduced the average number of genes per association by ",
+# Compute average decrease in # of significant genes per credset due to fine-mapping
+finemap.decrease.pct <- 100*(mean(credsets$n_sig_genes) - mean(credsets$n_sig_genes)) / mean(credsets$n_genes.prior)
+cat(paste("Fine-mapping reduced the average number of significant genes per block by ",
           round(finemap.decrease.pct), "%\n", sep=""))
 
 # Scatterplot of effect of fine-mapping on number of genes per association

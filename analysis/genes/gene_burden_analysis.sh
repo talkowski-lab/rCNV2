@@ -612,6 +612,9 @@ finemap_min_cnv_covariance=0.2
 finemap_conf_pip=0.15
 finemap_vconf_pip=0.85
 
+# Dev only: localize gene features (these are passed as an argument in the WDL)
+gsutil -m cp ${rCNV_bucket}/cleaned_data/genes/metadata/${gene_features} ./
+
 # Copy association stats & other reference data from the project Google Bucket (note: requires permissions)
 mkdir stats
 gsutil -m cp \

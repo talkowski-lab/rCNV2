@@ -28,7 +28,7 @@ load.credsets <- function(credsets.in){
   # Ensure numerics
   numeric.cols <- c("start", "end", "mean_control_freq", "mean_case_freq",
                     "pooled_ln_or", "pooled_ln_or_ci_lower", "pooled_ln_or_ci_upper",
-                    "best_pvalue", "n_genes")
+                    "best_pvalue", "n_genes", "n_sig_genes", "n_hpos")
   credsets[, numeric.cols] <- apply(credsets[, numeric.cols], 2, as.numeric)
 
   # Get pointwise parameters
@@ -37,9 +37,15 @@ load.credsets <- function(credsets.in){
   credsets$pt.border <- pw.params$pt.border
 
   # Split list-style columns
-  credsets$all_genes <- strsplit(credsets$all_genes, split=";")
-  credsets$vconf_genes <- strsplit(credsets$vconf_genes, split=";")
-  credsets$conf_genes <- strsplit(credsets$conf_genes, split=";")
+  list.cols <- c("all_genes", "sig_genes", "top_gene",
+                 "vconf_genes", "conf_genes", "hpos")
+  credsets[, list.cols] <- apply(credsets[, list.cols], 2, strsplit, split=";")
+
+  # Compute number of significant genes in credible set
+  credsets$n_sig_in_credset <- apply(credsets[, c("all_genes", "sig_genes")],
+                                     1, function(glists){
+    length(glists$sig_genes %in% glists$all_genes)
+  })
 
   return(credsets)
 }
@@ -62,8 +68,11 @@ load.gene.associations <- function(assocs.in){
   # Ensure numerics
   numeric.cols <- c("start", "end", "control_freq", "case_freq",
                     "ln_or", "ln_or_ci_lower", "ln_or_ci_upper",
-                    "pvalue", "pip")
+                    "pvalue", "pip_final", "pip_HPO_specific")
   assocs[, numeric.cols] <- apply(assocs[, numeric.cols], 2, as.numeric)
+
+  # Convert boolean columns
+  assocs$top_gene <- as.logical(assocs$top_gene)
 
   # Get pointwise parameters
   pw.params <- get.sig.gene.pw.params(assocs$sig_level, assocs$cnv)

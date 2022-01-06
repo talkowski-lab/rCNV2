@@ -30,7 +30,7 @@ workflow curate_annotations {
   Int crb_blacklist_buffer
   Int crb_blacklist_buffer_min_size
   String rCNV_bucket
-  String rCNV_docker_burden_testing
+  String rCNV_docker_track_curation
   String rCNV_docker_meta_analysis
   String rCNV_docker_crb_clustering
   String prefix
@@ -42,6 +42,7 @@ workflow curate_annotations {
     input:
       tracklist=chromhmm_tracklist,
       tracks_per_shard=tracks_per_shard,
+      rCNV_docker=rCNV_docker_track_curation,
       prefix="${prefix}.chromhmm_shards"
   }
   scatter ( shard in shard_tracklist_chromhmm.shards ) {
@@ -59,7 +60,7 @@ workflow curate_annotations {
   }
   call merge_shards as merge_chromhmm {
     input:
-      stat_shards=curate_and_burden_chromhmm.stats,,
+      stat_shards=curate_and_burden_chromhmm.stats,
       rCNV_docker=rCNV_docker_track_curation,
       prefix="${prefix}.chromhmm"
   }

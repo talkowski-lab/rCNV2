@@ -9,7 +9,7 @@
 # Analysis of case-control CNV burdens per cis-regulatory block (CRB)
 
 
-import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_crb_burden_perm_test/versions/3/plain-WDL/descriptor" as scattered_perm
+import "https://api.firecloud.org/ga4gh/v1/tools/rCNV:scattered_crb_burden_perm_test/versions/4/plain-WDL/descriptor" as scattered_perm
 
 
 workflow crb_burden_analysis {
@@ -24,6 +24,8 @@ workflow crb_burden_analysis {
   Int min_probes_per_crb
   Float min_frac_controls_probe_exclusion
   String meta_model_prefix
+  Float winsorize_meta_z
+  Int meta_min_cases
   Float min_element_ovr
   Float min_frac_all_elements
   Float p_cutoff
@@ -51,7 +53,7 @@ workflow crb_burden_analysis {
       metacohort_list=metacohort_list,
       rCNV_bucket=rCNV_bucket,
       athena_cloud_docker=athena_cloud_docker,
-      freq_code=freq_code
+      freq_code="rCNV"
   }
 
   # Scatter over phenotypes
@@ -110,6 +112,8 @@ workflow crb_burden_analysis {
         p_cutoff=p_cutoff,
         n_pheno_perms=n_pheno_perms,
         meta_model_prefix=meta_model_prefix,
+        winsorize_meta_z=winsorize_meta_z,
+        meta_min_cases=meta_min_cases,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker,
         prefix=pheno[0],
@@ -129,7 +133,7 @@ workflow crb_burden_analysis {
         noncoding_filter=noncoding_filter,
         CNV=cnv,
         n_pheno_perms=n_pheno_perms,
-        fdr_target=p_cutoff,
+        meta_p_cutoff=p_cutoff,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker,
         dummy_completion_markers=rCNV_perm_test.completion_marker,
@@ -153,6 +157,8 @@ workflow crb_burden_analysis {
         meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
         max_manhattan_neg_log10_p=max_manhattan_neg_log10_p,
         meta_model_prefix=meta_model_prefix,
+        winsorize_meta_z=winsorize_meta_z,
+        meta_min_cases=meta_min_cases,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker,
         prefix=pheno[0],
@@ -169,6 +175,8 @@ workflow crb_burden_analysis {
         freq_code="rCNV",
         noncoding_filter=noncoding_filter,
         meta_model_prefix=meta_model_prefix,
+        winsorize_meta_z=winsorize_meta_z,
+        meta_min_cases=meta_min_cases,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker,
         prefix=pheno[0],
@@ -198,6 +206,9 @@ task build_exclusion_list {
     gsutil -m cp -r \
       ${rCNV_bucket}/cleaned_data/control_probesets \
       ./
+
+    # Clone rCNV2 repo (not present in athena-cloud Docker)
+    git clone https://github.com/talkowski-lab/rCNV2.git
 
     # Make inputs for conditional exclusion script
     zcat ${crbs} | cut -f1-4 | bgzip -c > crb_coords.bed.gz
@@ -342,7 +353,6 @@ task burden_test {
         "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.crb_burden"
     done < ${metacohort_list}
 
-
     # Copy results to output bucket
     gsutil -m cp *.crb_burden.counts.bed.gz* \
       "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/counts/"
@@ -442,7 +452,8 @@ task coding_burden_test {
   runtime {
     docker: "${rCNV_docker}"
     preemptible: 1
-    memory: "4 GB"
+    disks: "local-disk 100 HDD"
+    memory: "8 GB"
     bootDiskSizeGb: "20"
   }
 
@@ -461,7 +472,7 @@ task calc_meta_p_cutoff {
   String CNV
   String noncoding_filter
   Int n_pheno_perms
-  Float fdr_target
+  Float meta_p_cutoff
   String rCNV_bucket
   String rCNV_docker
   Array[File] dummy_completion_markers #Must delocalize something or Cromwell will bypass permutation test
@@ -496,7 +507,7 @@ task calc_meta_p_cutoff {
     # Analyze p-values and compute FDR
     /opt/rCNV2/analysis/sliding_windows/calc_empirical_fdr.R \
       --cnv ${CNV} \
-      --fdr-target ${fdr_target} \
+      --fdr-target ${meta_p_cutoff} \
       --linear-fit \
       --flat-ladder \
       --plot crb_burden.${freq_code}.${noncoding_filter}_noncoding.${CNV}.${fdr_table_suffix}_permutation_results.png \
@@ -505,7 +516,7 @@ task calc_meta_p_cutoff {
       crb_burden.${freq_code}.${noncoding_filter}_noncoding.${CNV}.${fdr_table_suffix}
 
     # Also produce an optional table of flat Bonferroni P-value cutoffs
-    awk -v pval=${fdr_target} -v FS="\t" -v OFS="\t" \
+    awk -v pval=${meta_p_cutoff} -v FS="\t" -v OFS="\t" \
       '{ print $1, pval }' ${phenotype_list} \
     > crb_burden.${freq_code}.${noncoding_filter}_noncoding.${CNV}.bonferroni_pval.hpo_cutoffs.tsv
 
@@ -547,6 +558,8 @@ task meta_analysis {
   Array[File] meta_p_cutoff_tables
   Int max_manhattan_neg_log10_p
   String meta_model_prefix
+  Float winsorize_meta_z
+  Int meta_min_cases
   String rCNV_bucket
   String rCNV_docker
   String prefix
@@ -563,16 +576,21 @@ task meta_analysis {
     mkdir refs/
     gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
-    # Get metadata for meta-analysis
-    mega_idx=$( head -n1 "${metacohort_sample_table}" \
-                | sed 's/\t/\n/g' \
-                | awk '{ if ($1=="mega") print NR }' )
+    # Get metadata for meta-analysis (while accounting for cohorts below inclusion criteria)
+    last_cohort_col=$( head -n1 "${metacohort_sample_table}" | awk '{ print NF-1 }' )
+    keep_cols=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+                 | cut -f4-$last_cohort_col \
+                 | sed 's/\t/\n/g' \
+                 | awk -v min_n=${meta_min_cases} '{ if ($1>=min_n) print NR+3 }' \
+                 | paste -s -d, )
     ncase=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
-             | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
-             | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+             | cut -f$keep_cols \
+             | sed 's/\t/\n/g' \
+             | awk '{ sum+=$1 }END{ print sum }' )
     nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
-             | awk -v FS="\t" -v mega_idx="$mega_idx" '{ print $mega_idx }' \
-             | sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta' )
+             | cut -f$keep_cols \
+             | sed 's/\t/\n/g' \
+             | awk '{ sum+=$1 }END{ print sum }' )
     descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
                | awk -v FS="\t" '{ print $2 }' )
     title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
@@ -603,12 +621,13 @@ task meta_analysis {
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt
       /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
-        --or-corplot ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.or_corplot_grid.jpg \
         --model ${meta_model_prefix} \
         --conditional-exclusion ${exclusion_bed} \
         --p-is-neg-log10 \
         --spa \
-        --adjust-biobanks \
+        --spa-exclude /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
+        --winsorize ${winsorize_meta_z} \
+        --min-cases ${meta_min_cases} \
         --keep-n-columns 4 \
         ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.bed
@@ -679,6 +698,8 @@ task coding_meta_analysis {
   String freq_code
   String noncoding_filter
   String meta_model_prefix
+  Float winsorize_meta_z
+  Int meta_min_cases
   String rCNV_bucket
   String rCNV_docker
   String prefix
@@ -693,6 +714,12 @@ task coding_meta_analysis {
     mkdir refs/
     gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
+    # Get metadata for meta-analysis
+    DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
+                    crb_burden.${freq_code}.${noncoding_filter}_noncoding.DEL.bonferroni_pval.hpo_cutoffs.tsv )
+    DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
+                    crb_burden.${freq_code}.${noncoding_filter}_noncoding.DUP.bonferroni_pval.hpo_cutoffs.tsv )
+
     # Run meta-analysis for each CNV type
     for CNV in DEL DUP; do
 
@@ -701,15 +728,16 @@ task coding_meta_analysis {
         echo -e "$meta\t$meta.${prefix}.${freq_code}.$CNV.crb_burden.stats.bed.gz"
       done < <( fgrep -v mega ${metacohort_list} ) \
       > ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.input.txt
-
+      
       /opt/rCNV2/analysis/generic_scripts/meta_analysis.R \
-        --or-corplot ${prefix}.${freq_code}.$CNV.crb_burden.or_corplot_grid.jpg \
         --model ${meta_model_prefix} \
         --conditional-exclusion ${exclusion_bed} \
         --p-is-neg-log10 \
-        --keep-n-columns 4 \
         --spa \
-        --adjust-biobanks \
+        --spa-exclude /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
+        --winsorize ${winsorize_meta_z} \
+        --min-cases ${meta_min_cases} \
+        --keep-n-columns 4 \
         ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed
       bgzip -f ${prefix}.${freq_code}.$CNV.crb_burden.meta_analysis.stats.bed

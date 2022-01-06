@@ -155,21 +155,21 @@ ngenes=$( zcat meta_stats/${example_hpo}.rCNV.DEL.gene_burden.meta_analysis.stat
 
 
 # Plot fine-mapping descriptive panels (number of genes per block, distribution of PIPs, etc)
-head -n1 rCNV.DEL.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_no_variation_features.tsv \
+head -n1 rCNV.$CNV.gene_fine_mapping.gene_stats.naive_priors.tsv | cut -f1-5 \
 | awk -v OFS="\t" '{ print $0, "cnv" }' > pip_header.tsv
 for CNV in DEL DUP; do
-  fgrep -v "#" rCNV.$CNV.gene_fine_mapping.gene_stats.naive_priors.tsv \
+  fgrep -v "#" rCNV.$CNV.gene_fine_mapping.gene_stats.naive_priors.tsv | cut -f1-5 \
   | awk -v OFS="\t" -v CNV=$CNV '{ print $0, CNV }'
 done  \
 | cat pip_header.tsv - > all_PIPs.prior.tsv
 for CNV in DEL DUP; do
-  fgrep -v "#" rCNV.$CNV.gene_fine_mapping.gene_stats.genetics_only.tsv \
+  fgrep -v "#" rCNV.$CNV.gene_fine_mapping.gene_stats.genetics_only.tsv | cut -f1-5 \
   | awk -v OFS="\t" -v CNV=$CNV '{ print $0, CNV }'
 done  \
 | cat pip_header.tsv - > all_PIPs.posterior.tsv
 for CNV in DEL DUP; do 
   fgrep -v "#" rCNV.$CNV.gene_fine_mapping.gene_stats.merged_no_variation_features.tsv \
-  | awk -v OFS="\t" -v CNV=$CNV '{ print $0, CNV }'
+  | cut -f1-5 | awk -v OFS="\t" -v CNV=$CNV '{ print $0, CNV }'
 done \
 | cat pip_header.tsv - > all_PIPs.full_model.tsv
 if ! [ -e finemapping_distribs ]; then
