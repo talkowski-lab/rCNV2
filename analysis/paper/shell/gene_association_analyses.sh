@@ -4,11 +4,11 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Master code block for secondary analyses of gene association & fine mapping
+# Main code block for secondary analyses of gene association & fine mapping
 
 
 # Launch docker image & authenticate GCP credentials
