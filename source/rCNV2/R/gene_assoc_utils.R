@@ -31,11 +31,6 @@ load.credsets <- function(credsets.in){
                     "best_pvalue", "n_genes", "n_sig_genes", "n_hpos")
   credsets[, numeric.cols] <- apply(credsets[, numeric.cols], 2, as.numeric)
 
-  # Get pointwise parameters
-  pw.params <- get.sig.gene.pw.params(credsets$best_sig_level, credsets$cnv)
-  credsets$pt.bg <- pw.params$pt.bg
-  credsets$pt.border <- pw.params$pt.border
-
   # Split list-style columns
   list.cols <- c("all_genes", "sig_genes", "top_gene",
                  "vconf_genes", "conf_genes", "hpos")
@@ -44,8 +39,14 @@ load.credsets <- function(credsets.in){
   # Compute number of significant genes in credible set
   credsets$n_sig_in_credset <- apply(credsets[, c("all_genes", "sig_genes")],
                                      1, function(glists){
-    length(glists$sig_genes %in% glists$all_genes)
+    length(which(glists$sig_genes %in% glists$all_genes))
   })
+
+  # Get pointwise parameters
+  pw.params <- get.sig.gene.pw.params(credsets$best_sig_level, credsets$cnv)
+  credsets$pt.bg <- pw.params$pt.bg
+  credsets$pt.border <- pw.params$pt.border
+  credsets$pt.pch <- pw.params$pt.pch
 
   return(credsets)
 }
@@ -96,16 +97,19 @@ load.gene.associations <- function(assocs.in){
 get.sig.gene.pw.params <- function(sig, cnv){
   pt.bg <- rep(NA, length(sig))
   pt.border <- rep(NA, length(sig))
+  pt.pch <- rep(NA, length(sig))
 
   gw.idxs <- which(sig == "exome_wide")
   pt.bg[gw.idxs] <- cnv.colors[cnv[gw.idxs]]
   pt.border[gw.idxs] <- cnv.blacks[cnv[gw.idxs]]
+  pt.pch[gw.idxs] <- 22
 
   fdr.idxs <- which(sig == "FDR")
   pt.bg[fdr.idxs] <- control.cnv.colors[cnv[fdr.idxs]]
   pt.border[fdr.idxs] <- cnv.colors[cnv[fdr.idxs]]
+  pt.pch[fdr.idxs] <- 23
 
-  return(list("pt.bg"=pt.bg, "pt.border"=pt.border))
+  return(list("pt.bg"=pt.bg, "pt.border"=pt.border, "pt.pch"=pt.pch))
 }
 
 
@@ -127,7 +131,7 @@ categorize.genes <- function(credsets){
     }else{
       cnv.idxs <- which(credsets$cnv==cnv)
     }
-    g.top <- unique(sort(credsets$top_gene[cnv.idxs]))
+    g.top <- unique(sort(unlist(credsets$top_gene[cnv.idxs])))
     g.nottop <- setdiff(unique(sort(unlist(credsets$all_genes[cnv.idxs]))),
                         g.top)
     g.vconf <- unique(sort(unlist(credsets$vconf_genes[cnv.idxs])))

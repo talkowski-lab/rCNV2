@@ -609,8 +609,8 @@ finemap_elnet_l1_l2_mix=0.75
 finemap_cluster_distance=200000
 finemap_nonsig_distance=1000000
 finemap_min_cnv_covariance=0.2
-finemap_conf_pip=0.15
-finemap_vconf_pip=0.85
+finemap_conf_pip=0.2
+finemap_vconf_pip=0.8
 
 # Dev only: localize gene features (these are passed as an argument in the WDL)
 gsutil -m cp ${rCNV_bucket}/cleaned_data/genes/metadata/${gene_features} ./

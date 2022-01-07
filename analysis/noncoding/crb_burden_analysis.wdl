@@ -207,17 +207,17 @@ task build_exclusion_list {
       ${rCNV_bucket}/cleaned_data/control_probesets \
       ./
 
-    # Clone rCNV2 repo (not present in athena-cloud Docker)
-    git clone https://github.com/talkowski-lab/rCNV2.git
-
     # Make inputs for conditional exclusion script
     zcat ${crbs} | cut -f1-4 | bgzip -c > crb_coords.bed.gz
     for file in control_probesets/*bed.gz; do
       echo -e "$file\t$( basename $file | sed 's/\.bed\.gz//g' )"
     done > probeset_tracks.tsv
 
+    # Clone rCNV2 repo (not present in athena-cloud Docker)
+    git clone https://github.com/talkowski-lab/rCNV2.git
+
     # Build conditional exclusion list
-    /opt/rCNV2/data_curation/other/probe_based_exclusion.py \
+    rCNV2/data_curation/other/probe_based_exclusion.py \
       --outfile ${crbs_prefix}.cohort_exclusion.bed.gz \
       --probecounts-outfile ${crbs_prefix}.probe_counts.bed.gz \
       --control-mean-counts-outfile ${crbs_prefix}.mean_probe_counts_per_cohort.bed.gz \
@@ -351,7 +351,7 @@ task burden_test {
         "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.DUP.crb_burden.stats.bed.gz" \
         "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.DEL.crb_burden.stats.bed.gz" \
         "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.crb_burden"
-    done < ${metacohort_list}
+    done < <( fgrep -v "mega" ${metacohort_list} )
 
     # Copy results to output bucket
     gsutil -m cp *.crb_burden.counts.bed.gz* \
@@ -438,7 +438,7 @@ task coding_burden_test {
           "$meta.${prefix}.${freq_code}.$CNV.crb_burden.stats.bed.gz"
         tabix -f "$meta.${prefix}.${freq_code}.$CNV.crb_burden.stats.bed.gz"
       done
-    done < ${metacohort_list}
+    done < <( fgrep -v "mega" ${metacohort_list} )
 
     # Copy results to output bucket
     gsutil -m cp *.crb_burden.counts.bed.gz* \
@@ -452,8 +452,8 @@ task coding_burden_test {
   runtime {
     docker: "${rCNV_docker}"
     preemptible: 1
-    disks: "local-disk 100 HDD"
-    memory: "8 GB"
+    disks: "local-disk 200 HDD"
+    memory: "16 GB"
     bootDiskSizeGb: "20"
   }
 
@@ -664,8 +664,6 @@ task meta_analysis {
     # Copy results to output bucket
     gsutil -m cp *.crb_burden.*meta_analysis.stats.bed.gz* \
       "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/stats/"
-    gsutil -m cp *.crb_burden.*or_corplot_grid.jpg \
-      "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/plots/"
     gsutil -m cp *.crb_burden.*meta_analysis.*.png \
       "${rCNV_bucket}/analysis/crb_burden/${prefix}/${freq_code}/plots/"
 
@@ -684,7 +682,6 @@ task meta_analysis {
     bootDiskSizeGb: "20"
   }
 }
-
 
 
 # Run unfiltered meta-analysis (including coding CNVs) across metacohorts for a single phenotype

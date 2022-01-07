@@ -131,7 +131,7 @@ credsets.scatter <- function(credsets, x, y, subset_to_regions=NULL,
   }
 
   # Add points (always add gw-sig last)
-  points(x, y, pch=21, cex=pt.cex,
+  points(x, y, pch=credsets$pt.pch, cex=pt.cex,
          bg=credsets$pt.bg, col=credsets$pt.border)
 
   # Add axis ticks

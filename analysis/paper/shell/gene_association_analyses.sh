@@ -140,20 +140,6 @@ ngenes=$( zcat meta_stats/${example_hpo}.rCNV.DEL.gene_burden.meta_analysis.stat
   assoc_stat_plots/${prefix}.example_miami.png
 
 
-# # Collect list of genes theoretically eligible to be in each credible set
-# while read chrom start end csID; do
-#   echo -e "$chrom\t$(( $start - $finemap_dist ))\t$(( $end + $finemap_dist ))" \
-#   | awk -v OFS="\t" '{ if ($2<0) $2=0; print $1, $2, $3 }' \
-#   | bedtools intersect -u -wa \
-#     -a refs/gencode.v19.canonical.pext_filtered.all_features.bed.gz \
-#     -b - \
-#   | cut -f4 | sort | uniq | paste -s -d\; \
-#   | awk -v OFS="\t" -v csID=$csID '{ print csID, $1 }'
-# done < <( zcat rCNV.final_genes.credible_sets.bed.gz | fgrep -v "#" | cut -f1-4 ) \
-# | cat <( echo -e "#credible_set_id\teligible_genes" ) - \
-# > credible_set.eligible_genes.tsv
-
-
 # Plot fine-mapping descriptive panels (number of genes per block, distribution of PIPs, etc)
 head -n1 rCNV.$CNV.gene_fine_mapping.gene_stats.naive_priors.tsv | cut -f1-5 \
 | awk -v OFS="\t" '{ print $0, "cnv" }' > pip_header.tsv
@@ -237,7 +223,7 @@ done | wc -l
 # Count number of significant large segments with at least one confident fine-mapped gene
 for CNV in DEL DUP; do
   zcat rCNV.final_segments.loci.bed.gz \
-  | fgrep -w $CNV | cut -f22 \
+  | fgrep -w $CNV | cut -f23 \
   | fgrep -wf <( zcat rCNV.final_genes.genes.bed.gz | fgrep -w $CNV | cut -f4 )
 done | wc -l
 
@@ -270,10 +256,10 @@ zcat rCNV.final_genes.genes.bed.gz \
 # Gather mean odds ratio across all gw sig large segments and credsets
 for wrapper in 1; do
   zcat rCNV.final_segments.associations.bed.gz \
-  | fgrep -v "#" | cut -f10
+  | fgrep -v "#" | cut -f11
   for CNV in DEL DUP; do
     zcat rCNV.final_segments.loci.bed.gz \
-    | fgrep -w $CNV | cut -f22 | sed 's/\;/\n/g' \
+    | fgrep -w $CNV | cut -f23 | sed 's/\;/\n/g' \
     | sort | uniq \
     | fgrep -wvf - <( zcat rCNV.final_genes.credible_sets.bed.gz ) \
     | fgrep -w $CNV
@@ -286,16 +272,6 @@ zcat rCNV.final_genes.credible_sets.bed.gz | fgrep -v "#" | cut -f9 \
 | awk '{ sum+=$1 }END{ print sum/NR }'
 zcat rCNV.final_genes.credible_sets.bed.gz | fgrep -v "#" | cut -f9 | sort -nk1,1 | head -n1
 zcat rCNV.final_genes.credible_sets.bed.gz | fgrep -v "#" | cut -f9 | sort -nk1,1 | tail -n1
-
-# # Count number of haploinsufficient genes that qualify as mechanism expansion per DECIPHER + DDG2P
-# zcat rCNV.final_genes.genes.bed.gz \
-# | fgrep -v "#" | fgrep -w DEL | cut -f4 | sort | uniq \
-# | fgrep -wf <( cat refs/gene_lists/ClinGen.all_triplosensitive.genes.list \
-#                    refs/gene_lists/DDG2P.all_gof.genes.list \
-#                    refs/gene_lists/DDG2P.all_other.genes.list ) \
-# | fgrep -wvf <( cat refs/gene_lists/ClinGen.all_haploinsufficient.genes.list \
-#                    refs/gene_lists/DDG2P.all_lof.genes.list ) \
-# | wc -l
 
 
 # Count number of constrained fine-mapped genes that aren't present in OMIM

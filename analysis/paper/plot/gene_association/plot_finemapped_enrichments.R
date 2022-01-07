@@ -76,9 +76,9 @@ calc.enrichment <- function(genes, feats, feat, ci="bootstrap", add.sig=FALSE,
 
 # Compute enrichment for a single feature across all groups of genes for plotting
 get.plot.data <- function(feats, feat, gene.groups, not.credset.genes, ci="bootstrap", add.sig=FALSE){
-  # Group 1: PIP ≥ 0.15, top gene
-  # Group 2: PIP ≥ 0.15, not top gene
-  # Group 3: PIP < 0.15, not top gene
+  # Group 1: PIP ≥ 0.2, top gene
+  # Group 2: PIP ≥ 0.2, not top gene
+  # Group 3: PIP < 0.2, not top gene
   # Group 4: all genes outside of credible sets
   lapply(c("DEL", "DUP", "CNV"), function(cnv){
     g1 <- unique(c(gene.groups[[cnv]]$top.vconf, gene.groups[[cnv]]$top.conf))
@@ -228,9 +228,9 @@ plot.enrichment <- function(feats, feat, gene.groups, ci="bootstrap",
   text(x=x.at[1:3], y=ymin-(1.5*cell.height)-cell.buffer, cex=5/6,
        labels=c("Yes", "No", "No"), font=c(2, 1, 1))
   text(x=x.at[1:2], y=ymin-(0.5*cell.height)-cell.buffer, cex=5/6,
-       labels=bquote("" >= 0.15))
+       labels=bquote("" >= 0.2))
   text(x=x.at[3], y=ymin-(0.5*cell.height)-cell.buffer, cex=5/6,
-       labels=bquote("" < 0.15))
+       labels=bquote("" < 0.2))
   text(x=x.at[4], y=ymin-cell.height-cell.buffer, cex=5/6, font=3,
        labels="All\nOther\nGenes", col=ns.color, xpd=T)
   if(add.y.labels==TRUE){
@@ -323,6 +323,6 @@ sapply(names(genelists), function(glist){
 pdf(paste(out.prefix, "ddd_dn_lof", "enrichments.pdf", sep="."),
     height=2.1, width=2.6)
 plot.enrichment(feats, "excess_ddd_dn_lof", gene.groups, ci="bootstrap", pt.cex=1.25,
-                y.ax.title="Excess De Novo\nPTVs per Gene", y.ax.title.line=0.2,
+                y.ax.title="Excess De Novo\nPTVs per Gene", y.ax.title.line=0.9,
                 blue.bg=FALSE)
 dev.off()

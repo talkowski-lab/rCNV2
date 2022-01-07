@@ -91,7 +91,7 @@ done > probeset_tracks.tsv
   crb_coords.bed.gz \
   probeset_tracks.tsv \
   control_probesets/rCNV.control_counts_by_array.tsv \
-  <( fgrep -v mega ${metacohort_list} )
+  <( fgrep -v "mega" ${metacohort_list} )
 
 
 
@@ -173,7 +173,7 @@ while read pheno hpo; do
       "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.DUP.crb_burden.stats.bed.gz" \
       "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.DEL.crb_burden.stats.bed.gz" \
       "$meta.${prefix}.${freq_code}.${noncoding_filter}_noncoding.crb_burden"
-  done < ${metacohort_list}
+  done < <( fgrep -v "mega" ${metacohort_list} )
 done < ${phenotype_list}
 
 
@@ -217,7 +217,7 @@ while read pheno hpo; do
         "$meta.${prefix}.${freq_code}.$CNV.crb_burden.stats.bed.gz"
       tabix -f "$meta.${prefix}.${freq_code}.$CNV.crb_burden.stats.bed.gz"
     done
-  done < ${metacohort_list}
+  done < <( fgrep -v "mega" ${metacohort_list} )
 done < ${phenotype_list}
 
 
