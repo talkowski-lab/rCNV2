@@ -195,8 +195,8 @@ out.prefix <- args$args[6]
 
 # # DEV PARAMETERS
 # scores.in <- "~/scratch/rCNV.gene_scores.tsv.gz"
-# del.meta.in <- "~/scratch/rCNV2_analysis_d1.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz"
-# dup.meta.in <- "~/scratch/rCNV2_analysis_d1.rCNV.DUP.gene_burden.meta_analysis.stats.bed.gz"
+# del.meta.in <- "~/scratch/rCNV2_analysis_d2.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz"
+# dup.meta.in <- "~/scratch/rCNV2_analysis_d2.rCNV.DUP.gene_burden.meta_analysis.stats.bed.gz"
 # constr.genes.in <- "~/scratch/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list"
 # xlist.in <- "~/scratch/rCNV.gene_scoring.training_gene_blacklist.bed.gz"
 # out.prefix <- "~/scratch/test_gene_score_empirical_cutoffs"

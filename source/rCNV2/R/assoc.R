@@ -179,7 +179,15 @@ fisher.burden.test <- function(bed, keep.n.cols=3, precision=10){
                            "fisher_OR_lower" = round(f.res$OR.lower, precision),
                            "fisher_OR_upper" = round(f.res$OR.upper, precision))
 
-  return(merge(bed[, 1:keep.n.cols], fisher.bed, all.y=T, sort=F))
+  # Merge & deduplicate (necessary for situations where two genes have different
+  # symbols but identical coordinates)
+  bed.slice <- bed[, unique(c(colnames(bed)[1:keep.n.cols],
+                              "case.CNV", "case.ref", "control.CNV", "control.ref"))]
+  colnames(bed.slice)[keep.n.cols + 1:4] <- colnames(fisher.bed)[c(4:5, 7:8)]
+  out.df <- merge(bed.slice, fisher.bed, all.y=T, sort=F, by=colnames(fisher.bed)[c(1:5, 7:8)])
+  first.cols <- colnames(bed)[1:keep.n.cols]
+  latter.cols <- colnames(fisher.bed)[which(!colnames(fisher.bed) %in% first.cols)]
+  return(out.df[!duplicated(out.df), c(first.cols, latter.cols)])
 }
 
 
@@ -263,8 +271,8 @@ or.corplot.grid <- function(stats.list, pt.cex=1){
         text(x=0.5, y=0.5, labels=bquote(italic(R)==1))
         # Otherwise, plot as normal
       }else{
-        dens.scatter(x=log10(stats.list[[c]][, grep("odds_ratio", colnames(stats.list[[c]]), fixed=T)]),
-                     y=log10(stats.list[[r]][, grep("odds_ratio", colnames(stats.list[[r]]), fixed=T)]),
+        dens.scatter(x=log10(stats.list[[c]][, grep("OR", colnames(stats.list[[c]]), fixed=T)]),
+                     y=log10(stats.list[[r]][, grep("OR", colnames(stats.list[[r]]), fixed=T)]),
                      parmar=parmar, pt.cex=pt.cex)
       }
       # Add headers & axes
@@ -330,7 +338,7 @@ combine.single.cohort.assoc.stats <- function(stats.list, cond.excl.in=NULL,
   # Annotate rows with cohorts to be conditionally excluded
   if(!is.null(cond.excl.in)){
     cond.excl.df <- read.table(cond.excl.in, header=T, sep="\t", comment.char="")
-    colnames(cond.excl.df)[1:3] <- mergeby.cols[1:3]
+    colnames(cond.excl.df)[1:keep.n.cols] <- mergeby.cols[1:keep.n.cols]
     merged <- merge(merged, cond.excl.df, by=mergeby.cols,
                     all.x=T, all.y=F, sort=F)
   }else{

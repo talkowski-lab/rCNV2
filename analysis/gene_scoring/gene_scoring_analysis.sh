@@ -45,20 +45,21 @@ gtf_index="genes/gencode.v19.canonical.gtf.gz.tbi"
 contig=18
 pad_controls=0
 max_cnv_size=300000000
-min_cds_ovr_del=1.0
-min_cds_ovr_dup=1.0
-max_genes_per_cnv=28
+min_cds_ovr_del=0.84
+min_cds_ovr_dup=0.84
+max_genes_per_cnv=24
 meta_model_prefix="fe"
 min_cnvs_per_gene_training=10
-cen_tel_dist=5000000
+cen_tel_dist=0
 exclusion_bed=refs/gencode.v19.canonical.pext_filtered.cohort_exclusion.bed.gz
 winsorize_meta_z=1.0
 meta_min_cases=300
 prior_frac=0.12
 
 
-# Create training excludelist: Remove all genes within ±3Mb of a telomere/centromere, 
+# Create training excludelist: Remove all genes within +N bp of a telomere/centromere, 
 # or those within known genomic disorder regions
+# (Note: cen/tel exclusion no longer applied — no evidence these genes will bias results)
 zcat refs/GRCh37.centromeres_telomeres.bed.gz \
 | awk -v FS="\t" -v OFS="\t" -v d=${cen_tel_dist} \
   '{ if ($2-d<0) print $1, "0", $3+d; else print $1, $2-d, $3+d }' \
@@ -148,7 +149,7 @@ while read meta cohorts; do
     --negative-truth-genes gold_standard.haplosufficient.genes.list \
     --exclude-genes <( zcat ${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
                        | fgrep -v "#" | cut -f4 ) \
-    --max-genes-for-summary 28 \
+    --max-genes-for-summary 24 \
     --summary-counts ${meta}.optimization_data.counts_per_hpo.DEL.tsv \
     --cnv-stats ${meta}.optimization_data.counts_per_cnv.DEL.tsv \
     --gzip
@@ -161,7 +162,7 @@ while read meta cohorts; do
     --negative-truth-genes gold_standard.triploinsensitive.genes.list \
     --exclude-genes <( zcat ${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
                        | fgrep -v "#" | cut -f4 ) \
-    --max-genes-for-summary 28 \
+    --max-genes-for-summary 24 \
     --summary-counts ${meta}.optimization_data.counts_per_hpo.DUP.tsv \
     --cnv-stats ${meta}.optimization_data.counts_per_cnv.DUP.tsv \
     --gzip
@@ -175,13 +176,15 @@ for CNV in DEL DUP; do
   > optimize_genes_per_cnv.${CNV}.input.tsv
 done
 /opt/rCNV2/analysis/gene_scoring/optimize_genes_per_cnv.R \
+  --max-eval 50 \
   optimize_genes_per_cnv.DEL.input.tsv \
   optimize_genes_per_cnv.DUP.input.tsv \
   optimize_genes_per_cnv.results.pdf
 
 
 # Parameter optimization: minimum number of CNVs per gene for training
-# NOTE: requires running meta-analysis and get_underpowered_genes tasks first in WDL
+# NOTE: requires running meta-analysis tasks first in WDL
+### TODO: DO WE NEED TO BLACKLIST GENOMIC DISORDERS FROM THIS??
 gsutil -m cp ${rCNV_bucket}/analysis/gene_scoring/data/** ./
 for CNV in DEL DUP; do
   /opt/rCNV2/analysis/gene_scoring/variance_vs_counts.R \

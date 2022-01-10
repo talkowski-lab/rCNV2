@@ -33,7 +33,7 @@ pad_controls=0
 min_cds_ovr_del=0.02
 min_cds_ovr_dup=0.84
 max_genes_per_cnv=20000
-p_cutoff=0.000002973712
+p_cutoff=0.000002901915
 max_manhattan_neg_log10_p=30
 n_pheno_perms=50
 meta_model_prefix="fe"
@@ -166,7 +166,7 @@ done < ${phenotype_list}
 # Test/dev parameters
 genes_bed="$meta.${prefix}.${freq_code}.$CNV.gene_burden.stats.bed.gz" #Note: in the WDL, this file is extracted as the first stats bed from the array (as a test case)
 # For convenience, this can be downloaded from a precomputed file here (but will be generated dynamically in the WDL)
-gsutil -m cp ${rCNV_bucket}/freeze_pre_rev1/analysis_freeze_pre_rev1/gene_burden/${prefix}/${freq_code}/stats/$genes_bed ./
+gsutil -m cp ${rCNV_bucket}/analysis/gene_burden/${prefix}/${freq_code}/stats/$genes_bed ./
 gtf_prefix="gencode.v19.canonical" #Note: this can be inferred in WDL as basename(gtf, ".gtf.gz")
 min_probes_per_gene=10
 min_frac_controls_probe_exclusion=0.9
@@ -373,11 +373,11 @@ phenotype_list="refs/test_phenotypes.list"
 metacohort_list="refs/rCNV_metacohort_list.txt"
 metacohort_sample_table="refs/HPOs_by_metacohort.table.tsv"
 rCNV_bucket="gs://rcnv_project"
-p_cutoff=0.000002973712
-meta_p_cutoff=0.000002973712
+p_cutoff=0.000002901915
+meta_p_cutoff=0.000002901915
 max_manhattan_neg_log10_p=30
 meta_model_prefix="fe"
-exclusion_bed="gencode.v19.canonical.cohort_exclusion.bed.gz" #Note: this file must be generated above
+exclusion_bed="gencode.v19.canonical.pext_filtered.cohort_exclusion.bed.gz" #Note: this file must be generated above
 
 # Copy necessary data for local testing (without running the above -- this is not in the WDL)
 gsutil -m cp \

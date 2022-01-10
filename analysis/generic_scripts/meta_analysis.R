@@ -89,23 +89,23 @@ keep.n.cols <- opts$`keep-n-columns`
 
 # # Dev parameters
 # setwd("~/scratch")
-# infile <- "HP0012759.rCNV.DEL.sliding_window.meta_analysis.input.txt"
-# outfile <- "HP0012759.rCNV.DEL.sliding_window.meta_analysis.stats.bed"
+# infile <- "HP0012759.rCNV.DEL.gene_burden.meta_analysis.input.txt"
+# outfile <- "HP0012759.rCNV.DEL.gene_burden.meta_analysis.bed"
 # corplot.out <- "corplot.test.jpg"
 # model <- "fe"
-# cond.excl.in <- "GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz"
+# cond.excl.in <- "gencode.v19.canonical.pext_filtered.cohort_exclusion.bed.gz"
 # p.is.neg.log10 <- T
 # spa <- T
 # spa.xbed.in <- "DEL_GDs.bed.gz"
 # winsorize <- 0.99
 # mirror.saddle <- F
 # adjust.biobanks <- F
-# adjust.inflation <- T
+# adjust.inflation <- F
 # min.cases <- 300
 # probe.counts.in <- NULL
 # calc.fdr <- T
 # secondary <- T
-# keep.n.cols <- 3
+# keep.n.cols <- 4
 
 # Read list of cohorts to meta-analyze
 cohort.info <- read.table(infile, header=F, sep="\t")
@@ -143,7 +143,7 @@ if(!is.null(corplot.out)){
   jpeg(corplot.out, res=300,
        height=300*(3.5+(ncohorts/1.5)),
        width=300*(4+(ncohorts/1.5)))
-  or.corplot.grid(stats.list, pt.cex=0.25)
+  or.corplot.grid(stats.list, pt.cex=0.4)
   dev.off()
 }
 

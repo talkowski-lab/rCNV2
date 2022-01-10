@@ -55,8 +55,8 @@ load.data <- function(infile, max.eval){
   return(dlist)
 }
 
-# Joint optimization of ratio differences for a single CNV type
-opt.single.cnvtype <- function(dlist, max.eval){
+# Optimize ratio differences
+opt.genes.per.cnv <- function(dlist, max.eval, weighted=FALSE){
   # Compute joint ratio diffs
   wdiffs <- do.call("rbind", lapply(1:max.eval, function(k){
     case.hits <- sapply(dlist, function(df){df$case_pos[which(df$n_genes==k)]})
@@ -65,7 +65,12 @@ opt.single.cnvtype <- function(dlist, max.eval){
     diffs <- sapply(dlist, function(df){df$cc_ratio_diff[which(df$n_genes==k)]})
     c(sum(weights * diffs), mean(diffs), sum(case.hits))
   }))
-  opt <- dlist[[1]]$n_genes[which(wdiffs[, 2]==max(wdiffs[, 2], na.rm=T))]
+  if(weighted){
+    opt.idx <- 1
+  }else{
+    opt.idx <- 2
+  }
+  opt <- dlist[[1]]$n_genes[which(wdiffs[, opt.idx]==max(wdiffs[, opt.idx], na.rm=T))]
   return(list("opt.data"=wdiffs, "opt"=opt))
 }
 
@@ -121,7 +126,7 @@ require(rCNV2, quietly=T)
 
 # List of command-line options
 option_list <- list(
-  make_option(c("--max-eval"), default=80,
+  make_option(c("--max-eval"), default=50,
               help="Maximum number of genes per CNVs to evaluate")
 )
 
@@ -141,7 +146,7 @@ max.eval <- opts$`max-eval`
 # del.in <- "~/scratch/optimize_genes_per_cnv.DEL.input.tsv"
 # dup.in <- "~/scratch/optimize_genes_per_cnv.DUP.input.tsv"
 # out.pdf <- "~/scratch/test.pdf"
-# max.eval <- 80
+# max.eval <- 50
 # setwd("~/scratch/")
 
 # Load data and compute summaries
@@ -149,10 +154,14 @@ del <- load.data(del.in, max.eval)
 dup <- load.data(dup.in, max.eval)
 
 # Run optimization per CNV type
-del.opt <- opt.single.cnvtype(del, max.eval)
-dup.opt <- opt.single.cnvtype(dup, max.eval)
+del.opt <- opt.genes.per.cnv(del, max.eval)
+dup.opt <- opt.genes.per.cnv(dup, max.eval)
 print(paste("Optimal cutoffs per CNV type:",
             del.opt$opt, "(DEL);", dup.opt$opt, "(DUP)"))
+
+# Run joint optimization
+joint.opt <- opt.genes.per.cnv(c(del, dup), max.eval)
+print(paste("Optimal cutoffs when averaged across both CNV type:", joint.opt$opt))
 
 # Plot optimization
 pdf(out.pdf, height=4, width=10)

@@ -174,6 +174,7 @@ workflow crb_burden_analysis {
         exclusion_bed=build_exclusion_list.exclusion_bed,
         freq_code="rCNV",
         noncoding_filter=noncoding_filter,
+        meta_p_cutoff_tables=calc_genome_wide_cutoffs.bonferroni_cutoff_table,
         meta_model_prefix=meta_model_prefix,
         winsorize_meta_z=winsorize_meta_z,
         meta_min_cases=meta_min_cases,
@@ -568,7 +569,7 @@ task meta_analysis {
   command <<<
     set -e
 
-    # Copy burden counts & gene coordinates
+    # Copy burden counts & CRB coordinates
     find / -name "*${prefix}.${freq_code}.${noncoding_filter}_noncoding.*.crb_burden.stats.bed.gz*" \
     | xargs -I {} mv {} ./
     find / -name "*crb_burden.${freq_code}.${noncoding_filter}_noncoding.*.bonferroni_pval.hpo_cutoffs.tsv*" \
@@ -694,6 +695,7 @@ task coding_meta_analysis {
   File exclusion_bed
   String freq_code
   String noncoding_filter
+  Array[File] meta_p_cutoff_tables
   String meta_model_prefix
   Float winsorize_meta_z
   Int meta_min_cases
@@ -704,18 +706,41 @@ task coding_meta_analysis {
 
   command <<<
     set -e
-
-    # Copy burden counts & gene coordinates
+    
+    # Copy burden counts & CRB coordinates
     find / -name "*${prefix}.${freq_code}.*.crb_burden.stats.bed.gz*" \
+    | xargs -I {} mv {} ./
+    find / -name "*crb_burden.${freq_code}.${noncoding_filter}_noncoding.*.bonferroni_pval.hpo_cutoffs.tsv*" \
     | xargs -I {} mv {} ./
     mkdir refs/
     gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
 
-    # Get metadata for meta-analysis
+    # Get metadata for meta-analysis (while accounting for cohorts below inclusion criteria)
+    last_cohort_col=$( head -n1 "${metacohort_sample_table}" | awk '{ print NF-1 }' )
+    keep_cols=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+                 | cut -f4-$last_cohort_col \
+                 | sed 's/\t/\n/g' \
+                 | awk -v min_n=${meta_min_cases} '{ if ($1>=min_n) print NR+3 }' \
+                 | paste -s -d, )
+    ncase=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+             | cut -f$keep_cols \
+             | sed 's/\t/\n/g' \
+             | awk '{ sum+=$1 }END{ print sum }' )
+    nctrl=$( fgrep -w "HEALTHY_CONTROL" "${metacohort_sample_table}" \
+             | cut -f$keep_cols \
+             | sed 's/\t/\n/g' \
+             | awk '{ sum+=$1 }END{ print sum }' )
+    descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+               | awk -v FS="\t" '{ print $2 }' )
+    title="$descrip (${hpo})\nMeta-analysis of $ncase cases and $nctrl controls"
     DEL_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
                     crb_burden.${freq_code}.${noncoding_filter}_noncoding.DEL.bonferroni_pval.hpo_cutoffs.tsv )
     DUP_p_cutoff=$( awk -v hpo=${prefix} '{ if ($1==hpo) print $2 }' \
                     crb_burden.${freq_code}.${noncoding_filter}_noncoding.DUP.bonferroni_pval.hpo_cutoffs.tsv )
+
+    # Set HPO-specific parameters
+    descrip=$( fgrep -w "${hpo}" "${metacohort_sample_table}" \
+               | awk -v FS="\t" '{ print $2 }' )
 
     # Run meta-analysis for each CNV type
     for CNV in DEL DUP; do
