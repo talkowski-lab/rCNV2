@@ -26,7 +26,7 @@ gsutil -m cp -r \
   ${rCNV_bucket}/analysis/gene_scoring/data/rCNV.*.gene_abfs.tsv \
   ${rCNV_bucket}/analysis/gene_scoring/data/${prefix}.rCNV.*.gene_burden.meta_analysis.stats.bed.gz \
   ${rCNV_bucket}/analysis/gene_scoring/data/${prefix}.rCNV.*.gene_burden.underpowered_genes.bed.gz \
-  ${rCNV_bucket}/analysis/gene_scoring/refs/rCNV.gene_scoring.training_gene_blacklist.bed.gz \
+  ${rCNV_bucket}/analysis/gene_scoring/refs/rCNV.gene_scoring.training_gene_excludelist.bed.gz \
   ${rCNV_bucket}/results/gene_scoring/rCNV.gene_scores.tsv.gz \
   ${rCNV_bucket}/analysis/gene_scoring/all_models \
   ${rCNV_bucket}/analysis/gene_scoring/gene_lists \
@@ -46,82 +46,85 @@ gsutil -m cp -r \
   refs/
 
 
-### TODO: REVISE THESE TO REFLECT FINAL TRAINING SETS
-# # Plot UpSet comparisons of gold-standard haploinsufficient genes
-# if ! [ -e training_data ]; then
-#   mkdir training_data
-# fi
-# echo -e "LoF constrained\trefs/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list" > hi.gs.upset.input.tsv
-# cat \
-#   refs/gene_lists/DDG2P.hc_lof.genes.list \
-#   refs/gene_lists/ClinGen.hc_haploinsufficient.genes.list \
-# | sort | uniq > hc_lof_disease.genes.list
-# echo -e "Dominant LoF disease\thc_lof_disease.genes.list" >> hi.gs.upset.input.tsv
-# echo -e "Low-expressor intolerant\trefs/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.low_expression_invariant.genes.list" >> hi.gs.upset.input.tsv
-# /opt/rCNV2/analysis/paper/plot/misc/plot_upset.R \
-#   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
-#   --cnv-coloring "DEL" \
-#   hi.gs.upset.input.tsv \
-#   training_data/${prefix}.gold_standard_genes.haploinsufficient.upset.pdf
+# Plot UpSet comparisons of gold-standard haploinsufficient genes
+if ! [ -e training_data ]; then
+  mkdir training_data
+fi
+echo -e "LoF constrained\trefs/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list" > hi.gs.upset.input.tsv
+cat \
+  refs/gene_lists/DDG2P.hc_lof.genes.list \
+  refs/gene_lists/ClinGen.hc_haploinsufficient.genes.list \
+| sort | uniq > hc_lof_disease.genes.list
+echo -e "Dominant LoF disease\thc_lof_disease.genes.list" >> hi.gs.upset.input.tsv
+echo -e "Low-expressor intolerant\trefs/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.low_expression_invariant.genes.list" >> hi.gs.upset.input.tsv
+echo -e "No LoF SVs in gnomAD\trefs/gene_lists/gnomad_sv.v2.1.nonneuro.no_lof_dels.genes.list" >> hi.gs.upset.input.tsv
+/opt/rCNV2/analysis/paper/plot/misc/plot_upset.R \
+  --min-highlight 3 \
+  --cnv-coloring "DEL" \
+  hi.gs.upset.input.tsv \
+  training_data/${prefix}.gold_standard_genes.haploinsufficient.upset.pdf
 
 
-# # Plot UpSet comparisons of gold-standard haplosufficient genes
-# if ! [ -e training_data ]; then
-#   mkdir training_data
-# fi
-# echo -e "Mutationally tolerant\trefs/gene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list" > hs.gs.upset.input.tsv
-# cat \
-#   refs/gene_lists/HP0000118.HPOdb.genes.list \
-#   refs/gene_lists/DDG2P*.genes.list \
-#   refs/gene_lists/ClinGen*.genes.list \
-# | fgrep -wvf - refs/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
-# | sort | uniq > no_disease_assoc.genes.list
-# echo -e "No disease assoc.\tno_disease_assoc.genes.list" >> hs.gs.upset.input.tsv
-# echo -e "Low-expressor tolerant\trefs/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.low_expression_variable.genes.list" >> hs.gs.upset.input.tsv
-# /opt/rCNV2/analysis/paper/plot/misc/plot_upset.R \
-#   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
-#   --cnv-coloring "DEL" \
-#   hs.gs.upset.input.tsv \
-#   training_data/${prefix}.gold_standard_genes.haplosufficient.upset.pdf
+# Plot UpSet comparisons of gold-standard haplosufficient genes
+if ! [ -e training_data ]; then
+  mkdir training_data
+fi
+echo -e "Mutationally tolerant\trefs/gene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list" > hs.gs.upset.input.tsv
+cat \
+  refs/gene_lists/HP0000118.HPOdb.genes.list \
+  refs/gene_lists/DDG2P*.genes.list \
+  refs/gene_lists/ClinGen*.genes.list \
+| fgrep -wvf - refs/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
+| sort | uniq > no_disease_assoc.genes.list
+echo -e "No disease assoc.\tno_disease_assoc.genes.list" >> hs.gs.upset.input.tsv
+echo -e "Low-expressor tolerant\trefs/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.low_expression_variable.genes.list" >> hs.gs.upset.input.tsv
+echo -e "Has LoF SVs in gnomAD\trefs/gene_lists/gnomad_sv.v2.1.nonneuro.has_lof_dels.genes.list" >> hs.gs.upset.input.tsv
+/opt/rCNV2/analysis/paper/plot/misc/plot_upset.R \
+  --min-highlight 4 \
+  --cnv-coloring "DEL" \
+  hs.gs.upset.input.tsv \
+  training_data/${prefix}.gold_standard_genes.haplosufficient.upset.pdf
 
 
-# # Plot UpSet comparisons of gold-standard triplosensitive genes
-# if ! [ -e training_data ]; then
-#   mkdir training_data
-# fi
-# echo -e "Missense constrained\trefs/gene_lists/gnomad.v2.1.1.mis_constrained.genes.list" > ts.gs.upset.input.tsv
-# cat \
-#   refs/gene_lists/DDG2P.hc_gof.genes.list \
-#   refs/gene_lists/DDG2P.hc_other.genes.list \
-#   refs/gene_lists/ClinGen.all_triplosensitive.genes.list \
-# | sort | uniq > hc_notlof_disease.genes.list
-# echo -e "Dominant GoF disease\thc_lof_disease.genes.list" >> ts.gs.upset.input.tsv
-# echo -e "High-expressor intolerant\trefs/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.high_expression_invariant.genes.list" >> ts.gs.upset.input.tsv
-# /opt/rCNV2/analysis/paper/plot/misc/plot_upset.R \
-#   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
-#   --cnv-coloring "DUP" \
-#   ts.gs.upset.input.tsv \
-#   training_data/${prefix}.gold_standard_genes.triplosensitive.upset.pdf
+# Plot UpSet comparisons of gold-standard triplosensitive genes
+if ! [ -e training_data ]; then
+  mkdir training_data
+fi
+echo -e "Missense constrained\trefs/gene_lists/gnomad.v2.1.1.mis_constrained.genes.list" > ts.gs.upset.input.tsv
+cat \
+  refs/gene_lists/DDG2P.hc_gof.genes.list \
+  refs/gene_lists/DDG2P.hc_other.genes.list \
+  refs/gene_lists/ClinGen.all_triplosensitive.genes.list \
+| sort | uniq > hc_notlof_disease.genes.list
+echo -e "Dominant GoF disease\thc_lof_disease.genes.list" >> ts.gs.upset.input.tsv
+echo -e "High-expressor intolerant\trefs/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.high_expression_invariant.genes.list" >> ts.gs.upset.input.tsv
+echo -e "No CG DUPs in gnomAD\trefs/gene_lists/gnomad_sv.v2.1.nonneuro.no_cg_dups.genes.list" >> ts.gs.upset.input.tsv
+/opt/rCNV2/analysis/paper/plot/misc/plot_upset.R \
+  --min-highlight 3 \
+  --cnv-coloring "DUP" \
+  ts.gs.upset.input.tsv \
+  training_data/${prefix}.gold_standard_genes.triplosensitive.upset.pdf
 
 
-# # Plot UpSet comparisons of gold-standard triploinsensitive genes
-# if ! [ -e training_data ]; then
-#   mkdir training_data
-# fi
-# echo -e "Mutationally tolerant\trefs/gene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list" > ti.gs.upset.input.tsv
-# cat \
-#   refs/gene_lists/HP0000118.HPOdb.genes.list \
-#   refs/gene_lists/DDG2P*.genes.list \
-#   refs/gene_lists/ClinGen*.genes.list \
-# | fgrep -wvf - refs/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
-# | sort | uniq > no_disease_assoc.genes.list
-# echo -e "No disease assoc.\tno_disease_assoc.genes.list" >> ti.gs.upset.input.tsv
-# echo -e "High-expressor tolerant\trefs/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.high_expression_variable.genes.list" >> ti.gs.upset.input.tsv
-# /opt/rCNV2/analysis/paper/plot/misc/plot_upset.R \
-#   --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
-#   --cnv-coloring "DUP" \
-#   ti.gs.upset.input.tsv \
-#   training_data/${prefix}.gold_standard_genes.triploinsensitive.upset.pdf
+# Plot UpSet comparisons of gold-standard triploinsensitive genes
+if ! [ -e training_data ]; then
+  mkdir training_data
+fi
+echo -e "Mutationally tolerant\trefs/gene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list" > ti.gs.upset.input.tsv
+cat \
+  refs/gene_lists/HP0000118.HPOdb.genes.list \
+  refs/gene_lists/DDG2P*.genes.list \
+  refs/gene_lists/ClinGen*.genes.list \
+| fgrep -wvf - refs/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
+| sort | uniq > no_disease_assoc.genes.list
+echo -e "No disease assoc.\tno_disease_assoc.genes.list" >> ti.gs.upset.input.tsv
+echo -e "High-expressor tolerant\trefs/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.high_expression_variable.genes.list" >> ti.gs.upset.input.tsv
+echo -e "Has CG DUPs in gnomAD\trefs/gene_lists/gnomad_sv.v2.1.nonneuro.has_cg_dups.genes.list" >> ti.gs.upset.input.tsv
+/opt/rCNV2/analysis/paper/plot/misc/plot_upset.R \
+  --min-highlight 4 \
+  --cnv-coloring "DUP" \
+  ti.gs.upset.input.tsv \
+  training_data/${prefix}.gold_standard_genes.triploinsensitive.upset.pdf
 
 
 # Plot distribution of training effect sizes and BFDPs
@@ -129,11 +132,11 @@ if ! [ -e training_data ]; then
   mkdir training_data
 fi
 for CNV in DEL DUP; do
-  # Combine training blacklist
+  # Combine training excludelist
   zcat *.$CNV.gene_burden.underpowered_genes.bed.gz \
-    rCNV.gene_scoring.training_gene_blacklist.bed.gz \
+    rCNV.gene_scoring.training_gene_excludelist.bed.gz \
   | fgrep -v "#" | cut -f4 | sort -V | uniq \
-  > rCNV.$CNV.training_blacklist.genes.list
+  > rCNV.$CNV.training_excludelist.genes.list
   # Set CNV-specific parameters
   case $CNV in
     DEL)
@@ -151,7 +154,7 @@ for CNV in DEL DUP; do
     rCNV.$CNV.gene_abfs.tsv \
     $true_genes \
     $false_genes \
-    rCNV.$CNV.training_blacklist.genes.list \
+    rCNV.$CNV.training_excludelist.genes.list \
     $CNV \
     training_data/${prefix}.$CNV
 done
@@ -214,13 +217,12 @@ fgrep -wvf \
 if ! [ -e basic_distribs ]; then
   mkdir basic_distribs
 fi
-### TODO: FIX THIS -- AT PRESENT DUPLICATIONS NEVER REACH THE CONSTRAINED DELETION CUTOFF
 /opt/rCNV2/analysis/paper/plot/gene_scores/empirical_score_cutoffs.R \
   rCNV.gene_scores.tsv.gz \
   ${prefix}.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz \
   ${prefix}.rCNV.DUP.gene_burden.meta_analysis.stats.bed.gz \
   refs/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
-  rCNV.gene_scoring.training_gene_blacklist.bed.gz \
+  rCNV.gene_scoring.training_gene_excludelist.bed.gz \
   basic_distribs/${prefix}
 /opt/rCNV2/analysis/paper/plot/gene_scores/plot_scores_scatter.R \
   rCNV.gene_scores.tsv.gz \

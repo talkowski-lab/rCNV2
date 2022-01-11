@@ -58,9 +58,7 @@ workflow gene_burden_analysis {
   File raw_finemap_merged_no_variation_features
   File raw_finemap_merged_features
   String rCNV_bucket
-  String rCNV_docker_assoc        # Note: strictly for dev/caching convenience; can collapse into a single docker at a later date
-  String rCNV_docker_covariance   # Note: strictly for dev/caching convenience; can collapse into a single docker at a later date
-  String rCNV_docker_finemap      # Note: strictly for dev/caching convenience; can collapse into a single docker at a later date
+  String rCNV_docker
   String athena_cloud_docker
   String fisher_cache_string
   String perm_cache_string
@@ -89,7 +87,7 @@ workflow gene_burden_analysis {
         p_cutoff=p_cutoff,
         max_manhattan_neg_log10_p=max_manhattan_neg_log10_p,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_assoc,
+        rCNV_docker=rCNV_docker,
         prefix=pheno[0],
         cache_string=fisher_cache_string
     }
@@ -128,7 +126,7 @@ workflow gene_burden_analysis {
         winsorize_meta_z=winsorize_meta_z,
         meta_min_cases=meta_min_cases,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_assoc,
+        rCNV_docker=rCNV_docker,
         prefix=pheno[0],
         cache_string=perm_cache_string
     }
@@ -146,7 +144,7 @@ workflow gene_burden_analysis {
         n_pheno_perms=n_pheno_perms,
         fdr_target=p_cutoff,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_assoc,
+        rCNV_docker=rCNV_docker,
         dummy_completion_markers=rCNV_perm_test.completion_marker,
         fdr_table_suffix="empirical_genome_wide_pval",
         p_val_column_name="meta_neg_log10_p"
@@ -170,7 +168,7 @@ workflow gene_burden_analysis {
         winsorize_meta_z=winsorize_meta_z,
         meta_min_cases=meta_min_cases,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_assoc,
+        rCNV_docker=rCNV_docker,
         prefix=pheno[0],
         cache_string=meta_cache_string
     }
@@ -187,7 +185,7 @@ workflow gene_burden_analysis {
         min_cds_ovr_dup=min_cds_ovr_dup,
         freq_code="rCNV",
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_covariance,
+        rCNV_docker=rCNV_docker,
         prefix=basename(gtf, '.gtf.gz')
     }
   }
@@ -195,7 +193,7 @@ workflow gene_burden_analysis {
     input:
       covariance_shards=calc_covariance.covariance_shards,
       rCNV_bucket=rCNV_bucket,
-      rCNV_docker=rCNV_docker_finemap,
+      rCNV_docker=rCNV_docker,
       prefix=basename(gtf, '.gtf.gz')
   }
 
@@ -223,7 +221,7 @@ workflow gene_burden_analysis {
         gene_features=finemap_genomic_features,
         FDR_cutoff=FDR_cutoff,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_finemap
+        rCNV_docker=rCNV_docker
     }
     
     # Expression features
@@ -248,7 +246,7 @@ workflow gene_burden_analysis {
         gene_features=finemap_expression_features,
         FDR_cutoff=FDR_cutoff,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_finemap
+        rCNV_docker=rCNV_docker
     }
     
     # Chromatin features
@@ -273,7 +271,7 @@ workflow gene_burden_analysis {
         gene_features=finemap_chromatin_features,
         FDR_cutoff=FDR_cutoff,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_finemap
+        rCNV_docker=rCNV_docker
     }
     
     # Protein features
@@ -298,7 +296,7 @@ workflow gene_burden_analysis {
         gene_features=finemap_protein_features,
         FDR_cutoff=FDR_cutoff,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_finemap
+        rCNV_docker=rCNV_docker
     }
 
     # Constraint features
@@ -323,7 +321,7 @@ workflow gene_burden_analysis {
         gene_features=finemap_constraint_features,
         FDR_cutoff=FDR_cutoff,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_finemap
+        rCNV_docker=rCNV_docker
     }
 
     # Variation features
@@ -348,7 +346,7 @@ workflow gene_burden_analysis {
         gene_features=finemap_variation_features,
         FDR_cutoff=FDR_cutoff,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_finemap
+        rCNV_docker=rCNV_docker
     }
     
     # Merged features
@@ -373,7 +371,7 @@ workflow gene_burden_analysis {
         gene_features=finemap_merged_features,
         FDR_cutoff=FDR_cutoff,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_finemap
+        rCNV_docker=rCNV_docker
     }
     
     # Merged features (no variation)
@@ -398,7 +396,7 @@ workflow gene_burden_analysis {
         gene_features=finemap_merged_no_variation_features,
         FDR_cutoff=FDR_cutoff,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_finemap
+        rCNV_docker=rCNV_docker
     }
   }
 
@@ -410,7 +408,7 @@ workflow gene_burden_analysis {
       credset_beds=finemap_merged_no_variation.joint_credsets_bed,
       freq_code="rCNV",
       rCNV_bucket=rCNV_bucket,
-      rCNV_docker=rCNV_docker_finemap
+      rCNV_docker=rCNV_docker
   }
 
   # Once complete, plot finemap results
@@ -433,7 +431,7 @@ workflow gene_burden_analysis {
         raw_features_merged=raw_finemap_merged_features,
         phenotype_list=phenotype_list,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_finemap
+        rCNV_docker=rCNV_docker
     }
   }
 

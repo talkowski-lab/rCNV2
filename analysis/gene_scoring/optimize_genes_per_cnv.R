@@ -23,25 +23,29 @@ load.data.single <- function(path, max.eval){
   x <- read.table(path, sep="\t", header=T, comment.char="")
   case.idx <- which(x$pheno=="case")
   control.idx <- which(x$pheno=="control")
-  cdfs <- as.data.frame(do.call("rbind", lapply(1:max.eval, function(k){
-    kidx <- which(x$n_genes <= k)
-    case.signal <- sum(x$n_pos[intersect(case.idx, kidx)])
-    case.noise <- sum(x$n_neg[intersect(case.idx, kidx)])
-    case.ratio <- case.signal/case.noise
-    control.signal <- sum(x$n_pos[intersect(control.idx, kidx)])
-    control.noise <- sum(x$n_neg[intersect(control.idx, kidx)])
-    control.ratio <- control.signal/control.noise
-    cc.ratio <- case.ratio / control.ratio
-    cc.ratio.diff <- case.ratio - control.ratio
-    c(k,
-      case.signal, case.noise, case.ratio,
-      control.signal, control.noise, control.ratio,
-      cc.ratio, cc.ratio.diff)
-  })))
-  cdfs <- as.data.frame(apply(cdfs, 2, as.numeric))
-  colnames(cdfs) <- c("n_genes", "case_pos", "case_neg", "case_ratio",
-                      "control_pos", "control_neg", "control_ratio",
-                      "ratio_of_ratios", "cc_ratio_diff")
+  x$true_only <- x$n_pos>0 & x$n_neg<1
+  x$ambiguous <- x$n_pos>0 & x$n_neg>0
+  # Approximate proportion of true informative CNVs added
+  # for each step in max.eval
+  if(any(x$true_only)){
+    true.added <- dnorm(1:max.eval,
+                        mean=mean(x$n_genes[x$true_only]),
+                        sd=sd(x$n_genes[x$true_only]))
+  }else{
+    true.added <- rep(1/max.eval, len=max.eval)
+  }
+  # Approximate proportion of uninformative CNVs (noise) added
+  # for each step in max.eval
+  if(any(x$ambiguous)){
+    ambig.added <- dnorm(1:max.eval,
+                         mean=mean(x$n_genes[x$ambiguous]),
+                         sd=sd(x$n_genes[x$ambiguous]))
+  }else{
+    ambig.added <- rep(1/max.eval, len=max.eval)
+  }
+  cdfs <- data.frame("true.added" = true.added,
+                     "ambig.added" = ambig.added,
+                     "d" = true.added - ambig.added)
   return(cdfs)
 }
 
@@ -55,64 +59,56 @@ load.data <- function(infile, max.eval){
   return(dlist)
 }
 
-# Optimize ratio differences
-opt.genes.per.cnv <- function(dlist, max.eval, weighted=FALSE){
-  # Compute joint ratio diffs
-  wdiffs <- do.call("rbind", lapply(1:max.eval, function(k){
-    case.hits <- sapply(dlist, function(df){df$case_pos[which(df$n_genes==k)]})
-    weights <- case.hits / sum(case.hits)
-    bests <- sapply(dlist, function(df){max(df$cc_ratio_diff, na.rm=T)})
-    diffs <- sapply(dlist, function(df){df$cc_ratio_diff[which(df$n_genes==k)]})
-    c(sum(weights * diffs), mean(diffs), sum(case.hits))
-  }))
-  if(weighted){
-    opt.idx <- 1
-  }else{
-    opt.idx <- 2
-  }
-  opt <- dlist[[1]]$n_genes[which(wdiffs[, opt.idx]==max(wdiffs[, opt.idx], na.rm=T))]
-  return(list("opt.data"=wdiffs, "opt"=opt))
+# Optimize cutoffs for a list of cohorts
+opt.genes.per.cnv <- function(dlist, max.eval){
+  # Compute optimal cutoff per cohort
+  opt <- sapply(dlist, function(df){
+    # Optimal cutoff is the first value where the derivative <= 0
+    # Subtract one to go to step immediately before this point
+    min(which(df$d <= 0)) - 1
+  })
+  names(opt) <- names(dlist)
+
+  # Average derivatives across cohorts
+  d.avg <- apply(do.call("cbind", lapply(dlist, function(df){df$d})), 1, mean)
+  joint.opt <- min(which(d.avg <= 0)) - 1
+  return(list("per.cohort"=opt, "joint"=joint.opt))
 }
 
-# Plot case/control ratio diffs for a single cohort
-plot.diffs <- function(dlist, cohort, ymax=NULL, color="red"){
-  x <- as.data.frame(dlist[[cohort]])
-  xmax <- max(dlist[[1]]$n_genes)
-  if(is.null(ymax)){
-    ymax <- max(c(x$case_ratio, x$control_ratio), na.rm=T)
+# Plot optimization derivative for a single cohort
+plot.diffs <- function(df, cohort, opt, ylims=NULL, color="black"){
+  d <- df$d
+  xmax <- nrow(df)
+  if(is.null(ylims)){
+    ylims <- max(d, na.rm=T)
   }
-  best.idx <- which(x$cc_ratio_diff==max(x$cc_ratio_diff, na.rm=T))
   par(mar=c(4, 4, 3, 0.5), bty="n")
-  plot(x$n_genes, x$control_ratio, xlim=c(0, xmax), ylim=c(0, ymax),
+  plot(1:xmax, d, xlim=c(0, xmax), ylim=ylims,
        xaxs="i", yaxs="i", xpd=T,
-       lwd=3, type="l", col="gray50",
-       xlab="Max. Genes / CNV", ylab="Signal-to-Noise Ratio", main=cohort,
-       panel.first=c(polygon(x=c(x$n_genes, rev(x$n_genes)),
-                             y=c(x$control_ratio, rev(x$case_ratio)),
-                             col=adjustcolor(color, alpha=0.2), border=NA),
-                     segments(x0=x$n_genes[best.idx], x1=x$n_genes[best.idx],
-                              y0=x$case_ratio[best.idx], y1=x$control_ratio[best.idx])))
-  points(x$n_genes, x$case_ratio, type="l", lwd=3, col=color)
+       lwd=3, type="l", col=color,
+       xlab="Max. Genes / CNV", ylab="Optimization Derivative", main=cohort,
+       panel.first=c(abline(h=0, col="gray70")))
+  abline(v=opt)
 }
 
 # Wrapper for plotting all cohorts
-plot.all <- function(del, dup){
+plot.all <- function(del, dup, del.opt, dup.opt){
   # Get plot data
-  ymax.del <- max(sapply(del, function(df){max(c(df$case_ratio, df$control_ratio), na.rm=T)}), na.rm=T)
-  ymax.dup <- max(sapply(dup, function(df){max(c(df$case_ratio, df$control_ratio), na.rm=T)}), na.rm=T)
+  ylims.del <- range(sapply(del, function(df){range(df$d, na.rm=T)}), na.rm=T)
+  ylims.dup <- range(sapply(dup, function(df){range(df$d, na.rm=T)}), na.rm=T)
 
   # Prep layout
   par(mfrow=c(2, length(del)))
 
   # Plot signal:noise ratio for all cohorts
   sapply(names(del), function(cohort){
-    plot.diffs(del, cohort, ymax.del)
+    plot.diffs(del[[cohort]], cohort, del.opt[cohort],
+               ylims.del, cnv.colors[1])
   })
-  legend("topright", lwd=3, col=c("red", "grey50"), legend=c("Cases", "Controls"), cex=0.9, bty="n")
   sapply(names(dup), function(cohort){
-    plot.diffs(dup, cohort, ymax.dup, "blue")
+    plot.diffs(dup[[cohort]], cohort, dup.opt[cohort],
+               ylims.dup, cnv.colors[2])
   })
-  legend("topright", lwd=3, col=c("blue", "grey50"), legend=c("Cases", "Controls"), cex=0.9, bty="n")
 }
 
 
@@ -126,7 +122,7 @@ require(rCNV2, quietly=T)
 
 # List of command-line options
 option_list <- list(
-  make_option(c("--max-eval"), default=50,
+  make_option(c("--max-eval"), default=100,
               help="Maximum number of genes per CNVs to evaluate")
 )
 
@@ -146,7 +142,7 @@ max.eval <- opts$`max-eval`
 # del.in <- "~/scratch/optimize_genes_per_cnv.DEL.input.tsv"
 # dup.in <- "~/scratch/optimize_genes_per_cnv.DUP.input.tsv"
 # out.pdf <- "~/scratch/test.pdf"
-# max.eval <- 50
+# max.eval <- 100
 # setwd("~/scratch/")
 
 # Load data and compute summaries
@@ -157,14 +153,16 @@ dup <- load.data(dup.in, max.eval)
 del.opt <- opt.genes.per.cnv(del, max.eval)
 dup.opt <- opt.genes.per.cnv(dup, max.eval)
 print(paste("Optimal cutoffs per CNV type:",
-            del.opt$opt, "(DEL);", dup.opt$opt, "(DUP)"))
+            floor(mean(del.opt$joint)), "(DEL);",
+            floor(mean(dup.opt$joint)), "(DUP)"))
 
 # Run joint optimization
 joint.opt <- opt.genes.per.cnv(c(del, dup), max.eval)
-print(paste("Optimal cutoffs when averaged across both CNV type:", joint.opt$opt))
+print(paste("Optimal cutoffs when averaged across both CNV type:",
+            floor(mean(joint.opt$joint))))
 
 # Plot optimization
 pdf(out.pdf, height=4, width=10)
-plot.all(del, dup)
+plot.all(del, dup, del.opt$per.cohort, dup.opt$per.cohort)
 dev.off()
 

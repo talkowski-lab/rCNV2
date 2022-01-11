@@ -23,10 +23,11 @@ workflow gene_burden_analysis {
   String meta_model_prefix
   Float winsorize_meta_z
   Int meta_min_cases
-  Int min_cnvs_per_gene_training
+  Int min_cnvs_per_gene_training_del
+  Int min_cnvs_per_gene_training_dup
   Float prior_frac
   Float prior_lnor_thresholding_pct
-  File training_blacklist
+  File training_excludelist
   File gene_features
   File raw_gene_features
   Float max_true_bfdp
@@ -41,7 +42,7 @@ workflow gene_burden_analysis {
 
   Array[String] cnv_types = ["DEL", "DUP"]
 
-  Array[String] models = ["logit", "svm", "randomforest", "lda", "naivebayes", "sgd", "neuralnet"]
+  Array[String] models = ["logit", "svm", "randomforest", "lda", "naivebayes", "neuralnet". "gbdt", "knn"]
 
   # Scatter over contigs (for speed)
   scatter ( contig in contigs ) {
@@ -119,94 +120,95 @@ workflow gene_burden_analysis {
         prefix=prefix,
         CNV=CNV,
         metacohort_list=metacohort_list,
-        min_cnvs_per_gene_training=min_cnvs_per_gene_training,
+        min_cnvs_per_gene_training_del=min_cnvs_per_gene_training_del,
+        min_cnvs_per_gene_training_dup=min_cnvs_per_gene_training_dup,
         freq_code="rCNV",
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker
     }
   }
 
-  # # Estimate prior effect sizes and compute BFDPs
-  # call calc_priors_bfdp {
-  #   input:
-  #     del_meta_stats=rCNV_meta_analysis.meta_stats_bed[0],
-  #     dup_meta_stats=rCNV_meta_analysis.meta_stats_bed[1],
-  #     underpowered_genes=get_underpowered_genes.underpowered_genes,
-  #     freq_code="rCNV",
-  #     rCNV_bucket=rCNV_bucket,
-  #     rCNV_docker=rCNV_docker,
-  #     prior_frac=prior_frac,
-  #     prior_lnor_thresholding_pct=prior_lnor_thresholding_pct
-  # }
+  # Estimate prior effect sizes and compute BFDPs
+  call calc_priors_bfdp {
+    input:
+      del_meta_stats=rCNV_meta_analysis.meta_stats_bed[0],
+      dup_meta_stats=rCNV_meta_analysis.meta_stats_bed[1],
+      underpowered_genes=get_underpowered_genes.underpowered_genes,
+      freq_code="rCNV",
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker,
+      prior_frac=prior_frac,
+      prior_lnor_thresholding_pct=prior_lnor_thresholding_pct
+  }
 
-  # # Score genes for each model
-  # scatter ( model in models ) {
-  #   call score_genes as score_genes_DEL {
-  #     input:
-  #       CNV="DEL",
-  #       BFDP_stats=calc_priors_bfdp.del_bfdp,
-  #       blacklist=training_blacklist,
-  #       underpowered_genes=get_underpowered_genes.underpowered_genes[0],
-  #       gene_features=gene_features,
-  #       model=model,
-  #       max_true_bfdp=max_true_bfdp,
-  #       min_false_bfdp=min_false_bfdp,
-  #       elnet_alpha=elnet_alpha,
-  #       elnet_l1_l2_mix=elnet_l1_l2_mix,
-  #       freq_code="rCNV",
-  #       rCNV_bucket=rCNV_bucket,
-  #       rCNV_docker=rCNV_docker
-  #   }
-  #   call score_genes as score_genes_DUP {
-  #     input:
-  #       CNV="DUP",
-  #       BFDP_stats=calc_priors_bfdp.dup_bfdp,
-  #       blacklist=training_blacklist,
-  #       underpowered_genes=get_underpowered_genes.underpowered_genes[1],
-  #       gene_features=gene_features,
-  #       model=model,
-  #       max_true_bfdp=max_true_bfdp,
-  #       min_false_bfdp=min_false_bfdp,
-  #       elnet_alpha=elnet_alpha,
-  #       elnet_l1_l2_mix=elnet_l1_l2_mix,
-  #       freq_code="rCNV",
-  #       rCNV_bucket=rCNV_bucket,
-  #       rCNV_docker=rCNV_docker
-  #   }
-  # }
+  # Score genes for each model
+  scatter ( model in models ) {
+    call score_genes as score_genes_DEL {
+      input:
+        CNV="DEL",
+        BFDP_stats=calc_priors_bfdp.del_bfdp,
+        excludelist=training_excludelist,
+        underpowered_genes=get_underpowered_genes.underpowered_genes[0],
+        gene_features=gene_features,
+        model=model,
+        max_true_bfdp=max_true_bfdp,
+        min_false_bfdp=min_false_bfdp,
+        elnet_alpha=elnet_alpha,
+        elnet_l1_l2_mix=elnet_l1_l2_mix,
+        freq_code="rCNV",
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
+    }
+    call score_genes as score_genes_DUP {
+      input:
+        CNV="DUP",
+        BFDP_stats=calc_priors_bfdp.dup_bfdp,
+        excludelist=training_excludelist,
+        underpowered_genes=get_underpowered_genes.underpowered_genes[1],
+        gene_features=gene_features,
+        model=model,
+        max_true_bfdp=max_true_bfdp,
+        min_false_bfdp=min_false_bfdp,
+        elnet_alpha=elnet_alpha,
+        elnet_l1_l2_mix=elnet_l1_l2_mix,
+        freq_code="rCNV",
+        rCNV_bucket=rCNV_bucket,
+        rCNV_docker=rCNV_docker
+    }
+  }
 
-  # # Score with ensemble classifier, and return updated array of all scores + ensemble
-  # call score_ensemble as score_ensemble_DEL {
-  #   input:
-  #     CNV="DEL",
-  #     scores=score_genes_DEL.scores_tsv,
-  #     freq_code="rCNV",
-  #     rCNV_bucket=rCNV_bucket,
-  #     rCNV_docker=rCNV_docker
-  # }
-  # call score_ensemble as score_ensemble_DUP {
-  #   input:
-  #     CNV="DUP",
-  #     scores=score_genes_DUP.scores_tsv,
-  #     freq_code="rCNV",
-  #     rCNV_bucket=rCNV_bucket,
-  #     rCNV_docker=rCNV_docker
-  # }
+  # Score with ensemble classifier, and return updated array of all scores + ensemble
+  call score_ensemble as score_ensemble_DEL {
+    input:
+      CNV="DEL",
+      scores=score_genes_DEL.scores_tsv,
+      freq_code="rCNV",
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
+  }
+  call score_ensemble as score_ensemble_DUP {
+    input:
+      CNV="DUP",
+      scores=score_genes_DUP.scores_tsv,
+      freq_code="rCNV",
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
+  }
 
-  # # Determine best model & QC final scores
-  # call qc_scores {
-  #   input:
-  #     del_scores=score_ensemble_DEL.all_scores,
-  #     dup_scores=score_ensemble_DUP.all_scores,
-  #     models=models,
-  #     raw_gene_features=raw_gene_features,
-  #     freq_code="rCNV",
-  #     rCNV_bucket=rCNV_bucket,
-  #     rCNV_docker=rCNV_docker
-  # }
+  # Determine best model & QC final scores
+  call qc_scores {
+    input:
+      del_scores=score_ensemble_DEL.all_scores,
+      dup_scores=score_ensemble_DUP.all_scores,
+      models=models,
+      raw_gene_features=raw_gene_features,
+      freq_code="rCNV",
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
+  }
 
   output {
-    # File gene_scores = qc_scores.final_scores
+    File gene_scores = qc_scores.final_scores
   }
 }
 
@@ -465,7 +467,7 @@ task merge_and_meta_analysis {
   String rCNV_docker
 
   command <<<
-    set -e
+    set -euo pipefail
 
     # Copy necessary reference files
     mkdir refs/
@@ -537,13 +539,24 @@ task get_underpowered_genes {
   String prefix
   String CNV
   File metacohort_list
-  Int min_cnvs_per_gene_training
+  Int min_cnvs_per_gene_training_del
+  Int min_cnvs_per_gene_training_dup
   String freq_code
   String rCNV_bucket
   String rCNV_docker
 
   command <<<
     set -e
+
+    # Set CNV-specific variables
+    case ${CNV} in
+      "DEL")
+        min_cnvs_per_gene=${min_cnvs_per_gene_training_del}
+        ;;
+      "DUP")
+        min_cnvs_per_gene=${min_cnvs_per_gene_training_dup}
+        ;;
+    esac
 
     # Make list of stats files to be considered
     find / -name "*.${prefix}.${freq_code}.${CNV}.gene_burden.stats.*.bed.gz" \
@@ -569,10 +582,10 @@ task get_underpowered_genes {
     done < <( fgrep -v "mega" ${metacohort_list} ) \
     > ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt
 
-    # Extract list of genes with < min_cnvs_per_gene_training (to be used as blacklist later for training)
+    # Extract list of genes with < min_cnvs_per_gene_training (to be used as excludelist later for training)
     # Note: this cutoff must be pre-determined with eval_or_vs_cnv_counts.R, but is not automated here
     /opt/rCNV2/analysis/gene_scoring/get_underpowered_genes.R \
-      --min-cnvs ${min_cnvs_per_gene_training} \
+      --min-cnvs "$min_cnvs_per_gene" \
       --gene-counts-out ${prefix}.${freq_code}.${CNV}.counts_per_gene.tsv \
       ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt \
       ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed
@@ -616,11 +629,11 @@ task calc_priors_bfdp {
   Float prior_lnor_thresholding_pct
 
   command <<<
-    set -e
+    set -euo pipefail
 
     # Localize necessary references
     gsutil -m cp \
-      ${rCNV_bucket}/analysis/gene_scoring/refs/${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+      ${rCNV_bucket}/analysis/gene_scoring/refs/${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
       ${rCNV_bucket}/analysis/gene_scoring/gene_lists/*.genes.list \
       ./
     mkdir gene_lists/
@@ -631,12 +644,12 @@ task calc_priors_bfdp {
     # Locate underpowered genes
     find / -name "*.gene_burden.underpowered_genes.bed.gz" | xargs -I {} mv {} ./
 
-    # Create CNV-type-specific gene blacklists
+    # Create CNV-type-specific gene excludelists
     for CNV in DEL DUP; do
       zcat *.$CNV.gene_burden.underpowered_genes.bed.gz \
-        ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+        ${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
       | fgrep -v "#" | cut -f4 | sort -V | uniq \
-      > ${freq_code}.$CNV.training_blacklist.genes.list
+      > ${freq_code}.$CNV.training_excludelist.genes.list
     done
 
     # Compute prior effect sizes
@@ -644,8 +657,8 @@ task calc_priors_bfdp {
       --pct ${prior_lnor_thresholding_pct} \
       ${del_meta_stats} \
       ${dup_meta_stats} \
-      ${freq_code}.DEL.training_blacklist.genes.list \
-      ${freq_code}.DUP.training_blacklist.genes.list \
+      ${freq_code}.DEL.training_excludelist.genes.list \
+      ${freq_code}.DUP.training_excludelist.genes.list \
       gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
       gold_standard.haploinsufficient.genes.list \
       gold_standard.haplosufficient.genes.list \
@@ -699,7 +712,7 @@ task calc_priors_bfdp {
         --theta1 $theta1 \
         --var0 1 \
         --prior ${prior_frac} \
-        --blacklist ${freq_code}.$CNV.training_blacklist.genes.list \
+        --blacklist ${freq_code}.$CNV.training_excludelist.genes.list \
         --outfile ${freq_code}.$CNV.gene_abfs.tsv \
         "$statsbed"
     done
@@ -739,7 +752,7 @@ task calc_priors_bfdp {
 task score_genes {
   String CNV
   File BFDP_stats
-  File blacklist
+  File excludelist
   File underpowered_genes
   File gene_features
   Float max_true_bfdp
@@ -760,14 +773,14 @@ task score_genes {
       ${rCNV_bucket}/analysis/gene_scoring/gene_lists/*genes.list \
       ./
 
-    # Merge blacklist and list of underpowered genes
-    zcat ${blacklist} ${underpowered_genes} \
+    # Merge excludelist and list of underpowered genes
+    zcat ${excludelist} ${underpowered_genes} \
     | grep -ve '^#' \
     | sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
     | uniq \
-    | cat <( zcat ${blacklist} | grep -e '^#' ) - \
+    | cat <( zcat ${excludelist} | grep -e '^#' ) - \
     | bgzip -c  \
-    > blacklist_plus_underpowered.bed.gz
+    > excludelist_plus_underpowered.bed.gz
 
     # Set CNV type-specific parameters
     case ${CNV} in
@@ -784,7 +797,7 @@ task score_genes {
     # Score genes
     /opt/rCNV2/analysis/gene_scoring/score_genes.py \
       --centromeres GRCh37.centromeres_telomeres.bed.gz \
-      --blacklist blacklist_plus_underpowered.bed.gz \
+      --blacklist excludelist_plus_underpowered.bed.gz \
       --true-positives $true_pos \
       --true-negatives $true_neg \
       --model ${model} \

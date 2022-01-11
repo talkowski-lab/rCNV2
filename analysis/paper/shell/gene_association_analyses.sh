@@ -141,7 +141,7 @@ ngenes=$( zcat meta_stats/${example_hpo}.rCNV.DEL.gene_burden.meta_analysis.stat
 
 
 # Plot fine-mapping descriptive panels (number of genes per block, distribution of PIPs, etc)
-head -n1 rCNV.$CNV.gene_fine_mapping.gene_stats.naive_priors.tsv | cut -f1-5 \
+head -n1 rCNV.DEL.gene_fine_mapping.gene_stats.naive_priors.tsv | cut -f1-5 \
 | awk -v OFS="\t" '{ print $0, "cnv" }' > pip_header.tsv
 for CNV in DEL DUP; do
   fgrep -v "#" rCNV.$CNV.gene_fine_mapping.gene_stats.naive_priors.tsv | cut -f1-5 \
@@ -288,6 +288,6 @@ gsutil -m cp -r \
   feature_heatmap \
   assoc_stat_plots \
   finemapping_distribs \
-  ${prefix}.*finemapped_genes_grid*pdf \
+  finemapped_gene_grids \
   ${rCNV_bucket}/analysis/paper/plots/gene_association/
 

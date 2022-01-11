@@ -10,7 +10,7 @@ Fit model & score dosage sensitivity for all genes based on BFDP
 """
 
 
-model_options = 'logit svm randomforest lda naivebayes sgd neuralnet'.split()
+model_options = 'logit svm randomforest lda naivebayes sgd neuralnet gbdt knn'.split()
 
 
 from os import path
@@ -27,6 +27,8 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDAC
 from sklearn.naive_bayes import GaussianNB as GNBC
 from sklearn.linear_model import SGDClassifier as SGDC
 from sklearn.neural_network import MLPClassifier as MLPC
+from sklearn.ensemble import GradientBoostingClassifier as GBDT
+from sklearn.neighbors import KNeighborsClassifier as KNN
 from scipy.stats import norm
 from random import seed, shuffle
 import argparse
@@ -220,9 +222,13 @@ def fit_model(features, sumstats, train_genes, test_genes,
                               alpha=logit_alpha, l1_ratio=1 - l1_l2_mix, 
                               random_state=0)
         elif model == 'neuralnet':
-            classifier = MLPC(hidden_layer_sizes=(20, 10, 5, 2), activation='logistic', 
+            classifier = MLPC(hidden_layer_sizes=(20, 10, 5, 2), activation='relu', 
                               solver='adam', early_stopping=True, alpha=logit_alpha, 
                               random_state=0, max_iter=1000)
+        elif model == 'gbdt':
+            classifier = GBDT(random_state=0)
+        elif model == 'knn':
+            classifier = KNN(n_neighbors=100, weights='distance')
 
         # Fit sklearn model & predict on test set
         fitted_model = classifier.fit(train_df.drop(labels='bfdp', axis=1), 
@@ -254,8 +260,7 @@ def split_genes(genes, n_splits=10, random_seed=2020):
 def fit_model_cv(features, sumstats, all_pairs, xgenes=[], model='logit', 
                  logit_alpha=0.1, l1_l2_mix=1, nested_cv=True, random=True):
     """
-    Fit model with N-fold CV 
-    
+    Fit model with N-fold CV
     """
 
     if nested_cv:
@@ -306,7 +311,8 @@ def fit_model_cv(features, sumstats, all_pairs, xgenes=[], model='logit',
 
 def predict_bfdps(features, sumstats, chrompairs, xbed=None, true_pos=[], 
                   true_neg=[], model='logit', logit_alpha=0.1, l1_l2_mix=1, 
-                  nested_cv=True, random=True, quiet=False):
+                  nested_cv=True, random=True, pred_out_of_sample=True,
+                  quiet=False):
     """
     Predicts bfdps for all genes with (optional) N-fold CV
     """
@@ -320,23 +326,46 @@ def predict_bfdps(features, sumstats, chrompairs, xbed=None, true_pos=[],
     else:
         xgenes = []
 
-    # Generate predictions for each pair of chromosomes in serial
-    for i in range(len(chrompairs)):
-        train_pairs = [x for k, x in enumerate(chrompairs) if k != i]
-        pred_chroms = sorted(list(chrompairs[i]))
-        pred_genes = list(sumstats.index[sumstats.chrom.isin(pred_chroms)])
+    # Generate predictions for each pair of chromosomes in serial, unless optioned otherwise
+    if pred_out_of_sample:
+        for i in range(len(chrompairs)):
+            train_pairs = [x for k, x in enumerate(chrompairs) if k != i]
+            pred_chroms = sorted(list(chrompairs[i]))
+            pred_genes = list(sumstats.index[sumstats.chrom.isin(pred_chroms)])
+
+            if not quiet:
+                msg = 'Now scoring {:,} genes from chromsomes {}'
+                print(msg.format(len(pred_genes), ', '.join(pred_chroms)))
+            
+            # Fit model
+            fitted_model, rmse = \
+                fit_model_cv(features, sumstats, train_pairs, xgenes, model, 
+                             logit_alpha, l1_l2_mix, nested_cv, random)
+
+            # Predict bfdps
+            pred_df = features.loc[features.index.isin(pred_genes), :]
+            if model == 'logit':
+                pred_vals = fitted_model.predict(pred_df)
+            else:
+                pred_class_probs = fitted_model.predict_proba(pred_df)
+                pred_vals = pd.Series(pred_class_probs[:, 1], name='pred', index=pred_df.index)
+            pred_vals.name = 'pred_bfdp'
+            pred_bfdps.update(pred_vals)
+    
+    # if --no-out-of-sample-prediction is specified, train on _all_ genes
+    else:
 
         if not quiet:
-            msg = 'Now scoring {:,} genes from chromsomes {}'
-            print(msg.format(len(pred_genes), ', '.join(pred_chroms)))
-        
+            msg = 'Now scoring {:,} genes from all chromsomes simultaneously'
+            print(msg.format(len(features.index)))
+
         # Fit model
         fitted_model, rmse = \
-            fit_model_cv(features, sumstats, train_pairs, xgenes, model, 
+            fit_model_cv(features, sumstats, chrompairs, xgenes, model, 
                          logit_alpha, l1_l2_mix, nested_cv, random)
 
         # Predict bfdps
-        pred_df = features.loc[features.index.isin(pred_genes), :]
+        pred_df = features.loc[features.index, :]
         if model == 'logit':
             pred_vals = fitted_model.predict(pred_df)
         else:
@@ -395,6 +424,10 @@ def main():
     parser.add_argument('--no-nested-cv', action='store_true', help='Do not perform ' +
                         ' 10-fold nested CV when predicting scores for each subset of ' +
                         'chromosomes and instead train model on all chromosomes]')
+    parser.add_argument('--no-out-of-sample-prediction', action='store_true', default=False,
+                        help='Do not insist that genes be held out from training set ' +
+                        'when predicting scores [default: hold out genes from training ' +
+                        'data when predicting for those genes]')
     parser.add_argument('-o', '--outfile', default='stdout', help='Output .tsv of ' +
                         'scores per gene. [default: stdout]')
     args = parser.parse_args()
@@ -437,7 +470,8 @@ def main():
     nested_cv = not args.no_nested_cv
     pred_bfdps = predict_bfdps(features, sumstats, chrompairs, args.blacklist,
                                true_pos, true_neg, args.model, args.logit_alpha, 
-                               args.l1_l2_mix, nested_cv, random=(not args.chromsplit))
+                               args.l1_l2_mix, nested_cv, random=(not args.chromsplit),
+                               pred_out_of_sample=(not args.no_out_of_sample_prediction))
 
     # Write predicted BFDPs to outfile, along with scaled score & quantile
     pred_bfdps.to_csv(outfile, sep='\t', index=True, na_rep='NA')

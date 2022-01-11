@@ -48,7 +48,7 @@ intersect.sets <- function(gsets){
 ##########################
 # Master UpSet plot
 plot.upset <- function(gmat, min.highlight, light.color, dark.color,
-                       top.bottom.ratio=3/2, button.cex=1.5, link.lwd=3,
+                       top.bottom.ratio=3/2, button.cex=1.3, link.lwd=3,
                        parmar=c(0.2, 10, 1.5, 0.2)){
   # Get plot parameters
   n.rows <- ncol(gmat)-1
@@ -84,7 +84,7 @@ plot.upset <- function(gmat, min.highlight, light.color, dark.color,
            lwd=link.lwd, col="white")
   sapply(1:n.cols, function(x){
     sapply(1:n.rows, function(y){
-      points(x=x-0.5, y=-y+0.5, pch=19, cex=button.cex, col="white")
+      points(x=x-0.5, y=-y+0.5, pch=19, cex=button.cex, col="white", xpd=T)
     })
   })
   
@@ -115,7 +115,7 @@ plot.upset <- function(gmat, min.highlight, light.color, dark.color,
              y0=-min(hits)+0.5, y1=-max(hits)+0.5, 
              lwd=link.lwd, col=colors[i])
     points(x=rep(i-0.5, length(hits)), y=-hits+0.5, 
-           pch=19, cex=button.cex, col=colors[i])
+           pch=19, cex=button.cex, col=colors[i], xpd=T)
   })
   
   # Add axes
@@ -133,10 +133,10 @@ plot.upset <- function(gmat, min.highlight, light.color, dark.color,
 #####################
 require(optparse, quietly=T)
 require(shape, quietly=T)
+require(rCNV2, quietly=T)
 
 # List of command-line options
 option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced."),
   make_option(c("--min-highlight"), default=2, metavar="integer",
               help="Minimum intersection size to highlight."),
   make_option(c("--dark-color"), default="black", metavar="character",
@@ -146,7 +146,7 @@ option_list <- list(
   make_option(c("--cnv-coloring"), default=NULL, metavar="character", 
               help="Override color specifications based on rCNV color palettes"),
   make_option(c("--height"), default=2.25, help="Height of .pdf"),
-  make_option(c("--width"), default=3.2, help="Width of .pdf")
+  make_option(c("--width"), default=3.75, help="Width of .pdf")
 )
 
 # Get command-line arguments & options
@@ -163,7 +163,6 @@ if(length(args$args) != 2){
 # Writes args & opts to vars
 tsv.in <- args$args[1]
 outfile <- args$args[2]
-rcnv.config <- opts$`rcnv-config`
 min.highlight <- opts$`min-highlight`
 dark.color <- opts$`dark-color`
 light.color <- opts$`light-color`
@@ -179,11 +178,6 @@ pdf.width <- opts$`width`
 # cnv.coloring <- "DEL"
 # pdf.height <- 2.25
 # pdf.width <- 3.2
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
 
 # Set colors
 if(!is.null(cnv.coloring)){
