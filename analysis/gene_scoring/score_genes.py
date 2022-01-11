@@ -209,8 +209,8 @@ def fit_model(features, sumstats, train_genes, test_genes,
     else:
         # Instantiate classifier, depending on model
         if model == 'svm':
-            classifier = SVC(C=logit_alpha, random_state=0, max_iter=1000, 
-                             probability=True, kernel='linear', break_ties=True)
+            classifier = SVC(C=logit_alpha, random_state=0, max_iter=-1, 
+                             probability=True, kernel='sigmoid', break_ties=True)
         elif model == 'randomforest':
             classifier = RFC(random_state=0)
         elif model == 'lda':
@@ -224,7 +224,7 @@ def fit_model(features, sumstats, train_genes, test_genes,
         elif model == 'neuralnet':
             classifier = MLPC(hidden_layer_sizes=(20, 10, 5, 2), activation='relu', 
                               solver='adam', early_stopping=True, alpha=logit_alpha, 
-                              random_state=0, max_iter=1000)
+                              random_state=0, max_iter=10000)
         elif model == 'gbdt':
             classifier = GBDT(random_state=0)
         elif model == 'knn':

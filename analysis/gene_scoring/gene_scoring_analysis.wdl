@@ -36,13 +36,14 @@ workflow gene_burden_analysis {
   Float elnet_l1_l2_mix
   String rCNV_bucket
   String rCNV_docker
+  String rCNV_docker_scoring #Note: this is separate just for development purposes; can be collapsed in at a later date
   File contiglist
 
   Array[Array[String]] contigs = read_tsv(contiglist)
 
   Array[String] cnv_types = ["DEL", "DUP"]
 
-  Array[String] models = ["logit", "svm", "randomforest", "lda", "naivebayes", "neuralnet". "gbdt", "knn"]
+  Array[String] models = ["logit", "svm", "randomforest", "lda", "naivebayes", "neuralnet", "gbdt", "knn"]
 
   # Scatter over contigs (for speed)
   scatter ( contig in contigs ) {
@@ -157,7 +158,7 @@ workflow gene_burden_analysis {
         elnet_l1_l2_mix=elnet_l1_l2_mix,
         freq_code="rCNV",
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker
+        rCNV_docker=rCNV_docker_scoring
     }
     call score_genes as score_genes_DUP {
       input:
@@ -173,7 +174,7 @@ workflow gene_burden_analysis {
         elnet_l1_l2_mix=elnet_l1_l2_mix,
         freq_code="rCNV",
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker
+        rCNV_docker=rCNV_docker_scoring
     }
   }
 
@@ -805,6 +806,8 @@ task score_genes {
       --min-false-bfdp ${min_false_bfdp} \
       --regularization-alpha ${elnet_alpha} \
       --regularization-l1-l2-mix ${elnet_l1_l2_mix} \
+      --chromsplit \
+      --no-out-of-sample-prediction \
       --outfile ${freq_code}.${CNV}.gene_scores.${model}.tsv \
       ${BFDP_stats} \
       ${gene_features}

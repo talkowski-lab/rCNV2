@@ -19,7 +19,7 @@ args <- commandArgs(trailingOnly=T)
 # # DEV parameters
 # setwd("~/scratch/")
 # args <- c("rCNV.DEL.gene_scores.neuralnet.baseline.tsv",
-#           "rCNV.DEL.gene_scores.neuralnet.relu.tsv",
+#           "rCNV.DEL.gene_scores.neuralnet.oneshot.tsv",
 #           "gencode.v19.canonical.pext_filtered.all_features.no_variation.bed.gz",
 #           "gnomad_oe_lof_upper",
 #           "test_score_comparison.png")
