@@ -43,7 +43,7 @@ workflow gene_burden_analysis {
 
   Array[String] cnv_types = ["DEL", "DUP"]
 
-  Array[String] models = ["logit", "svm", "randomforest", "lda", "naivebayes", "neuralnet", "gbdt", "knn"]
+  Array[String] models = ["logit", "randomforest", "lda", "naivebayes", "neuralnet", "gbdt", "knn"]
 
   # Scatter over contigs (for speed)
   scatter ( contig in contigs ) {
@@ -185,7 +185,7 @@ workflow gene_burden_analysis {
       scores=score_genes_DEL.scores_tsv,
       freq_code="rCNV",
       rCNV_bucket=rCNV_bucket,
-      rCNV_docker=rCNV_docker
+      rCNV_docker=rCNV_docker_scoring
   }
   call score_ensemble as score_ensemble_DUP {
     input:
@@ -193,7 +193,7 @@ workflow gene_burden_analysis {
       scores=score_genes_DUP.scores_tsv,
       freq_code="rCNV",
       rCNV_bucket=rCNV_bucket,
-      rCNV_docker=rCNV_docker
+      rCNV_docker=rCNV_docker_scoring
   }
 
   # Determine best model & QC final scores
@@ -205,7 +205,7 @@ workflow gene_burden_analysis {
       raw_gene_features=raw_gene_features,
       freq_code="rCNV",
       rCNV_bucket=rCNV_bucket,
-      rCNV_docker=rCNV_docker
+      rCNV_docker=rCNV_docker_scoring
   }
 
   output {
