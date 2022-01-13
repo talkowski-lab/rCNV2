@@ -42,7 +42,7 @@ plot.lnors <- function(lnors, true.genes, false.genes, CNV,
                    lnors$meta_lnOR[which(!(lnors$gene %in% c(false.genes, true.genes)))],
                    lnors$meta_lnOR[which(lnors$gene %in% true.genes)])
   plot.dat <- lapply(plot.dat, function(lnors){log2(exp(lnors))})
-  ylim <- quantile(lnors$meta_lnOR, probs=c(0.005, 0.995), na.rm=T)
+  ylim <- quantile(lnors$meta_lnOR, probs=c(0.0005, 0.9995), na.rm=T)
   if(blue.bg==TRUE){
     plot.bg <- bluewhite
     plot.border <- NA
@@ -142,11 +142,11 @@ plot.bfdp.vs.lnor <- function(bfdps, lnors, true.genes, false.genes, CNV,
 
   # Add points
   sapply(c(2, 1, 3), function(i){
-    points(plot.dat[[i]], pch=19, cex=pt.cex, col=colors[i])
+    points(plot.dat[[i]], pch=19, cex=pt.cex, col=colors[i], xpd=T)
   })
   sapply(c(2, 1, 3), function(i){
     avgs <- apply(plot.dat[[i]], 2, mean, na.rm=T)
-    points(avgs[1], avgs[2], pch=23, col=cnv.blacks[CNV], bg=colors[i])
+    points(avgs[1], avgs[2], pch=23, col=cnv.blacks[CNV], bg=colors[i], xpd=T)
   })
 
   # Add X-axis
@@ -164,11 +164,24 @@ plot.bfdp.vs.lnor <- function(bfdps, lnors, true.genes, false.genes, CNV,
   mtext(2, line=1.75, text="Bayesian FDP")
 
   # Add legend (if optioned)
+  x.midpoint <- mean(par("usr")[1:2])
+  x.dist <- diff(par("usr")[1:2])
   if(add.legend==TRUE){
-    points(x=par("usr")[1]+(0.04*diff(par("usr")[1:2])),
-           y=0.05, pch=23, col=cnv.blacks[CNV], bg="white")
-    text(x=par("usr")[1]+(0.02*diff(par("usr")[1:2])), y=0.04,
-         pos=4, labels="Group mean", cex=5/6)
+    if(quantile(lnors$meta_lnOR, probs=0.9, na.rm=T) >= x.midpoint){
+      legend.x <- par("usr")[1]
+      legend.xmod <- 0.02 * x.dist
+      legend.pos <- 4
+      legend.y <- 0.05
+    }else{
+      legend.x <- par("usr")[2]
+      legend.xmod <- -0.02 * x.dist
+      legend.pos <- 2
+      legend.y <- 0.95
+    }
+    points(x=legend.x+(2*legend.xmod), y=legend.y,
+           pch=23, col=cnv.blacks[CNV], bg="white")
+    text(x=legend.x+legend.xmod, y=legend.y-0.01,
+         pos=legend.pos, labels="Group mean", cex=5/6)
   }
 }
 

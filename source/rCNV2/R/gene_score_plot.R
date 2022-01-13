@@ -407,7 +407,8 @@ plot.stratified.metric <- function(strat.dat, ylims=NULL, y.title=NULL,
   axis(2, at=c(y0.val, 10e10), tck=0, labels=NA, col=blueblack)
   axis(2, at=y.ax.at, tck=-0.025, labels=NA, col=blueblack)
   axis(2, at=y.ax.at, las=2, line=-0.65, tick=F)
-  axis(2, at=mean(c(y0.val, par("usr")[4])), labels=parse(text=y.title), line=0.5, tck=F)
+  axis(2, at=mean(c(y0.val, par("usr")[4])), labels=parse(text=y.title),
+       line=0.8, tck=F)
 }
 
 

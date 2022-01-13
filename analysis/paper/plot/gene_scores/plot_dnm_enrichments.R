@@ -310,7 +310,7 @@ sapply(c("pHaplo", "pTriplo"), function(score){
   sapply(dnm.cohorts, function(cohort){
     pdf(paste(out.prefix, "dnm_enrichments", cohort, score, "pdf", sep="."),
         height=2, width=3)
-    plot.dnm.oe(scores, score, meta, cohort, csqs, ymax=5, blue.bg=FALSE)
+    plot.dnm.oe(scores, score, meta, cohort, csqs, ymax=6, blue.bg=FALSE)
     dev.off()
   })
 })

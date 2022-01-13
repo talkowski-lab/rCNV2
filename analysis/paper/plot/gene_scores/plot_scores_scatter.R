@@ -107,9 +107,8 @@ scores.scatterplot <- function(scores, pt.colors, add.cor=TRUE,
                                bg.col="white", gridlines.col=bluewhite,
                                x.ax.title="Haploinsufficiency Score (pHaplo)",
                                y.ax.title="Triplosensitivity Score (pTriplo)",
-                               parmar=c(2.7, 2.7, 1, 1)){
+                               ax.at=seq(0, 1, 0.2), parmar=c(2.7, 2.7, 1, 1)){
   # Prep plot area
-  ax.at <- seq(0, 1, 0.2)
   par(mar=parmar, bty="n", family="sans")
   plot(NA, xlim=c(0, 1 + margin.dens.height), ylim=c(0, 1 + margin.dens.height),
        xaxt="n", xlab="", xaxs="i", yaxt="n", ylab="", yaxs="i")
@@ -260,7 +259,7 @@ plot.gradients <- function(scores, gradient.norm, gradient.pal, null.x=NA, null.
                      hc.cutoff=NA, lc.cutoff=NA,
                      margin.dens.height=0, pt.cex=0.125,
                      x.ax.title="pHaplo", y.ax.title="pTriplo",
-                     parmar=c(2.7, 2.7, 0.4, 0.4))
+                     ax.at=seq(0, 1, 0.25), parmar=c(2.7, 2.7, 0.4, 0.4))
   if(!is.na(null.x) & !is.na(null.y)){
     null.pt.idxs <- which(scores$pHaplo<null.x & scores$pTriplo<null.y)
     points(x=scores$pHaplo[null.pt.idxs], y=scores$pTriplo[null.pt.idxs],

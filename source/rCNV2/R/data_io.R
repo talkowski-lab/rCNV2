@@ -11,22 +11,30 @@
 # Functions for handling I/O of various preformatted datasets
 
 
-#' Load BED3
+#' Load BED3+
 #'
-#' Load a simple BED3 file
+#' Load a simple BED3+ file
 #'
 #' @param bed.in path to input BED fil
 #' @param header boolean indicator if BED has header \[default: TRUE\]
+#' @param keep.n.cols number of columns to retain \[default: 3\]
+#' @param numeric.cols vector of column indexes to coerce to numeric \[default: all columns after first\]
 #'
 #' @return data frame of coordinates
 #'
 #' @export load.bed3
 #' @export
-load.bed3 <- function(bed.in, header=T){
+load.bed3 <- function(bed.in, header=T, keep.n.cols=3, numeric.cols=NULL){
+  keep.n.cols <- max(c(keep.n.cols, 3), na.rm=T)
   bed <- read.table(bed.in, header=header, sep="\t", comment.char="", check.names=F)
-  colnames(bed) <- c("chr", "start", "end")
-  bed[, -1] <- apply(bed[, -1], 2, as.numeric)
-  return(bed)
+  keep.n.cols <- min(c(keep.n.cols, ncol(bed)), na.rm=T)
+  colnames(bed)[1:3] <- c("chr", "start", "end")
+  if(is.null(numeric.cols)){
+    numeric.cols <- 2:keep.n.cols
+  }
+  numeric.cols <- intersect(numeric.cols, 1:ncol(bed))
+  bed[, numeric.cols] <- apply(bed[, numeric.cols], 2, as.numeric)
+  return(bed[, 1:keep.n.cols])
 }
 
 

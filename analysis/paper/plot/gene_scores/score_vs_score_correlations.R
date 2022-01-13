@@ -17,23 +17,6 @@ scores.to.keep <- c("pHaplo", "pTriplo", "gnomad_pLI", "gnomad_pRec", "gnomad_pN
                     "gnomad_oe_lof_upper", "gnomad_oe_mis_upper", "rvis_pct",
                     "exac_del_z", "exac_dup_z", "exac_cnv_z", "hurles_hi", "eds",
                     "sHet", "ccdg_del", "ccdg_dup", "episcore")
-score.abbrevs <- c("pHaplo" = "pHaplo",
-                   "pTriplo" = "pTriplo",
-                   "gnomad_pLI" = "pLI",
-                   "gnomad_pRec" = "pRec",
-                   "gnomad_pNull" = "pNull",
-                   "gnomad_oe_lof_upper" = "LOEUF",
-                   "gnomad_oe_mis_upper" = "Mis. OEUF",
-                   "rvis_pct" = "RVIS Pct.",
-                   "exac_del_z" = "ExAC DEL Score",
-                   "exac_dup_z" = "ExAC DUP Score",
-                   "exac_cnv_z" = "ExAC CNV Score",
-                   "hurles_hi" = "HI Index",
-                   "eds" = "EDS",
-                   "sHet" = "sHet",
-                   "ccdg_del" = "CCDG DEL Score",
-                   "ccdg_dup" = "CCDG DUP Score",
-                   "episcore" = "EpiScore")
 plot.height <- 1.9 #global plot height, in inches
 png.res <- 400 #dpi resolution for png
 
@@ -41,6 +24,28 @@ png.res <- 400 #dpi resolution for png
 ######################
 ### DATA FUNCTIONS ###
 ######################
+# Infer gene scores assigned to mean when curating feature metadata
+clean.filled.scores <- function(features, scores.to.keep){
+  contigs <- unique(features$chr)
+  for(score in intersect(scores.to.keep, colnames(features))){
+    score.idx <- which(colnames(features) == score)
+    for(contig in contigs){
+      contig.idxs <- which(features$chr == contig)
+      # Compute mode of values for this chromosome
+      val.counts <- sort(table(features[contig.idxs, score.idx]), decreasing=TRUE)
+      # Only assume NAs were filled if mode > 2x second-most common value
+      if(val.counts[1] > 2 * val.counts[2]){
+        filled.idxs <- intersect(which(features[, score.idx] == names(val.counts[1])),
+                                 contig.idxs)
+        if(length(filled.idxs) > 0){
+          features[filled.idxs, score.idx] <- NA
+        }
+      }
+    }
+  }
+  return(features[, -c(1:3)])
+}
+
 # Merge all rCNV-derived and existing scores into a single dataframe
 merge.scores <- function(rcnv.scores, features, scores.to.keep){
   merged <- merge(rcnv.scores[, which(colnames(rcnv.scores) %in% c("gene", scores.to.keep))],
@@ -188,8 +193,11 @@ out.prefix <- args$args[4]
 
 # Load scores, features, and feature metadata
 rcnv.scores <- load.scores(scores.in)
-features <- load.features(features.in, fill=NA, norm=F)
+features <- load.bed3(features.in, keep.n.cols=10e10, numeric.cols=c(2:3, 5:10e3))
 feat.meta <- load.gene.feature.metadata(feature.metadata.in)
+
+# Remove median-assigned genes for each score added during data curation
+features <- clean.filled.scores(features, scores.to.keep)
 
 # Merge all scores into single dataframe
 scores <- merge.scores(rcnv.scores, features, scores.to.keep)
@@ -209,8 +217,6 @@ dup.pal <- colorRampPalette(c(cnv.blacks[2], cnv.colors[2],
 
 # Plot correlations of all scores vs pHaplo
 sapply(scores.to.keep, function(score){
-  # pdf(paste(out.prefix, score, "vs_pHaplo.pdf", sep="."),
-  #     height=plot.height, width=plot.height)
   png(paste(out.prefix, score, "vs_pHaplo.png", sep="."),
       height=png.res*plot.height, width=png.res*plot.height, res=png.res)
   score.corplot(scores, score, "pHaplo", del.pal, blue.bg=FALSE)

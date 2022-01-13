@@ -548,8 +548,8 @@ task get_variation_data {
       --get-variation \
       --gnomad-constraint refs/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz \
       --ddd-dnms refs/ddd_dnm_counts.tsv.gz \
-      --asc-dnms refs/fu_asc_spark_dnm_counts.tsv.gz \
-      --asc-unaffected-dnms refs/fu_asc_spark_dnm_counts.unaffecteds.tsv.gz \
+      --asc-dnms refs/asc_spark_2021_dnm_counts.tsv.gz \
+      --asc-unaffected-dnms refs/asc_spark_2021_dnm_counts.unaffecteds.tsv.gz \
       --gnomad-svs refs/gnomad_sv_nonneuro_counts.tsv.gz \
       --redin-bcas refs/redin_bca_counts.tsv.gz \
       --outbed ${prefix}.variation_features.${contig}.bed.gz \

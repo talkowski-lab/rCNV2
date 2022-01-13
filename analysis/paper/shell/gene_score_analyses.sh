@@ -217,17 +217,19 @@ fgrep -wvf \
 if ! [ -e basic_distribs ]; then
   mkdir basic_distribs
 fi
+zcat rCNV.gene_scoring.training_gene_excludelist.bed.gz \
+| fgrep -v "#" | cut -f4 | sort | uniq \
+> rCNV.gene_scoring.excluded_training_genes.list
 /opt/rCNV2/analysis/paper/plot/gene_scores/empirical_score_cutoffs.R \
   rCNV.gene_scores.tsv.gz \
   ${prefix}.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz \
   ${prefix}.rCNV.DUP.gene_burden.meta_analysis.stats.bed.gz \
   refs/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
-  rCNV.gene_scoring.training_gene_excludelist.bed.gz \
+  rCNV.gene_scoring.excluded_training_genes.list \
   basic_distribs/${prefix}
 /opt/rCNV2/analysis/paper/plot/gene_scores/plot_scores_scatter.R \
   rCNV.gene_scores.tsv.gz \
   basic_distribs/${prefix}
-# TODO: remove mean-assigned genes with missing scores from pHaplo/pTriplo score correlations
 /opt/rCNV2/analysis/paper/plot/gene_scores/score_vs_score_correlations.R \
   rCNV.gene_scores.tsv.gz \
   refs/gencode.v19.canonical.pext_filtered.all_features.no_variation.bed.gz \
@@ -245,7 +247,6 @@ echo -e "Mouse het. lethal\trefs/gene_lists/mouse_het_lethal.genes.list\tFALSE" 
 echo -e "Cell essential\trefs/gene_lists/cell_essential.genes.list\tFALSE" >> phaplo_vs_gene_sets.input.tsv
 echo -e "Cell non-essential\trefs/gene_lists/cell_nonessential.genes.list\tFALSE" >> phaplo_vs_gene_sets.input.tsv
 echo -e "Olfactory receptors\trefs/gene_lists/olfactory_receptors.genes.list\tFALSE" >> phaplo_vs_gene_sets.input.tsv
-# TODO: ADD DDD+ASC TO THIS ANALYSIS
 /opt/rCNV2/analysis/paper/plot/gene_scores/plot_gene_set_enrichments.R \
   --height 1.7 \
   rCNV.gene_scores.tsv.gz \
@@ -274,12 +275,12 @@ echo -e "Olfactory receptors\trefs/gene_lists/olfactory_receptors.genes.list\tFA
 if ! [ -e enrichments ]; then
   mkdir enrichments
 fi
+### TODO: FINISH UPGRADING THIS TO REFLECT NEW ASC DATA
 ### TODO: COULD CONSIDER ADDING OTHER NEW SCORES TO THESE COMPARISONS
 /opt/rCNV2/analysis/paper/plot/gene_scores/plot_asd_denovo_cnv_analysis.R \
   rCNV.gene_scores.tsv.gz \
   refs/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
-  refs/asc_spark_denovo_cnvs.cleaned.b37.annotated.bed.gz \
-  refs/asc_spark_child_phenotypes.list \
+  refs/asc_spark_2021_denovo_cnvs.cleaned.b37.annotated.bed.gz \
   enrichments/${prefix}
 
 

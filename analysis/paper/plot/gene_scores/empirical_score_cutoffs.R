@@ -159,8 +159,8 @@ plot.score.vs.or <- function(bins, baseline, score.cutoff, score,
   mtext(1, line=1.3, text=xtitle, xpd=T)
   axis(2, at=c(-10e10, 10e10), col=blueblack, tck=0, labels=NA)
   axis(2, at=y.ax.at, tck=ax.tck, labels=NA, col=blueblack)
-  axis(2, at=y.ax.at, tick=F, labels=exp(y.ax.at), las=2, line=-0.6)
-  mtext(2, line=1.2, text=ytitle)
+  axis(2, at=y.ax.at, tick=F, labels=exp(y.ax.at), las=2, line=-0.7)
+  mtext(2, line=1.35, text=ytitle)
   axis(3, at=c(score.cutoff, par("usr")[2]), col=blueblack, tck=-ax.tck)
 }
 
@@ -198,7 +198,7 @@ out.prefix <- args$args[6]
 # del.meta.in <- "~/scratch/rCNV2_analysis_d2.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz"
 # dup.meta.in <- "~/scratch/rCNV2_analysis_d2.rCNV.DUP.gene_burden.meta_analysis.stats.bed.gz"
 # constr.genes.in <- "~/scratch/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list"
-# xlist.in <- "~/scratch/rCNV.gene_scoring.training_gene_blacklist.bed.gz"
+# xlist.in <- "~/scratch/rCNV.gene_scoring.excluded_training_genes.list"
 # out.prefix <- "~/scratch/test_gene_score_empirical_cutoffs"
 
 # Load scores
@@ -247,7 +247,7 @@ pdf.width <- 2.75
 pdf.parmar <- c(2.3, 2.3, 0.3, 0.3)
 
 # Plot full pHaplo vs lnOR
-pdf(paste(out.prefix, "phi_vs_effect_size.full.pdf", sep="."),
+pdf(paste(out.prefix, "phi_vs_effect_size.pdf", sep="."),
     height=pdf.height, width=pdf.width)
 plot.score.vs.or(phi.lnor.full, del.constr.lnor[1], phi.cutoff, "pHaplo",
                  ylims=ylims, avg.pt.cex=pt.cex, avg.genes.per.bin=avg.genes.per.bin,
@@ -255,22 +255,19 @@ plot.score.vs.or(phi.lnor.full, del.constr.lnor[1], phi.cutoff, "pHaplo",
 dev.off()
 
 # Plot full pTriplo vs lnOR
-pdf(paste(out.prefix, "pts_vs_effect_size.full.pdf", sep="."),
+pdf(paste(out.prefix, "pts_vs_effect_size.pdf", sep="."),
     height=pdf.height, width=pdf.width)
 plot.score.vs.or(pts.lnor.full, del.constr.lnor[1], pts.cutoff, "pTriplo",
                  ylims=ylims, avg.pt.cex=pt.cex, avg.genes.per.bin=avg.genes.per.bin,
                  blue.bg=FALSE, parmar=pdf.parmar)
-# text(x=par("usr")[1], y=del.constr.lnor[1]+(0.08*diff(par("usr")[3:4])),
-#      labels="Rare deletions of\nall constrained genes",
-#      font=3, cex=5/6, col=graphabs.green, pos=4)
 dev.off()
 
-# Plot fine pTriplo vs lnOR
-pdf(paste(out.prefix, "pts_vs_effect_size.fine.pdf", sep="."),
-    height=(5/6)*pdf.height, width=(1/2)*pdf.width)
-plot.score.vs.or(pts.lnor.fine.forplot, del.constr.lnor[1], pts.cutoff, "pTriplo",
-                 ylims=ylims, avg.pt.cex=pt.cex, xtitle="pTriplo", ytitle=NA,
-                 blue.bg=FALSE, parmar=c(pdf.parmar[1], 1.3, pdf.parmar[3:4]))
-axis(1, at=1, tick=F, line=-0.7)
-dev.off()
+# # Plot fine pTriplo vs lnOR
+# pdf(paste(out.prefix, "pts_vs_effect_size.fine.pdf", sep="."),
+#     height=(5/6)*pdf.height, width=(1/2)*pdf.width)
+# plot.score.vs.or(pts.lnor.fine.forplot, del.constr.lnor[1], pts.cutoff, "pTriplo",
+#                  ylims=ylims, avg.pt.cex=pt.cex, xtitle="pTriplo", ytitle=NA,
+#                  blue.bg=FALSE, parmar=c(pdf.parmar[1], 1.3, pdf.parmar[3:4]))
+# axis(1, at=1, tick=F, line=-0.7)
+# dev.off()
 

@@ -102,9 +102,13 @@ for(comp in c("DEL_vs_DUP", "gw_vs_FDR", "NAHR_vs_nonrecurrent",
     x.bool <- !(segs.bylnor$region_id %in% lnor.groups[[1]])
     x.labs <- c("Weak", "Strong")
   }else if(comp == "sig_vs_litGDs"){
-  seg.df <- segs.all
+    seg.df <- segs.all
     x.bool <- !(seg.df$any_sig)
     x.labs <- c("GW+FDR", "Lit. GDs")
+  }else if(comp == "pleiotropy"){
+    seg.df <- segs.sig
+    x.bool <- seg.df$n_hpos > 1
+    x.labs <- c("Single HPO", ">1 HPO")
   }
 
   # Create output subdirectory, if it doesn't exist

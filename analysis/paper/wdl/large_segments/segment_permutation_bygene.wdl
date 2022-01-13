@@ -247,8 +247,8 @@ task annotate_shard {
     echo -e "OMIM\tgene_lists/HP0000118.HPOdb.genes.list" >> genelists_to_annotate.tsv
 
     # Build DNM input
-    echo -e "ASC\trefs/fu_asc_spark_dnm_counts.tsv.gz\trefs/ASC_2021.gw_sig.genes.list" > dnm_counts_to_annotate.tsv
-    echo -e "ASC_unaffected\trefs/fu_asc_spark_dnm_counts.unaffecteds.tsv.gz\trefs/ASC_2021.gw_sig.genes.list" >> dnm_counts_to_annotate.tsv
+    echo -e "ASC\trefs/asc_spark_2021_dnm_counts.tsv.gz\trefs/ASC_2021.gw_sig.genes.list" > dnm_counts_to_annotate.tsv
+    echo -e "ASC_unaffected\trefs/asc_spark_2021_dnm_counts.unaffecteds.tsv.gz\trefs/ASC_2021.gw_sig.genes.list" >> dnm_counts_to_annotate.tsv
     echo -e "DDD\trefs/ddd_dnm_counts.tsv.gz\trefs/DDD_2020.gw_sig.genes.list" >> dnm_counts_to_annotate.tsv
 
     # Build HPO-matched gene lists

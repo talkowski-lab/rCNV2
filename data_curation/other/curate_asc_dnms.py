@@ -6,8 +6,9 @@
 # Distributed under terms of the MIT license.
 
 """
-Curates de novo mutations from ASC supplemental table
+Curates de novo mutations from ASC supplemental tables
 Expects the equivalent of Supplementary Table 2.3 from Satterstrom et al., Cell, 2020
+Can handle the supplement from Fo et al., medRxiv, 2021, with --version fu_2021
 """
 
 import pandas as pd
@@ -20,7 +21,7 @@ import subprocess
 lof_csqs = 'frameshift_variant stop_gained splice_donor_variant splice_acceptor_variant'.split()
 
 
-def load_dnms(dnms_in, controls=False):
+def load_dnms(dnms_in, controls=False, version='satterstrom_2020'):
     """
     Load DNMs and extract columns & rows of interest
     Return: list of (gene, consequence) tuples
@@ -35,14 +36,27 @@ def load_dnms(dnms_in, controls=False):
     else:
         affected_key = 2
 
-    # Restrict to high-confidence coding variants
-    keep_rows = (dnm_df.Affected_Status == affected_key) \
-                & dnm_df.Coding \
-                & (dnm_df.Confidence == 'HIGH')
-    dnm_df = dnm_df.loc[keep_rows, :]
+    # Parse table based on version of ASC analysis specified
+    if version == 'satterstrom_2020':
 
-    # Restrict to columns of interest and return as list of tuples
-    keep_cols = 'GENE_NAME VEP_functional_class_canonical_simplified'.split()
+        # Restrict to high-confidence coding variants
+        keep_rows = (dnm_df.Affected_Status == affected_key) \
+                    & dnm_df.Coding \
+                    & (dnm_df.Confidence == 'HIGH')
+        dnm_df = dnm_df.loc[keep_rows, :]
+
+        # Restrict to columns of interest
+        keep_cols = 'GENE_NAME VEP_functional_class_canonical_simplified'.split()
+
+    elif version == 'fu_2021':
+
+        # Restrict to high-confidence coding variants
+        dnm_df = dnm_df[dnm_df.Affected_Status == affected_key]
+
+        # Restrict to columns of interest
+        keep_cols = 'Gene Simplified_csq'.split()
+
+    # Return data as list of (gene, consequence) tuples
     return list(dnm_df.loc[:, keep_cols].itertuples(index=False, name=None))
 
 
@@ -61,6 +75,9 @@ def main():
                         required=True)
     parser.add_argument('--controls', help='output DNMs in controls. [default: cases]',
                         action='store_true')
+    parser.add_argument('-v', '--version', default='satterstrom_2020', help='Specify ' +
+                        'version of ASC analysis to expect. [default: satterstrom_2020]',
+                        choices=['satterstrom_2020', 'fu_2021'])
     parser.add_argument('-o', '--outfile', help='Path to output tsv file. [default: ' +
                         'stdout]', default='stdout')
     parser.add_argument('-z', '--gzip', action='store_true', help='Compress ' + 
@@ -84,7 +101,7 @@ def main():
     gdict = {g.rstrip() : zeros.copy() for g in open(args.genes).readlines()}
 
     # Load & filter DNMs
-    dnms = load_dnms(args.dnm_tsv, args.controls)
+    dnms = load_dnms(args.dnm_tsv, args.controls, args.version)
 
     # Count DNMs per gene
     for gene, csq in dnms:
