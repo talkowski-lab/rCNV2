@@ -22,14 +22,16 @@ export rCNV_bucket="gs://rcnv_project"
 
 # Copy all filtered CNV data, gene coordinates, and other references 
 # from the project Google Bucket (note: requires permissions)
-mkdir cleaned_cnv/ phenos/
+mkdir cleaned_cnv/ phenos/ refs/
 gsutil -m cp -r ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
 gsutil -m cp -r ${rCNV_bucket}/cleaned_data/phenotypes/filtered/meta*.cleaned_phenos.txt phenos/
 gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes ./
-mkdir refs/
-gsutil -m cp ${rCNV_bucket}/refs/GRCh37.*.bed.gz refs/
-gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/* refs/
-gsutil -m cp ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz refs/
+gsutil -m cp \
+  ${rCNV_bucket}/refs/GRCh37.*.bed.gz \
+  ${rCNV_bucket}/analysis/analysis_refs/* \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/loose_unclustered_nahr_regions.bed.gz \
+  refs/
 
 
 # Test/dev parameters
@@ -51,20 +53,17 @@ max_genes_per_cnv=36
 meta_model_prefix="fe"
 min_cnvs_per_gene_training_del=14
 min_cnvs_per_gene_training_dup=10
-cen_tel_dist=0
 exclusion_bed=refs/gencode.v19.canonical.pext_filtered.cohort_exclusion.bed.gz
 winsorize_meta_z=1.0
 meta_min_cases=300
 prior_frac=0.137
 
 
-# Create training excludelist: Remove all genes within +N bp of a telomere/centromere, 
-# or those within known genomic disorder regions
+# Create training excludelist: Remove all genes within known NAHR-mediated genomic disorder regions
 # (Note: cen/tel exclusion no longer applied — no evidence these genes will bias results)
-zcat refs/GRCh37.centromeres_telomeres.bed.gz \
-| awk -v FS="\t" -v OFS="\t" -v d=${cen_tel_dist} \
-  '{ if ($2-d<0) print $1, "0", $3+d; else print $1, $2-d, $3+d }' \
-| cat - <( zcat refs/lit_GDs.*.bed.gz | cut -f1-3 | fgrep -v "#" ) \
+zcat refs/lit_GDs.*.bed.gz | cut -f1-3 | fgrep -v "#" \
+| bedtools intersect -r -f 0.25 -u -a - \
+  -b refs/loose_unclustered_nahr_regions.bed.gz \
 | sort -Vk1,1 -k2,2n -k3,3n \
 | bedtools merge -i - \
 > ${freq_code}.gene_scoring.training_mask.bed.gz
@@ -136,6 +135,7 @@ cat \
 gsutil -m cp \
   gold_standard.*.genes.list \
   ${rCNV_bucket}/analysis/gene_scoring/gene_lists/
+
 
 
 # Note: data for parameter optimization is computed in parallel in FireCloud with
@@ -217,8 +217,16 @@ for contig in $( seq 1 22 ); do
   while read meta cohorts; do
     echo $meta
 
+    # Exclude all NAHR CNVs from burden testing
+    bedtools intersect -v -r -f 0.5 \
+      -a cleaned_cnv/$meta.${freq_code}.bed.gz \
+      -b refs/loose_unclustered_nahr_regions.bed.gz \
+    | bgzip -c \
+    > cleaned_cnv/$meta.${freq_code}.no_NAHR.bed.gz
+    tabix -f cleaned_cnv/$meta.${freq_code}.no_NAHR.bed.gz
+
     # Set metacohort-specific parameters
-    cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
+    cnv_bed="cleaned_cnv/$meta.${freq_code}.no_NAHR.bed.gz"
     effective_case_n=$( fgrep -w $meta refs/rCNV2.hpos_by_severity.developmental.counts.tsv | cut -f2 )
 
     # Iterate over CNV types

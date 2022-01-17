@@ -53,8 +53,8 @@ anno.cnv.scores <- function(cnvs, scores.rCNV, scores.other){
 calc.or <- function(cnvs){
   n.case.all <- asc_spark_samplesizes["ASD"]
   n.ctrl.all <- asc_spark_samplesizes["Control"]
-  n.case.cnv <- length(which(cnvs$pheno == "ASD"))
-  n.ctrl.cnv <- length(which(cnvs$pheno == "Control"))
+  n.case.cnv <- length(unique(cnvs$sample[which(cnvs$pheno == "ASD")]))
+  n.ctrl.cnv <- length(unique(cnvs$sample[which(cnvs$pheno == "Control")]))
   n.case.ref <- n.case.all - n.case.cnv
   n.ctrl.ref <- n.ctrl.all - n.ctrl.cnv
   or.table <- matrix(c(n.ctrl.ref, n.case.ref, n.ctrl.cnv, n.case.cnv), nrow=2, byrow=T) + 0.5
@@ -287,7 +287,7 @@ out.prefix <- args$args[5]
 # # DEV PARAMETERS
 # scores.in <- "~/scratch/rCNV.gene_scores.tsv.gz"
 # constraint.meta.in <- "~/scratch/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz"
-# asd_cnvs.in <- "~/scratch/asc_spark_2021_denovo_cnvs.cleaned.b37.annotated.bed.gz"
+# asd_cnvs.in <- "~/scratch/asc_spark_2021_denovo_cnvs.cleaned.b37.annotated.nonNAHR.bed.gz"
 # out.prefix <- "~/scratch/test_gene_score_dnCNV_analyses"
 
 # Load rCNV scores and other (non-rCNV) scores
@@ -327,6 +327,32 @@ plot.or.by.scorebin(cnvs[which(cnvs$cnv=="DUP"), ], score="pTriplo", cnv.pct=T, 
 mtext(1, line=2.1, text="in Quartiles by pTriplo")
 dev.off()
 
+### TODO: Evaluate performance stratification vs. number of genes
+# DEV CODE
+calc.or(cnvs[which(cnvs$cnv == "DEL" & cnvs$n_genes==1 & cnvs$pHaplo<0.8), ])
+calc.or(cnvs[which(cnvs$cnv == "DEL" & cnvs$n_genes==1 & cnvs$pHaplo>0.8), ])
+# DEV CODE COMPARE VS LOEUF
+calc.or(cnvs[which(cnvs$cnv == "DEL" & cnvs$n_genes==1 & cnvs$gnomad_oe_lof_upper<0.4), ])
+calc.or(cnvs[which(cnvs$cnv == "DEL" & cnvs$n_genes==1 & cnvs$gnomad_oe_lof_upper>0.8), ])
+
+
+### TODO: Evaluate odds ratio vs. sliding score window
+# DEV CODE
+del.or.by.filter <- do.call("rbind", lapply(seq(0, 0.99, 0.01), function(k){
+  calc.or(cnvs[which(cnvs$cnv == "DEL" & cnvs$pHaplo>=k), ])
+}))
+dup.or.by.filter <- do.call("rbind", lapply(seq(0, 0.99, 0.01), function(k){
+  calc.or(cnvs[which(cnvs$cnv == "DUP" & cnvs$pTriplo>=k), ])
+}))
+par(mfrow=c(1, 2))
+plot(x=seq(0, 0.99, 0.01), y=del.or.by.filter[, 1], type="l", lwd=3, col=cnv.colors[1],
+     xlab="pHaplo Cutoff", ylab="ASD Odds Ratio (dnDELs)", ylim=c(0, 15),
+     main="ASD Odds Ratio, De Novo Deletions\nWhen Filtered by pHaplo")
+plot(x=seq(0, 0.99, 0.01), y=dup.or.by.filter[, 1], type="l", lwd=3, col=cnv.colors[2],
+     xlab="pTriplo Cutoff", ylab="ASD Odds Ratio (dnDUPs)", ylim=c(0, 30),
+     main="ASD Odds Ratio, De Novo Duplications\nWhen Filtered by pTriplo")
+
+
 # Plot odds ratios stratified by high/low pHaplo & pTriplo
 strat.ors <- calc.or.stratified(cnvs, high.cutoff=0.8, low.cutoff=0.5, norm.vs.baseline=F)
 pdf(paste(out.prefix, "asc_spark_denovo_cnvs.odds_ratios.stratified.pdf", sep="."),
@@ -334,43 +360,44 @@ pdf(paste(out.prefix, "asc_spark_denovo_cnvs.odds_ratios.stratified.pdf", sep=".
 plot.stratified.metric(strat.ors, y.title="\"log\"[2](\"ASD Odds Ratio\")")
 dev.off()
 
-# Evaluate performance of various scores vs. proband/sibling labels
-del.evals <- lapply(all.scores, function(score){
-  evaluate.score.asd_cnv(cnvs[which(cnvs$cnv=="DEL"), ], score=score)
-})
-dup.evals <- lapply(all.scores, function(score){
-  evaluate.score.asd_cnv(cnvs[which(cnvs$cnv=="DUP"), ], score=score)
-})
-
-# Assign colors for score comparison
-score.colors <- c(cnv.colors[1:2], rev(viridis(ncol(scores.other)-1)))
-score.text.colors <- rev(c(rep("white", 2),
-                       rep("black", floor((ncol(scores.other)-1) / 2)),
-                       rep("white", ceiling((ncol(scores.other)-1) / 2))))
-
-# Plot ROC
-pdf(paste(out.prefix, "asc_spark_denovo_cnvs.roc.del.pdf", sep="."),
-    height=2.75, width=2.75)
-plot.roc(del.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
-dev.off()
-pdf(paste(out.prefix, "asc_spark_denovo_cnvs.roc.dup.pdf", sep="."),
-    height=2.75, width=2.75)
-plot.roc(dup.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
-dev.off()
-
-# Plot PRC
-pdf(paste(out.prefix, "asc_spark_denovo_cnvs.prc.del.pdf", sep="."),
-    height=2.75, width=2.75)
-plot.prc(del.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
-dev.off()
-pdf(paste(out.prefix, "asc_spark_denovo_cnvs.prc.dup.pdf", sep="."),
-    height=2.75, width=2.75)
-plot.prc(dup.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
-dev.off()
-
-# Plot legend
-pdf(paste(out.prefix, "asc_spark_denovo_cnvs.roc_prc.legend.pdf", sep="."),
-    height=2.2, width=2.7)
-simple.legend(labels=rev(score.names[all.scores]), colors=rev(score.colors))
-dev.off()
+### TODO: REVISE THIS
+# # Evaluate performance of various scores vs. proband/sibling labels
+# del.evals <- lapply(all.scores, function(score){
+#   evaluate.score.asd_cnv(cnvs[which(cnvs$cnv=="DEL"), ], score=score)
+# })
+# dup.evals <- lapply(all.scores, function(score){
+#   evaluate.score.asd_cnv(cnvs[which(cnvs$cnv=="DUP"), ], score=score)
+# })
+#
+# # Assign colors for score comparison
+# score.colors <- c(cnv.colors[1:2], rev(viridis(ncol(scores.other)-1)))
+# score.text.colors <- rev(c(rep("white", 2),
+#                        rep("black", floor((ncol(scores.other)-1) / 2)),
+#                        rep("white", ceiling((ncol(scores.other)-1) / 2))))
+#
+# # Plot ROC
+# pdf(paste(out.prefix, "asc_spark_denovo_cnvs.roc.del.pdf", sep="."),
+#     height=2.75, width=2.75)
+# plot.roc(del.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
+# dev.off()
+# pdf(paste(out.prefix, "asc_spark_denovo_cnvs.roc.dup.pdf", sep="."),
+#     height=2.75, width=2.75)
+# plot.roc(dup.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
+# dev.off()
+#
+# # Plot PRC
+# pdf(paste(out.prefix, "asc_spark_denovo_cnvs.prc.del.pdf", sep="."),
+#     height=2.75, width=2.75)
+# plot.prc(del.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
+# dev.off()
+# pdf(paste(out.prefix, "asc_spark_denovo_cnvs.prc.dup.pdf", sep="."),
+#     height=2.75, width=2.75)
+# plot.prc(dup.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
+# dev.off()
+#
+# # Plot legend
+# pdf(paste(out.prefix, "asc_spark_denovo_cnvs.roc_prc.legend.pdf", sep="."),
+#     height=2.2, width=2.7)
+# simple.legend(labels=rev(score.names[all.scores]), colors=rev(score.colors))
+# dev.off()
 

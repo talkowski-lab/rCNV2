@@ -151,3 +151,28 @@ prune.hpo.jaccard.matrix <- function(hpo.jac, sample.sizes, max.jac=0.5,
   }
 }
 
+
+
+
+#' Inverse-variance weighted mean
+#'
+#' Compute inverse-variance weighted mean and 95% CI
+#'
+#' @param values numeric vector of values to be averaged
+#' @param vars variance for each entry in `values`
+#' @param conf confidence interval to return \[default: 0.95\]
+#'
+#' @return vector of weighted mean and lower/upper bounds of confidence interval
+#'
+#' @export
+inv.var.avg <- function(lnors, vars, conf=0.95){
+  keep.idx <- which(complete.cases(data.frame(lnors, vars)))
+  numerator <- sum((lnors/vars)[keep.idx])
+  denominator <- sum(1/vars[keep.idx])
+  avg <- numerator/denominator
+  pooled.se <- sqrt(1/denominator)
+  lower.ci <- avg + qnorm((1-conf)/2)*pooled.se
+  upper.ci <- avg + qnorm(conf+(1-conf)/2)*pooled.se
+  return(c(avg, lower.ci, upper.ci))
+}
+

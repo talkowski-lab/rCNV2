@@ -324,12 +324,14 @@ task burden_test {
     set -e
 
     # Copy CNV data and constrained gene coordinates
-    mkdir cleaned_cnv/
+    mkdir cleaned_cnv/ refs/
     gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
     gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
-    mkdir refs/
-    gsutil -m cp ${rCNV_bucket}/refs/GRCh37.*.bed.gz refs/
-    gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
+    gsutil -m cp \
+      ${rCNV_bucket}/refs/GRCh37.*.bed.gz \
+      ${rCNV_bucket}/analysis/paper/data/large_segments/loose_unclustered_nahr_regions.bed.gz \
+      gs://rcnv_project/analysis/analysis_refs/* \
+      refs/
 
     # Extract contig of interest from GTF
     tabix ${gtf} ${contig} | bgzip -c > ${contig}.gtf.gz
@@ -341,8 +343,16 @@ task burden_test {
     while read meta cohorts; do
       echo $meta
 
+      # Exclude all NAHR CNVs from burden testing
+      bedtools intersect -v -r -f 0.5 \
+        -a cleaned_cnv/$meta.${freq_code}.bed.gz \
+        -b refs/loose_unclustered_nahr_regions.bed.gz \
+      | bgzip -c \
+      > cleaned_cnv/$meta.${freq_code}.no_NAHR.bed.gz
+      tabix -f cleaned_cnv/$meta.${freq_code}.no_NAHR.bed.gz
+
       # Set metacohort-specific parameters
-      cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
+      cnv_bed="cleaned_cnv/$meta.${freq_code}.no_NAHR.bed.gz"
       effective_case_n=$( fgrep -w $meta refs/rCNV2.hpos_by_severity.developmental.counts.tsv | cut -f2 )
 
       # Iterate over CNV types

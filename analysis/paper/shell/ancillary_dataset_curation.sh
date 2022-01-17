@@ -31,7 +31,7 @@ gsutil -m cp -r \
   ${rCNV_bucket}/analysis/analysis_refs/GRCh37.genome \
   ${rCNV_bucket}/refs/gnomad_v2.1_sv.nonneuro.sites.vcf* \
   ${rCNV_bucket}/raw_data/other/fu_asc_spark_denovo_cnvs.raw.bed.gz \
-  ${rCNV_bucket}/analysis/paper/data/large_segments/loose_unclustered_nahr_regions.bed.gz \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/loose_unclustered_nahr_regions.w_genes.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
   ./
 
@@ -103,20 +103,6 @@ wget https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnoma
 gzip -f gene_mutation_rates.tsv
 
 
-# Annotate NAHR segments vs. genes for CNV curation below
-zcat loose_unclustered_nahr_regions.bed.gz \
-| awk -v OFS="\t" '{ print $0, "junk_"NR, "DEL", "junk" }' \
-| /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
-    --min-cds-ovr 0.00001 \
-    --outbed /dev/null \
-    --cnvs-out /dev/stdout \
-    --bgzip \
-    /dev/stdin \
-    gencode.v19.canonical.pext_filtered.gtf.gz \
-| cut -f1-3,7,9 | bgzip -c \
-> loose_unclustered_nahr_regions.annotated.bed.gz
-
-
 # Process ASC/SPARK de novo CNVs, including:
 # 1. restrict to autosomes
 # 2. exclude CNVs larger than 20Mb
@@ -137,7 +123,7 @@ liftOver -minMatch=0.5 -bedPlus=3 \
   fu_asc_spark_denovo_cnvs.cleaned.hg38.liftFail.txt
 sed 's/^chr//g' fu_asc_spark_denovo_cnvs.cleaned.hg19.bed \
 | sort -Vk1,1 -k2,2n -k3,3n \
-| awk -v OFS="\t" '{ print $1, $2, $3, "Fu_dnCNV_"NR, $4, $5 }' \
+| awk -v OFS="\t" '{ print $1, $2, $3, $4"_dnCNV_"NR, $5, $6 }' \
 > fu_asc_spark_denovo_cnvs.cleaned.b37.bed
 for CNV in DEL DUP; do
   case $CNV in
@@ -161,15 +147,27 @@ done
 for CNV in DEL DUP; do
   /opt/rCNV2/data_curation/other/match_segs_by_gene_content.py \
     -a fu_asc_spark_denovo_cnvs.cleaned.b37.${CNV}.annotated.bed.gz \
-    -b loose_unclustered_nahr_regions.annotated.bed.gz \
+    -b loose_unclustered_nahr_regions.w_genes.bed.gz \
     -v -r -f 0.5
 done \
-| fgrep -v "#" \
-| awk -v FS="\t" -v OFS="\t" '{ if ($7>0) print $1, $2, $3, $5, $6, $7, $9 }' \
+| fgrep -v "#" | sed 's/_dnCNV_/\t/g' \
+| awk -v FS="\t" -v OFS="\t" '{ if ($8>0) print $1, $2, $3, $4, $6, $7, $8, $10 }' \
 | sort -Vk1,1 -k2,2 -k3,3n \
-| cat <( echo -e "#chr\tstart\tend\tcnv\tpheno\tn_genes\tgenes" ) - \
+| cat <( echo -e "#chr\tstart\tend\tsample\tcnv\tpheno\tn_genes\tgenes" ) - \
 | bgzip -c \
-> asc_spark_2021_denovo_cnvs.cleaned.b37.annotated.bed.gz
+> asc_spark_2021_denovo_cnvs.cleaned.b37.annotated.nonNAHR.bed.gz
+for CNV in DEL DUP; do
+  /opt/rCNV2/data_curation/other/match_segs_by_gene_content.py \
+    -a fu_asc_spark_denovo_cnvs.cleaned.b37.${CNV}.annotated.bed.gz \
+    -b loose_unclustered_nahr_regions.annotated.bed.gz \
+    -r -f 0.5
+done \
+| fgrep -v "#" | sed 's/_dnCNV_/\t/g' \
+| awk -v FS="\t" -v OFS="\t" '{ if ($8>0) print $1, $2, $3, $4, $6, $7, $8, $10 }' \
+| sort -Vk1,1 -k2,2 -k3,3n \
+| cat <( echo -e "#chr\tstart\tend\tsample\tcnv\tpheno\tn_genes\tgenes" ) - \
+| bgzip -c \
+> asc_spark_2021_denovo_cnvs.cleaned.b37.annotated.NAHR.bed.gz
 
 
 # Copy curated DNMs, BCAs, mutation rates, and de novo CNVs to gs:// bucket (note: requires permissions)
@@ -181,6 +179,7 @@ gsutil -m cp \
   redin_bca_breakpoints.bed.gz \
   gnomad_sv_nonneuro_counts.tsv.gz \
   gene_mutation_rates.tsv.gz \
-  asc_spark_2021_denovo_cnvs.cleaned.b37.annotated.bed.gz \
+  asc_spark_2021_denovo_cnvs.cleaned.b37.annotated.nonNAHR.bed.gz \
+  asc_spark_2021_denovo_cnvs.cleaned.b37.annotated.NAHR.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/misc/
 

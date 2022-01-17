@@ -18,6 +18,27 @@ options(stringsAsFactors=F, scipen=1000, family="sans")
 ######################
 ### DATA FUNCTIONS ###
 ######################
+# Load genes impacted by CNVs from a single cohort
+load.cohort.cnvs <- function(cnvs.in){
+  x <- read.table(cnvs.in, header=T, sep="\t", comment.char="")
+  x <- x[which(x$ngenes>0), c("phenos", "genes")]
+  x$phenos <- strsplit(x$phenos, split=";")
+  x$genes <- strsplit(x$genes, split=";")
+  return(x)
+}
+
+# Load all data required for on-the-fly meta-analysis
+load.meta.dat <- function(meta.inputs.in){
+  inputs <- read.table(meta.inputs.in, sep="\t", header=T)
+  cohorts <- as.character(inputs$cohort)
+  n_case <- as.numeric(inputs$n_case)
+  n_control <- as.numeric(inputs$n_control)
+  names(n_control) <- names(n_case) <- cohorts
+  cnvs <- lapply(inputs$cnv_path, load.cohort.cnvs)
+  names(cnvs) <- cohorts
+  return(list("cnvs" = cnvs, "n_case" = n_case, "n_control" = n_control))
+}
+
 # Load meta-analysis stats and extract effect size estimates w/relative variance
 load.lnors <- function(meta.in, xlist){
   meta <- read.table(meta.in, sep="\t", header=T, comment.char="")
@@ -25,18 +46,6 @@ load.lnors <- function(meta.in, xlist){
   meta$meta_lnOR_se <- (meta$meta_lnOR_upper - meta$meta_lnOR_lower) / (2 * qnorm(0.975))
   meta$meta_lnOR_var <- meta$meta_lnOR_se^2
   return(meta[, c("gene", "meta_lnOR", "meta_lnOR_var")])
-}
-
-# Compute inverse-variance weighted mean and 95% CI
-inv.var.avg <- function(lnors, vars, conf=0.95){
-  keep.idx <- which(complete.cases(data.frame(lnors, vars)))
-  numerator <- sum((lnors/vars)[keep.idx])
-  denominator <- sum(1/vars[keep.idx])
-  avg <- numerator/denominator
-  pooled.se <- sqrt(1/denominator)
-  lower.ci <- avg + qnorm((1-conf)/2)*pooled.se
-  upper.ci <- avg + qnorm(conf+(1-conf)/2)*pooled.se
-  return(c(avg, lower.ci, upper.ci))
 }
 
 # Compute average effect size per score bin
@@ -175,31 +184,30 @@ require(optparse, quietly=T)
 option_list <- list()
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage=paste("%prog scores.tsv meta_stats.del.tsv meta_stats.dup.tsv constr.genes exclude.list out_prefix", sep=" "),
+args <- parse_args(OptionParser(usage=paste("%prog scores.tsv meta_inputs.tsv constr.genes exclude.list out_prefix", sep=" "),
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Checks for appropriate positional arguments
-if(length(args$args) != 6){
-  stop(paste("Six positional arguments required: scores.tsv, meta_stats.del.tsv, meta_stats.dup.tsv, constr.genes.list, exclude.genes, and output_prefix\n", sep=" "))
+if(length(args$args) != 5){
+  stop(paste("Five positional arguments required: scores.tsv, meta_inputs.tsv, constr.genes.list, exclude.genes, and output_prefix\n", sep=" "))
 }
 
 # Writes args & opts to vars
 scores.in <- args$args[1]
-del.meta.in <- args$args[2]
-dup.meta.in <- args$args[3]
-constr.genes.in <- args$args[4]
-xlist.in <- args$args[5]
-out.prefix <- args$args[6]
+meta.inputs.in <- args$args[2]
+constr.genes.in <- args$args[3]
+xlist.in <- args$args[4]
+out.prefix <- args$args[5]
 
 # # DEV PARAMETERS
-# scores.in <- "~/scratch/rCNV.gene_scores.tsv.gz"
-# del.meta.in <- "~/scratch/rCNV2_analysis_d2.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz"
-# dup.meta.in <- "~/scratch/rCNV2_analysis_d2.rCNV.DUP.gene_burden.meta_analysis.stats.bed.gz"
-# constr.genes.in <- "~/scratch/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list"
-# xlist.in <- "~/scratch/rCNV.gene_scoring.excluded_training_genes.list"
-# out.prefix <- "~/scratch/test_gene_score_empirical_cutoffs"
+# setwd("~/scratch/")
+# scores.in <- "rCNV.gene_scores.tsv.gz"
+# meta.inputs.in <- "empirical_score_cutoff.meta_inputs.tsv"
+# constr.genes.in <- "gene_lists/gnomad.v2.1.1.lof_constrained.genes.list"
+# xlist.in <- "rCNV.gene_scoring.excluded_training_genes.list"
+# out.prefix <- "test_gene_score_empirical_cutoffs"
 
 # Load scores
 scores <- load.scores(scores.in)
@@ -208,9 +216,10 @@ scores <- load.scores(scores.in)
 constr.genes <- unique(as.character(read.table(constr.genes.in, header=F, sep="\t")[, 1]))
 xlist <- unique(as.character(read.table(xlist.in, header=F, sep="\t")[, 1]))
 
-# Extract meta-analysis odds ratios
-del.lnors <- load.lnors(del.meta.in, xlist)
-dup.lnors <- load.lnors(dup.meta.in, xlist)
+# Load data necessary for on-the-fly meta-analyses
+meta.dat <- load.meta.dat(meta.inputs.in)
+
+### TODO: CONTINUE IMPLEMENTING O-T-F METAS
 
 # Compute average lnOR for deletions of constrained genes
 del.constr.idxs <- which(del.lnors$gene %in% constr.genes & !(del.lnors$gene %in% xlist))

@@ -107,7 +107,7 @@ def main():
         if bgzip:
             subprocess.run(['bgzip', '-f', outbed_path])
 
-’’’
+
 if __name__ == '__main__':
     main()
 

@@ -28,12 +28,12 @@ def load_cnvs(cnvs_in, max_size=20000000):
     cnvs = pd.read_csv(cnvs_in, sep='\t')
     
     keep_rows = ((cnvs.chr.isin(elig_chroms)) & (cnvs.end - cnvs.start <= max_size))
-    keep_cols = cnvs.columns.isin('chr start end call Affected_Status'.split())
+    keep_cols = cnvs.columns.isin('chr start end sample call Affected_Status'.split())
 
     cnvs = cnvs.loc[keep_rows, keep_cols]
 
     cnvs['pheno'] = cnvs.Affected_Status.map({1 : 'Control', 2 : 'ASD'})
-    cnvs = cnvs['chr start end call pheno'.split()]
+    cnvs = cnvs['chr start end sample call pheno'.split()]
     return cnvs.rename(columns={'chr' : '#chr', 'call' : 'cnv'})
 
 

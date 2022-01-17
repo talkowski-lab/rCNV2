@@ -26,6 +26,7 @@ gsutil -m cp -r \
   ${rCNV_bucket}/analysis/gene_scoring/data/rCNV.*.gene_abfs.tsv \
   ${rCNV_bucket}/analysis/gene_scoring/data/${prefix}.rCNV.*.gene_burden.meta_analysis.stats.bed.gz \
   ${rCNV_bucket}/analysis/gene_scoring/data/${prefix}.rCNV.*.gene_burden.underpowered_genes.bed.gz \
+  ${rCNV_bucket}/analysis/gene_scoring/optimization_data \
   ${rCNV_bucket}/analysis/gene_scoring/refs/rCNV.gene_scoring.training_gene_excludelist.bed.gz \
   ${rCNV_bucket}/results/gene_scoring/rCNV.gene_scores.tsv.gz \
   ${rCNV_bucket}/analysis/gene_scoring/all_models \
@@ -40,7 +41,7 @@ gsutil -m cp -r \
   ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.genomic_features.eigenfeatures.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/misc/asc_spark_* \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists \
-  ${rCNV_bucket}/analysis/analysis_refs/gene_feature_transformations.tsv \
+  ${rCNV_bucket}/analysis/analysis_refs/* \
   ${rCNV_bucket}/analysis/paper/data/misc/gene_feature_metadata.tsv \
   ${rCNV_bucket}/analysis/paper/data/large_segments/${prefix}.master_segments.bed.gz \
   refs/
@@ -213,6 +214,31 @@ fgrep -wvf \
   model_comparisons/${prefix}.TS_only
 
 
+# Prepare files for on-the fly meta-analysis of CNV effect sizes vs. gene scores
+echo -e "cohort\tn_case\tn_control\tcnv_path" \
+> empirical_score_cutoff.meta_inputs.tsv
+zcat optimization_data/rCNV.DEL.meta1.genes_per_cnv.tsv.gz | head -n1 \
+> optimization_data/opt_data.header.tsv
+while read meta cohorts; do
+  # Subset CNVs to developmental cases & controls
+  for CNV in DEL DUP; do
+    zcat optimization_data/rCNV.$CNV.$meta.genes_per_cnv.tsv.gz \
+    | fgrep -wf <( cat refs/rCNV2.hpos_by_severity.developmental.list \
+                       <( echo "HEALTHY_CONTROL" ) )
+  done | sort -Vk1,1 | cat optimization_data/opt_data.header.tsv - | gzip -c \
+  > optimization_data/rCNV.$meta.annotated_developmental_and_control_cnvs.tsv.gz
+
+  # Write info to meta-analysis input
+  for dummy in 1; do
+    fgrep -w $meta refs/rCNV2.hpos_by_severity.developmental.counts.tsv
+    cidx=$( head -n1 refs/HPOs_by_metacohort.table.tsv | sed 's/\t/\n/g' \
+            | awk -v OFS="\t" '{ print NR, $0 }' | fgrep -w $meta | cut -f1 )
+    fgrep -w "HEALTHY_CONTROL" refs/HPOs_by_metacohort.table.tsv | cut -f$cidx
+    echo optimization_data/rCNV.$meta.annotated_developmental_and_control_cnvs.tsv.gz
+  done | paste -s >> empirical_score_cutoff.meta_inputs.tsv
+done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt )
+
+
 # Plot basic distributions of scores
 if ! [ -e basic_distribs ]; then
   mkdir basic_distribs
@@ -222,8 +248,7 @@ zcat rCNV.gene_scoring.training_gene_excludelist.bed.gz \
 > rCNV.gene_scoring.excluded_training_genes.list
 /opt/rCNV2/analysis/paper/plot/gene_scores/empirical_score_cutoffs.R \
   rCNV.gene_scores.tsv.gz \
-  ${prefix}.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz \
-  ${prefix}.rCNV.DUP.gene_burden.meta_analysis.stats.bed.gz \
+  empirical_score_cutoff.meta_inputs.tsv \
   refs/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
   rCNV.gene_scoring.excluded_training_genes.list \
   basic_distribs/${prefix}
@@ -280,7 +305,7 @@ fi
 /opt/rCNV2/analysis/paper/plot/gene_scores/plot_asd_denovo_cnv_analysis.R \
   rCNV.gene_scores.tsv.gz \
   refs/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
-  refs/asc_spark_2021_denovo_cnvs.cleaned.b37.annotated.bed.gz \
+  refs/asc_spark_2021_denovo_cnvs.cleaned.b37.annotated.nonNAHR.bed.gz \
   enrichments/${prefix}
 
 
@@ -300,7 +325,6 @@ fi
 if ! [ -e enrichments ]; then
   mkdir enrichments
 fi
-### TODO: DEBUG THIS. SOMETHING DOESNT LOOK RIGHT WITH ASC & ASC UNAFFECTED
 /opt/rCNV2/analysis/paper/plot/gene_scores/plot_dnm_enrichments.R \
   rCNV.gene_scores.tsv.gz \
   refs/gencode.v19.canonical.pext_filtered.all_features.bed.gz \
