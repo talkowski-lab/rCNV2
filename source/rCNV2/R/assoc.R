@@ -534,6 +534,7 @@ meta.single <- function(stats.merged, cohorts, row.idx, model="fe",
                         adjust.biobanks=F, cohort.inflation=NULL,
                         probe.counts=NULL, empirical.continuity=T,
                         drop_top_cohort=F){
+  require(metafor, quietly=T)
   # Collect list of cohorts to exclude
   exclude.cohorts <- unlist(strsplit(stats.merged$exclude_cohorts[row.idx], split=";"))
   if(drop_top_cohort == TRUE){

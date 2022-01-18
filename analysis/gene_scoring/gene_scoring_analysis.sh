@@ -51,7 +51,7 @@ min_cds_ovr_del=0.84
 min_cds_ovr_dup=0.84
 max_genes_per_cnv=37
 meta_model_prefix="fe"
-max_standard_error=2
+max_standard_error=1
 exclusion_bed=refs/gencode.v19.canonical.pext_filtered.cohort_exclusion.bed.gz
 winsorize_meta_z=1.0
 meta_min_cases=300
@@ -399,8 +399,6 @@ for CNV in DEL DUP; do
 done
 
 
-
-
 # Score genes for a single model & CNV type
 # Dev/test parameters
 gsutil -m cp \
@@ -416,9 +414,7 @@ gene_features="gencode.v19.canonical.pext_filtered.all_features.no_variation.eig
 raw_gene_features="gencode.v19.canonical.pext_filtered.all_features.no_variation.bed.gz"
 max_true_bfdp=0.5
 min_false_bfdp=0.5
-model="neuralnet"
-elnet_alpha=0.1
-elnet_l1_l2_mix=1
+model="logit"
 
 # Copy necessary references
 gsutil -m cp \
@@ -456,8 +452,6 @@ esac
   --model ${model} \
   --max-true-bfdp ${max_true_bfdp} \
   --min-false-bfdp ${min_false_bfdp} \
-  --regularization-alpha ${elnet_alpha} \
-  --regularization-l1-l2-mix ${elnet_l1_l2_mix} \
   --chromsplit \
   --no-out-of-sample-prediction \
   --outfile ${freq_code}.${CNV}.gene_scores.${model}.tsv \

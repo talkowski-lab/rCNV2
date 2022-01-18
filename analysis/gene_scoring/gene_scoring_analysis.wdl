@@ -31,8 +31,6 @@ workflow gene_burden_analysis {
   File raw_gene_features
   Float max_true_bfdp
   Float min_false_bfdp
-  Float elnet_alpha
-  Float elnet_l1_l2_mix
   String rCNV_bucket
   String rCNV_docker
   String rCNV_docker_scoring #Note: this is separate just for development purposes; can be collapsed in at a later date
@@ -42,7 +40,7 @@ workflow gene_burden_analysis {
 
   Array[String] cnv_types = ["DEL", "DUP"]
 
-  Array[String] models = ["logit", "randomforest", "lda", "naivebayes", "neuralnet", "gbdt", "knn"]
+  Array[String] models = ["logit", "svm", "randomforest", "lda", "naivebayes", "neuralnet", "gbdt", "knn"]
 
   # Scatter over contigs (for speed)
   scatter ( contig in contigs ) {
@@ -556,7 +554,7 @@ task get_underpowered_genes {
     # Extract list of genes with standard error < max_standard_error (to be used as excludelist later for training)
     /opt/rCNV2/analysis/gene_scoring/get_underpowered_genes.R \
       --max-se "${max_standard_error}" \
-      ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz \
+      ${meta_stats} \
       ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed
     awk -v OFS="\t" '{ print $1, $2, $3, $4 }' \
       ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed \
@@ -567,7 +565,6 @@ task get_underpowered_genes {
     # Copy meta-analysis results to Google bucket
     gsutil -m cp \
       ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed.gz \
-      ${prefix}.${freq_code}.${CNV}.counts_per_gene.tsv \
       ${rCNV_bucket}/analysis/gene_scoring/data/
   >>>
 
@@ -575,13 +572,11 @@ task get_underpowered_genes {
     docker: "${rCNV_docker}"
     preemptible: 1
     memory: "8 GB"
-    bootDiskSizeGb: "30"
     disks: "local-disk 50 HDD"
   }
 
   output {
     File underpowered_genes = "${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed.gz"
-    File counts_per_gene = "${prefix}.${freq_code}.${CNV}.counts_per_gene.tsv"
   }
 }
 
@@ -902,10 +897,10 @@ task qc_scores {
       gene_lists/gold_standard.triploinsensitive.genes.list \
       $compdir/${freq_code}_gene_scoring_model_comparisons
 
-    # Merge scores from best model (highest harmonic mean AUC)
+    # Compute harmonic mean of AUCs and merge scores from ensemble model
     sed -n '2p' $compdir/${freq_code}_gene_scoring_model_comparisons.summary_table.tsv \
-    | cut -f1 > best_model.tsv
-    best_model=$( cat best_model.tsv )
+    | cut -f1 > best_average_auc.tsv
+    best_model="ensemble"
     /opt/rCNV2/analysis/gene_scoring/merge_del_dup_scores.R \
       ${freq_code}.DEL.gene_scores.$best_model.tsv \
       ${freq_code}.DUP.gene_scores.$best_model.tsv \
@@ -991,7 +986,7 @@ task qc_scores {
   }
 
   output {
-    String best_model = read_string("best_model.tsv")
+    String best_average_auc = read_string("best_average_auc.tsv")
     File final_scores = "${freq_code}.gene_scores.tsv.gz"
   }
 }

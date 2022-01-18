@@ -53,6 +53,13 @@ gene.meta.otf <- function(meta.dat, genes, cnv){
     nctrl.all <- meta.dat$n_control[i]
     hits <- which(sapply(cnvs$genes, function(glist){length(intersect(glist, genes)) > 0}))
     hits.iscase <- table(cnvs$iscase[hits])
+    for(lab in c("TRUE", "FALSE")){
+      if(!(lab %in% names(hits.iscase))){
+        names <- c(names(hits.iscase), lab)
+        hits.iscase <- c(hits.iscase, 0)
+        names(hits.iscase) <- names
+      }
+    }
     ncase.alt <- hits.iscase["TRUE"]
     ncase.ref <- ncase.all - ncase.alt
     nctrl.alt <- hits.iscase["FALSE"]
@@ -66,28 +73,18 @@ gene.meta.otf <- function(meta.dat, genes, cnv){
   meta.single(stats.merged, meta.dat$cohorts, row.idx=1)
 }
 
-# Load meta-analysis stats and extract effect size estimates w/relative variance
-load.lnors <- function(meta.in, xlist){
-  meta <- read.table(meta.in, sep="\t", header=T, comment.char="")
-  meta[which(!(meta$gene %in% xlist)), c("gene", "meta_lnOR", "meta_lnOR_lower", "meta_lnOR_upper")]
-  meta$meta_lnOR_se <- (meta$meta_lnOR_upper - meta$meta_lnOR_lower) / (2 * qnorm(0.975))
-  meta$meta_lnOR_var <- meta$meta_lnOR_se^2
-  return(meta[, c("gene", "meta_lnOR", "meta_lnOR_var")])
-}
-
-# Compute average effect size per score bin
-avg.lnor.per.score.bin <- function(lnor.df, scores, score, bins=100,
-                                   start=1, end=0){
+# Compute effect size per score bin
+lnor.per.score.bin <- function(meta.dat, scores, score, cnv, xlist=c(),
+                               bins=100, start=1, end=0){
   score.breaks <- seq(start, end, length.out=bins+1)
   res <- as.data.frame(t(sapply(1:bins, function(i){
     upper.genes <- scores$gene[which(scores[, score] >= score.breaks[i+1])]
+    upper.genes <- setdiff(upper.genes, xlist)
     n.upper.genes <- length(upper.genes)
-    upper.lnor <- inv.var.avg(lnor.df$meta_lnOR[which(lnor.df$gene %in% upper.genes)],
-                              lnor.df$meta_lnOR_var[which(lnor.df$gene %in% upper.genes)])
+    upper.lnor <- gene.meta.otf(meta.dat, upper.genes, cnv)[1:3]
     bin.genes <- intersect(upper.genes, scores$gene[which(scores[, score] < score.breaks[i])])
     n.bin.genes <- length(bin.genes)
-    bin.lnor <- inv.var.avg(lnor.df$meta_lnOR[which(lnor.df$gene %in% bin.genes)],
-                            lnor.df$meta_lnOR_var[which(lnor.df$gene %in% bin.genes)])
+    bin.lnor <- gene.meta.otf(meta.dat, bin.genes, cnv)[1:3]
     return(c(score.breaks[i+1], n.upper.genes, upper.lnor, n.bin.genes, bin.lnor))
   })))
   colnames(res) <- c("cutoff",
@@ -205,6 +202,7 @@ plot.score.vs.or <- function(bins, baseline, score.cutoff, score,
 ### RSCRIPT BLOCK ###
 #####################
 require(rCNV2, quietly=T)
+require(metafor, quietly=T)
 require(optparse, quietly=T)
 
 # List of command-line options
@@ -247,11 +245,15 @@ xlist <- unique(as.character(read.table(xlist.in, header=F, sep="\t")[, 1]))
 meta.dat <- load.meta.dat(meta.inputs.in)
 
 # Compute lnOR for deletions of constrained genes
-del.constr.lnor <- gene.meta.otf(meta.dat, setdiff(constr.genes, xlist), "DEL")[1:3]
+del.constr.lnor <- gene.meta.otf(meta.dat, setdiff(constr.genes, xlist), "DEL")[1]
+
+# TODO: KEEP IMPLEMENTING THIS
 
 # Compute lnOR estimates for genes by pHaplo & pTriplo bin
-phi.lnor.full <- avg.lnor.per.score.bin(meta.dat, scores, "pHaplo", bins=100, start=1, end=0)
-pts.lnor.full <- avg.lnor.per.score.bin(meta.dat, scores, "pTriplo", bins=100, start=1, end=0)
+phi.lnor.full <- lnor.per.score.bin(meta.dat, scores, "pHaplo", "DEL", xlist,
+                                    bins=100, start=1, end=0)
+pts.lnor.full <- lnor.per.score.bin(meta.dat, scores, "pTriplo", "DUP", xlist,
+                                    bins=100, start=1, end=0)
 # pts.lnor.fine <- avg.lnor.per.score.bin(dup.lnors, scores, "pTriplo", bins=100, start=1, end=0.9)
 # pts.lnor.fine.forplot <- avg.lnor.per.score.bin(dup.lnors, scores, "pTriplo", bins=50, start=1, end=0.95)
 
@@ -270,7 +272,7 @@ cat(paste("\nComparable pTriplo cutoff >=", pts.cutoff, "(includes",
           "genes)\n"))
 
 # Set standardized parameters for all plots
-ylims <- quantile(c(phi.lnor.full$margin_lnOR, pts.lnor.full$margin_lnOR, pts.lnor.fine$margin_lnOR),
+ylims <- quantile(c(phi.lnor.full$margin_lnOR, pts.lnor.full$margin_lnOR),
                   probs=c(0.005, 0.995), na.rm=T)
 pt.cex <- 3/4
 avg.genes.per.bin <- mean(c(phi.lnor.full$margin_genes, pts.lnor.full$margin_genes), na.rm=T)

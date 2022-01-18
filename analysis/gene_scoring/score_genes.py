@@ -18,14 +18,12 @@ import pybedtools as pbt
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import scale, StandardScaler
-from statsmodels.genmod.generalized_linear_model import GLM
-from statsmodels.genmod import families
-# from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV
+from sklearn.linear_model import LogisticRegression as logit
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier as RFC
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDAC
 from sklearn.naive_bayes import GaussianNB as GNBC
-from sklearn.linear_model import SGDClassifier as SGDC
 from sklearn.neural_network import MLPClassifier as MLPC
 from sklearn.ensemble import GradientBoostingClassifier as GBDT
 from sklearn.neighbors import KNeighborsClassifier as KNN
@@ -176,8 +174,7 @@ def rmse(pairs):
     return np.sqrt(np.sum(mse) / len(pairs))
 
 
-def fit_model(features, sumstats, train_genes, test_genes,  
-              model='logit', logit_alpha=0.1, l1_l2_mix=1):
+def fit_model(features, sumstats, train_genes, test_genes, model='logit'):
     """
     Fit classifier to train_genes and calculate RMSE on test_genes
     """
@@ -194,47 +191,59 @@ def fit_model(features, sumstats, train_genes, test_genes,
     test_df = full_df.loc[full_df.index.isin(test_genes), :].\
                   drop(labels='chrom', axis=1)
 
-    # Fit according to specified model
+    # Instantiate classifier dependent on model
     if model == 'logit':
-        # Fit logit GLM & predict on test set
-        glm = GLM(train_df.bfdp, train_df.drop(labels='bfdp', axis=1),
-                  family=families.Binomial())
-        if logit_alpha is None:
-            fitted_model = glm.fit()
-        else:
-            fitted_model = glm.fit_regularized(L1_wt = 1 - l1_l2_mix, alpha=logit_alpha)
-        test_bfdps = fitted_model.predict(test_df.drop(labels='bfdp', axis=1))
-        test_bfdps.name = 'pred'
+        grid_params = {'C' : [10 ** x for x in range(-3, 4, 1)],
+                       'l1_ratio' : [x / 10 for x in range(0, 11, 1)]}
+        base_class = logit(solver='saga', penalty='elasticnet', max_iter=10000)
+    elif model == 'svm':
+        grid_params = {'C' : [10 ** x for x in range(-3, 2, 1)],
+                       'kernel' : ['linear', 'sigmoid']}
+        base_class = SVC(random_state=0, max_iter=-1, probability=True, break_ties=True),               
+    elif model == 'randomforest':
+        grid_params = {'n_estimators' : [50, 100, 500],
+                       'criterion' : ['gini', 'entropy']}
+        base_class = RFC(random_state=0, bootstrap=True, oob_score=True)
+    elif model == 'lda':
+        grid_params = {'shrinkage' : [None, 0, 0.5, 1, 'auto'],
+                       'solver' : ['svd', 'lsqr', 'eigen']}
+        base_class = LDAC()
+    elif model == 'naivebayes':
+        grid_params = {'var_smoothing' : [10 ** x for x in range(-4, -11, -1)]}
+        base_class = GNBC()
+    elif model == 'neuralnet':
+        grid_params = {'hidden_layer_sizes' : [(10, 5, 2), 
+                                               (20, 10, 5),
+                                               (20, 10, 5, 2),
+                                               (50, 20, 10),
+                                               (50, 20, 10, 5),
+                                               (50, 20, 10, 5, 2)],
+                       'alpha' : [10 ** x for x in range(-4, 5, 1)]}
+        base_class = MLPC(activation='relu', solver='adam', early_stopping=True, 
+                          random_state=0, max_iter=10000)
+    elif model == 'gbdt':
+        grid_params = {'n_estimators' : [50, 100],
+                       'subsample' : [0.5, 1]}
+        base_class = GBDT(random_state=0)
+    elif model == 'knn':
+        grid_params = {'n_neighbors' : [10, 50, 100, 500],
+                       'weights' : ['uniform', 'distance'],
+                       'leaf_size' : [5, 10, 25, 50, 100]}
+        base_class = KNN()
 
+    # Learn best parameters for classifier using cross-validated grid search
+    classifier = GridSearchCV(base_class, grid_params, verbose=1, n_jobs=-1)
+
+    # Fit sklearn model & predict on test set
+    # (Models parameterized by grid search need to be treated separately)
+    if isinstance(classifier, GridSearchCV):
+        fitted_model = classifier.fit(train_df.drop(labels='bfdp', axis=1), 
+                                  np.round(train_df.bfdp)).best_estimator_
     else:
-        # Instantiate classifier, depending on model
-        if model == 'svm':
-            classifier = SVC(C=logit_alpha, random_state=0, max_iter=-1, 
-                             probability=True, kernel='sigmoid', break_ties=True)
-        elif model == 'randomforest':
-            classifier = RFC(random_state=0)
-        elif model == 'lda':
-            classifier = LDAC()
-        elif model == 'naivebayes':
-            classifier = GNBC()
-        elif model == 'sgd':
-            classifier = SGDC(loss='modified_huber', penalty='elasticnet', 
-                              alpha=logit_alpha, l1_ratio=1 - l1_l2_mix, 
-                              random_state=0)
-        elif model == 'neuralnet':
-            classifier = MLPC(hidden_layer_sizes=(20, 10, 5, 2), activation='relu', 
-                              solver='adam', early_stopping=True, alpha=logit_alpha, 
-                              random_state=0, max_iter=10000)
-        elif model == 'gbdt':
-            classifier = GBDT(random_state=0)
-        elif model == 'knn':
-            classifier = KNN(n_neighbors=100, weights='distance')
-
-        # Fit sklearn model & predict on test set
         fitted_model = classifier.fit(train_df.drop(labels='bfdp', axis=1), 
                                       np.round(train_df.bfdp))
-        test_bfdps = pd.Series(fitted_model.predict_proba(test_df.drop(labels='bfdp', axis=1))[:, 1],
-                               name='pred', index=test_df.index)
+    test_bfdps = pd.Series(fitted_model.predict_proba(test_df.drop(labels='bfdp', axis=1))[:, 1],
+                           name='pred', index=test_df.index)
 
     # Compute RMSE of bfdps for test set
     test_vals = test_df.merge(test_bfdps, left_index=True, right_index=True).\
@@ -258,7 +267,7 @@ def split_genes(genes, n_splits=10, random_seed=2020):
 
 
 def fit_model_cv(features, sumstats, all_pairs, xgenes=[], model='logit', 
-                 logit_alpha=0.1, l1_l2_mix=1, nested_cv=True, random=True):
+                 nested_cv=True, random=True):
     """
     Fit model with N-fold CV
     """
@@ -278,8 +287,7 @@ def fit_model_cv(features, sumstats, all_pairs, xgenes=[], model='logit',
                 train_genes = [g for s in train_splits for g in s]
                 test_genes = gene_splits[i]
                 model_fit, test_rmse = \
-                    fit_model(features, sumstats, train_genes, test_genes, model, 
-                              logit_alpha, l1_l2_mix)
+                    fit_model(features, sumstats, train_genes, test_genes, model)
                 models.append((test_rmse, model_fit))
 
         # Otherwise, partition train/test sets based on chromosome pairs
@@ -292,8 +300,7 @@ def fit_model_cv(features, sumstats, all_pairs, xgenes=[], model='logit',
                 test_genes = list(sumstats.index[(sumstats.chrom.isin(list(all_pairs[i]))) & \
                                                  ~(sumstats.index.isin(xgenes))])
                 model_fit, test_rmse = \
-                    fit_model(features, sumstats, train_genes, test_genes, model, 
-                              logit_alpha, l1_l2_mix)
+                    fit_model(features, sumstats, train_genes, test_genes, model)
                 models.append((test_rmse, model_fit))
 
         best_rmse, best_model = \
@@ -303,16 +310,18 @@ def fit_model_cv(features, sumstats, all_pairs, xgenes=[], model='logit',
         all_chroms = [c for s in all_pairs for c in s]
         all_genes = list(sumstats.index[(sumstats.chrom.isin(all_chroms)) & \
                                         ~(sumstats.index.isin(xgenes))])
-        best_model, best_rmse = fit_model(features, sumstats, all_genes, all_genes, 
-                                          model, logit_alpha, l1_l2_mix)
+        best_model, best_rmse = \
+            fit_model(features, sumstats, all_genes, all_genes, model)
+
+    print('Best model determined to be:')
+    print(best_model)
 
     return best_model, best_rmse
 
 
 def predict_bfdps(features, sumstats, chrompairs, xbed=None, true_pos=[], 
-                  true_neg=[], model='logit', logit_alpha=0.1, l1_l2_mix=1, 
-                  nested_cv=True, random=True, pred_out_of_sample=True,
-                  quiet=False):
+                  true_neg=[], model='logit', nested_cv=True, random=True, 
+                  pred_out_of_sample=True, quiet=False):
     """
     Predicts bfdps for all genes with (optional) N-fold CV
     """
@@ -340,15 +349,12 @@ def predict_bfdps(features, sumstats, chrompairs, xbed=None, true_pos=[],
             # Fit model
             fitted_model, rmse = \
                 fit_model_cv(features, sumstats, train_pairs, xgenes, model, 
-                             logit_alpha, l1_l2_mix, nested_cv, random)
+                             nested_cv, random)
 
             # Predict bfdps
             pred_df = features.loc[features.index.isin(pred_genes), :]
-            if model == 'logit':
-                pred_vals = fitted_model.predict(pred_df)
-            else:
-                pred_class_probs = fitted_model.predict_proba(pred_df)
-                pred_vals = pd.Series(pred_class_probs[:, 1], name='pred', index=pred_df.index)
+            pred_class_probs = fitted_model.predict_proba(pred_df)
+            pred_vals = pd.Series(pred_class_probs[:, 1], name='pred', index=pred_df.index)
             pred_vals.name = 'pred_bfdp'
             pred_bfdps.update(pred_vals)
     
@@ -362,15 +368,12 @@ def predict_bfdps(features, sumstats, chrompairs, xbed=None, true_pos=[],
         # Fit model
         fitted_model, rmse = \
             fit_model_cv(features, sumstats, chrompairs, xgenes, model, 
-                         logit_alpha, l1_l2_mix, nested_cv, random)
+                         nested_cv, random)
 
         # Predict bfdps
         pred_df = features.loc[features.index, :]
-        if model == 'logit':
-            pred_vals = fitted_model.predict(pred_df)
-        else:
-            pred_class_probs = fitted_model.predict_proba(pred_df)
-            pred_vals = pd.Series(pred_class_probs[:, 1], name='pred', index=pred_df.index)
+        pred_class_probs = fitted_model.predict_proba(pred_df)
+        pred_vals = pd.Series(pred_class_probs[:, 1], name='pred', index=pred_df.index)
         pred_vals.name = 'pred_bfdp'
         pred_bfdps.update(pred_vals)
 
@@ -414,13 +417,6 @@ def main():
     parser.add_argument('--chromsplit', action='store_true', default=False,
                         help='Use chromsome partitions for train/test sets. ' +
                         '[default: randomly sample from chromosome partitions]')
-    parser.add_argument('--regularization-alpha', dest='logit_alpha', type=float,
-                        help='Regularization penalty weight for logit glm. Must ' +
-                        'be in ~ [0, 1]. [default: no regularization]', default=0.1)
-    parser.add_argument('--regularization-l1-l2-mix', dest='l1_l2_mix', type=float,
-                        help='Regularization parameter (elastic net alpha) for ' +
-                        'logit glm. 0 = L1, 1 = L2, (0, 1) = elastic net. ' +
-                        '[default: L2 regularization]', default=1)
     parser.add_argument('--no-nested-cv', action='store_true', help='Do not perform ' +
                         ' 10-fold nested CV when predicting scores for each subset of ' +
                         'chromosomes and instead train model on all chromosomes]')
@@ -467,10 +463,10 @@ def main():
     features = load_features(args.features)
 
     # Predict bfdps for all genes
-    nested_cv = not args.no_nested_cv
     pred_bfdps = predict_bfdps(features, sumstats, chrompairs, args.blacklist,
-                               true_pos, true_neg, args.model, args.logit_alpha, 
-                               args.l1_l2_mix, nested_cv, random=(not args.chromsplit),
+                               true_pos, true_neg, args.model, 
+                               nested_cv=(not args.no_nested_cv), 
+                               random=(not args.chromsplit),
                                pred_out_of_sample=(not args.no_out_of_sample_prediction))
 
     # Write predicted BFDPs to outfile, along with scaled score & quantile
