@@ -22,7 +22,8 @@ options(stringsAsFactors=F, scipen=1000, family="sans")
 load.cohort.cnvs <- function(cnvs.in){
   x <- read.table(cnvs.in, header=T, sep="\t", comment.char="")
   x <- x[which(x$ngenes>0), c("phenos", "genes")]
-  x$phenos <- strsplit(x$phenos, split=";")
+  x$iscase <- strsplit(x$phenos, split=";") != c("HEALTHY_CONTROL")
+  x$phenos <- NULL
   x$genes <- strsplit(x$genes, split=";")
   return(x)
 }
@@ -34,9 +35,35 @@ load.meta.dat <- function(meta.inputs.in){
   n_case <- as.numeric(inputs$n_case)
   n_control <- as.numeric(inputs$n_control)
   names(n_control) <- names(n_case) <- cohorts
-  cnvs <- lapply(inputs$cnv_path, load.cohort.cnvs)
+  cnvs <- apply(inputs[, c("DEL_path", "DUP_path")], 1, function(paths){
+    return(list("DEL" = load.cohort.cnvs(paths[1]),
+                "DUP" = load.cohort.cnvs(paths[2])))
+  })
   names(cnvs) <- cohorts
-  return(list("cnvs" = cnvs, "n_case" = n_case, "n_control" = n_control))
+  return(list("cnvs" = cnvs, "n_case" = n_case,
+              "n_control" = n_control, "cohorts" = cohorts))
+}
+
+# Compute on-the-fly meta-analysis of all CNVs that hit a list of genes
+gene.meta.otf <- function(meta.dat, genes, cnv){
+  stats.merged <- do.call("cbind", lapply(1:length(meta.dat$cnvs), function(i){
+    cnvs <- meta.dat$cnvs[[i]][[cnv]]
+    cohort <- meta.dat$cohorts[i]
+    ncase.all <- meta.dat$n_case[i]
+    nctrl.all <- meta.dat$n_control[i]
+    hits <- which(sapply(cnvs$genes, function(glist){length(intersect(glist, genes)) > 0}))
+    hits.iscase <- table(cnvs$iscase[hits])
+    ncase.alt <- hits.iscase["TRUE"]
+    ncase.ref <- ncase.all - ncase.alt
+    nctrl.alt <- hits.iscase["FALSE"]
+    nctrl.ref <- nctrl.all - nctrl.alt
+    outvals <- data.frame(ncase.alt, ncase.ref, nctrl.alt, nctrl.ref)
+    colnames(outvals) <- paste(cohort, c("case_alt", "case_ref", "control_alt",
+                                         "control_ref"), sep=".")
+    return(outvals)
+  }))
+  stats.merged$exclude_cohorts <- ""
+  meta.single(stats.merged, meta.dat$cohorts, row.idx=1)
 }
 
 # Load meta-analysis stats and extract effect size estimates w/relative variance
@@ -56,11 +83,11 @@ avg.lnor.per.score.bin <- function(lnor.df, scores, score, bins=100,
     upper.genes <- scores$gene[which(scores[, score] >= score.breaks[i+1])]
     n.upper.genes <- length(upper.genes)
     upper.lnor <- inv.var.avg(lnor.df$meta_lnOR[which(lnor.df$gene %in% upper.genes)],
-                             lnor.df$meta_lnOR_var[which(lnor.df$gene %in% upper.genes)])
+                              lnor.df$meta_lnOR_var[which(lnor.df$gene %in% upper.genes)])
     bin.genes <- intersect(upper.genes, scores$gene[which(scores[, score] < score.breaks[i])])
     n.bin.genes <- length(bin.genes)
     bin.lnor <- inv.var.avg(lnor.df$meta_lnOR[which(lnor.df$gene %in% bin.genes)],
-                             lnor.df$meta_lnOR_var[which(lnor.df$gene %in% bin.genes)])
+                            lnor.df$meta_lnOR_var[which(lnor.df$gene %in% bin.genes)])
     return(c(score.breaks[i+1], n.upper.genes, upper.lnor, n.bin.genes, bin.lnor))
   })))
   colnames(res) <- c("cutoff",
@@ -219,18 +246,14 @@ xlist <- unique(as.character(read.table(xlist.in, header=F, sep="\t")[, 1]))
 # Load data necessary for on-the-fly meta-analyses
 meta.dat <- load.meta.dat(meta.inputs.in)
 
-### TODO: CONTINUE IMPLEMENTING O-T-F METAS
-
-# Compute average lnOR for deletions of constrained genes
-del.constr.idxs <- which(del.lnors$gene %in% constr.genes & !(del.lnors$gene %in% xlist))
-del.constr.lnor <- inv.var.avg(del.lnors$meta_lnOR[del.constr.idxs], del.lnors$meta_lnOR_var[del.constr.idxs])
+# Compute lnOR for deletions of constrained genes
+del.constr.lnor <- gene.meta.otf(meta.dat, setdiff(constr.genes, xlist), "DEL")[1:3]
 
 # Compute lnOR estimates for genes by pHaplo & pTriplo bin
-phi.lnor.full <- avg.lnor.per.score.bin(del.lnors, scores, "pHaplo", bins=100, start=1, end=0)
-phi.lnor.fine <- avg.lnor.per.score.bin(del.lnors, scores, "pHaplo", bins=100, start=1, end=0.9)
-pts.lnor.full <- avg.lnor.per.score.bin(dup.lnors, scores, "pTriplo", bins=100, start=1, end=0)
-pts.lnor.fine <- avg.lnor.per.score.bin(dup.lnors, scores, "pTriplo", bins=100, start=1, end=0.9)
-pts.lnor.fine.forplot <- avg.lnor.per.score.bin(dup.lnors, scores, "pTriplo", bins=50, start=1, end=0.95)
+phi.lnor.full <- avg.lnor.per.score.bin(meta.dat, scores, "pHaplo", bins=100, start=1, end=0)
+pts.lnor.full <- avg.lnor.per.score.bin(meta.dat, scores, "pTriplo", bins=100, start=1, end=0)
+# pts.lnor.fine <- avg.lnor.per.score.bin(dup.lnors, scores, "pTriplo", bins=100, start=1, end=0.9)
+# pts.lnor.fine.forplot <- avg.lnor.per.score.bin(dup.lnors, scores, "pTriplo", bins=50, start=1, end=0.95)
 
 # Derive cutoffs
 phi.cutoff <- get.cutoff(phi.lnor.full, phi.lnor.fine, del.constr.lnor[1])
@@ -238,7 +261,7 @@ pts.cutoff <- get.cutoff(pts.lnor.full, pts.lnor.fine, del.constr.lnor[1])
 
 # Print derived cutoffs
 cat(paste("\nAverage rare deletion of constrained gene confers odds ratio =",
-            round(exp(del.constr.lnor[1]), 4), "\n"))
+          round(exp(del.constr.lnor[1]), 4), "\n"))
 cat(paste("\nComparable pHaplo cutoff >=", phi.cutoff, "(includes",
           prettyNum(length(which(scores$pHaplo>=phi.cutoff)), big.mark=","),
           "genes)\n"))

@@ -215,7 +215,7 @@ fgrep -wvf \
 
 
 # Prepare files for on-the fly meta-analysis of CNV effect sizes vs. gene scores
-echo -e "cohort\tn_case\tn_control\tcnv_path" \
+echo -e "cohort\tn_case\tn_control\tDEL_path\tDUP_path" \
 > empirical_score_cutoff.meta_inputs.tsv
 zcat optimization_data/rCNV.DEL.meta1.genes_per_cnv.tsv.gz | head -n1 \
 > optimization_data/opt_data.header.tsv
@@ -224,9 +224,10 @@ while read meta cohorts; do
   for CNV in DEL DUP; do
     zcat optimization_data/rCNV.$CNV.$meta.genes_per_cnv.tsv.gz \
     | fgrep -wf <( cat refs/rCNV2.hpos_by_severity.developmental.list \
-                       <( echo "HEALTHY_CONTROL" ) )
-  done | sort -Vk1,1 | cat optimization_data/opt_data.header.tsv - | gzip -c \
-  > optimization_data/rCNV.$meta.annotated_developmental_and_control_cnvs.tsv.gz
+                       <( echo "HEALTHY_CONTROL" ) ) \
+    | sort -Vk1,1 | cat optimization_data/opt_data.header.tsv - | gzip -c \
+    > optimization_data/rCNV.$meta.annotated_developmental_and_control.$CNV.tsv.gz
+  done
 
   # Write info to meta-analysis input
   for dummy in 1; do
@@ -234,7 +235,9 @@ while read meta cohorts; do
     cidx=$( head -n1 refs/HPOs_by_metacohort.table.tsv | sed 's/\t/\n/g' \
             | awk -v OFS="\t" '{ print NR, $0 }' | fgrep -w $meta | cut -f1 )
     fgrep -w "HEALTHY_CONTROL" refs/HPOs_by_metacohort.table.tsv | cut -f$cidx
-    echo optimization_data/rCNV.$meta.annotated_developmental_and_control_cnvs.tsv.gz
+    for CNV in DEL DUP; do
+      echo optimization_data/rCNV.$meta.annotated_developmental_and_control.$CNV.tsv.gz
+    done
   done | paste -s >> empirical_score_cutoff.meta_inputs.tsv
 done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt )
 

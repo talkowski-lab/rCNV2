@@ -49,10 +49,9 @@ pad_controls=0
 max_cnv_size=300000000
 min_cds_ovr_del=0.84
 min_cds_ovr_dup=0.84
-max_genes_per_cnv=36
+max_genes_per_cnv=37
 meta_model_prefix="fe"
-min_cnvs_per_gene_training_del=14
-min_cnvs_per_gene_training_dup=10
+max_standard_error=2
 exclusion_bed=refs/gencode.v19.canonical.pext_filtered.cohort_exclusion.bed.gz
 winsorize_meta_z=1.0
 meta_min_cases=300
@@ -158,7 +157,7 @@ while read meta cohorts; do
     --negative-truth-genes gold_standard.haplosufficient.genes.list \
     --exclude-genes <( zcat ${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
                        | fgrep -v "#" | cut -f4 ) \
-    --max-genes-for-summary 36 \
+    --max-genes-for-summary 37 \
     --summary-counts ${meta}.optimization_data.counts_per_hpo.DEL.tsv \
     --cnv-stats ${meta}.optimization_data.counts_per_cnv.DEL.tsv \
     --gzip
@@ -171,7 +170,7 @@ while read meta cohorts; do
     --negative-truth-genes gold_standard.triploinsensitive.genes.list \
     --exclude-genes <( zcat ${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
                        | fgrep -v "#" | cut -f4 ) \
-    --max-genes-for-summary 36 \
+    --max-genes-for-summary 37 \
     --summary-counts ${meta}.optimization_data.counts_per_hpo.DUP.tsv \
     --cnv-stats ${meta}.optimization_data.counts_per_cnv.DUP.tsv \
     --gzip
@@ -189,19 +188,6 @@ done
   optimize_genes_per_cnv.DEL.input.tsv \
   optimize_genes_per_cnv.DUP.input.tsv \
   optimize_genes_per_cnv.results.pdf
-
-
-# Parameter optimization: minimum number of CNVs per gene for training
-# NOTE: requires running meta-analysis tasks first in WDL
-gsutil -m cp ${rCNV_bucket}/analysis/gene_scoring/data/** ./
-for CNV in DEL DUP; do
-  echo $CNV
-  /opt/rCNV2/analysis/gene_scoring/variance_vs_counts.R \
-    rCNV2_analysis_d2.rCNV.$CNV.gene_burden.meta_analysis.stats.bed.gz \
-    rCNV2_analysis_d2.rCNV.$CNV.counts_per_gene.tsv \
-    ${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
-    variance_vs_cnvs.$CNV.pdf
-done
 
 
 # Recompute association stats per cohort
@@ -316,22 +302,10 @@ for CNV in DEL DUP; do
   bgzip -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed
   tabix -p bed -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz
 
-  # Set CNV-specific variables
-  case ${CNV} in
-    "DEL")
-      min_cnvs_per_gene=${min_cnvs_per_gene_training_del}
-      ;;
-    "DUP")
-      min_cnvs_per_gene=${min_cnvs_per_gene_training_dup}
-      ;;
-  esac
-
-  # Extract list of genes with < min_cnvs_per_gene_training (to be used as excludelist later for training)
-  # Note: this cutoff must be pre-determined with eval_or_vs_cnv_counts.R, but is not automated here
+  # Extract list of genes with standard error < max_standard_error (to be used as excludelist later for training)
   /opt/rCNV2/analysis/gene_scoring/get_underpowered_genes.R \
-    --min-cnvs "$min_cnvs_per_gene" \
-    --gene-counts-out ${prefix}.${freq_code}.${CNV}.counts_per_gene.tsv \
-    ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt \
+    --max-se "${max_standard_error}" \
+    ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz \
     ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed
   awk -v OFS="\t" '{ print $1, $2, $3, $4 }' \
     ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed \

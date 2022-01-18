@@ -23,8 +23,7 @@ workflow gene_burden_analysis {
   String meta_model_prefix
   Float winsorize_meta_z
   Int meta_min_cases
-  Int min_cnvs_per_gene_training_del
-  Int min_cnvs_per_gene_training_dup
+  Float max_standard_error
   Float prior_frac
   Float prior_lnor_thresholding_pct
   File training_excludelist
@@ -116,16 +115,13 @@ workflow gene_burden_analysis {
     }
     call get_underpowered_genes {
       input:
-        stats_beds=rCNV_burden_test.stats_beds,
-        stats_beds_idxs=rCNV_burden_test.stats_bed_idxs,
+        meta_stats=rCNV_meta_analysis.meta_stats_bed,
         prefix=prefix,
         CNV=CNV,
-        metacohort_list=metacohort_list,
-        min_cnvs_per_gene_training_del=min_cnvs_per_gene_training_del,
-        min_cnvs_per_gene_training_dup=min_cnvs_per_gene_training_dup,
+        max_standard_error=max_standard_error,
         freq_code="rCNV",
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker
+        rCNV_docker=rCNV_docker_scoring
     }
   }
 
@@ -137,7 +133,7 @@ workflow gene_burden_analysis {
       underpowered_genes=get_underpowered_genes.underpowered_genes,
       freq_code="rCNV",
       rCNV_bucket=rCNV_bucket,
-      rCNV_docker=rCNV_docker,
+      rCNV_docker=rCNV_docker_scoring,
       prior_frac=prior_frac,
       prior_lnor_thresholding_pct=prior_lnor_thresholding_pct
   }
@@ -211,6 +207,7 @@ workflow gene_burden_analysis {
   output {
     File gene_scores = qc_scores.final_scores
   }
+
 }
 
 
@@ -545,60 +542,21 @@ task merge_and_meta_analysis {
 
 # Get list of genes with insufficient CNV data to be used for model training
 task get_underpowered_genes {
-  Array[Array[File]] stats_beds
-  Array[Array[File]] stats_beds_idxs
+  File meta_stats
   String prefix
   String CNV
-  File metacohort_list
-  Int min_cnvs_per_gene_training_del
-  Int min_cnvs_per_gene_training_dup
+  Float max_standard_error
   String freq_code
   String rCNV_bucket
   String rCNV_docker
 
   command <<<
-    set -e
+    set -euo pipefail
 
-    # Set CNV-specific variables
-    case ${CNV} in
-      "DEL")
-        min_cnvs_per_gene=${min_cnvs_per_gene_training_del}
-        ;;
-      "DUP")
-        min_cnvs_per_gene=${min_cnvs_per_gene_training_dup}
-        ;;
-    esac
-
-    # Make list of stats files to be considered
-    find / -name "*.${prefix}.${freq_code}.${CNV}.gene_burden.stats.*.bed.gz" \
-    > stats.paths.list
-    # Debug: print paths to stdout
-    cat stats.paths.list
-
-    # Merge burden stats per cohort
-    zcat $( sed -n '1p' stats.paths.list ) | sed -n '1p' > header.tsv
-    while read meta cohort; do
-      zcat $( fgrep $meta stats.paths.list ) \
-      | grep -ve '^#' \
-      | sort -Vk1,1 -k2,2n -k3,3n \
-      | cat header.tsv - \
-      | bgzip -c \
-      > "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
-      tabix -f "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
-    done < <( fgrep -v "mega" ${metacohort_list} )
-
-    # Make input for meta-analysis
-    while read meta cohorts; do
-      echo -e "$meta\t$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
-    done < <( fgrep -v "mega" ${metacohort_list} ) \
-    > ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt
-
-    # Extract list of genes with < min_cnvs_per_gene_training (to be used as excludelist later for training)
-    # Note: this cutoff must be pre-determined with eval_or_vs_cnv_counts.R, but is not automated here
+    # Extract list of genes with standard error < max_standard_error (to be used as excludelist later for training)
     /opt/rCNV2/analysis/gene_scoring/get_underpowered_genes.R \
-      --min-cnvs "$min_cnvs_per_gene" \
-      --gene-counts-out ${prefix}.${freq_code}.${CNV}.counts_per_gene.tsv \
-      ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt \
+      --max-se "${max_standard_error}" \
+      ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz \
       ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed
     awk -v OFS="\t" '{ print $1, $2, $3, $4 }' \
       ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed \
