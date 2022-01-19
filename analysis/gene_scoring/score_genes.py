@@ -199,7 +199,7 @@ def fit_model(features, sumstats, train_genes, test_genes, model='logit'):
     elif model == 'svm':
         grid_params = {'C' : [10 ** x for x in range(-3, 2, 1)],
                        'kernel' : ['linear', 'sigmoid']}
-        base_class = SVC(random_state=0, max_iter=-1, probability=True, break_ties=True),               
+        base_class = SVC(random_state=0, max_iter=-1, probability=True, break_ties=True)           
     elif model == 'randomforest':
         grid_params = {'n_estimators' : [50, 100, 500],
                        'criterion' : ['gini', 'entropy']}

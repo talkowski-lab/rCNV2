@@ -148,8 +148,6 @@ workflow gene_burden_analysis {
         model=model,
         max_true_bfdp=max_true_bfdp,
         min_false_bfdp=min_false_bfdp,
-        elnet_alpha=elnet_alpha,
-        elnet_l1_l2_mix=elnet_l1_l2_mix,
         freq_code="rCNV",
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker_scoring
@@ -164,8 +162,6 @@ workflow gene_burden_analysis {
         model=model,
         max_true_bfdp=max_true_bfdp,
         min_false_bfdp=min_false_bfdp,
-        elnet_alpha=elnet_alpha,
-        elnet_l1_l2_mix=elnet_l1_l2_mix,
         freq_code="rCNV",
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker_scoring
@@ -722,8 +718,6 @@ task score_genes {
   Float max_true_bfdp
   Float min_false_bfdp
   String model
-  Float elnet_alpha
-  Float elnet_l1_l2_mix
   String freq_code
   String rCNV_bucket
   String rCNV_docker
@@ -767,8 +761,6 @@ task score_genes {
       --model ${model} \
       --max-true-bfdp ${max_true_bfdp} \
       --min-false-bfdp ${min_false_bfdp} \
-      --regularization-alpha ${elnet_alpha} \
-      --regularization-l1-l2-mix ${elnet_l1_l2_mix} \
       --chromsplit \
       --no-out-of-sample-prediction \
       --outfile ${freq_code}.${CNV}.gene_scores.${model}.tsv \
