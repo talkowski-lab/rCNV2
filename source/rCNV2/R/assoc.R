@@ -884,3 +884,108 @@ meta <- function(stats.merged, cohorts, model="fe", saddle=T, adjust.biobanks=F,
                              meta.res[, grep("meta_", colnames(meta.res), fixed=T)])))
 }
 
+
+#' Load single cohort data for on-the-fly meta-analysis
+#'
+#' Load a list of genes impacted per CNV for a single cohort for on-the-fly meta-analyses
+#'
+#' @param cnvs.in path to input .tsv (see `details`)
+#'
+#'
+#' @return data.frame with two columns:
+#' * `$iscase` boolean for whether CNV was observed in case sample
+#' * `$genes` list of genes impacted by this CNV
+#'
+#' @details `cnvs.in` must be a .tsv with at least the following two columns:
+#' 1. `phenos` : semicolon-delimited list of all HPO terms corresponding to that CNV
+#' 2. `genes` : semicolon-delimited list of genes impacted by that CNV
+#' Other columns can be optionally present and will be ignored.
+#'
+#' @export
+load.otf.cohort.cnvs <- function(cnvs.in){
+  x <- read.table(cnvs.in, header=T, sep="\t", comment.char="")
+  x <- x[which(x$ngenes>0), c("phenos", "genes")]
+  x$iscase <- strsplit(x$phenos, split=";") != c("HEALTHY_CONTROL")
+  x$phenos <- NULL
+  x$genes <- strsplit(x$genes, split=";")
+  return(x)
+}
+
+
+#' Load on-the-fly meta-analysis data
+#'
+#' Load all data required for on-the-fly meta-analysis
+#'
+#' @param meta.inputs.in path to input .tsv (see `details`)
+#'
+#' @return list with one element per row in `meta.inputs.in`.
+#' Each cohort has four named features:
+#' * `cnvs` : deletions and duplications as loaded by [load.otf.cohort.cnvs()]
+#' * `n_case` : vector of number of cases per cohort
+#' * `n_control` : vector of number of controls per cohort
+#' * `cohorts` : vector of cohort names
+#'
+#' @details `meta.inputs.in` is expected to be a .tsv with the following five columns:
+#' 1. `cohort` : name of cohort
+#' 2. `n_case` : number of case samples
+#' 3. `n_control` : number of control samples
+#' 4. `DEL_path` : path to deletion BED file
+#' 5. `DUP_path` : path to duplication BED file
+#'
+#' @seealso [load.otf.cohort.cnvs()]
+#'
+#' @export
+load.otf.meta.dat <- function(meta.inputs.in){
+  inputs <- read.table(meta.inputs.in, sep="\t", header=T)
+  cohorts <- as.character(inputs$cohort)
+  n_case <- as.numeric(inputs$n_case)
+  n_control <- as.numeric(inputs$n_control)
+  names(n_control) <- names(n_case) <- cohorts
+  cnvs <- apply(inputs[, c("DEL_path", "DUP_path")], 1, function(paths){
+    return(list("DEL" = load.otf.cohort.cnvs(paths[1]),
+                "DUP" = load.otf.cohort.cnvs(paths[2])))
+  })
+  names(cnvs) <- cohorts
+  return(list("cnvs" = cnvs, "n_case" = n_case,
+              "n_control" = n_control, "cohorts" = cohorts))
+}
+
+
+#' On-the-fly meta-analysis of a gene list
+#'
+#' Compute on-the-fly meta-analysis of all CNVs that hit a list of genes
+#'
+#' @param meta-dat meta-analysis inputs as loaded by [load.otf.meta.dat()]
+#' @param genes vector of genes of interest
+#' @param cnv CNV type to evaluate (options: `DEL` or `DUP`)
+#'
+#' @seealso [load.otf.meta.dat()]
+#'
+#' @export
+gene.meta.otf <- function(meta.dat, genes, cnv){
+  stats.merged <- do.call("cbind", lapply(1:length(meta.dat$cnvs), function(i){
+    cnvs <- meta.dat$cnvs[[i]][[cnv]]
+    cohort <- meta.dat$cohorts[i]
+    ncase.all <- meta.dat$n_case[i]
+    nctrl.all <- meta.dat$n_control[i]
+    hits <- which(sapply(cnvs$genes, function(glist){length(intersect(glist, genes)) > 0}))
+    hits.iscase <- table(cnvs$iscase[hits])
+    for(lab in c("TRUE", "FALSE")){
+      if(!(lab %in% names(hits.iscase))){
+        names <- c(names(hits.iscase), lab)
+        hits.iscase <- c(hits.iscase, 0)
+        names(hits.iscase) <- names
+      }
+    }
+    ncase.alt <- hits.iscase["TRUE"]
+    ncase.ref <- ncase.all - ncase.alt
+    nctrl.alt <- hits.iscase["FALSE"]
+    nctrl.ref <- nctrl.all - nctrl.alt
+    outvals <- data.frame(ncase.alt, ncase.ref, nctrl.alt, nctrl.ref)
+    colnames(outvals) <- paste(cohort, c("case_alt", "case_ref", "control_alt",
+                                         "control_ref"), sep=".")
+    return(outvals)
+  }))
+  stats.merged$exclude_cohorts <- ""
+  return(meta.single(stats.merged, meta.dat$cohorts, row.idx=1))
+}

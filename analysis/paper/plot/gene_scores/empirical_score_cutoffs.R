@@ -18,61 +18,6 @@ options(stringsAsFactors=F, scipen=1000, family="sans")
 ######################
 ### DATA FUNCTIONS ###
 ######################
-# Load genes impacted by CNVs from a single cohort
-load.cohort.cnvs <- function(cnvs.in){
-  x <- read.table(cnvs.in, header=T, sep="\t", comment.char="")
-  x <- x[which(x$ngenes>0), c("phenos", "genes")]
-  x$iscase <- strsplit(x$phenos, split=";") != c("HEALTHY_CONTROL")
-  x$phenos <- NULL
-  x$genes <- strsplit(x$genes, split=";")
-  return(x)
-}
-
-# Load all data required for on-the-fly meta-analysis
-load.meta.dat <- function(meta.inputs.in){
-  inputs <- read.table(meta.inputs.in, sep="\t", header=T)
-  cohorts <- as.character(inputs$cohort)
-  n_case <- as.numeric(inputs$n_case)
-  n_control <- as.numeric(inputs$n_control)
-  names(n_control) <- names(n_case) <- cohorts
-  cnvs <- apply(inputs[, c("DEL_path", "DUP_path")], 1, function(paths){
-    return(list("DEL" = load.cohort.cnvs(paths[1]),
-                "DUP" = load.cohort.cnvs(paths[2])))
-  })
-  names(cnvs) <- cohorts
-  return(list("cnvs" = cnvs, "n_case" = n_case,
-              "n_control" = n_control, "cohorts" = cohorts))
-}
-
-# Compute on-the-fly meta-analysis of all CNVs that hit a list of genes
-gene.meta.otf <- function(meta.dat, genes, cnv){
-  stats.merged <- do.call("cbind", lapply(1:length(meta.dat$cnvs), function(i){
-    cnvs <- meta.dat$cnvs[[i]][[cnv]]
-    cohort <- meta.dat$cohorts[i]
-    ncase.all <- meta.dat$n_case[i]
-    nctrl.all <- meta.dat$n_control[i]
-    hits <- which(sapply(cnvs$genes, function(glist){length(intersect(glist, genes)) > 0}))
-    hits.iscase <- table(cnvs$iscase[hits])
-    for(lab in c("TRUE", "FALSE")){
-      if(!(lab %in% names(hits.iscase))){
-        names <- c(names(hits.iscase), lab)
-        hits.iscase <- c(hits.iscase, 0)
-        names(hits.iscase) <- names
-      }
-    }
-    ncase.alt <- hits.iscase["TRUE"]
-    ncase.ref <- ncase.all - ncase.alt
-    nctrl.alt <- hits.iscase["FALSE"]
-    nctrl.ref <- nctrl.all - nctrl.alt
-    outvals <- data.frame(ncase.alt, ncase.ref, nctrl.alt, nctrl.ref)
-    colnames(outvals) <- paste(cohort, c("case_alt", "case_ref", "control_alt",
-                                         "control_ref"), sep=".")
-    return(outvals)
-  }))
-  stats.merged$exclude_cohorts <- ""
-  meta.single(stats.merged, meta.dat$cohorts, row.idx=1)
-}
-
 # Compute effect size per score bin
 lnor.per.score.bin <- function(meta.dat, scores, score, cnv, xlist=c(),
                                bins=100, start=1, end=0){
@@ -242,20 +187,17 @@ constr.genes <- unique(as.character(read.table(constr.genes.in, header=F, sep="\
 xlist <- unique(as.character(read.table(xlist.in, header=F, sep="\t")[, 1]))
 
 # Load data necessary for on-the-fly meta-analyses
-meta.dat <- load.meta.dat(meta.inputs.in)
+meta.dat <- load.otf.meta.dat(meta.inputs.in)
 
 # Compute lnOR for deletions of constrained genes
 del.constr.lnor <- gene.meta.otf(meta.dat, setdiff(constr.genes, xlist), "DEL")[1]
-
-# TODO: KEEP IMPLEMENTING THIS
 
 # Compute lnOR estimates for genes by pHaplo & pTriplo bin
 phi.lnor.full <- lnor.per.score.bin(meta.dat, scores, "pHaplo", "DEL", xlist,
                                     bins=100, start=1, end=0)
 pts.lnor.full <- lnor.per.score.bin(meta.dat, scores, "pTriplo", "DUP", xlist,
                                     bins=100, start=1, end=0)
-# pts.lnor.fine <- avg.lnor.per.score.bin(dup.lnors, scores, "pTriplo", bins=100, start=1, end=0.9)
-# pts.lnor.fine.forplot <- avg.lnor.per.score.bin(dup.lnors, scores, "pTriplo", bins=50, start=1, end=0.95)
+pts.lnor.fine <- avg.lnor.per.score.bin(dup.lnors, scores, "pTriplo", bins=50, start=1, end=0.95)
 
 # Derive cutoffs
 phi.cutoff <- get.cutoff(phi.lnor.full, phi.lnor.fine, del.constr.lnor[1])
@@ -296,12 +238,12 @@ plot.score.vs.or(pts.lnor.full, del.constr.lnor[1], pts.cutoff, "pTriplo",
                  blue.bg=FALSE, parmar=pdf.parmar)
 dev.off()
 
-# # Plot fine pTriplo vs lnOR
-# pdf(paste(out.prefix, "pts_vs_effect_size.fine.pdf", sep="."),
-#     height=(5/6)*pdf.height, width=(1/2)*pdf.width)
-# plot.score.vs.or(pts.lnor.fine.forplot, del.constr.lnor[1], pts.cutoff, "pTriplo",
-#                  ylims=ylims, avg.pt.cex=pt.cex, xtitle="pTriplo", ytitle=NA,
-#                  blue.bg=FALSE, parmar=c(pdf.parmar[1], 1.3, pdf.parmar[3:4]))
-# axis(1, at=1, tick=F, line=-0.7)
-# dev.off()
+# Plot fine pTriplo vs lnOR
+pdf(paste(out.prefix, "pts_vs_effect_size.fine.pdf", sep="."),
+    height=(5/6)*pdf.height, width=(1/2)*pdf.width)
+plot.score.vs.or(pts.lnor.fine, del.constr.lnor[1], pts.cutoff, "pTriplo",
+                 ylims=ylims, avg.pt.cex=pt.cex, xtitle="pTriplo", ytitle=NA,
+                 blue.bg=FALSE, parmar=c(pdf.parmar[1], 1.3, pdf.parmar[3:4]))
+axis(1, at=1, tick=F, line=-0.7)
+dev.off()
 

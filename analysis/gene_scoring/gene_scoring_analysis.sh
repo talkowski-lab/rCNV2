@@ -332,14 +332,37 @@ for CNV in DEL DUP; do
   > ${freq_code}.$CNV.training_excludelist.genes.list
 done
 
+# Prepare files for on-the fly meta-analysis of CNV effect sizes
+echo -e "cohort\tn_case\tn_control\tDEL_path\tDUP_path" \
+> prior_estimation.meta_inputs.tsv
+zcat optimization_data/rCNV.DEL.meta1.genes_per_cnv.tsv.gz | head -n1 \
+> optimization_data/opt_data.header.tsv
+while read meta cohorts; do
+  # Subset CNVs to developmental cases & controls
+  for CNV in DEL DUP; do
+    zcat optimization_data/rCNV.$CNV.$meta.genes_per_cnv.tsv.gz \
+    | fgrep -wf <( cat refs/rCNV2.hpos_by_severity.developmental.list \
+                       <( echo "HEALTHY_CONTROL" ) ) \
+    | sort -Vk1,1 | cat optimization_data/opt_data.header.tsv - | gzip -c \
+    > optimization_data/rCNV.$meta.annotated_developmental_and_control.$CNV.tsv.gz
+  done
+
+  # Write info to meta-analysis input
+  for dummy in 1; do
+    fgrep -w $meta refs/rCNV2.hpos_by_severity.developmental.counts.tsv
+    cidx=$( head -n1 refs/HPOs_by_metacohort.table.tsv | sed 's/\t/\n/g' \
+            | awk -v OFS="\t" '{ print NR, $0 }' | fgrep -w $meta | cut -f1 )
+    fgrep -w "HEALTHY_CONTROL" refs/HPOs_by_metacohort.table.tsv | cut -f$cidx
+    for CNV in DEL DUP; do
+      echo optimization_data/rCNV.$meta.annotated_developmental_and_control.$CNV.tsv.gz
+    done
+  done | paste -s >> prior_estimation.meta_inputs.tsv
+done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt )
+
 # Compute prior effect sizes
-prior_lnor_thresholding_pct=1
 /opt/rCNV2/analysis/gene_scoring/estimate_prior_effect_sizes.R \
-  --pct ${prior_lnor_thresholding_pct} \
-  ${del_meta_stats} \
-  ${dup_meta_stats} \
-  ${freq_code}.DEL.training_excludelist.genes.list \
-  ${freq_code}.DUP.training_excludelist.genes.list \
+  prior_estimation.meta_inputs.tsv \
+  ${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
   genes/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
   gold_standard.haploinsufficient.genes.list \
   gold_standard.haplosufficient.genes.list \
@@ -358,18 +381,6 @@ awk -v FS="\t" '{ if ($1=="theta1" && $2=="DEL") print $3 }' \
 awk -v FS="\t" '{ if ($1=="theta1" && $2=="DUP") print $3 }' \
   ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
 > theta1_dup.tsv
-awk -v FS="\t" '{ if ($1=="var0" && $2=="DEL") print $3 }' \
-  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-> var0_del.tsv
-awk -v FS="\t" '{ if ($1=="var0" && $2=="DUP") print $3 }' \
-  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-> var0_dup.tsv
-awk -v FS="\t" '{ if ($1=="var1" && $2=="DEL") print $3 }' \
-  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-> var1_del.tsv
-awk -v FS="\t" '{ if ($1=="var1" && $2=="DUP") print $3 }' \
-  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-> var1_dup.tsv
 
 # Compute BFDP per gene
 for CNV in DEL DUP; do

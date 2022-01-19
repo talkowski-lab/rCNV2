@@ -193,13 +193,13 @@ def fit_model(features, sumstats, train_genes, test_genes, model='logit'):
 
     # Instantiate classifier dependent on model
     if model == 'logit':
-        grid_params = {'C' : [10 ** x for x in range(-3, 4, 1)],
+        grid_params = {'C' : [10 ** x for x in range(-2, 3, 1)],
                        'l1_ratio' : [x / 10 for x in range(0, 11, 1)]}
-        base_class = logit(solver='saga', penalty='elasticnet', max_iter=10000)
+        base_class = logit(solver='saga', penalty='elasticnet')
     elif model == 'svm':
         grid_params = {'C' : [10 ** x for x in range(-3, 2, 1)],
                        'kernel' : ['linear', 'sigmoid']}
-        base_class = SVC(random_state=0, max_iter=-1, probability=True, break_ties=True)           
+        base_class = SVC(random_state=0, probability=True, break_ties=True)           
     elif model == 'randomforest':
         grid_params = {'n_estimators' : [50, 100, 500],
                        'criterion' : ['gini', 'entropy']}
@@ -220,7 +220,7 @@ def fit_model(features, sumstats, train_genes, test_genes, model='logit'):
                                                (50, 20, 10, 5, 2)],
                        'alpha' : [10 ** x for x in range(-4, 5, 1)]}
         base_class = MLPC(activation='relu', solver='adam', early_stopping=True, 
-                          random_state=0, max_iter=10000)
+                          random_state=0)
     elif model == 'gbdt':
         grid_params = {'n_estimators' : [50, 100],
                        'subsample' : [0.5, 1]}
