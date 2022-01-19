@@ -197,9 +197,9 @@ def fit_model(features, sumstats, train_genes, test_genes, model='logit'):
                        'l1_ratio' : [x / 10 for x in range(0, 11, 1)]}
         base_class = logit(solver='saga', penalty='elasticnet')
     elif model == 'svm':
-        grid_params = {'C' : [10 ** x for x in range(-3, 2, 1)],
-                       'kernel' : ['linear', 'sigmoid']}
-        base_class = SVC(random_state=0, probability=True, break_ties=True)           
+        grid_params = {'C' : [10 ** x for x in range(-2, 2, 1)]}
+        base_class = SVC(random_state=0, probability=True, 
+                         break_ties=True, kernel='rbf')
     elif model == 'randomforest':
         grid_params = {'n_estimators' : [50, 100, 500],
                        'criterion' : ['gini', 'entropy']}

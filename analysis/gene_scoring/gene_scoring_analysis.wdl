@@ -589,18 +589,15 @@ task calc_priors_bfdp {
   Float prior_lnor_thresholding_pct
 
   command <<<
-    set -euo pipefail
+    set -e
 
     # Localize necessary references
     gsutil -m cp -r \
       ${rCNV_bucket}/analysis/gene_scoring/refs/${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
       ${rCNV_bucket}/analysis/gene_scoring/optimization_data \
       ${rCNV_bucket}/analysis/gene_scoring/gene_lists/*.genes.list \
+      ${rCNV_bucket}/cleaned_data/genes/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
       ./
-    mkdir gene_lists/
-    gsutil -m cp \
-      gs://rcnv_project/cleaned_data/genes/gene_lists/*genes.list \
-      gene_lists/
     mkdir refs/
     gsutil -m cp \
       ${rCNV_bucket}/analysis/analysis_refs/* \
@@ -648,7 +645,7 @@ task calc_priors_bfdp {
     /opt/rCNV2/analysis/gene_scoring/estimate_prior_effect_sizes.R \
       prior_estimation.meta_inputs.tsv \
       ${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
-      genes/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
+      gnomad.v2.1.1.lof_constrained.genes.list \
       gold_standard.haploinsufficient.genes.list \
       gold_standard.haplosufficient.genes.list \
       gold_standard.triplosensitive.genes.list \
@@ -793,7 +790,8 @@ task score_genes {
   runtime {
     docker: "${rCNV_docker}"
     preemptible: 1
-    memory: "8 GB"
+    memory: "32 GB"
+    cpu: "16"
     bootDiskSizeGb: "20"
   }
 

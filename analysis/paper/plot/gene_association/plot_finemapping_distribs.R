@@ -280,7 +280,8 @@ require(optparse, quietly=T)
 option_list <- list()
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage=paste("%prog credsets.bed assocs.bed prior.pips.tsv",
+args <- parse_args(OptionParser(usage=paste("%prog credsets.bed assocs.bed",
+                                            "credsets.prejoint.bed prior.pips.tsv",
                                             "posterior.pips.tsv fullmodel.pips.tsv",
                                             "out.prefix"),
                                 option_list=option_list),
@@ -289,21 +290,24 @@ opts <- args$options
 
 # Checks for appropriate positional arguments
 if(length(args$args) != 6){
-  stop(paste("Four positional arguments required: credsets.bed, assocs.bed,",
-             "prior.pips.tsv, posterior.pips.tsv, fullmodel.pips.tsv, and out.prefix\n"))
+  stop(paste("Seven positional arguments required: credsets.bed, assocs.bed,",
+             "credsets.prejoint.bed, prior.pips.tsv, posterior.pips.tsv,",
+             "fullmodel.pips.tsv, and out.prefix\n"))
 }
 
 # Writes args & opts to vars
 credsets.in <- args$args[1]
 assocs.in <- args$args[2]
-prior.pips.in <- args$args[3]
-posterior.pips.in <- args$args[4]
-final.pips.in <- args$args[5]
-out.prefix <- args$args[6]
+credsets.prejoint.in <- args$args[3]
+prior.pips.in <- args$args[4]
+posterior.pips.in <- args$args[5]
+final.pips.in <- args$args[6]
+out.prefix <- args$args[7]
 
 # # DEV PARAMETERS
 # credsets.in <- "~/scratch/rCNV.final_genes.credible_sets.bed.gz"
 # assocs.in <- "~/scratch/rCNV.final_genes.associations.bed.gz"
+# credsets.prejoint.in <- "~/scratch/rCNV.prejoint.credsets.bed.gz"
 # prior.pips.in <- "~/scratch/all_PIPs.prior.tsv"
 # posterior.pips.in <- "~/scratch/all_PIPs.posterior.tsv"
 # final.pips.in <- "~/scratch/all_PIPs.full_model.tsv"
@@ -312,6 +316,7 @@ out.prefix <- args$args[6]
 # Load credible sets and associations
 credsets <- load.credsets(credsets.in)
 assocs <- load.gene.associations(assocs.in)
+credsets.prejoint <- load.credsets(credsets.prejoint.in)
 
 # Load PIPs for all genes
 pips <- list("Prior" = load.pips(prior.pips.in),
@@ -380,3 +385,6 @@ pdf(paste(out.prefix, "finemapped_distribs.credset_pip.pdf", sep="."),
     height=2.1, width=2.7)
 plot.pip.hist(pips[[4]])
 dev.off()
+
+# Compare prior/posterior/full model for selected genes
+

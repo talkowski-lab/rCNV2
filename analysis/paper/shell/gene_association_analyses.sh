@@ -30,7 +30,8 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.naive_priors.tsv \
   ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.genetics_only.tsv \
   ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.merged_no_variation_features.tsv \
-  ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_no_variation_features.tsv \
+  ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.naive_priors.tsv \
+  ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.credible_sets_per_hpo.merged_no_variation_features.bed \
   ./
 mkdir meta_stats/
 gsutil -m cp -r \
@@ -158,12 +159,19 @@ for CNV in DEL DUP; do
   | cut -f1-5 | awk -v OFS="\t" -v CNV=$CNV '{ print $0, CNV }'
 done \
 | cat pip_header.tsv - > all_PIPs.full_model.tsv
+head -n1 rCNV.DEL.gene_fine_mapping.credible_sets_per_hpo.merged_no_variation_features.bed \
+> rCNV.prejoint.credsets.bed
+cat rCNV.*.gene_fine_mapping.credible_sets_per_hpo.merged_no_variation_features.bed \
+| fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
+>> rCNV.prejoint.credsets.bed
+bgzip -f rCNV.prejoint.credsets.bed
 if ! [ -e finemapping_distribs ]; then
   mkdir finemapping_distribs
 fi
 /opt/rCNV2/analysis/paper/plot/gene_association/plot_finemapping_distribs.R \
   rCNV.final_genes.credible_sets.bed.gz \
   rCNV.final_genes.associations.bed.gz \
+  rCNV.prejoint.credsets.bed.gz \
   all_PIPs.prior.tsv \
   all_PIPs.posterior.tsv \
   all_PIPs.full_model.tsv \
