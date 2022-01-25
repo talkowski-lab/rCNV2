@@ -243,7 +243,7 @@ cat(paste("\nDuplication odds ratio = 2.0 at pTriplo cutoff >=", pts.cutoff.lc, 
 out.df <- data.frame("score"=rep(c("pHaplo", "pTriplo"), 2),
                      "confidence"=c("hc", "hc", "lc", "lc"),
                      "cutoff"=c(phi.cutoff, pts.cutoff, phi.cutoff.lc, pts.cutoff.lc))
-colnames(out.df)[1] <- paste("#", colnames(out.df)[1])
+colnames(out.df)[1] <- paste("#", colnames(out.df)[1], sep="")
 write.table(out.df, cutoffs.out, col.names=T, row.names=F, quote=F, sep="\t")
 
 # Set standardized parameters for all plots

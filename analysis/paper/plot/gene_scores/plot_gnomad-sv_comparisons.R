@@ -268,7 +268,7 @@ plot.oe.by.scorebin <- function(oe.dat, scores, score, var, metric="oe", n.bins=
   if(metric == "oe"){
     mtext(2, text=paste("Obs/Exp", cnv.label, "per Gene"), line=1.75)
   }else{
-    mtext(2, paste("Mean", cnv.label, "per Gene"), line=1.75)
+    mtext(2, text=paste("Mean", cnv.label, "per Gene"), line=1.75)
   }
 }
 
