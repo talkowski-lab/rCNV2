@@ -4,11 +4,11 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Master code block for secondary analyses of gene association & fine mapping
+# Main code block for secondary analyses of gene association & fine mapping
 
 
 # Launch docker image & authenticate GCP credentials
@@ -30,7 +30,8 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.naive_priors.tsv \
   ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.genetics_only.tsv \
   ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.merged_no_variation_features.tsv \
-  ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_no_variation_features.tsv \
+  ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.naive_priors.tsv \
+  ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.credible_sets_per_hpo.merged_no_variation_features.bed \
   ./
 mkdir meta_stats/
 gsutil -m cp -r \
@@ -140,44 +141,42 @@ ngenes=$( zcat meta_stats/${example_hpo}.rCNV.DEL.gene_burden.meta_analysis.stat
   assoc_stat_plots/${prefix}.example_miami.png
 
 
-# # Collect list of genes theoretically eligible to be in each credible set
-# while read chrom start end csID; do
-#   echo -e "$chrom\t$(( $start - $finemap_dist ))\t$(( $end + $finemap_dist ))" \
-#   | awk -v OFS="\t" '{ if ($2<0) $2=0; print $1, $2, $3 }' \
-#   | bedtools intersect -u -wa \
-#     -a refs/gencode.v19.canonical.pext_filtered.all_features.bed.gz \
-#     -b - \
-#   | cut -f4 | sort | uniq | paste -s -d\; \
-#   | awk -v OFS="\t" -v csID=$csID '{ print csID, $1 }'
-# done < <( zcat rCNV.final_genes.credible_sets.bed.gz | fgrep -v "#" | cut -f1-4 ) \
-# | cat <( echo -e "#credible_set_id\teligible_genes" ) - \
-# > credible_set.eligible_genes.tsv
-
-
 # Plot fine-mapping descriptive panels (number of genes per block, distribution of PIPs, etc)
-head -n1 rCNV.DEL.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_no_variation_features.tsv \
+head -n1 rCNV.DEL.gene_fine_mapping.gene_stats.naive_priors.tsv | cut -f1-5 \
 | awk -v OFS="\t" '{ print $0, "cnv" }' > pip_header.tsv
 for CNV in DEL DUP; do
-  fgrep -v "#" rCNV.$CNV.gene_fine_mapping.gene_stats.naive_priors.tsv \
+  fgrep -v "#" rCNV.$CNV.gene_fine_mapping.gene_stats.naive_priors.tsv | cut -f1-5 \
   | awk -v OFS="\t" -v CNV=$CNV '{ print $0, CNV }'
 done  \
 | cat pip_header.tsv - > all_PIPs.prior.tsv
 for CNV in DEL DUP; do
-  fgrep -v "#" rCNV.$CNV.gene_fine_mapping.gene_stats.genetics_only.tsv \
+  fgrep -v "#" rCNV.$CNV.gene_fine_mapping.gene_stats.genetics_only.tsv | cut -f1-5 \
   | awk -v OFS="\t" -v CNV=$CNV '{ print $0, CNV }'
 done  \
 | cat pip_header.tsv - > all_PIPs.posterior.tsv
 for CNV in DEL DUP; do 
   fgrep -v "#" rCNV.$CNV.gene_fine_mapping.gene_stats.merged_no_variation_features.tsv \
-  | awk -v OFS="\t" -v CNV=$CNV '{ print $0, CNV }'
+  | cut -f1-5 | awk -v OFS="\t" -v CNV=$CNV '{ print $0, CNV }'
 done \
 | cat pip_header.tsv - > all_PIPs.full_model.tsv
+head -n1 rCNV.DEL.gene_fine_mapping.credible_sets_per_hpo.merged_no_variation_features.bed \
+> rCNV.prejoint.credsets.bed
+cat rCNV.*.gene_fine_mapping.credible_sets_per_hpo.merged_no_variation_features.bed \
+| fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
+>> rCNV.prejoint.credsets.bed
+bgzip -f rCNV.prejoint.credsets.bed
+echo -e "PTV Constrained\trefs/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list" \
+> comparison_genesets.tsv
+echo -e "Mis. Constrained\trefs/gene_lists/gnomad.v2.1.1.mis_constrained.genes.list" \
+>> comparison_genesets.tsv
+
 if ! [ -e finemapping_distribs ]; then
   mkdir finemapping_distribs
 fi
 /opt/rCNV2/analysis/paper/plot/gene_association/plot_finemapping_distribs.R \
   rCNV.final_genes.credible_sets.bed.gz \
   rCNV.final_genes.associations.bed.gz \
+  rCNV.prejoint.credsets.bed.gz \
   all_PIPs.prior.tsv \
   all_PIPs.posterior.tsv \
   all_PIPs.full_model.tsv \
@@ -237,7 +236,7 @@ done | wc -l
 # Count number of significant large segments with at least one confident fine-mapped gene
 for CNV in DEL DUP; do
   zcat rCNV.final_segments.loci.bed.gz \
-  | fgrep -w $CNV | cut -f22 \
+  | fgrep -w $CNV | cut -f23 \
   | fgrep -wf <( zcat rCNV.final_genes.genes.bed.gz | fgrep -w $CNV | cut -f4 )
 done | wc -l
 
@@ -270,10 +269,10 @@ zcat rCNV.final_genes.genes.bed.gz \
 # Gather mean odds ratio across all gw sig large segments and credsets
 for wrapper in 1; do
   zcat rCNV.final_segments.associations.bed.gz \
-  | fgrep -v "#" | cut -f10
+  | fgrep -v "#" | cut -f11
   for CNV in DEL DUP; do
     zcat rCNV.final_segments.loci.bed.gz \
-    | fgrep -w $CNV | cut -f22 | sed 's/\;/\n/g' \
+    | fgrep -w $CNV | cut -f23 | sed 's/\;/\n/g' \
     | sort | uniq \
     | fgrep -wvf - <( zcat rCNV.final_genes.credible_sets.bed.gz ) \
     | fgrep -w $CNV
@@ -286,16 +285,6 @@ zcat rCNV.final_genes.credible_sets.bed.gz | fgrep -v "#" | cut -f9 \
 | awk '{ sum+=$1 }END{ print sum/NR }'
 zcat rCNV.final_genes.credible_sets.bed.gz | fgrep -v "#" | cut -f9 | sort -nk1,1 | head -n1
 zcat rCNV.final_genes.credible_sets.bed.gz | fgrep -v "#" | cut -f9 | sort -nk1,1 | tail -n1
-
-# # Count number of haploinsufficient genes that qualify as mechanism expansion per DECIPHER + DDG2P
-# zcat rCNV.final_genes.genes.bed.gz \
-# | fgrep -v "#" | fgrep -w DEL | cut -f4 | sort | uniq \
-# | fgrep -wf <( cat refs/gene_lists/ClinGen.all_triplosensitive.genes.list \
-#                    refs/gene_lists/DDG2P.all_gof.genes.list \
-#                    refs/gene_lists/DDG2P.all_other.genes.list ) \
-# | fgrep -wvf <( cat refs/gene_lists/ClinGen.all_haploinsufficient.genes.list \
-#                    refs/gene_lists/DDG2P.all_lof.genes.list ) \
-# | wc -l
 
 
 # Count number of constrained fine-mapped genes that aren't present in OMIM
@@ -312,6 +301,6 @@ gsutil -m cp -r \
   feature_heatmap \
   assoc_stat_plots \
   finemapping_distribs \
-  ${prefix}.*finemapped_genes_grid*pdf \
+  finemapped_gene_grids \
   ${rCNV_bucket}/analysis/paper/plots/gene_association/
 

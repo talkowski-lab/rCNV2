@@ -4,7 +4,7 @@
 \alias{dens.scatter}
 \title{Density-colored scatterplot}
 \usage{
-dens.scatter(x, y, pt.cex = 1, parmar = rep(0.5, 4), add.cor = T)
+dens.scatter(x, y, pt.cex = 1, parmar = rep(0.5, 4), add.cor = T, plot.cor = T)
 }
 \arguments{
 \item{x}{independent variable vector}
@@ -16,6 +16,8 @@ dens.scatter(x, y, pt.cex = 1, parmar = rep(0.5, 4), add.cor = T)
 \item{parmar}{argument for option(parmar=...)}
 
 \item{add.cor}{boolean indicator to add correlation coefficient to plot [default: TRUE]}
+
+\item{plot.cor}{boolean indicator to plot linear best-fit line below plot [default: TRUE]}
 }
 \value{
 None

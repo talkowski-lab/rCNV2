@@ -2,18 +2,22 @@
 % Please edit documentation in R/data_io.R
 \name{load.bed3}
 \alias{load.bed3}
-\title{Load BED3}
+\title{Load BED3+}
 \usage{
-load.bed3(bed.in, header = T)
+load.bed3(bed.in, header = T, keep.n.cols = 3, numeric.cols = NULL)
 }
 \arguments{
 \item{bed.in}{path to input BED fil}
 
 \item{header}{boolean indicator if BED has header [default: TRUE]}
+
+\item{keep.n.cols}{number of columns to retain [default: 3]}
+
+\item{numeric.cols}{vector of column indexes to coerce to numeric [default: all columns after first]}
 }
 \value{
 data frame of coordinates
 }
 \description{
-Load a simple BED3 file
+Load a simple BED3+ file
 }

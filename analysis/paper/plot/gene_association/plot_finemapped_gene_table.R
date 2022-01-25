@@ -17,26 +17,18 @@ options(stringsAsFactors=F, scipen=1000)
 ######################
 ### DATA FUNCTIONS ###
 ######################
-# Load a list of OMIM gene lists per HPO
-load.omim.lists <- function(omimlists.in){
-  # Expects a two-column tsv of (hpo, path) pairs
-  olist <- read.table(omimlists.in, sep="\t", header=F)
-  hpos <- as.character(olist[, 1])
-  glists <- lapply(1:nrow(olist), function(i){
-    unique(sort(as.character(read.table(olist[i, 2], header=F)[, 1])))
-  })
-  names(glists) <- hpos
-  return(glists)
-}
-
 # Annotate a single gene based on OMIM, HPO, and constraint
 annotate.gene <- function(gene, hpos, omim.genes, lof.genes, mis.genes){
   # OMIM comparisons
   omim.matches <- sapply(omim.genes, function(glist){gene %in% glist})
-  if(any(omim.matches[hpos])){
-    omim.label <- "D+"
-  }else if(any(omim.matches)){
-    omim.label <- "D"
+  if(length(hpos) > 0){
+    if(any(omim.matches[hpos])){
+      omim.label <- "D+"
+    }else if(any(omim.matches)){
+      omim.label <- "D"
+    }else{
+      omim.label <- NA
+    }
   }else{
     omim.label <- NA
   }
@@ -56,6 +48,16 @@ annotate.gene <- function(gene, hpos, omim.genes, lof.genes, mis.genes){
   return(list("omim"=omim.label, "lof"=lof, "mis"=mis))
 }
 
+# Calculate the fraction of constrained genes per group
+frac.constr.per.quadrant <- function(gene.groups, glist){
+  for(i in 1:length(gene.groups$CNV)){
+    genes <- gene.groups$CNV[[i]]
+    cat(paste(names(gene.groups$CNV)[i], ": ",
+                round(100 * length(which(genes %in% glist)) / length(genes), 1),
+                "%\n", sep=""))
+  }
+}
+
 
 ##########################
 ### PLOTTING FUNCTIONS ###
@@ -63,7 +65,11 @@ annotate.gene <- function(gene, hpos, omim.genes, lof.genes, mis.genes){
 # Format gene symbol for plotting
 format.gene.label <- function(gene, assocs, omim.genes, lof.genes, mis.genes){
   # Get data
-  hpos <- assocs$hpo[which(assocs$gene == gene)]
+  if(gene %in% assocs$gene){
+    hpos <- assocs$hpo[which(assocs$gene == gene)]
+  }else{
+    hpos <- c()
+  }
   annos <- annotate.gene(gene, hpos, omim.genes, lof.genes, mis.genes)
 
   # Set base
@@ -110,7 +116,7 @@ print.quadrant <- function(genes, gene.groups, credsets, assocs,
                            omim.genes, lof.genes, mis.genes,
                            x.start, y.start, top, conf,
                            text.cex=5/6, break.width=5,
-                           max.n.genes=50, y.min=NULL){
+                           max.n.genes=50, y.min=NULL, x.buffer=-0.1){
   y.add <- 0
   x.add <- 0
   k <- 0
@@ -120,7 +126,7 @@ print.quadrant <- function(genes, gene.groups, credsets, assocs,
         gene <- genes[i]
         gene.fmt <- format.gene.label(gene, assocs, omim.genes, lof.genes, mis.genes)
         gene.col <- get.gene.color.byquadrant(gene, gene.groups, top, conf)
-        text(x=x.start + x.add, y=y.start + y.add + 0.5,
+        text(x=x.start + x.add + x.buffer, y=y.start + y.add + 0.5,
              labels=parse(text=gene.fmt), pos=4, cex=text.cex, col=gene.col)
         x.add <- x.add + 1
         k <- k + 1
@@ -180,20 +186,20 @@ plot.gene.grid <- function(gene.groups, credsets, assocs,
   segments(x0=quadrant.width, x1=quadrant.width, y0=0, y1=n.rows.total, col=blueblack)
 
   # Add axes
-  axis(3, at=quadrant.width/2, tick=F, line=-0.85, labels="Top gene in at least one credible set")
-  axis(3, at=(3/2)*quadrant.width, tick=F, line=-0.85, labels="Not top gene in any credible set")
+  axis(3, at=quadrant.width/2, tick=F, line=-0.85, labels="Top gene in credible set")
+  axis(3, at=(3/2)*quadrant.width, tick=F, line=-0.85, labels="Not top gene in credible set")
   axis(2, at=(n.rows.top/2)-0.9, tick=F, line=-0.8, las=2, labels="Highly")
   axis(2, at=(n.rows.top/2), tick=F, line=-0.8, las=2, labels="confident")
   axis(2, at=(n.rows.top/2)+0.9, tick=F, line=-0.8, las=2,
-       labels=expression(("PIP" >= 0.85)), cex.axis=(5.5/6))
+       labels=expression(("PIP" >= 0.8)), cex.axis=(5.5/6))
   axis(2, at=n.rows.top+(n.rows.bottom/2)-0.2, tick=F, line=-0.8, las=2, padj=0,
        labels="Confident")
   axis(2, at=n.rows.top+(n.rows.bottom/2)+0.2, tick=F, line=-0.8, las=2, padj=1,
-       labels=expression(("PIP" >= 0.15)), cex.axis=(5.5/6))
+       labels=expression(("PIP" >= 0.2)), cex.axis=(5.5/6))
   axis(2, at=n.rows.top+n.rows.bottom+0.5-0.2, tick=F, line=-0.8, las=2, padj=0,
        labels="Unlikely")
   axis(2, at=n.rows.top+n.rows.bottom+0.5+0.2, tick=F, line=-0.8, las=2, padj=1,
-       labels=expression(("PIP" < 0.15)), cex.axis=(5.5/6))
+       labels=expression(("PIP" < 0.2)), cex.axis=(5.5/6))
 
   # Add genes to each quadrant
   print.quadrant(genes.topleft, gene.groups, credsets, assocs, omim.genes, lof.genes, mis.genes,
@@ -249,7 +255,7 @@ lof.in <- args$args[3]
 mis.in <- args$args[4]
 omimlists.in <- args$args[5]
 out.prefix <- args$args[6]
-
+#
 # # DEV PARAMETERS
 # credsets.in <- "~/scratch/rCNV.final_genes.credible_sets.bed.gz"
 # assocs.in <- "~/scratch/rCNV.final_genes.associations.bed.gz"
@@ -265,15 +271,78 @@ assocs <- load.gene.associations(assocs.in)
 # Load gene lists for annotations
 lof.genes <- read.table(lof.in, header=F)[, 1]
 mis.genes <- read.table(mis.in, header=F)[, 1]
-omim.genes <- load.omim.lists(omimlists.in)
-
-# Split fine-mapped genes into categories based on top/not top status and conf/vconf
-gene.groups <- categorize.genes(credsets)
+omim.genes <- load.gene.lists(omimlists.in)
 
 # Plot gene grid for all genes
-pdf(paste(out.prefix, "finemapped_genes_grid.all.pdf", sep="."), height=2*6, width=2*6.5)
+gene.groups <- categorize.genes(credsets)
+cat("\nProportion constrained (all credsets):\n")
+frac.constr.per.quadrant(gene.groups, lof.genes)
+genes.per.row <- 5
+max.n.rows <- sum(sapply(c("vconf", "conf", "notconf"), function(conf){
+    ceiling(length(gene.groups$CNV[[paste("top", conf, sep=".")]]) / 5)
+}))
+n.rows <- max.n.rows
+pdf(paste(out.prefix, "finemapped_genes_grid.all.pdf", sep="."),
+    height=(n.rows / max.n.rows)*5 + 0.5, width=2*genes.per.row)
 plot.gene.grid(gene.groups, credsets, assocs, omim.genes, lof.genes, mis.genes,
-               quadrant.width=5, max.per.quadrant=10e10, parmar=c(0.5, 4.5, 1.2, 0.2))
+               quadrant.width=genes.per.row, max.per.quadrant=10e10,
+               parmar=c(0.5, 4.5, 1.2, 0.2))
 dev.off()
 
-## TODO: ADD SPLITS BY SIGNIFICANCE & ADULT/DEV
+# Plot gene grid for all credsets at EW significance
+gene.groups <- categorize.genes(credsets[which(credsets$best_sig_level=="exome_wide"), ])
+cat("\nProportion constrained (exome-wide significant credsets):\n")
+frac.constr.per.quadrant(gene.groups, lof.genes)
+n.rows <- sum(sapply(c("vconf", "conf", "notconf"), function(conf){
+  ceiling(length(gene.groups$CNV[[paste("top", conf, sep=".")]]) / 5)
+}))
+pdf(paste(out.prefix, "finemapped_genes_grid.EW_sig.pdf", sep="."),
+    height=(n.rows / max.n.rows)*5 + 0.5, width=2*genes.per.row)
+plot.gene.grid(gene.groups, credsets, assocs, omim.genes, lof.genes, mis.genes,
+               quadrant.width=genes.per.row, max.per.quadrant=10e10,
+               parmar=c(0.5, 4.5, 1.2, 0.2))
+dev.off()
+
+# Plot gene grid for all credsets at FDR significance
+gene.groups <- categorize.genes(credsets[which(credsets$best_sig_level=="FDR"), ])
+cat("\nProportion constrained (FDR-significant credsets):\n")
+frac.constr.per.quadrant(gene.groups, lof.genes)
+n.rows <- sum(sapply(c("vconf", "conf", "notconf"), function(conf){
+  ceiling(length(gene.groups$CNV[[paste("top", conf, sep=".")]]) / 5)
+}))
+pdf(paste(out.prefix, "finemapped_genes_grid.FDR_sig.pdf", sep="."),
+    height=(n.rows / max.n.rows)*5 + 0.5, width=2*genes.per.row)
+plot.gene.grid(gene.groups, credsets, assocs, omim.genes, lof.genes, mis.genes,
+               quadrant.width=genes.per.row, max.per.quadrant=10e10,
+               parmar=c(0.5, 4.5, 1.2, 0.2))
+dev.off()
+
+# Plot gene grid for all credsets associated with developmental HPOs
+dev.idxs <- which(sapply(credsets$hpos, function(h){any(h %in% developmental.hpos)}))
+gene.groups <- categorize.genes(credsets[dev.idxs, ])
+cat("\nProportion constrained (developmental credsets):\n")
+frac.constr.per.quadrant(gene.groups, lof.genes)
+n.rows <- sum(sapply(c("vconf", "conf", "notconf"), function(conf){
+  ceiling(length(gene.groups$CNV[[paste("top", conf, sep=".")]]) / 5)
+}))
+pdf(paste(out.prefix, "finemapped_genes_grid.developmental.pdf", sep="."),
+    height=(n.rows / max.n.rows)*5 + 0.5, width=2*genes.per.row)
+plot.gene.grid(gene.groups, credsets, assocs, omim.genes, lof.genes, mis.genes,
+               quadrant.width=genes.per.row, max.per.quadrant=10e10,
+               parmar=c(0.5, 4.5, 1.2, 0.2))
+dev.off()
+
+# Plot gene grid for all credsets associated with adult HPOs
+dev.idxs <- which(sapply(credsets$hpos, function(h){!any(h %in% developmental.hpos)}))
+gene.groups <- categorize.genes(credsets[dev.idxs, ])
+cat("\nProportion constrained (non-developmental credsets):\n")
+frac.constr.per.quadrant(gene.groups, lof.genes)
+n.rows <- sum(sapply(c("vconf", "conf", "notconf"), function(conf){
+  ceiling(length(gene.groups$CNV[[paste("top", conf, sep=".")]]) / 5)
+}))
+pdf(paste(out.prefix, "finemapped_genes_grid.adult.pdf", sep="."),
+    height=(max(c(8, n.rows)) / max.n.rows)*5 + 0.5, width=2*genes.per.row)
+plot.gene.grid(gene.groups, credsets, assocs, omim.genes, lof.genes, mis.genes,
+               quadrant.width=genes.per.row, max.per.quadrant=10e10,
+               parmar=c(0.5, 4.5, 1.2, 0.2))
+dev.off()

@@ -4,7 +4,7 @@
 # Distributed under terms of the MIT License
 
 # Base image: rcnv-base
-FROM gcr.io/gnomad-wgs-v2-sv/rcnv:latest
+FROM gcr.io/gnomad-wgs-v2-sv/rcnv-base:latest
 MAINTAINER "Ryan Collins <rlcollins@g.harvard.edu>"
 
 # Checkout most recent branch of rCNV2 repo and pull updates

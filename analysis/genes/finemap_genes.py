@@ -960,9 +960,9 @@ def output_credsets_bed(hpo_data, sig_df, outfile, conf_pip=0.1, vconf_pip=0.9, 
         sig_genes = [g for g in genes if g in hpo_data[hpo]['sig_genes'].keys()]
         all_sig_genes = [g for g in hpo_data[hpo]['blocks'][cred]['finemap_res'].keys() \
                          if g in hpo_data[hpo]['sig_genes'].keys()]
-        if any([hpo_data[hpo]['all_genes'][g]['ew_sig'] for g in genes]):
+        if any([hpo_data[hpo]['all_genes'][g]['ew_sig'] for g in all_sig_genes]):
             best_sig_level = 'exome_wide'
-        elif any([hpo_data[hpo]['all_genes'][g]['fdr_sig'] for g in genes]):
+        elif any([hpo_data[hpo]['all_genes'][g]['fdr_sig'] for g in all_sig_genes]):
             best_sig_level = 'FDR'
         else:
             best_sig_level = 'not_significant'
@@ -976,7 +976,7 @@ def output_credsets_bed(hpo_data, sig_df, outfile, conf_pip=0.1, vconf_pip=0.9, 
         top_pip = np.nanmax(hpo_res_df.PIP[(hpo_res_df.gene.isin(all_sig_genes))])
         top_gene = sorted(list(set(hpo_res_df.gene[hpo_res_df.PIP == top_pip].tolist())))
         n_genes = len(genes)
-        n_sig_genes = len(sig_genes)
+        n_sig_genes = len(all_sig_genes)
         gdat = hpo_data[hpo]['all_genes']
         chrom = str(gdat[genes[0]]['gene_bt'][0].chrom)
         start = str(np.nanmin([gdat[g]['gene_bt'][0].start for g in genes]))
@@ -1014,7 +1014,7 @@ def output_credsets_bed(hpo_data, sig_df, outfile, conf_pip=0.1, vconf_pip=0.9, 
         outline += outnums_fmt.format(control_freq, case_freq, lnor, lnor_lower, 
                                       lnor_upper, best_p)
         outline += '\t' + '\t'.join([str(n_genes), ';'.join(genes), str(n_sig_genes),
-                                     ';'.join(sig_genes), ';'.join(top_gene),
+                                     ';'.join(all_sig_genes), ';'.join(top_gene),
                                      ';'.join(vconf_genes), ';'.join(conf_genes)]) + '\n'
         outlines_presort.append([int(chrom), int(start), hpo, outline])
         
@@ -1131,16 +1131,17 @@ def output_joint_credsets_bed(hpo_data, sig_df, cs_clusters, genes_bt, outfile,
         cred_df = sig_df[sig_df.credible_set.isin(cluster)]['gene PIP'.split()].drop_duplicates()
 
         # Use proxy to get more credible set info
+        all_genes = list(cs_proxy_data['finemap_res'].keys())
         genes = sorted(list(set(cred_df.gene.tolist())))
         n_genes = len(genes)
         sig_genes = set()
         for hpo in hpos:
             sig_genes.update(set(hpo_data[hpo]['sig_genes'].keys()).intersection(set(genes)))
-        n_sig_genes = len(sig_genes)
         all_sig_genes = set()
         for hpo in hpos:
             all_sig_genes.update([g for g in hpo_data[hpo]['sig_genes'].keys() \
                                   if g in cs_proxy_data['finemap_res'].keys()])
+        n_sig_genes = len(all_sig_genes)
 
         # Candidate genes must be significant in at least one HPO
         vconf_genes = sorted(list(set(cred_df.gene[(cred_df.gene.isin(sig_genes)) & \
@@ -1162,10 +1163,11 @@ def output_joint_credsets_bed(hpo_data, sig_df, cs_clusters, genes_bt, outfile,
         gdat = None
         for hpo in hpos:
             gdat_h = {}
-            for gene in genes:
+            for gene in all_genes:
                 gdat_h_i = hpo_data[hpo]['all_genes'].get(gene, None)
                 if gdat_h_i is not None:
                     gdat_h[gene] = {k : v for k, v in gdat_h_i.items() if k != 'gene_bt'}
+                    gdat_h[gene]['in_credset'] = (gene in genes)
             gdf_h = pd.DataFrame.from_dict(gdat_h, orient='index')
             gdf_h['gene'] = gdf_h.index
             gdf_h['HPO'] = hpo
@@ -1175,6 +1177,7 @@ def output_joint_credsets_bed(hpo_data, sig_df, cs_clusters, genes_bt, outfile,
                 gdat = gdat.append(gdf_h, ignore_index=True)
 
         # Get summary information across all HPOs in cluster
+        # TODO: fix this to look at all genes included in finemapping, not just credset
         if any(gdat.ew_sig):
             best_sig_level = 'exome_wide'
         elif any(gdat.fdr_sig):
@@ -1185,17 +1188,17 @@ def output_joint_credsets_bed(hpo_data, sig_df, cs_clusters, genes_bt, outfile,
         if best_p == 0:
             best_z = np.nanmax(gdat.zscore)
             best_p = norm.sf(best_z)
-        control_freq = np.nanmean(gdat.control_freq)
+        control_freq = np.nanmean(gdat.control_freq[gdat.in_credset])
 
         # Compute pooled case frequency as mean weighted by np.sqrt(N_cases)
-        cfreqs = gdat.case_freq
-        cfreq_weights = np.sqrt(gdat.HPO.map(ncase_dict))
+        cfreqs = gdat.case_freq[gdat.in_credset]
+        cfreq_weights = np.sqrt(gdat.HPO[gdat.in_credset].map(ncase_dict))
         case_freq = np.average(cfreqs, weights=cfreq_weights)
 
         # Get pooled effect size as inverse-variance weighted mean of all genes across all HPOs
-        gors = gdat.lnOR.tolist()
+        gors = gdat.lnOR[gdat.in_credset].tolist()
         gvars = [ci2se(ci) ** 2 for ci in \
-                 gdat.loc[:, 'lnOR_lower lnOR_upper'.split()].itertuples(index=False)]
+                 gdat[gdat.in_credset].loc[:, 'lnOR_lower lnOR_upper'.split()].itertuples(index=False)]
         lnor, lnor_ci = iv_mean(gors, gvars)
         lnor_lower, lnor_upper = sorted(lnor_ci)
 
@@ -1210,7 +1213,7 @@ def output_joint_credsets_bed(hpo_data, sig_df, cs_clusters, genes_bt, outfile,
         # Add stats to out_df
         outvals = [chrom, start, end, 'tmp', cnv, best_sig_level, control_freq, 
                    case_freq, lnor, lnor_lower, lnor_upper, best_p, n_genes, 
-                   ';'.join(sorted(genes)), n_sig_genes, ';'.join(sorted(sig_genes)), 
+                   ';'.join(sorted(genes)), n_sig_genes, ';'.join(sorted(all_sig_genes)), 
                    ';'.join(sorted(top_gene)), ';'.join(sorted(vconf_genes)), 
                    ';'.join(sorted(conf_genes)), n_hpos, ';'.join(sorted(hpos))]
         out_df = out_df.append(pd.DataFrame([outvals], columns=cols), ignore_index=True)

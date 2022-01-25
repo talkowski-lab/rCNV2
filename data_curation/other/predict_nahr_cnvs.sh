@@ -59,13 +59,11 @@ zcat genomicSuperDups.txt.gz \
 > clustered_nahr_regions.no_genes.bed
 
 
-# Annotate vs genes
+# Annotate vs. genes
 /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
-    -o clustered_nahr_regions.w_genes.bed \
     clustered_nahr_regions.no_genes.bed \
-    refs/gencode.v19.canonical.pext_filtered.gtf.gz
-cut -f1-4,7-8 clustered_nahr_regions.w_genes.bed \
-| bgzip -c > clustered_nahr_regions.bed.gz
+    refs/gencode.v19.canonical.pext_filtered.gtf.gz \
+| cut -f1-4,7-8 | bgzip -c > clustered_nahr_regions.bed.gz
 
 
 # Separately, for labeling individual CNVs as NAHR, create a looser list
@@ -83,8 +81,19 @@ zcat genomicSuperDups.txt.gz \
 > loose_unclustered_nahr_regions.bed.gz
 
 
+# Annotate vs. genes
+zcat loose_unclustered_nahr_regions.bed.gz \
+| awk -v OFS="\t" '{ print $1, $2, $3, "region_"NR, $1":"$2"-"$3, "dummy" }' \
+| cat <( echo -e "#chr\tstart\tend\tregion_id\tcoords\tdummy" ) - \
+| /opt/rCNV2/analysis/sliding_windows/get_genes_per_region.py \
+    /dev/stdin \
+    refs/gencode.v19.canonical.pext_filtered.gtf.gz \
+| cut -f1-3,7-8 | bgzip -c > loose_unclustered_nahr_regions.w_genes.bed.gz
+
+
 # Copy to Google bucket (note: requires permissions)
 gsutil -m cp \
   clustered_nahr_regions.bed.gz \
   loose_unclustered_nahr_regions.bed.gz \
+  loose_unclustered_nahr_regions.w_genes.bed.gz \
   gs://rcnv_project/analysis/paper/data/large_segments/

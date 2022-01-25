@@ -21,34 +21,87 @@ options(stringsAsFactors=F, scipen=1000)
 load.pips <- function(path){
   pips <- read.table(path, header=T, sep="\t", comment.char="")
   colnames(pips)[1] <- gsub("X.", "", colnames(pips)[1], fixed=T)
-  return(pips)
-}
 
-# Compute number of originally significant genes per credible set
-get.n.orig.sig.genes <- function(credsets, prior.pips){
-  apply(credsets[, c("credible_set_id", "cnv")], 1, function(vals){
-    length(which(prior.pips$credible_set==vals[1] & prior.pips$cnv==vals[2]))
-  })
+  # Joint model is already averaged across phenotypes,
+  # but need to do the same for posterior and prior
+  for(gene in unique(pips$gene)){
+    gene.idxs <- which(pips$gene == gene)
+    pips$PIP[gene.idxs] <- mean(pips$PIP[gene.idxs], na.rm=T)
+  }
+
+  # Drop HPO and deduplicate
+  pips <- pips[, c("gene", "PIP", "cnv")]
+
+  return(pips[which(!duplicated(pips)), ])
 }
 
 
 ##########################
 ### PLOTTING FUNCTIONS ###
 ##########################
+# Plot histogram of number of genes per credible set
+plot.cs.size.hist <- function(credsets, sig.only=TRUE,  bin.width=1,
+                              parmar=c(2.15, 2.85, 1, 0.6)){
+  # Get plotting data
+  if(sig.only){
+    col <- "n_sig_in_credset"
+    x.title <- "Sig. Genes per Credible Set"
+  }else{
+    col <- "n_genes"
+    x.title <- "Genes per Credible Set"
+  }
+  pdat <- lapply(c("DEL", "DUP"), function(cnv){
+    credsets[which(credsets$cnv == cnv), col]
+  })
+  xmax <- max(unlist(pdat))
+  breaks <- seq(0, xmax+1, bin.width)
+  counts.del <- hist(pdat[[1]], breaks=breaks, plot=F)$counts
+  counts.dup <- hist(pdat[[2]], breaks=breaks, plot=F)$counts
+  counts <- counts.del + counts.dup
+  bar.colors <- c(rep(cnv.colors[1], length(counts)),
+                  rep(cnv.colors[2], length(counts)))
+
+  # Prepare plot area
+  par(bty="n", mar=parmar)
+  plot(NA, xlim=c(0, xmax), ylim=c(0, 1.025*max(counts)),
+       xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
+  y.ax.at <- axTicks(2)
+
+  # Add stacked histogram
+  rect(xleft=breaks[-length(breaks)], xright=breaks[-1],
+       ybottom=c(rep(0, length(counts.del)), counts.del),
+       ytop=c(counts.del, counts.del+counts.dup),
+       col=bar.colors, border=bar.colors, lwd=0.5, xpd=T)
+  rect(xleft=breaks[-length(breaks)], xright=breaks[-1],
+       ybottom=rep(0, length(counts.del)),
+       ytop=counts.del+counts.dup,
+       col=NA, border=blueblack, xpd=T)
+
+  # Add axes
+  x.ax.at <- axTicks(1)
+  axis(1, x.ax.at, tck=-0.025, labels=NA, col=blueblack)
+  sapply(x.ax.at, function(x){axis(1, x, tick=F, line=-0.7)})
+  mtext(1, line=1.25, text=x.title)
+  axis(2, c(0, 10e10), tck=0, labels=NA, col=blueblack)
+  axis(2, y.ax.at, tck=-0.025, labels=NA, col=blueblack)
+  axis(2, y.ax.at, tick=F, las=2, line=-0.6)
+  mtext(2, line=1.9, text="Credible Sets")
+}
+
+
 # Scatterplot of two sets of PIPs matched on gene, CNV, and phenotype
-pip.scatter <- function(assocs, stats1, stats2, label1, label2,
+pip.scatter <- function(stats1, stats2, label1, label2,
                         pt.cex=0.75, pt.lwd=1, blue.bg=TRUE,
                         parmar=c(2.75, 2.75, 0.25, 0.25)){
   # Join PIP sets & assign colors
-  x <- merge(stats1, stats2, by=c("HPO", "gene", "cnv"), suffix=c(".1", ".2"))
-  set.seed(2020)
+  x <- merge(stats1, stats2, by=c("gene", "cnv"), suffix=c(".1", ".2"))
+  set.seed(2021)
   x <- x[sample(1:nrow(x), nrow(x), replace=F), ]
   pt.pch <- apply(x[, c("PIP.1", "PIP.2")], 1, function(vals){
     if(as.numeric(vals[1]) >= as.numeric(vals)[2]){25}else{24}
-    })
-  colnames(assocs)[which(colnames(assocs) == "hpo")] <- "HPO"
-  pt.col <- merge(x, assocs, by=c("HPO", "gene"), sort=F, all=F)$pt.bg
-  pt.bcol <- merge(x, assocs, by=c("HPO", "gene"), sort=F, all=F)$pt.border
+  })
+  pt.col <- cnv.colors[x$cnv]
+  pt.bcol <- cnv.blacks[x$cnv]
   x <- x[, grep("PIP", colnames(x), fixed=T)]
   if(blue.bg==TRUE){
     plot.bg <- bluewhite
@@ -85,11 +138,12 @@ pip.scatter <- function(assocs, stats1, stats2, label1, label2,
   points(x, pch=pt.pch, cex=pt.cex, col=pt.bcol, bg=pt.col, lwd=pt.lwd)
 }
 
+
 # Histogram of numeric difference in PIPs matched on gene, CNV, and phenotype
 pip.split.hist <- function(stats1, stats2, label1, label2, bin.width=0.05,
-                           parmar=c(2.1, 4.2, 0.25, 0.25)){
+                           parmar=c(2.1, 2.75, 0.25, 0.25)){
   # Join PIP sets
-  x <- merge(stats1, stats2, by=c("HPO", "gene", "cnv"), suffix=c(".1", ".2"))
+  x <- merge(stats1, stats2, by=c("gene", "cnv"), suffix=c(".1", ".2"))
 
   # Compute PIP differences split by CNV type
   d <- lapply(c("DEL", "DUP"), function(cnv){
@@ -111,7 +165,6 @@ pip.split.hist <- function(stats1, stats2, label1, label2, bin.width=0.05,
        xaxt="n", yaxt="n", xlab="", ylab="", yaxs="i")
   x.ax.at <- seq(-1, 1, 0.5)
   y.ax.at <- axTicks(2)
-  # abline(h=y.ax.at, col=bluewhite)
 
   # Add bars
   bar.colors <- lapply(1:2, function(i){
@@ -140,28 +193,31 @@ pip.split.hist <- function(stats1, stats2, label1, label2, bin.width=0.05,
   axis(2, at=y.ax.at, labels=NA, tck=-0.03, col=blueblack)
   sapply(y.ax.at, function(y){
     axis(2, at=y, tick=F, line=-0.65, las=2, cex.axis=5/6, labels=prettyNum(y, big.mark=","))})
-  mtext(2, text="Gene-rCNV\nAssociations", line=2.2)
+  mtext(2, text="Genes", line=1.7)
 
   # Add annotations
   abline(v=c(-1, 1)*bin.width, lty=5, col=blueblack)
   n.left <- sum(counts[[1]][-length(counts[[1]])])
   text(x=par("usr")[1]-(2*bin.width), y=0.6*par("usr")[4], pos=4,
        labels=paste(label1, "\ngreater by\n", bin.width, " for\n",
-                    prettyNum(n.left, big.mark=","), " assocs", sep=""),
+                    prettyNum(n.left, big.mark=","), " genes", sep=""),
        cex=5/6, font=3, col=control.cnv.colors[2])
   n.right <- sum(counts[[2]][-1])
   text(x=par("usr")[2]+(2*bin.width), y=0.6*par("usr")[4], pos=2,
        labels=paste(label2, "\ngreater by\n", bin.width, " for\n",
-                    prettyNum(n.right, big.mark=","), " assocs", sep=""),
+                    prettyNum(n.right, big.mark=","), " genes", sep=""),
        cex=5/6, font=3, col=cnv.colors[2])
 }
 
+
 # Plot histogram of PIPs for all genes in all credible sets
-plot.pip.hist <- function(allgenes, conf.cutoff=0.15, vconf.cutoff=0.85,
+plot.pip.hist <- function(allgenes, conf.cutoff=0.2, vconf.cutoff=0.8,
                           breaks=seq(0, 1, 0.025), parmar=c(2.15, 2.85, 1, 0.6)){
   # Get plotting data
   pips <- lapply(c("DEL", "DUP"), function(cnv){
-    allgenes$PIP[which(allgenes$cnv==cnv & !is.na(allgenes$credible_set))]
+    all.hits <- allgenes[which(allgenes$cnv==cnv & !is.na(allgenes$credible_set)),
+                         c("gene", "PIP")]
+    all.hits$PIP[!duplicated(all.hits)]
   })
   counts.del <- hist(pips[[1]], breaks=breaks, plot=F)$counts
   counts.dup <- hist(pips[[2]], breaks=breaks, plot=F)$counts
@@ -183,14 +239,14 @@ plot.pip.hist <- function(allgenes, conf.cutoff=0.15, vconf.cutoff=0.85,
   par(bty="n", mar=parmar)
   plot(NA, xlim=c(0, 1), ylim=c(0, 1.025*max(counts)),
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
-  # rect(xleft=c(conf.cutoff, vconf.cutoff), xright=c(vconf.cutoff, 1),
-  #      ybottom=0, ytop=par("usr")[4], col=c(cnv.whites[cnv], control.cnv.colors[cnv]),
-  #      border=NA, bty="n")
   y.ax.at <- axTicks(2)
-  # abline(h=y.ax.at, col=bluewhite)
+  rect(xleft=c(conf.cutoff, vconf.cutoff), xright=rep(par("usr")[2], 2),
+       ybottom=par("usr")[3], ytop=par("usr")[4], border=NA, bty="n",
+       col=adjustcolor(bluewhite, alpha=0.5))
   abline(v=c(conf.cutoff, vconf.cutoff), lty=2, col=blueblack)
-  text(x=c(conf.cutoff, vconf.cutoff)+0.05, y=sum(par("usr")[3:4])/2, srt=90,
-       labels=c("Confident", "Highly Confident"), cex=5/6)
+  text(x=c(conf.cutoff, conf.cutoff, vconf.cutoff)+c(-0.05, 0.05, 0.05),
+       y=sum(par("usr")[3:4])/2, srt=90, col=c(ns.color, rep(blueblack, 2)),
+       labels=c("Unlikely", "Confident", "Highly Confident"), cex=5/6)
 
   # Add stacked histogram
   rect(xleft=breaks[-length(breaks)], xright=breaks[-1],
@@ -224,7 +280,8 @@ require(optparse, quietly=T)
 option_list <- list()
 
 # Get command-line arguments & options
-args <- parse_args(OptionParser(usage=paste("%prog credsets.bed assocs.bed prior.pips.tsv",
+args <- parse_args(OptionParser(usage=paste("%prog credsets.bed assocs.bed",
+                                            "credsets.prejoint.bed prior.pips.tsv",
                                             "posterior.pips.tsv fullmodel.pips.tsv",
                                             "out.prefix"),
                                 option_list=option_list),
@@ -233,21 +290,24 @@ opts <- args$options
 
 # Checks for appropriate positional arguments
 if(length(args$args) != 6){
-  stop(paste("Four positional arguments required: credsets.bed, assocs.bed,",
-             "prior.pips.tsv, posterior.pips.tsv, fullmodel.pips.tsv, and out.prefix\n"))
+  stop(paste("Seven positional arguments required: credsets.bed, assocs.bed,",
+             "credsets.prejoint.bed, prior.pips.tsv, posterior.pips.tsv,",
+             "fullmodel.pips.tsv, and out.prefix\n"))
 }
 
 # Writes args & opts to vars
 credsets.in <- args$args[1]
 assocs.in <- args$args[2]
-prior.pips.in <- args$args[3]
-posterior.pips.in <- args$args[4]
-final.pips.in <- args$args[5]
-out.prefix <- args$args[6]
+credsets.prejoint.in <- args$args[3]
+prior.pips.in <- args$args[4]
+posterior.pips.in <- args$args[5]
+final.pips.in <- args$args[6]
+out.prefix <- args$args[7]
 
 # # DEV PARAMETERS
 # credsets.in <- "~/scratch/rCNV.final_genes.credible_sets.bed.gz"
 # assocs.in <- "~/scratch/rCNV.final_genes.associations.bed.gz"
+# credsets.prejoint.in <- "~/scratch/rCNV.prejoint.credsets.bed.gz"
 # prior.pips.in <- "~/scratch/all_PIPs.prior.tsv"
 # posterior.pips.in <- "~/scratch/all_PIPs.posterior.tsv"
 # final.pips.in <- "~/scratch/all_PIPs.full_model.tsv"
@@ -256,27 +316,41 @@ out.prefix <- args$args[6]
 # Load credible sets and associations
 credsets <- load.credsets(credsets.in)
 assocs <- load.gene.associations(assocs.in)
+credsets.prejoint <- read.table(credsets.prejoint.in, header=T, sep="\t", comment.char="")
 
 # Load PIPs for all genes
 pips <- list("Prior" = load.pips(prior.pips.in),
              "Posterior" = load.pips(posterior.pips.in),
-             "Full Model" = load.pips(final.pips.in))
+             "Full Model" = load.pips(final.pips.in),
+             "full_verbose" = read.table(final.pips.in, header=T, sep="\t",
+                                         comment.char="", check.names=F))
+colnames(pips$full_verbose)[1] <- "HPO"
 
-# Annotate all credible sets with number of originally significant genes prior to fine-mapping
-credsets$n_genes.prior <- get.n.orig.sig.genes(credsets, pips[[1]])
+# Histogram of number of significant genes per credible set
+sapply(c(TRUE, FALSE), function(sig.only){
+  if(sig.only){
+    suffix <- "sig_genes"
+  }else{
+    suffix <- "all_genes"
+  }
+  pdf(paste(out.prefix, "credset_size_hist", suffix, ".pdf", sep="."),
+      height=2.1, width=2.5)
+  plot.cs.size.hist(credsets, sig.only, parmar=c(2.25, 2.85, 0.3, 1))
+  dev.off()
+})
 
-# Compute average decrease in # of genes per credset due to fine-mapping
-finemap.decrease.pct <- 100*(mean(credsets$n_genes.prior) - mean(credsets$n_genes)) / mean(credsets$n_genes.prior)
-cat(paste("Fine-mapping reduced the average number of genes per association by ",
+# Compute average decrease in # of significant genes per credset due to fine-mapping
+finemap.decrease.pct <- 100*(mean(credsets$n_sig_genes) - mean(credsets$n_sig_in_credset)) / mean(credsets$n_sig_genes)
+cat(paste("Fine-mapping reduced the average number of significant genes per block by ",
           round(finemap.decrease.pct), "%\n", sep=""))
 
 # Scatterplot of effect of fine-mapping on number of genes per association
-n_gene_range <- c(0, max(credsets[, c("n_genes.prior", "n_genes")]))
+n_gene_range <- c(0, max(credsets[, c("n_sig_genes", "n_sig_in_credset")]))
 pdf(paste(out.prefix, "genes_per_credset_before_vs_after.scatter.pdf", sep="."),
     height=2.5, width=2.6)
-credsets.scatter(credsets, credsets$n_genes.prior, credsets$n_genes, add.lm=T,
+credsets.scatter(credsets, credsets$n_sig_genes, credsets$n_sig_in_credset, add.lm=T,
                  xlims=n_gene_range, ylims=n_gene_range,
-                 abline.a=0, abline.b=1, abline.lty=5, blue.bg=FALSE, pt.cex=0.55,
+                 abline.a=0, abline.b=1, abline.lty=5, blue.bg=FALSE, pt.cex=0.7,
                  xtitle="Genes Before Fine-Mapping", x.title.line=1.25,
                  ytitle="Genes After Fine-Mapping",
                  parmar = c(2.4, 2.7, 0.25, 0.5))
@@ -293,21 +367,24 @@ sapply(list(c(1, 2), c(1, 3), c(2, 3)), function(idxs){
             gsub(" ", "_", name1, fixed=T),
             gsub(" ", "_", name2, fixed=T),
             "pdf", sep="."),
-      height=2.3, width=2.3)
-  pip.scatter(assocs, set1, set2, name1, name2, blue.bg=FALSE, pt.cex=0.5)
+      height=2.4, width=2.4)
+  pip.scatter(set1, set2, name1, name2, blue.bg=FALSE, pt.cex=0.4)
   dev.off()
   # Histogram of residuals
   pdf(paste(out.prefix, "residual_hist",
             gsub(" ", "_", name1, fixed=T),
             gsub(" ", "_", name2, fixed=T),
             "pdf", sep="."),
-      height=1.8, width=2.7)
+      height=1.8, width=2.4)
   pip.split.hist(set1, set2, name1, name2)
   dev.off()
 })
 
 # Plot histograms of PIPs for all genes in credible sets
 pdf(paste(out.prefix, "finemapped_distribs.credset_pip.pdf", sep="."),
-    height=2.2, width=2.7)
-plot.pip.hist(pips[[3]])
+    height=2.1, width=2.7)
+plot.pip.hist(pips[[4]])
 dev.off()
+
+# Compare prior/posterior/full model for selected genes
+gsets <- load.gene.lists()

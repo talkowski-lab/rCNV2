@@ -23,25 +23,24 @@ workflow gene_burden_analysis {
   String meta_model_prefix
   Float winsorize_meta_z
   Int meta_min_cases
-  Int min_cnvs_per_gene_training
+  Float max_standard_error
   Float prior_frac
   Float prior_lnor_thresholding_pct
-  File training_blacklist
+  File training_excludelist
   File gene_features
   File raw_gene_features
   Float max_true_bfdp
   Float min_false_bfdp
-  Float elnet_alpha
-  Float elnet_l1_l2_mix
   String rCNV_bucket
   String rCNV_docker
+  String rCNV_docker_scoring #Note: this is separate just for development purposes; can be collapsed in at a later date
   File contiglist
 
   Array[Array[String]] contigs = read_tsv(contiglist)
 
   Array[String] cnv_types = ["DEL", "DUP"]
 
-  Array[String] models = ["logit", "svm", "randomforest", "lda", "naivebayes", "sgd", "neuralnet"]
+  Array[String] models = ["logit", "svm", "randomforest", "lda", "naivebayes", "neuralnet", "gbdt", "knn"]
 
   # Scatter over contigs (for speed)
   scatter ( contig in contigs ) {
@@ -114,15 +113,13 @@ workflow gene_burden_analysis {
     }
     call get_underpowered_genes {
       input:
-        stats_beds=rCNV_burden_test.stats_beds,
-        stats_beds_idxs=rCNV_burden_test.stats_bed_idxs,
+        meta_stats=rCNV_meta_analysis.meta_stats_bed,
         prefix=prefix,
         CNV=CNV,
-        metacohort_list=metacohort_list,
-        min_cnvs_per_gene_training=min_cnvs_per_gene_training,
+        max_standard_error=max_standard_error,
         freq_code="rCNV",
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker
+        rCNV_docker=rCNV_docker_scoring
     }
   }
 
@@ -134,7 +131,7 @@ workflow gene_burden_analysis {
       underpowered_genes=get_underpowered_genes.underpowered_genes,
       freq_code="rCNV",
       rCNV_bucket=rCNV_bucket,
-      rCNV_docker=rCNV_docker,
+      rCNV_docker=rCNV_docker_scoring,
       prior_frac=prior_frac,
       prior_lnor_thresholding_pct=prior_lnor_thresholding_pct
   }
@@ -145,33 +142,29 @@ workflow gene_burden_analysis {
       input:
         CNV="DEL",
         BFDP_stats=calc_priors_bfdp.del_bfdp,
-        blacklist=training_blacklist,
+        excludelist=training_excludelist,
         underpowered_genes=get_underpowered_genes.underpowered_genes[0],
         gene_features=gene_features,
         model=model,
         max_true_bfdp=max_true_bfdp,
         min_false_bfdp=min_false_bfdp,
-        elnet_alpha=elnet_alpha,
-        elnet_l1_l2_mix=elnet_l1_l2_mix,
         freq_code="rCNV",
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker
+        rCNV_docker=rCNV_docker_scoring
     }
     call score_genes as score_genes_DUP {
       input:
         CNV="DUP",
         BFDP_stats=calc_priors_bfdp.dup_bfdp,
-        blacklist=training_blacklist,
+        excludelist=training_excludelist,
         underpowered_genes=get_underpowered_genes.underpowered_genes[1],
         gene_features=gene_features,
         model=model,
         max_true_bfdp=max_true_bfdp,
         min_false_bfdp=min_false_bfdp,
-        elnet_alpha=elnet_alpha,
-        elnet_l1_l2_mix=elnet_l1_l2_mix,
         freq_code="rCNV",
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker
+        rCNV_docker=rCNV_docker_scoring
     }
   }
 
@@ -182,7 +175,7 @@ workflow gene_burden_analysis {
       scores=score_genes_DEL.scores_tsv,
       freq_code="rCNV",
       rCNV_bucket=rCNV_bucket,
-      rCNV_docker=rCNV_docker
+      rCNV_docker=rCNV_docker_scoring
   }
   call score_ensemble as score_ensemble_DUP {
     input:
@@ -190,7 +183,7 @@ workflow gene_burden_analysis {
       scores=score_genes_DUP.scores_tsv,
       freq_code="rCNV",
       rCNV_bucket=rCNV_bucket,
-      rCNV_docker=rCNV_docker
+      rCNV_docker=rCNV_docker_scoring
   }
 
   # Determine best model & QC final scores
@@ -202,12 +195,13 @@ workflow gene_burden_analysis {
       raw_gene_features=raw_gene_features,
       freq_code="rCNV",
       rCNV_bucket=rCNV_bucket,
-      rCNV_docker=rCNV_docker
+      rCNV_docker=rCNV_docker_scoring
   }
 
   output {
     File gene_scores = qc_scores.final_scores
   }
+
 }
 
 
@@ -321,12 +315,14 @@ task burden_test {
     set -e
 
     # Copy CNV data and constrained gene coordinates
-    mkdir cleaned_cnv/
+    mkdir cleaned_cnv/ refs/
     gsutil -m cp -r gs://rcnv_project/cleaned_data/cnv/* cleaned_cnv/
     gsutil -m cp -r gs://rcnv_project/cleaned_data/genes ./
-    mkdir refs/
-    gsutil -m cp ${rCNV_bucket}/refs/GRCh37.*.bed.gz refs/
-    gsutil -m cp gs://rcnv_project/analysis/analysis_refs/* refs/
+    gsutil -m cp \
+      ${rCNV_bucket}/refs/GRCh37.*.bed.gz \
+      ${rCNV_bucket}/analysis/paper/data/large_segments/loose_unclustered_nahr_regions.bed.gz \
+      gs://rcnv_project/analysis/analysis_refs/* \
+      refs/
 
     # Extract contig of interest from GTF
     tabix ${gtf} ${contig} | bgzip -c > ${contig}.gtf.gz
@@ -338,8 +334,16 @@ task burden_test {
     while read meta cohorts; do
       echo $meta
 
+      # Exclude all NAHR CNVs from burden testing
+      bedtools intersect -v -r -f 0.5 \
+        -a cleaned_cnv/$meta.${freq_code}.bed.gz \
+        -b refs/loose_unclustered_nahr_regions.bed.gz \
+      | bgzip -c \
+      > cleaned_cnv/$meta.${freq_code}.no_NAHR.bed.gz
+      tabix -f cleaned_cnv/$meta.${freq_code}.no_NAHR.bed.gz
+
       # Set metacohort-specific parameters
-      cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
+      cnv_bed="cleaned_cnv/$meta.${freq_code}.no_NAHR.bed.gz"
       effective_case_n=$( fgrep -w $meta refs/rCNV2.hpos_by_severity.developmental.counts.tsv | cut -f2 )
 
       # Iterate over CNV types
@@ -465,7 +469,7 @@ task merge_and_meta_analysis {
   String rCNV_docker
 
   command <<<
-    set -e
+    set -euo pipefail
 
     # Copy necessary reference files
     mkdir refs/
@@ -532,49 +536,21 @@ task merge_and_meta_analysis {
 
 # Get list of genes with insufficient CNV data to be used for model training
 task get_underpowered_genes {
-  Array[Array[File]] stats_beds
-  Array[Array[File]] stats_beds_idxs
+  File meta_stats
   String prefix
   String CNV
-  File metacohort_list
-  Int min_cnvs_per_gene_training
+  Float max_standard_error
   String freq_code
   String rCNV_bucket
   String rCNV_docker
 
   command <<<
-    set -e
+    set -euo pipefail
 
-    # Make list of stats files to be considered
-    find / -name "*.${prefix}.${freq_code}.${CNV}.gene_burden.stats.*.bed.gz" \
-    > stats.paths.list
-    # Debug: print paths to stdout
-    cat stats.paths.list
-
-    # Merge burden stats per cohort
-    zcat $( sed -n '1p' stats.paths.list ) | sed -n '1p' > header.tsv
-    while read meta cohort; do
-      zcat $( fgrep $meta stats.paths.list ) \
-      | grep -ve '^#' \
-      | sort -Vk1,1 -k2,2n -k3,3n \
-      | cat header.tsv - \
-      | bgzip -c \
-      > "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
-      tabix -f "$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
-    done < <( fgrep -v "mega" ${metacohort_list} )
-
-    # Make input for meta-analysis
-    while read meta cohorts; do
-      echo -e "$meta\t$meta.${prefix}.${freq_code}.${CNV}.gene_burden.stats.bed.gz"
-    done < <( fgrep -v "mega" ${metacohort_list} ) \
-    > ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt
-
-    # Extract list of genes with < min_cnvs_per_gene_training (to be used as blacklist later for training)
-    # Note: this cutoff must be pre-determined with eval_or_vs_cnv_counts.R, but is not automated here
+    # Extract list of genes with standard error < max_standard_error (to be used as excludelist later for training)
     /opt/rCNV2/analysis/gene_scoring/get_underpowered_genes.R \
-      --min-cnvs ${min_cnvs_per_gene_training} \
-      --gene-counts-out ${prefix}.${freq_code}.${CNV}.counts_per_gene.tsv \
-      ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt \
+      --max-se "${max_standard_error}" \
+      ${meta_stats} \
       ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed
     awk -v OFS="\t" '{ print $1, $2, $3, $4 }' \
       ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed \
@@ -585,7 +561,6 @@ task get_underpowered_genes {
     # Copy meta-analysis results to Google bucket
     gsutil -m cp \
       ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed.gz \
-      ${prefix}.${freq_code}.${CNV}.counts_per_gene.tsv \
       ${rCNV_bucket}/analysis/gene_scoring/data/
   >>>
 
@@ -593,13 +568,11 @@ task get_underpowered_genes {
     docker: "${rCNV_docker}"
     preemptible: 1
     memory: "8 GB"
-    bootDiskSizeGb: "30"
     disks: "local-disk 50 HDD"
   }
 
   output {
     File underpowered_genes = "${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed.gz"
-    File counts_per_gene = "${prefix}.${freq_code}.${CNV}.counts_per_gene.tsv"
   }
 }
 
@@ -619,34 +592,60 @@ task calc_priors_bfdp {
     set -e
 
     # Localize necessary references
-    gsutil -m cp \
-      ${rCNV_bucket}/analysis/gene_scoring/refs/${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+    gsutil -m cp -r \
+      ${rCNV_bucket}/analysis/gene_scoring/refs/${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
+      ${rCNV_bucket}/analysis/gene_scoring/optimization_data \
       ${rCNV_bucket}/analysis/gene_scoring/gene_lists/*.genes.list \
+      ${rCNV_bucket}/cleaned_data/genes/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
       ./
-    mkdir gene_lists/
+    mkdir refs/
     gsutil -m cp \
-      gs://rcnv_project/cleaned_data/genes/gene_lists/*genes.list \
-      gene_lists/
+      ${rCNV_bucket}/analysis/analysis_refs/* \
+      refs/
 
     # Locate underpowered genes
     find / -name "*.gene_burden.underpowered_genes.bed.gz" | xargs -I {} mv {} ./
 
-    # Create CNV-type-specific gene blacklists
+    # Create CNV-type-specific gene excludelists
     for CNV in DEL DUP; do
       zcat *.$CNV.gene_burden.underpowered_genes.bed.gz \
-        ${freq_code}.gene_scoring.training_gene_blacklist.bed.gz \
+        ${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
       | fgrep -v "#" | cut -f4 | sort -V | uniq \
-      > ${freq_code}.$CNV.training_blacklist.genes.list
+      > ${freq_code}.$CNV.training_excludelist.genes.list
     done
+    
+    # Prepare files for on-the fly meta-analysis of CNV effect sizes
+    echo -e "cohort\tn_case\tn_control\tDEL_path\tDUP_path" \
+    > prior_estimation.meta_inputs.tsv
+    zcat optimization_data/rCNV.DEL.meta1.genes_per_cnv.tsv.gz | head -n1 \
+    > optimization_data/opt_data.header.tsv
+    while read meta cohorts; do
+      # Subset CNVs to developmental cases & controls
+      for CNV in DEL DUP; do
+        zcat optimization_data/rCNV.$CNV.$meta.genes_per_cnv.tsv.gz \
+        | fgrep -wf <( cat refs/rCNV2.hpos_by_severity.developmental.list \
+                           <( echo "HEALTHY_CONTROL" ) ) \
+        | sort -Vk1,1 | cat optimization_data/opt_data.header.tsv - | gzip -c \
+        > optimization_data/rCNV.$meta.annotated_developmental_and_control.$CNV.tsv.gz
+      done
+
+      # Write info to meta-analysis input
+      for dummy in 1; do
+        fgrep -w $meta refs/rCNV2.hpos_by_severity.developmental.counts.tsv
+        cidx=$( head -n1 refs/HPOs_by_metacohort.table.tsv | sed 's/\t/\n/g' \
+                | awk -v OFS="\t" '{ print NR, $0 }' | fgrep -w $meta | cut -f1 )
+        fgrep -w "HEALTHY_CONTROL" refs/HPOs_by_metacohort.table.tsv | cut -f$cidx
+        for CNV in DEL DUP; do
+          echo optimization_data/rCNV.$meta.annotated_developmental_and_control.$CNV.tsv.gz
+        done
+      done | paste -s >> prior_estimation.meta_inputs.tsv
+    done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt )
 
     # Compute prior effect sizes
     /opt/rCNV2/analysis/gene_scoring/estimate_prior_effect_sizes.R \
-      --pct ${prior_lnor_thresholding_pct} \
-      ${del_meta_stats} \
-      ${dup_meta_stats} \
-      ${freq_code}.DEL.training_blacklist.genes.list \
-      ${freq_code}.DUP.training_blacklist.genes.list \
-      gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
+      prior_estimation.meta_inputs.tsv \
+      ${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
+      gnomad.v2.1.1.lof_constrained.genes.list \
       gold_standard.haploinsufficient.genes.list \
       gold_standard.haplosufficient.genes.list \
       gold_standard.triplosensitive.genes.list \
@@ -664,18 +663,6 @@ task calc_priors_bfdp {
     awk -v FS="\t" '{ if ($1=="theta1" && $2=="DUP") print $3 }' \
       ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
     > theta1_dup.tsv
-    awk -v FS="\t" '{ if ($1=="var0" && $2=="DEL") print $3 }' \
-      ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-    > var0_del.tsv
-    awk -v FS="\t" '{ if ($1=="var0" && $2=="DUP") print $3 }' \
-      ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-    > var0_dup.tsv
-    awk -v FS="\t" '{ if ($1=="var1" && $2=="DEL") print $3 }' \
-      ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-    > var1_del.tsv
-    awk -v FS="\t" '{ if ($1=="var1" && $2=="DUP") print $3 }' \
-      ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-    > var1_dup.tsv
 
     # Compute BFDP per gene
     for CNV in DEL DUP; do
@@ -699,7 +686,7 @@ task calc_priors_bfdp {
         --theta1 $theta1 \
         --var0 1 \
         --prior ${prior_frac} \
-        --blacklist ${freq_code}.$CNV.training_blacklist.genes.list \
+        --blacklist ${freq_code}.$CNV.training_excludelist.genes.list \
         --outfile ${freq_code}.$CNV.gene_abfs.tsv \
         "$statsbed"
     done
@@ -739,14 +726,12 @@ task calc_priors_bfdp {
 task score_genes {
   String CNV
   File BFDP_stats
-  File blacklist
+  File excludelist
   File underpowered_genes
   File gene_features
   Float max_true_bfdp
   Float min_false_bfdp
   String model
-  Float elnet_alpha
-  Float elnet_l1_l2_mix
   String freq_code
   String rCNV_bucket
   String rCNV_docker
@@ -760,14 +745,14 @@ task score_genes {
       ${rCNV_bucket}/analysis/gene_scoring/gene_lists/*genes.list \
       ./
 
-    # Merge blacklist and list of underpowered genes
-    zcat ${blacklist} ${underpowered_genes} \
+    # Merge excludelist and list of underpowered genes
+    zcat ${excludelist} ${underpowered_genes} \
     | grep -ve '^#' \
     | sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
     | uniq \
-    | cat <( zcat ${blacklist} | grep -e '^#' ) - \
+    | cat <( zcat ${excludelist} | grep -e '^#' ) - \
     | bgzip -c  \
-    > blacklist_plus_underpowered.bed.gz
+    > excludelist_plus_underpowered.bed.gz
 
     # Set CNV type-specific parameters
     case ${CNV} in
@@ -784,14 +769,14 @@ task score_genes {
     # Score genes
     /opt/rCNV2/analysis/gene_scoring/score_genes.py \
       --centromeres GRCh37.centromeres_telomeres.bed.gz \
-      --blacklist blacklist_plus_underpowered.bed.gz \
+      --blacklist excludelist_plus_underpowered.bed.gz \
       --true-positives $true_pos \
       --true-negatives $true_neg \
       --model ${model} \
       --max-true-bfdp ${max_true_bfdp} \
       --min-false-bfdp ${min_false_bfdp} \
-      --regularization-alpha ${elnet_alpha} \
-      --regularization-l1-l2-mix ${elnet_l1_l2_mix} \
+      --chromsplit \
+      --no-out-of-sample-prediction \
       --outfile ${freq_code}.${CNV}.gene_scores.${model}.tsv \
       ${BFDP_stats} \
       ${gene_features}
@@ -805,7 +790,8 @@ task score_genes {
   runtime {
     docker: "${rCNV_docker}"
     preemptible: 1
-    memory: "8 GB"
+    memory: "16 GB"
+    cpu: "8"
     bootDiskSizeGb: "20"
   }
 
@@ -918,10 +904,10 @@ task qc_scores {
       gene_lists/gold_standard.triploinsensitive.genes.list \
       $compdir/${freq_code}_gene_scoring_model_comparisons
 
-    # Merge scores from best model (highest harmonic mean AUC)
+    # Compute harmonic mean of AUCs and merge scores from ensemble model
     sed -n '2p' $compdir/${freq_code}_gene_scoring_model_comparisons.summary_table.tsv \
-    | cut -f1 > best_model.tsv
-    best_model=$( cat best_model.tsv )
+    | cut -f1 > best_average_auc.tsv
+    best_model="ensemble"
     /opt/rCNV2/analysis/gene_scoring/merge_del_dup_scores.R \
       ${freq_code}.DEL.gene_scores.$best_model.tsv \
       ${freq_code}.DUP.gene_scores.$best_model.tsv \
@@ -1007,7 +993,7 @@ task qc_scores {
   }
 
   output {
-    String best_model = read_string("best_model.tsv")
+    String best_average_auc = read_string("best_average_auc.tsv")
     File final_scores = "${freq_code}.gene_scores.tsv.gz"
   }
 }

@@ -143,6 +143,7 @@ color.points.by.density <- function(x, y, palette=NULL){
 #' @param pt.cex scaling factor for points
 #' @param parmar argument for option(parmar=...)
 #' @param add.cor boolean indicator to add correlation coefficient to plot \[default: TRUE\]
+#' @param plot.cor boolean indicator to plot linear best-fit line below plot \[default: TRUE\]
 #'
 #' @return None
 #'
@@ -150,7 +151,7 @@ color.points.by.density <- function(x, y, palette=NULL){
 #'
 #' @export dens.scatter
 #' @export
-dens.scatter <- function(x, y, pt.cex=1, parmar=rep(0.5, 4), add.cor=T){
+dens.scatter <- function(x, y, pt.cex=1, parmar=rep(0.5, 4), add.cor=T, plot.cor=T){
   # Based on heatscatter.R from Colby Chiang
   # (https://github.com/cc2qe/voir/blob/master/bin/heatscatter.R)
   par(mar=parmar, bty="o")
@@ -165,7 +166,9 @@ dens.scatter <- function(x, y, pt.cex=1, parmar=rep(0.5, 4), add.cor=T){
   plot.df <- plot.df[order(plot.df$dens), ]
   plot(plot.df$x, plot.df$y, type="n",
        xlab="", xaxt="n", ylab="", yaxt="n")
-  abline(lm(y ~ x, data=plot.df), lwd=2)
+  if(plot.cor){
+    abline(lm(y ~ x, data=plot.df), lwd=2)
+  }
   points(plot.df$x, plot.df$y, col=plot.df$col, pch=19, cex=pt.cex)
   if(add.cor==T){
     r <- cor(plot.df$x, plot.df$y)

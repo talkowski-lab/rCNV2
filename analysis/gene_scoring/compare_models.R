@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -25,51 +25,11 @@ load.stats <- function(path){
   return(x)
 }
 
-# Compute ROC
-roc <- function(stats, score, true.genes, false.genes, steps=seq(1, 0, -0.001)){
-  x <- data.frame("score" = stats[, which(colnames(stats) == score)],
-                  "true" = stats$gene %in% true.genes,
-                  "false" = stats$gene %in% false.genes)
-  roc_res <- as.data.frame(t(sapply(steps, function(k){
-    idxs <- which(x$score >= k)
-    ftrue <- length(which(x$true[idxs])) / length(which(x$true))
-    ffalse <- length(which(x$false[idxs])) / length(which(x$false))
-    fother <- length(which(!x$true[idxs])) / length(which(!x$true))
-    fall <- length(idxs) / nrow(x)
-    return(c(k, fall, fother, ftrue, ffalse))
-  })))
-  colnames(roc_res) <- c("min_score", "frac_all", "frac_other", "frac_true", "frac_false")
-  return(roc_res)
-}
-
-# Compute PRC
-prc <- function(stats, score, true.genes, false.genes, steps=seq(1, 0, -0.001)){
-  x <- data.frame("score" = stats[, which(colnames(stats) == score)],
-                  "true" = stats$gene %in% true.genes,
-                  "false" = stats$gene %in% false.genes)
-  prc_res <- as.data.frame(t(sapply(steps, function(k){
-    idxs <- which(x$score >= k)
-    prec <- length(which(x$true[idxs])) / (length(which(x$true[idxs])) + length(which(x$false[idxs])))
-    recall <- length(which(x$true[idxs])) / length(which(x$true))
-    fall <- length(idxs) / nrow(x)
-    return(c(k, fall, prec, recall))
-  })))
-  colnames(prc_res) <- c("min_score", "frac_all", "precision", "recall")
-  return(prc_res)
-}
-
-# # Compute RMSE vs original BFDPs
-# calc.rmse <- function(stats, score, orig.bfdps){
-#   x <- merge(stats, orig.bfdps, all=F, sort=F, by="gene")
-#   keep.idx <- which(apply(x[, 2:3], 1, function(vals){all(!is.na(vals))}))
-#   sqrt(sum((x[keep.idx, 2] - x[keep.idx, 3])^2, na.rm=T) / length(keep.idx))
-# }
-
 # Wrapper to calculate all plotting data for a single model
 calc.plot.data <- function(stats, score, true.genes, false.genes){
-  roc.res <- roc(stats, score, true.genes, false.genes)
+  roc.res <- rCNV2::roc(stats, score, true.genes, false.genes)
   roc.auc <- flux::auc(roc.res$frac_false, roc.res$frac_true)
-  prc.res <- prc(stats, score, true.genes, false.genes)
+  prc.res <- rCNV2::prc(stats, score, true.genes, false.genes)
   prc.auc <- flux::auc(prc.res$recall, prc.res$precision)
   # rmse <- calc.rmse(stats, score, orig.bfdps)
   return(list("roc"=roc.res,
@@ -99,7 +59,7 @@ get.sum.table <- function(del, dup){
     mean.auc <- harmonic.mean(c(del.auroc, del.auprc, dup.auroc, dup.auprc))
     c(del.auroc, del.auprc, dup.auroc, dup.auprc, mean.auc)
   }))
-  
+
   x <- as.data.frame(cbind(names(del), sumdat))
   x[, 2:ncol(x)] <- apply(x[, 2:ncol(x)], 2, as.numeric)
   colnames(x) <- c("model", "del.auroc", "del.auprc", "dup.auroc", "dup.auprc", "mean.auc")
@@ -122,7 +82,7 @@ plot.roc <- function(data, title="Receiver Operating Characteristic"){
            type="l", lwd=3, col=colors[i])
   })
   legend("bottomright", pch=19, pt.cex=1.5, cex=0.75, bty="n",
-         col=colors[lorder], 
+         col=colors[lorder],
          legend=paste(names(data), " (AUC=",
                       sapply(data, function(x){format(round(x$roc.auc, 2), nsmall=2)}),
                       ")", sep="")[lorder])
@@ -147,7 +107,7 @@ plot.prc <- function(data, title="Precision/Recall"){
            type="l", col=colors[i], lwd=2)
   })
   legend("bottomleft", pch=19, pt.cex=1.5, cex=0.75, bty="n",
-         col=colors[lorder], 
+         col=colors[lorder],
          legend=paste(names(data), " (AUC=",
                       sapply(data, function(x){format(round(x$prc.auc, 2), nsmall=2)}),
                       ")", sep="")[lorder])
@@ -160,6 +120,7 @@ plot.prc <- function(data, title="Precision/Recall"){
 #####################
 ### RSCRIPT BLOCK ###
 #####################
+require(rCNV2, quietly=T)
 require(optparse, quietly=T)
 require(flux, quietly=T)
 require(Hmisc, quietly=T)
@@ -193,10 +154,10 @@ out.prefix <- args$args[7]
 # setwd("~/scratch")
 # del.in <- "rCNV.DEL.model_evaluation.input.tsv"
 # dup.in <- "rCNV.DUP.model_evaluation.input.tsv"
-# del.true_genes.in <- "gold_standard.haploinsufficient.genes.list"
-# dup.true_genes.in <- "gold_standard.triplosensitive.genes.list"
-# del.false_genes.in <- "gold_standard.haplosufficient.genes.list"
-# dup.false_genes.in <- "gold_standard.triploinsensitive.genes.list"
+# del.true_genes.in <- "gene_lists/gold_standard.haploinsufficient.genes.list"
+# dup.true_genes.in <- "gene_lists/gold_standard.triplosensitive.genes.list"
+# del.false_genes.in <- "gene_lists/gold_standard.haplosufficient.genes.list"
+# dup.false_genes.in <- "gene_lists/gold_standard.triploinsensitive.genes.list"
 # out.prefix <- "rCNV_gene_scoring_model_comparison"
 
 # Read gene lists
@@ -211,7 +172,7 @@ dup <- load.all.models(dup.in, dup.true.genes, dup.false.genes)
 
 # Compute table with stats
 write.table(get.sum.table(del, dup),
-            paste(out.prefix, "summary_table.tsv", sep="."), 
+            paste(out.prefix, "summary_table.tsv", sep="."),
             col.names=T, row.names=F, sep="\t", quote=F)
 
 # Plot ROCs

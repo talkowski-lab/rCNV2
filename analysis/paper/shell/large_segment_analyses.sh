@@ -130,8 +130,8 @@ while read nocolon hpo; do
 done < refs/test_phenotypes.list \
 > hpo_genelists.tsv
 cat << EOF > dnm_counts_to_annotate.tsv
-ASC${TAB}refs/fu_asc_spark_dnm_counts.tsv.gz${TAB}refs/ASC_2021.gw_sig.genes.list
-ASC_unaffected${TAB}refs/fu_asc_spark_dnm_counts.unaffecteds.tsv.gz${TAB}refs/ASC_2021.gw_sig.genes.list
+ASC${TAB}refs/asc_spark_2021_dnm_counts.tsv.gz${TAB}refs/ASC_2021.gw_sig.genes.list
+ASC_unaffected${TAB}refs/asc_spark_2021_dnm_counts.unaffecteds.tsv.gz${TAB}refs/ASC_2021.gw_sig.genes.list
 DDD${TAB}refs/ddd_dnm_counts.tsv.gz${TAB}refs/DDD_2020.gw_sig.genes.list
 EOF
 cat \
@@ -288,8 +288,8 @@ mkdir dnm_distributions
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   refs/ddd_dnm_counts.tsv.gz \
-  refs/asc_dnm_counts.tsv.gz \
-  refs/asc_dnm_counts.unaffecteds.tsv.gz \
+  refs/asc_spark_2021_dnm_counts.tsv.gz \
+  refs/asc_spark_2021_dnm_counts.unaffecteds.tsv.gz \
   refs/gene_mutation_rates.tsv.gz \
   refs/gencode.v19.canonical.pext_filtered.genomic_features.bed.gz \
   dnm_distributions/${prefix}

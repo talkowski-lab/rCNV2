@@ -24,6 +24,8 @@ workflow scattered_crb_burden_perm_test {
   Float p_cutoff
   Int n_pheno_perms
   String meta_model_prefix
+  Float winsorize_meta_z
+  Int meta_min_cases
   String rCNV_bucket
   String rCNV_docker
   String prefix
@@ -48,6 +50,8 @@ workflow scattered_crb_burden_perm_test {
         min_frac_all_elements=min_frac_all_elements,
         p_cutoff=p_cutoff,
         meta_model_prefix=meta_model_prefix,
+        winsorize_meta_z=winsorize_meta_z,
+        meta_min_cases=meta_min_cases,
         perm_idx=idx,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker,
@@ -77,6 +81,8 @@ task permuted_burden_test {
   Float min_frac_all_elements
   Float p_cutoff
   String meta_model_prefix
+  Float winsorize_meta_z
+  Int meta_min_cases
   Int perm_idx
   String rCNV_bucket
   String rCNV_docker
@@ -119,7 +125,7 @@ task permuted_burden_test {
       > shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz
       tabix -f shuffled_cnv/$meta.${freq_code}.pheno_shuf.bed.gz
 
-    done < ${metacohort_list}
+    done < <( fgrep -v "mega" ${metacohort_list} )
 
     # Iterate over CNV types
     for CNV in DEL DUP; do
@@ -167,9 +173,11 @@ task permuted_burden_test {
         --model ${meta_model_prefix} \
         --conditional-exclusion ${exclusion_bed} \
         --p-is-neg-log10 \
-        --keep-n-columns 4 \
         --spa \
-        --adjust-biobanks \
+        --spa-exclude /opt/rCNV2/refs/lit_GDs.all.$CNV.bed.gz \
+        --winsorize ${winsorize_meta_z} \
+        --min-cases ${meta_min_cases} \
+        --keep-n-columns 4 \
         ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.input.txt \
         ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.perm_$i.bed
       bgzip -f ${prefix}.${freq_code}.${noncoding_filter}_noncoding.$CNV.crb_burden.meta_analysis.stats.perm_$i.bed

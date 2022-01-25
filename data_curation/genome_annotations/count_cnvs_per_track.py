@@ -24,26 +24,21 @@ cnv_types = 'DEL DUP'.split()
 phenotypes = 'case control'.split()
 
 
-def load_cnvs_single(cnvpath, hpo, cnv_type):
+def load_cnvs_single(cnvpath, hpos, cnv_type):
     """
-    Loads & filters CNVs for a single HPO & CNV type
+    Loads & filters CNVs to a single CNV type for a list of HPOs
     Returns : pbt.BedTool
     """
 
     cnvs = pbt.BedTool(cnvpath)
 
-    def _hpo_filter(feature, hpo):
-        return hpo in feature[-1]
-
-    def _cnv_filter(feature, cnv_type):
-        return feature[4] == cnv_type
-
-    return cnvs.filter(_hpo_filter, hpo).\
-                filter(_cnv_filter, cnv_type).\
+    return cnvs.filter(lambda x: len(set(x[-1].split(';')).\
+                                     intersection(set(hpos))) > 0).\
+                filter(lambda x: x[4] == cnv_type).\
                 saveas()
 
 
-def load_cnvs(cohorts_in, case_hpo, control_hpo):
+def load_cnvs(cohorts_in, case_hpos, control_hpos):
     """
     Load CNVs and split by phenotype and CNV type
     Returns: 
@@ -55,7 +50,7 @@ def load_cnvs(cohorts_in, case_hpo, control_hpo):
     cnvs = {}
     cnv_counts = {}
     cohort_n = {}
-    pdict = {phenotypes[0] : case_hpo, phenotypes[1] : control_hpo}
+    pdict = {phenotypes[0] : case_hpos, phenotypes[1] : control_hpos}
 
     with open(cohorts_in) as fin:
         for cohort, n_case, n_control, cnvpath in csv.reader(fin, delimiter='\t'):
@@ -80,14 +75,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--cohorts', required=True, help='Four-column tsv with ' +
                         'cohort name, n_cases, n_controls, and path to CNV BED.')
+    parser.add_argument('--hpo-list', help='.txt file listing HPO terms to ' +
+                        'consider for case samples.', required=True)
     parser.add_argument('--track-stats', required=True, help='Tsv of tracks ' + 
                         'with stats as produced by curate_track.py. Assumes first ' + 
                         'column is track name and last column is track path.')
     parser.add_argument('-F', '--frac-overlap', help='Minimum fraction of element ' +
                         'that must be overlapped by a CNV to be counted', 
                         type=float, default=10e-10)
-    parser.add_argument('--case-hpo', help='HPO term to consider for case samples. ' +
-                        '[default: HP:0000118]', default='HP:0000118')
     parser.add_argument('--control-hpo', default='HEALTHY_CONTROL', help='HPO code ' +
                         'to use for control CNV counts. [default: HEALTHY_CONTROL]')
     parser.add_argument('--norm-by-samplesize', action='store_true', help='Return ' +
@@ -111,10 +106,13 @@ def main():
             outfile_path = args.outfile
             gzip_out = args.gzip
         outfile = open(outfile_path, 'w')
-        
 
+    # Load list of case HPOs
+    with open(args.hpo_list) as fin:
+        case_hpos = [x.rstrip() for x in fin.readlines()]
+        
     # Load CNVs per cohort and split by CNV type and phenotype
-    cnvs, cnv_counts, cohort_n = load_cnvs(args.cohorts, args.case_hpo, args.control_hpo)
+    cnvs, cnv_counts, cohort_n = load_cnvs(args.cohorts, case_hpos, [args.control_hpo])
 
     # Iterate over tracks and count CNVs for each metacohort
     with open(args.track_stats) as tsin:

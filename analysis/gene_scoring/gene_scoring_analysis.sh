@@ -22,14 +22,16 @@ export rCNV_bucket="gs://rcnv_project"
 
 # Copy all filtered CNV data, gene coordinates, and other references 
 # from the project Google Bucket (note: requires permissions)
-mkdir cleaned_cnv/ phenos/
+mkdir cleaned_cnv/ phenos/ refs/
 gsutil -m cp -r ${rCNV_bucket}/cleaned_data/cnv/* cleaned_cnv/
 gsutil -m cp -r ${rCNV_bucket}/cleaned_data/phenotypes/filtered/meta*.cleaned_phenos.txt phenos/
 gsutil -m cp -r ${rCNV_bucket}/cleaned_data/genes ./
-mkdir refs/
-gsutil -m cp ${rCNV_bucket}/refs/GRCh37.*.bed.gz refs/
-gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/* refs/
-gsutil -m cp ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz refs/
+gsutil -m cp \
+  ${rCNV_bucket}/refs/GRCh37.*.bed.gz \
+  ${rCNV_bucket}/analysis/analysis_refs/* \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/loose_unclustered_nahr_regions.bed.gz \
+  refs/
 
 
 # Test/dev parameters
@@ -45,24 +47,22 @@ gtf_index="genes/gencode.v19.canonical.gtf.gz.tbi"
 contig=18
 pad_controls=0
 max_cnv_size=300000000
-min_cds_ovr_del=1.0
-min_cds_ovr_dup=1.0
-max_genes_per_cnv=28
+min_cds_ovr_del=0.84
+min_cds_ovr_dup=0.84
+max_genes_per_cnv=37
 meta_model_prefix="fe"
-min_cnvs_per_gene_training=10
-cen_tel_dist=5000000
+max_standard_error=1
 exclusion_bed=refs/gencode.v19.canonical.pext_filtered.cohort_exclusion.bed.gz
 winsorize_meta_z=1.0
 meta_min_cases=300
-prior_frac=0.12
+prior_frac=0.137
 
 
-# Create training excludelist: Remove all genes within ±3Mb of a telomere/centromere, 
-# or those within known genomic disorder regions
-zcat refs/GRCh37.centromeres_telomeres.bed.gz \
-| awk -v FS="\t" -v OFS="\t" -v d=${cen_tel_dist} \
-  '{ if ($2-d<0) print $1, "0", $3+d; else print $1, $2-d, $3+d }' \
-| cat - <( zcat refs/lit_GDs.*.bed.gz | cut -f1-3 | fgrep -v "#" ) \
+# Create training excludelist: Remove all genes within known NAHR-mediated genomic disorder regions
+# (Note: cen/tel exclusion no longer applied — no evidence these genes will bias results)
+zcat refs/lit_GDs.*.bed.gz | cut -f1-3 | fgrep -v "#" \
+| bedtools intersect -r -f 0.25 -u -a - \
+  -b refs/loose_unclustered_nahr_regions.bed.gz \
 | sort -Vk1,1 -k2,2n -k3,3n \
 | bedtools merge -i - \
 > ${freq_code}.gene_scoring.training_mask.bed.gz
@@ -88,8 +88,10 @@ gsutil -m cp \
 cat \
   genes/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
   <( cat genes/gene_lists/DDG2P.hc_lof.genes.list genes/gene_lists/ClinGen.hc_haploinsufficient.genes.list | sort | uniq ) \
+  genes/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.low_expression_invariant.genes.list \
+  genes/gene_lists/gnomad_sv.v2.1.nonneuro.no_lof_dels.genes.list \
 | sort | uniq -c \
-| awk '{ if ($1>=2) print $2 }' \
+| awk '{ if ($1>=3) print $2 }' \
 | fgrep -wf - genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
 > gold_standard.haploinsufficient.genes.list
 
@@ -98,8 +100,10 @@ cat \
   genes/gene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list \
   <( cat genes/gene_lists/HP0000118.HPOdb.genes.list genes/gene_lists/DDG2P*.genes.list genes/gene_lists/ClinGen*.genes.list \
      | fgrep -wvf - genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list | sort | uniq ) \
+  genes/gene_lists/gnomad_sv.v2.1.nonneuro.has_lof_dels.genes.list \
+  genes/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.low_expression_variable.genes.list \
 | sort | uniq -c \
-| awk '{ if ($1>=2) print $2 }' \
+| awk '{ if ($1>=4) print $2 }' \
 | fgrep -wf - genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
 > gold_standard.haplosufficient.genes.list
 
@@ -107,18 +111,22 @@ cat \
 cat \
   genes/gene_lists/gnomad.v2.1.1.mis_constrained.genes.list \
   <( cat genes/gene_lists/DDG2P.hc_gof.genes.list genes/gene_lists/DDG2P.hc_other.genes.list genes/gene_lists/ClinGen.all_triplosensitive.genes.list | sort | uniq ) \
+  genes/gene_lists/gnomad_sv.v2.1.nonneuro.no_cg_dups.genes.list \
+  genes/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.high_expression_invariant.genes.list \
 | sort | uniq -c \
-| awk '{ if ($1>=2) print $2 }' \
+| awk '{ if ($1>=3) print $2 }' \
 | fgrep -wf - genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
 > gold_standard.triplosensitive.genes.list
 
-# Define list of high-confidence haplosufficient genes
+# Define list of high-confidence triploinsensitive genes
 cat \
   genes/gene_lists/gnomad.v2.1.1.mutation_tolerant.genes.list \
   <( cat genes/gene_lists/HP0000118.HPOdb.genes.list genes/gene_lists/DDG2P*.genes.list genes/gene_lists/ClinGen*.genes.list \
      | fgrep -wvf - genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list | sort | uniq ) \
+  genes/gene_lists/gnomad_sv.v2.1.nonneuro.has_cg_dups.genes.list \
+  genes/gene_lists/gencode.v19.canonical.pext_filtered.GTEx_v7_variable_expressors.high_expression_variable.genes.list \
 | sort | uniq -c \
-| awk '{ if ($1>=2) print $2 }' \
+| awk '{ if ($1>=4) print $2 }' \
 | fgrep -wf - genes/gene_lists/gencode.v19.canonical.pext_filtered.genes.list \
 > gold_standard.triploinsensitive.genes.list
 
@@ -126,6 +134,7 @@ cat \
 gsutil -m cp \
   gold_standard.*.genes.list \
   ${rCNV_bucket}/analysis/gene_scoring/gene_lists/
+
 
 
 # Note: data for parameter optimization is computed in parallel in FireCloud with
@@ -148,7 +157,7 @@ while read meta cohorts; do
     --negative-truth-genes gold_standard.haplosufficient.genes.list \
     --exclude-genes <( zcat ${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
                        | fgrep -v "#" | cut -f4 ) \
-    --max-genes-for-summary 28 \
+    --max-genes-for-summary 37 \
     --summary-counts ${meta}.optimization_data.counts_per_hpo.DEL.tsv \
     --cnv-stats ${meta}.optimization_data.counts_per_cnv.DEL.tsv \
     --gzip
@@ -161,7 +170,7 @@ while read meta cohorts; do
     --negative-truth-genes gold_standard.triploinsensitive.genes.list \
     --exclude-genes <( zcat ${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
                        | fgrep -v "#" | cut -f4 ) \
-    --max-genes-for-summary 28 \
+    --max-genes-for-summary 37 \
     --summary-counts ${meta}.optimization_data.counts_per_hpo.DUP.tsv \
     --cnv-stats ${meta}.optimization_data.counts_per_cnv.DUP.tsv \
     --gzip
@@ -175,20 +184,10 @@ for CNV in DEL DUP; do
   > optimize_genes_per_cnv.${CNV}.input.tsv
 done
 /opt/rCNV2/analysis/gene_scoring/optimize_genes_per_cnv.R \
+  --max-eval 100 \
   optimize_genes_per_cnv.DEL.input.tsv \
   optimize_genes_per_cnv.DUP.input.tsv \
   optimize_genes_per_cnv.results.pdf
-
-
-# Parameter optimization: minimum number of CNVs per gene for training
-# NOTE: requires running meta-analysis and get_underpowered_genes tasks first in WDL
-gsutil -m cp ${rCNV_bucket}/analysis/gene_scoring/data/** ./
-for CNV in DEL DUP; do
-  /opt/rCNV2/analysis/gene_scoring/variance_vs_counts.R \
-    rCNV2_analysis_d2.rCNV.$CNV.gene_burden.meta_analysis.stats.bed.gz \
-    rCNV2_analysis_d2.rCNV.$CNV.counts_per_gene.tsv \
-    variance_vs_cnvs.$CNV.pdf
-done
 
 
 # Recompute association stats per cohort
@@ -204,8 +203,16 @@ for contig in $( seq 1 22 ); do
   while read meta cohorts; do
     echo $meta
 
+    # Exclude all NAHR CNVs from burden testing
+    bedtools intersect -v -r -f 0.5 \
+      -a cleaned_cnv/$meta.${freq_code}.bed.gz \
+      -b refs/loose_unclustered_nahr_regions.bed.gz \
+    | bgzip -c \
+    > cleaned_cnv/$meta.${freq_code}.no_NAHR.bed.gz
+    tabix -f cleaned_cnv/$meta.${freq_code}.no_NAHR.bed.gz
+
     # Set metacohort-specific parameters
-    cnv_bed="cleaned_cnv/$meta.${freq_code}.bed.gz"
+    cnv_bed="cleaned_cnv/$meta.${freq_code}.no_NAHR.bed.gz"
     effective_case_n=$( fgrep -w $meta refs/rCNV2.hpos_by_severity.developmental.counts.tsv | cut -f2 )
 
     # Iterate over CNV types
@@ -295,12 +302,10 @@ for CNV in DEL DUP; do
   bgzip -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed
   tabix -p bed -f ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz
 
-  # Extract list of genes with < min_cnvs_per_gene_training (to be used as excludelist later for training)
-  # Note: this cutoff must be pre-determined with eval_or_vs_cnv_counts.R, but is not automated here
+  # Extract list of genes with standard error < max_standard_error (to be used as excludelist later for training)
   /opt/rCNV2/analysis/gene_scoring/get_underpowered_genes.R \
-    --min-cnvs ${min_cnvs_per_gene_training} \
-    --gene-counts-out ${prefix}.${freq_code}.${CNV}.counts_per_gene.tsv \
-    ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.input.txt \
+    --max-se "${max_standard_error}" \
+    ${prefix}.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz \
     ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed
   awk -v OFS="\t" '{ print $1, $2, $3, $4 }' \
     ${prefix}.${freq_code}.${CNV}.gene_burden.underpowered_genes.bed \
@@ -327,14 +332,37 @@ for CNV in DEL DUP; do
   > ${freq_code}.$CNV.training_excludelist.genes.list
 done
 
+# Prepare files for on-the fly meta-analysis of CNV effect sizes
+echo -e "cohort\tn_case\tn_control\tDEL_path\tDUP_path" \
+> prior_estimation.meta_inputs.tsv
+zcat optimization_data/rCNV.DEL.meta1.genes_per_cnv.tsv.gz | head -n1 \
+> optimization_data/opt_data.header.tsv
+while read meta cohorts; do
+  # Subset CNVs to developmental cases & controls
+  for CNV in DEL DUP; do
+    zcat optimization_data/rCNV.$CNV.$meta.genes_per_cnv.tsv.gz \
+    | fgrep -wf <( cat refs/rCNV2.hpos_by_severity.developmental.list \
+                       <( echo "HEALTHY_CONTROL" ) ) \
+    | sort -Vk1,1 | cat optimization_data/opt_data.header.tsv - | gzip -c \
+    > optimization_data/rCNV.$meta.annotated_developmental_and_control.$CNV.tsv.gz
+  done
+
+  # Write info to meta-analysis input
+  for dummy in 1; do
+    fgrep -w $meta refs/rCNV2.hpos_by_severity.developmental.counts.tsv
+    cidx=$( head -n1 refs/HPOs_by_metacohort.table.tsv | sed 's/\t/\n/g' \
+            | awk -v OFS="\t" '{ print NR, $0 }' | fgrep -w $meta | cut -f1 )
+    fgrep -w "HEALTHY_CONTROL" refs/HPOs_by_metacohort.table.tsv | cut -f$cidx
+    for CNV in DEL DUP; do
+      echo optimization_data/rCNV.$meta.annotated_developmental_and_control.$CNV.tsv.gz
+    done
+  done | paste -s >> prior_estimation.meta_inputs.tsv
+done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt )
+
 # Compute prior effect sizes
-prior_lnor_thresholding_pct=1
 /opt/rCNV2/analysis/gene_scoring/estimate_prior_effect_sizes.R \
-  --pct ${prior_lnor_thresholding_pct} \
-  ${del_meta_stats} \
-  ${dup_meta_stats} \
-  ${freq_code}.DEL.training_excludelist.genes.list \
-  ${freq_code}.DUP.training_excludelist.genes.list \
+  prior_estimation.meta_inputs.tsv \
+  ${freq_code}.gene_scoring.training_gene_excludelist.bed.gz \
   genes/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
   gold_standard.haploinsufficient.genes.list \
   gold_standard.haplosufficient.genes.list \
@@ -353,18 +381,6 @@ awk -v FS="\t" '{ if ($1=="theta1" && $2=="DEL") print $3 }' \
 awk -v FS="\t" '{ if ($1=="theta1" && $2=="DUP") print $3 }' \
   ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
 > theta1_dup.tsv
-awk -v FS="\t" '{ if ($1=="var0" && $2=="DEL") print $3 }' \
-  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-> var0_del.tsv
-awk -v FS="\t" '{ if ($1=="var0" && $2=="DUP") print $3 }' \
-  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-> var0_dup.tsv
-awk -v FS="\t" '{ if ($1=="var1" && $2=="DEL") print $3 }' \
-  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-> var1_del.tsv
-awk -v FS="\t" '{ if ($1=="var1" && $2=="DUP") print $3 }' \
-  ${freq_code}.prior_estimation.empirical_prior_estimates.tsv \
-> var1_dup.tsv
 
 # Compute BFDP per gene
 for CNV in DEL DUP; do
@@ -394,8 +410,6 @@ for CNV in DEL DUP; do
 done
 
 
-
-
 # Score genes for a single model & CNV type
 # Dev/test parameters
 gsutil -m cp \
@@ -412,8 +426,6 @@ raw_gene_features="gencode.v19.canonical.pext_filtered.all_features.no_variation
 max_true_bfdp=0.5
 min_false_bfdp=0.5
 model="logit"
-elnet_alpha=0.1
-elnet_l1_l2_mix=1
 
 # Copy necessary references
 gsutil -m cp \
@@ -451,8 +463,8 @@ esac
   --model ${model} \
   --max-true-bfdp ${max_true_bfdp} \
   --min-false-bfdp ${min_false_bfdp} \
-  --regularization-alpha ${elnet_alpha} \
-  --regularization-l1-l2-mix ${elnet_l1_l2_mix} \
+  --chromsplit \
+  --no-out-of-sample-prediction \
   --outfile ${freq_code}.${CNV}.gene_scores.${model}.tsv \
   ${BFDP_stats} \
   ${gene_features}
@@ -494,7 +506,7 @@ if ! [ -e $compdir ]; then
 fi
 for CNV in DEL DUP; do
   for wrapper in 1; do
-    for model in logit svm randomforest lda naivebayes sgd neuralnet ensemble; do
+    for model in logit svm randomforest lda naivebayes neuralnet gbdt knn ensemble; do
       echo $model
       echo ${freq_code}.$CNV.gene_scores.$model.tsv
     done | paste - -

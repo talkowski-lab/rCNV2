@@ -22,10 +22,10 @@ export rCNV_bucket="gs://rcnv_project"
 
 # Download necessary reference files
 mkdir refs/
-gsutil -m cp ${rCNV_bucket}/refs/** refs/
-gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/GRCh37.genome refs/
-gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/rCNV_metacohort* refs/
-gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/HPOs_by_metacohort.table.tsv refs/
+gsutil -m cp \
+  ${rCNV_bucket}/refs/** \
+  ${rCNV_bucket}/analysis/analysis_refs/* \
+  refs/
 mkdir cnvs/
 gsutil -m cp ${rCNV_bucket}/cleaned_data/cnv/noncoding/** cnvs/
 
@@ -453,15 +453,20 @@ gsutil -m cp \
   ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/
 
 
+
+
 # Development parameters for curate_annotations.wdl
 prefix="all_tracks"
 tracklist="test.annotations.list"
 min_element_size=5
 max_element_size=200000
-case_hpo="HP:0000707"
 min_element_overlap=1.0
-p_cutoff=0.01
-track_prefix="encode_tfbs"
+p_cutoff=0.05
+track_prefix="test_annotations"
+
+# Make dummy file of 10 annotations for development purposes
+gsutil -m cat ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/misc_genome_annotations.track_urls.list \
+| shuf | head -n10 > test.annotations.list
 
 # Curate all annotations in an arbitrary input list of paths
 while IFS=$'\t' read path tprefix; do
@@ -482,7 +487,6 @@ while IFS=$'\t' read path tprefix; do
 done < ${tracklist}
 export IFS=$' \t\n'
 
-
 # Compute CNV counts per annotation track per metacohort per CNV type
 cat *.curated.stats.tsv | fgrep -v "#" | sort -Vk1,1 | uniq \
 | awk -v FS="\t" -v OFS="\t" '{ print $0, $1".curated.bed.gz " }' \
@@ -493,10 +497,10 @@ cat *.curated.stats.tsv | fgrep -v "#" | sort -Vk1,1 | uniq \
 while read cohort; do
   for dummy in 1; do
     echo $cohort
+    fgrep -w $cohort refs/rCNV2.hpos_by_severity.developmental.counts.tsv | cut -f2
     cidx=$( sed -n '1p' refs/HPOs_by_metacohort.table.tsv \
             | sed 's/\t/\n/g' \
             | awk -v cohort=$cohort '{ if ($1==cohort) print NR }' )
-    fgrep -w ${case_hpo} refs/HPOs_by_metacohort.table.tsv | cut -f$cidx
     fgrep -w "HEALTHY_CONTROL" refs/HPOs_by_metacohort.table.tsv | cut -f$cidx
     echo -e "cnvs/$cohort.rCNV.strict_noncoding.bed.gz"
   done | paste -s
@@ -504,21 +508,17 @@ done < <( fgrep -v mega refs/rCNV_metacohort_list.txt | cut -f1 ) \
 > metacohorts.input.tsv
 /opt/rCNV2/data_curation/genome_annotations/count_cnvs_per_track.py \
   --cohorts metacohorts.input.tsv \
+  --hpo-list refs/rCNV2.hpos_by_severity.developmental.list \
   --track-stats ${prefix}.stats.tsv \
   --frac-overlap ${min_element_overlap} \
-  --case-hpo ${case_hpo} \
   --norm-by-samplesize \
   --outfile ${prefix}.stats.with_counts.tsv.gz \
   --gzip 
 
 
 # # Dev code:
-# gsutil -m cp \
-#   gs://fc-cc4e446a-02a8-44af-bb70-2ca6013099b4/83202b3d-9437-41aa-a82b-2d0c933d02d7/curate_annotations/84695746-fc0d-4781-9a64-b2b71323ea07/call-merge_chromhmm/rCNV.chromhmm.merged_stats.with_counts.tsv.gz \
-#   gs://fc-cc4e446a-02a8-44af-bb70-2ca6013099b4/83202b3d-9437-41aa-a82b-2d0c933d02d7/curate_annotations/84695746-fc0d-4781-9a64-b2b71323ea07/call-merge_tracklists/cacheCopy/rCNV.all_tracks.list \
-#   ./
-# stats=rCNV.chromhmm.merged_stats.with_counts.tsv.gz
-# merged_tracklist=rCNV.all_tracks.list
+# stats=${prefix}.stats.with_counts.tsv.gz
+# merged_tracklist=test.annotations.list
 
 
 # Burden meta-analysis of cohort CNV counts for each track

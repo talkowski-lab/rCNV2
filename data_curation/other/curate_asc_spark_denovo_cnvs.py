@@ -18,23 +18,7 @@ from os import path
 import subprocess
 
 
-def load_phenos(phenos_in):
-    """
-    Load mappings of sample ID : phenotype as dict
-    """
-
-    phenos = {}
-
-    with open(phenos_in) as fin:
-        reader = csv.reader(fin, delimiter='\t')
-        for child, pheno in reader:
-            if child not in phenos.keys():
-                phenos[child] = pheno
-
-    return phenos
-
-
-def load_cnvs(cnvs_in, phenos):
+def load_cnvs(cnvs_in, max_size=20000000):
     """
     Load and filter de novo CNVs
     """
@@ -43,17 +27,14 @@ def load_cnvs(cnvs_in, phenos):
 
     cnvs = pd.read_csv(cnvs_in, sep='\t')
     
-    keep_rows = ((cnvs['sample'].isin(phenos.keys())) & \
-                 (cnvs['chr'].isin(elig_chroms)) & \
-                 (cnvs['chr_prop'] <= 0.8) &
-                 (cnvs['inheritance'] == 'denovo'))
-    keep_cols = cnvs.columns.isin('chr start end call sample'.split())
+    keep_rows = ((cnvs.chr.isin(elig_chroms)) & (cnvs.end - cnvs.start <= max_size))
+    keep_cols = cnvs.columns.isin('chr start end sample call Affected_Status'.split())
 
     cnvs = cnvs.loc[keep_rows, keep_cols]
 
-    cnvs['pheno'] = cnvs['sample'].map(phenos)
+    cnvs['pheno'] = cnvs.Affected_Status.map({1 : 'Control', 2 : 'ASD'})
     cnvs = cnvs['chr start end sample call pheno'.split()]
-    return cnvs.rename(columns={'chr' : '#chr', 'call' : 'cnv', 'sample' : 'child_id'})
+    return cnvs.rename(columns={'chr' : '#chr', 'call' : 'cnv'})
 
 
 def main():
@@ -66,7 +47,6 @@ def main():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('cnvs', help='.tsv of de novo cnvs.')
-    parser.add_argument('phenos', help='.tsv of child IDs and phenotypes.')
     parser.add_argument('-o', '--outbed', default='stdout', help='Output .bed of ' +
                         'curated cnvs. [default: stdout]')
     parser.add_argument('-z', '--bgzip', dest='bgzip', action='store_true',
@@ -85,12 +65,8 @@ def main():
             bgzip = args.bgzip
         outbed = open(outbed_path, 'w')
 
-
-    # Load phenotypes
-    phenos = load_phenos(args.phenos)
-
     # Load and filter CNVs
-    cnvs = load_cnvs(args.cnvs, phenos)
+    cnvs = load_cnvs(args.cnvs)
 
     # Write CNVs to outfile
     cnvs.to_csv(outbed, sep='\t', index=False)

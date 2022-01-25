@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -17,9 +17,9 @@ options(scipen=10000, stringsAsFactors=F)
 #################
 ### FUNCTIONS ###
 #################
-# Load track stats 
+# Load track stats
 load.stats <- function(stats.in, cnv.split=T){
-  stats <- read.table(stats.in, sep="\t", comment.char="", 
+  stats <- read.table(stats.in, sep="\t", comment.char="",
                       check.names=F, header=T)
   colnames(stats)[1] <- gsub("#", "", colnames(stats)[1], fixed=T)
   if(cnv.split==T){
@@ -45,7 +45,7 @@ saddlepoint.adj <- function(zscores, neglog10=T, min.p=10e-300){
   zscores <- zscores - mu.hat
   cumuls <- gaussianCumulants(0, sd.hat)
   dx <- 0.01
-  x <- seq(min(min(zscores, na.rm=T), -40), 
+  x <- seq(min(min(zscores, na.rm=T), -40),
            max(max(zscores, na.rm=T), 40), dx)
   saddle.pdf <- saddlepoint(x, 1, cumuls)$approx
   saddle.cdf <- caTools::cumsumexact(saddle.pdf * dx)
@@ -79,7 +79,7 @@ saddlepoint.adj <- function(zscores, neglog10=T, min.p=10e-300){
 calc.ors <- function(stats, cohorts, spa=T){
   or.df <- as.data.frame(do.call("cbind", lapply(cohorts, function(cohort){
     ors <- as.data.frame(t(sapply(1:nrow(stats), function(i){
-      as.numeric(metafor::escalc("OR", 
+      as.numeric(metafor::escalc("OR",
                       ai=stats[i, paste(cohort, "control", "ref", sep="_")],
                       bi=stats[i, paste(cohort, "case", "ref", sep="_")],
                       ci=stats[i, paste(cohort, "control", "alt", sep="_")],
@@ -130,17 +130,21 @@ weighted.z <- function(stats, cohorts, spa=T){
 # Volcano plot
 volcano <- function(meta.res, p.cutoff=-log10(0.05), color="red", ymax=NULL){
   if(is.null(ymax)){
-    ymax <- max(p.cutoff, max(meta.res$meta.neg.log10_p, na.rm=T))
+    ymax <- max(p.cutoff, max(meta.res$meta.neglog10_p, na.rm=T))
   }
   ylims <- c(0, ymax)
   xlims <- range(meta.res$meta.lnOR)
-  sig <- which(meta.res$meta.zscore>0 & meta.res$meta.neg.log10_p>=p.cutoff)
+  sig <- (meta.res$meta.zscore > 0 & meta.res$meta.neglog10_p >= p.cutoff)
+  sig.idxs <- which(sig)
+  nonsig.idxs <- which(!sig)
   par(mar=c(3.5, 3.5, 1.3, 1))
   plot(NA, xlim=xlims, ylim=ylims, xlab="", ylab="")
   abline(v=0)
   segments(x0=0, x1=par("usr")[2], y0=p.cutoff, y1=p.cutoff, lty=2, col=color)
-  points(meta.res$meta.lnOR[-sig], meta.res$meta.neg.log10_p[-sig], cex=0.2, col="gray30")
-  points(meta.res$meta.lnOR[sig], meta.res$meta.neg.log10_p[sig], cex=0.2, col=color)
+  points(meta.res$meta.lnOR[nonsig.idxs], meta.res$meta.neglog10_p[nonsig.idxs],
+         cex=0.2, col="gray30")
+  points(meta.res$meta.lnOR[sig.idxs], meta.res$meta.neglog10_p[sig.idxs],
+         cex=0.2, col=color)
   mtext(1, line=2.25, text=bquote(italic("ln") * (OR)))
   mtext(2, line=2, text=bquote(-log[10](italic(P))))
 }
@@ -150,6 +154,7 @@ volcano <- function(meta.res, p.cutoff=-log10(0.05), color="red", ymax=NULL){
 ###RSCRIPT BLOCK
 ################
 # Load required libraries
+require(rCNV2, quietly=T)
 require(optparse, quietly=T)
 require(metafor, quietly=T)
 require(EQL, quietly=T)
@@ -157,14 +162,14 @@ require(caTools, quietly=T)
 
 # List of command-line options
 option_list <- list(
-  make_option(c("--cutoff"), type="numeric", default=0.05, 
+  make_option(c("--cutoff"), type="numeric", default=0.05,
               help="meta-analysis P-value (or FDR q-value) cutoff to consider a track significant [default '%default']",
               metavar="numeric"),
   make_option(c("--use-fdr"), action="store_true", default=FALSE,
               help="use FDR q-value for determining significance (rather than P-value) [default %default]"),
-  make_option(c("--signif-tracks"), type="character",  
+  make_option(c("--signif-tracks"), type="character",
               help="output file for significant tracks", metavar="string"),
-  make_option(c("--volcano"), type="character",  
+  make_option(c("--volcano"), type="character",
               help="path to (optional) volcano plot .png", metavar="string")
 )
 
@@ -183,11 +188,11 @@ signif.outfile <- opts$`signif-tracks`
 volcano.out <- opts$`volcano`
 
 # # Dev parameters
-# stats.in <- "~/scratch/rCNV.all.merged_stats.with_counts.tsv.gz"
-# outfile <- "~/scratch/rCNV.chromhmm_plus_encode_plus_enhancers.test.tsv"
+# stats.in <- "~/scratch/all_tracks.stats.with_counts.tsv.gz"
+# outfile <- "~/scratch/rCNV.noncoding.test.tsv"
 # cutoff <- -log10(0.05)
 # use.fdr <- F
-# signif.outfile <- "~/scratch/rCNV.rCNV.chromhmm_plus_encode_plus_enhancers.test.signif_tracks.list"
+# signif.outfile <- "~/scratch/rCNV.noncoding.test.signif_tracks.list"
 # volcano.out <- "~/scratch/test.volcano.png"
 
 # Read track stats and split by CNV type
@@ -204,9 +209,9 @@ meta.res <- as.data.frame(do.call("rbind", meta.res.split))
 # Extract significant track names
 if(!is.null(signif.outfile)){
   if(use.fdr==T){
-    sig.idx <- which(meta.res$meta.neg.log10_fdr_q >= cutoff & meta.res$meta.zscore > 0)
+    sig.idx <- which(meta.res$meta.neglog10_fdr_q >= cutoff & meta.res$meta.zscore > 0)
   }else{
-    sig.idx <- which(meta.res$meta.neg.log10_p >= cutoff & meta.res$meta.zscore > 0)
+    sig.idx <- which(meta.res$meta.neglog10_p >= cutoff & meta.res$meta.zscore > 0)
   }
   if(length(sig.idx) > 0){
     sig.tracks <- unique(meta.res[sig.idx, which(colnames(meta.res) %in% c("trackname", "original_path"))])
@@ -224,9 +229,11 @@ write.table(meta.res, outfile, sep="\t",
 if(!is.null(volcano.out)){
   png(volcano.out, height=4*300, width=8*300, res=300)
   par(mfrow=c(1, 2))
-  volcano(meta.res.split$DEL, p.cutoff=cutoff, color="red", ymax=max(meta.res$meta.neg.log10_p, na.rm=T))
+  volcano(meta.res.split$DEL, p.cutoff=cutoff, color=cnv.colors["DEL"],
+          ymax=max(meta.res$meta.neglog10_p, na.rm=T))
   mtext(3, line=0.1, text="Deletions", col="red", font=2)
-  volcano(meta.res.split$DUP, p.cutoff=cutoff, color="blue", ymax=max(meta.res$meta.neg.log10_p, na.rm=T))
+  volcano(meta.res.split$DUP, p.cutoff=cutoff, color=cnv.colors["DUP"],
+          ymax=max(meta.res$meta.neglog10_p, na.rm=T))
   mtext(3, line=0.1, text="Duplications", col="blue", font=2)
   dev.off()
 }

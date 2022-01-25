@@ -9,7 +9,7 @@ MAINTAINER "Ryan Collins <rlcollins@g.harvard.edu>"
 
 # Install make, zlib, unzip, and locales
 RUN apt-get -qqy update && \
-    apt-get -qqy install --fix-missing build-essential zlib1g-dev unzip locales
+    apt-get -qqy install --fix-missing build-essential coreutils less zlib1g-dev unzip locales
 
 # Install other system libraries required for R packages
 RUN apt-get -qqy update && \
