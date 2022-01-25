@@ -66,12 +66,16 @@ summed.oe <- function(obs.exp.df, indexes=NULL){
 
 # Compute obs/exp DNMs for a single consequence & cohort for a set of genes
 calc.dnm.oe.single <- function(genes, meta, cohort, csq){
-  obs.exp.df <- meta[which(meta$gene %in% genes),
-                     grep(paste(cohort, "dn", csq, sep="_"), colnames(meta))]
-  oe <- summed.oe(obs.exp.df)
-  ci <- boot.ci(boot(data=obs.exp.df, statistic=summed.oe, R=1000),
-                conf=0.95, type="norm")$normal[, -1]
-  as.numeric(c(oe, ci))
+  if(length(genes) > 0){
+    obs.exp.df <- meta[which(meta$gene %in% genes),
+                       grep(paste(cohort, "dn", csq, sep="_"), colnames(meta))]
+    oe <- summed.oe(obs.exp.df)
+    ci <- boot.ci(boot(data=obs.exp.df, statistic=summed.oe, R=1000),
+                  conf=0.95, type="norm")$normal[, -1]
+    as.numeric(c(oe, ci))
+  }else{
+    c(NA, NA, NA)
+  }
 }
 
 # Compute obs/exp DNMs for a single consequence & cohort for all sets of genes
@@ -122,7 +126,7 @@ calc.frac.bcas <- function(gene.groups, meta){
 # Plot rCNV score vs. DNM enrichment for a single cohort
 plot.dnm.oe <- function(scores, score, meta, cohort, csqs, n.bins=10,
                         xlab=NULL, ylab=NULL, ymax=NULL, blue.bg=TRUE,
-                        parmar=c(2.25, 2.6, 0.5, 0.5)){
+                        parmar=c(2.25, 2.2, 0.5, 0.5)){
   # Collect plot data
   gene.groups <- bin.genes(scores, score, n.bins)
   plot.dat <- calc.dnm.oe.cohort(gene.groups, meta, cohort, csqs)
@@ -183,13 +187,13 @@ plot.dnm.oe <- function(scores, score, meta, cohort, csqs, n.bins=10,
   axis(2, at=c(-100, 100), col=blueblack, tck=0, labels=NA)
   axis(2, at=y.ax.at, labels=NA, tck=-0.025, col=blueblack)
   axis(2, at=y.ax.at, tick=F, line=-0.65, las=2)
-  mtext(2, text=ylab, line=1.6)
+  mtext(2, text=ylab, line=1.2)
 }
 
 # Plot rCNV score vs. BCA disruptions
 plot.bca.fracs <- function(scores, score, meta, n.bins=10,
-                        xlab=NULL, ymax=NULL, blue.bg=TRUE,
-                        parmar=c(2.25, 4, 0.5, 0.5)){
+                           xlab=NULL, ymax=NULL, blue.bg=TRUE,
+                           parmar=c(2.25, 4, 0.5, 0.5)){
   # Collect plot data
   gene.groups <- bin.genes(scores, score, n.bins)
   all.plot.dat <- calc.frac.bcas(gene.groups, meta)

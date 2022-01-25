@@ -17,18 +17,6 @@ options(stringsAsFactors=F, scipen=1000)
 ######################
 ### DATA FUNCTIONS ###
 ######################
-# Load a list of OMIM gene lists per HPO
-load.omim.lists <- function(omimlists.in){
-  # Expects a two-column tsv of (hpo, path) pairs
-  olist <- read.table(omimlists.in, sep="\t", header=F)
-  hpos <- as.character(olist[, 1])
-  glists <- lapply(1:nrow(olist), function(i){
-    unique(sort(as.character(read.table(olist[i, 2], header=F)[, 1])))
-  })
-  names(glists) <- hpos
-  return(glists)
-}
-
 # Annotate a single gene based on OMIM, HPO, and constraint
 annotate.gene <- function(gene, hpos, omim.genes, lof.genes, mis.genes){
   # OMIM comparisons
@@ -283,7 +271,7 @@ assocs <- load.gene.associations(assocs.in)
 # Load gene lists for annotations
 lof.genes <- read.table(lof.in, header=F)[, 1]
 mis.genes <- read.table(mis.in, header=F)[, 1]
-omim.genes <- load.omim.lists(omimlists.in)
+omim.genes <- load.gene.lists(omimlists.in)
 
 # Plot gene grid for all genes
 gene.groups <- categorize.genes(credsets)

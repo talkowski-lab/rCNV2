@@ -14,14 +14,6 @@
 ######################
 ### DATA FUNCTIONS ###
 ######################
-# Load a list of gene lists
-load.gene.lists <- function(genelists.in){
-  x <- read.table(genelists.in, header=F, sep="\t")
-  genelists <- lapply(x[, 2], function(path){unique(read.table(path, header=F)[, 1])})
-  names(genelists) <- as.character(x[, 1])
-  return(genelists)
-}
-
 # Append one-hot features of membership per gene for a list of gene lists
 append.glist.feats <- function(feats, genelists){
   for(i in 1:length(genelists)){

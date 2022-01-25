@@ -250,12 +250,17 @@ zcat rCNV.gene_scoring.training_gene_excludelist.bed.gz \
 | fgrep -v "#" | cut -f4 | sort | uniq \
 > rCNV.gene_scoring.excluded_training_genes.list
 /opt/rCNV2/analysis/paper/plot/gene_scores/empirical_score_cutoffs.R \
+  --cutoffs-tsv-out ${prefix}.gene_score_cutoffs.tsv \
   rCNV.gene_scores.tsv.gz \
   empirical_score_cutoff.meta_inputs.tsv \
   refs/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
   rCNV.gene_scoring.excluded_training_genes.list \
   basic_distribs/${prefix}
+gsutil -m cp \
+  ${prefix}.gene_score_cutoffs.tsv \
+  gs://rcnv_project/analysis/analysis_refs/
 /opt/rCNV2/analysis/paper/plot/gene_scores/plot_scores_scatter.R \
+  --score-cutoffs ${prefix}.gene_score_cutoffs.tsv \
   rCNV.gene_scores.tsv.gz \
   basic_distribs/${prefix}
 /opt/rCNV2/analysis/paper/plot/gene_scores/score_vs_score_correlations.R \
@@ -303,8 +308,6 @@ echo -e "Olfactory receptors\trefs/gene_lists/olfactory_receptors.genes.list\tFA
 if ! [ -e enrichments ]; then
   mkdir enrichments
 fi
-### TODO: FINISH UPGRADING THIS TO REFLECT NEW ASC DATA
-### TODO: COULD CONSIDER ADDING OTHER NEW SCORES TO THESE COMPARISONS
 /opt/rCNV2/analysis/paper/plot/gene_scores/plot_asd_denovo_cnv_analysis.R \
   rCNV.gene_scores.tsv.gz \
   refs/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
@@ -380,8 +383,8 @@ fi
 if ! [ -e basic_distribs ]; then
   mkdir basic_distribs
 fi
-# TODO: FIX SEGMENT LABELS IN PLOTS
 /opt/rCNV2/analysis/paper/plot/gene_scores/driver_gene_prediction.R \
+  --score-cutoffs ${prefix}.gene_score_cutoffs.tsv \
   rCNV.gene_scores.tsv.gz \
   refs/${prefix}.master_segments.bed.gz \
   basic_distribs/${prefix}

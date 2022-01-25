@@ -223,6 +223,27 @@ load.genelist <- function(path){
 }
 
 
+#' Load a list of gene lists
+#'
+#' Loads a list of gene lists from an input .tsv
+#'
+#' @param genelists.in input .tsv (see `details`)
+#'
+#' @returns list of character vectors, one per row in `genelists.in`
+#'
+#' @details `genelists.in` must be a .tsv with the following two columns:
+#' 1. gene list name
+#' 2. path to flat .txt file with all genes in list
+#'
+#' @export
+load.gene.lists <- function(genelists.in){
+  x <- read.table(genelists.in, header=F, sep="\t")
+  genelists <- lapply(x[, 2], load.genelist)
+  names(genelists) <- as.character(x[, 1])
+  return(genelists)
+}
+
+
 #' Load mutation rates
 #'
 #' Load a table of gene-specific mutation rates

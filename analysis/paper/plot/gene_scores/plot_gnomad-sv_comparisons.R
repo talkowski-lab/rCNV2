@@ -196,7 +196,7 @@ plot.oe <- function(oe.dat, scores, score, var, metric="oe", n.bins=10,
 plot.oe.by.scorebin <- function(oe.dat, scores, score, var, metric="oe", n.bins=10,
                                 x.label=NULL, parse.x.label=T, x.label.line=2,
                                 x.ax.labels=NULL, parse.x.ax.labels=T, ylims=NULL,
-                                cex.x.ax.labels=1, pt.color=blueblack,
+                                cex.x.ax.labels=1, cnv.label="CNVs", pt.color=blueblack,
                                 baseline.color=blueblack, null.color=bluewhite,
                                 blue.bg=TRUE, parmar=c(3.5, 3.5, 0.5, 0.5)){
   # Collect plot data
@@ -266,9 +266,9 @@ plot.oe.by.scorebin <- function(oe.dat, scores, score, var, metric="oe", n.bins=
   axis(2, at=y.ax.at, col=blueblack, labels=NA, tck=-0.025)
   axis(2, at=y.ax.at, tick=F, labels=y.ax.at, las=2, line=-0.6)
   if(metric == "oe"){
-    mtext(2, text="Obs/Exp CNVs per Gene", line=1.75)
+    mtext(2, text=paste("Obs/Exp", cnv.label, "per Gene"), line=1.75)
   }else{
-    mtext(2, text="Mean CNVs per Gene", line=1.75)
+    mtext(2, paste("Mean", cnv.label, "per Gene"), line=1.75)
   }
 }
 
@@ -352,7 +352,7 @@ dev.off()
 pdf(paste(out.prefix, "scores_vs_gnomAD-SV.pHaplo_raw.quintiled_large.pdf", sep="."),
     height=2.75, width=2.1)
 plot.oe.by.scorebin(oe.dat, scores, "pHaplo", "gnomad_sv_lof_del", metric="mean", n.bins=5,
-                    x.label="All Autosomal Genes",
+                    x.label="All Autosomal Genes", cnv.label="LoF Dels.",
                     parse.x.label=F, x.label.line=1.1,
                     x.ax.labels=paste("\"Q\"[", 1:5, "]", sep=""),
                     parse.x.ax.labels=T, cex.x.ax.labels=0.9,
@@ -366,7 +366,7 @@ dev.off()
 pdf(paste(out.prefix, "scores_vs_gnomAD-SV.pTriplo_raw.quintiled_large.pdf", sep="."),
     height=2.75, width=2.1)
 plot.oe.by.scorebin(oe.dat, scores, "pTriplo", "gnomad_sv_cg", metric="mean", n.bins=5,
-                    x.label="All Autosomal Genes",
+                    x.label="All Autosomal Genes", cnv.label="CG Dups.",
                     parse.x.label=F, x.label.line=1.1,
                     x.ax.labels=paste("\"Q\"[", 1:5, "]", sep=""),
                     parse.x.ax.labels=T, cex.x.ax.labels=0.9,

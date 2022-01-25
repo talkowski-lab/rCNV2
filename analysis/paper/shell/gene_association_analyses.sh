@@ -165,6 +165,11 @@ cat rCNV.*.gene_fine_mapping.credible_sets_per_hpo.merged_no_variation_features.
 | fgrep -v "#" | sort -Vk1,1 -k2,2n -k3,3n -k4,4V \
 >> rCNV.prejoint.credsets.bed
 bgzip -f rCNV.prejoint.credsets.bed
+echo -e "PTV Constrained\trefs/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list" \
+> comparison_genesets.tsv
+echo -e "Mis. Constrained\trefs/gene_lists/gnomad.v2.1.1.mis_constrained.genes.list" \
+>> comparison_genesets.tsv
+
 if ! [ -e finemapping_distribs ]; then
   mkdir finemapping_distribs
 fi

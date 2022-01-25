@@ -59,7 +59,7 @@ merge.scores <- function(rcnv.scores, features, scores.to.keep){
 ##########################
 # Plot basic distribution for a single score
 plot.score.hist <- function(scores, score, n.bins=100, blue.bg=TRUE,
-                            parmar=c(1.1, 2.4, 1.1, 0.25)){
+                            parmar=c(1.1, 2.4, 0.25, 0.25)){
   # Extract plotting values
   vals <- as.numeric(scores[, score])
   vals <- vals[which(!is.na(vals))]

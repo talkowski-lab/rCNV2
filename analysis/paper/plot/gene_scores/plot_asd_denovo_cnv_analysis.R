@@ -50,22 +50,24 @@ anno.cnv.scores <- function(cnvs, scores.rCNV, scores.other){
 }
 
 # Compute odds ratio for a given subset of CNVs
-calc.or <- function(cnvs){
+calc.or <- function(cnvs, quiet=TRUE, continuity.correction=0.5){
   n.case.all <- asc_spark_samplesizes["ASD"]
   n.ctrl.all <- asc_spark_samplesizes["Control"]
   n.case.cnv <- length(unique(cnvs$sample[which(cnvs$pheno == "ASD")]))
   n.ctrl.cnv <- length(unique(cnvs$sample[which(cnvs$pheno == "Control")]))
   n.case.ref <- n.case.all - n.case.cnv
   n.ctrl.ref <- n.ctrl.all - n.ctrl.cnv
-  or.table <- matrix(c(n.ctrl.ref, n.case.ref, n.ctrl.cnv, n.case.cnv), nrow=2, byrow=T) + 0.5
+  or.table <- matrix(c(n.ctrl.ref, n.case.ref, n.ctrl.cnv, n.case.cnv), nrow=2, byrow=T) + continuity.correction
   colnames(or.table) <- c("Control", "ASD")
   rownames(or.table) <- c("Ref", "CNV")
-  print(or.table - 0.5)
+  if(!quiet){
+    print(or.table - continuity.correction)
+  }
   as.numeric(oddsratio.wald(or.table, correction=F)$measure[2, ])
 }
 
 # Compute odds ratios for CNVs binned by score (either percentile or absolute bin)
-calc.or.by.scorebin <- function(cnvs, score, n.bins=3, cnv.pct=TRUE){
+calc.or.by.scorebin <- function(cnvs, score, n.bins=3, cnv.pct=TRUE, marginal.ors=TRUE){
   bin.breaks <- seq(0, 1, length.out=n.bins+1)
   cnvs <- cnvs[which(!is.na(cnvs[, score])), ]
   if(cnv.pct==T){
@@ -74,7 +76,11 @@ calc.or.by.scorebin <- function(cnvs, score, n.bins=3, cnv.pct=TRUE){
     cnv.pct <- cnvs[, score]
   }
   ors <- as.data.frame(t(sapply(1:n.bins, function(i){
-    bin.cnvs <- cnvs[which(cnv.pct >= bin.breaks[i] & cnv.pct <= bin.breaks[i+1]), ]
+    if(marginal.ors){
+      bin.cnvs <- cnvs[which(cnv.pct >= bin.breaks[i] & cnv.pct <= bin.breaks[i+1]), ]
+    }else{
+      bin.cnvs <- cnvs[which(cnv.pct >= bin.breaks[i]), ]
+    }
     calc.or(bin.cnvs)
   })))
   colnames(ors) <- c("estimate", "lower", "upper")
@@ -164,10 +170,12 @@ prc.asd_cnv <- function(cnvs, phenos, score, steps=seq(1, 0, -0.001)){
 }
 
 # Wrapper to calculate all performance stats a single score vs. proband/sibling labels
-evaluate.score.asd_cnv <- function(cnvs, phenos, score){
-  roc.res <- roc.asd_cnv(cnvs, phenos, score)
+evaluate.score.asd_cnv <- function(cnvs, score){
+  # Add dummy column to CNVs to match rCNV2::roc() and rCNV2::prc()
+  cnvs$gene <- cnvs$pheno
+  roc.res <- rCNV2::roc(cnvs, score, "ASD", "Control")
   roc.auc <- flux::auc(roc.res$frac_false, roc.res$frac_true)
-  prc.res <- prc.asd_cnv(cnvs, phenos, score)
+  prc.res <- rCNV2::prc(cnvs, score, "ASD", "Control")
   prc.auc <- flux::auc(prc.res$recall, prc.res$precision)
   return(list("roc"=roc.res,
               "roc.auc"=roc.auc,
@@ -180,24 +188,30 @@ evaluate.score.asd_cnv <- function(cnvs, phenos, score){
 ### PLOTTING FUNCTIONS ###
 ##########################
 # Plot odds ratios for de novo CNVs by CNV score (either percentile or absolute bin)
-plot.or.by.scorebin <- function(cnvs, score, n.bins=3, cnv.pct=TRUE, print.ors=TRUE,
+plot.or.by.scorebin <- function(cnvs, score, n.bins=3, cnv.pct=TRUE, marginal.ors=TRUE, print.ors=TRUE,
+                                pt.type="p", pt.lwd=1, pt.cex=1.5, pt.color=blueblack,
+                                ci.type="bars", ci.color=pt.color,
+                                add.baseline=T, baseline.color=blueblack, blue.bg=TRUE, null.color=bluewhite,
                                 x.label=NULL, parse.x.label=T, x.label.line=2,
                                 x.ax.labels=NULL, parse.x.ax.labels=T,
-                                cex.x.ax.labels=1, pt.color=blueblack,
-                                baseline.color=blueblack, null.color=bluewhite,
-                                blue.bg=TRUE, parmar=c(3.5, 3.5, 0.5, 0.5)){
+                                cex.x.ax.labels=1, x.ax.labels.line=-1,
+                                fit.ylims.to="ci", ylim.buff.cex=1/3,
+                                parmar=c(3.5, 3.5, 0.5, 0.5)){
   # Gather plot data
   baseline <- log2(calc.or(cnvs)[1])
-  ors <- calc.or.by.scorebin(cnvs, score, n.bins, cnv.pct)
+  ors <- calc.or.by.scorebin(cnvs, score, n.bins, cnv.pct, marginal.ors)
   if(print.ors==TRUE){
     cat("ASD risk per score bin:\n")
     cat(paste(paste(round(ors[, 1], 3), collapse=", "), "\n"))
   }
   ors <- log2(ors)
   or.vals <- as.numeric(unlist(ors))
-  ylims <- range(or.vals[which(!is.infinite(or.vals) & !is.nan(or.vals) & !is.na(or.vals))])
-  if(ylims[1] > 0){
-    ylims[1] <- 0
+  if(fit.ylims.to == "ci"){
+    ylims <- range(or.vals[which(!is.infinite(or.vals) & !is.nan(or.vals) & !is.na(or.vals))])
+  }else if(fit.ylims.to == "mean"){
+    ylims <- range(ors[which(!is.infinite(ors[, 1]) & !is.nan(ors[, 1]) & !is.na(ors[, 1])), 1])
+    ylim.buff <- diff(ylims) * ylim.buff.cex
+    ylims <- ylims + c(-ylim.buff, ylim.buff)
   }
   if(blue.bg==TRUE){
     plot.bg <- bluewhite
@@ -213,31 +227,39 @@ plot.or.by.scorebin <- function(cnvs, score, n.bins=3, cnv.pct=TRUE, print.ors=T
 
   # Prep plot area
   par(mar=parmar, bty="n")
-  plot(NA, xlim=c(0, n.bins), ylim=ylims, xaxt="n", yaxt="n", xlab="", ylab="")
+  plot(NA, xlim=c(0, n.bins), ylim=ylims, xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i")
   rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
        border=plot.border, bty=plot.bty, col=plot.bg)
-  y.ax.at <- axTicks(2)
+  y.ax.at <- -10:10
   abline(h=y.ax.at, col=grid.col)
-  abline(h=c(0, baseline), lty=c(1, 2), col=c(null.color, baseline.color))
-  text(x=par("usr")[1]-(0.05*(par("usr")[2]-par("usr")[1])),
-       y=baseline+(0.035*(par("usr")[4]-par("usr")[3])),
-       labels="Baseline", cex=0.85, font=3, col=baseline.color, pos=4)
+  if(add.baseline){
+    abline(h=c(0, baseline), lty=c(1, 2), col=c(null.color, baseline.color))
+    text(x=par("usr")[1]-(0.05*(par("usr")[2]-par("usr")[1])),
+         y=baseline+(0.035*(par("usr")[4]-par("usr")[3])),
+         labels="Baseline", cex=0.85, font=3, col=baseline.color, pos=4)
+  }
 
   # Add points
   pt.x.at <- (1:n.bins)-0.5
-  segments(x0=pt.x.at, x1=pt.x.at, y0=ors$lower, y1=ors$upper, lend="round",
-           lwd=2.5, col=pt.color)
-  points(x=pt.x.at, y=ors$estimate, pch=19, col=pt.color, cex=1.5)
+  if(ci.type == "bars"){
+    segments(x0=pt.x.at, x1=pt.x.at, y0=ors$lower, y1=ors$upper, lend="round",
+             lwd=2.5, col=ci.color)
+  }else if(ci.type == "polygon"){
+    polygon(x=c(pt.x.at, rev(pt.x.at)), y=c(ors$lower, rev(ors$upper)),
+            bty="n", border=NA, col=ci.color)
+  }
+  points(x=pt.x.at, y=ors$estimate, type=pt.type,lwd=pt.lwd,
+         pch=19, col=pt.color, cex=pt.cex, xpd=T)
 
   # Add X axis
   if(!is.null(x.ax.labels)){
     sapply(1:length(pt.x.at), function(i){
       if(parse.x.ax.labels==T){
-        axis(1, at=pt.x.at[i], tick=F, line=-1, labels=parse(text=x.ax.labels[i]),
+        axis(1, at=pt.x.at[i], tick=F, line=x.ax.labels.line, labels=parse(text=x.ax.labels[i]),
              cex.axis=cex.x.ax.labels)
       }else{
-        axis(1, at=pt.x.at[i], tick=F, line=-1, labels=x.ax.labels[i],
+        axis(1, at=pt.x.at[i], tick=F, line=x.ax.labels.line, labels=x.ax.labels[i],
              cex.axis=cex.x.ax.labels)
       }
     })
@@ -282,7 +304,7 @@ if(length(args$args) != 4){
 scores.in <- args$args[1]
 constraint.meta.in <- args$args[2]
 asd_cnvs.in <- args$args[3]
-out.prefix <- args$args[5]
+out.prefix <- args$args[4]
 
 # # DEV PARAMETERS
 # scores.in <- "~/scratch/rCNV.gene_scores.tsv.gz"
@@ -301,57 +323,44 @@ cnvs <- load.cnvs(asd_cnvs.in)
 # Annotate CNVs with all scores
 cnvs <- anno.cnv.scores(cnvs, scores.rCNV, scores.other)
 
-# Plot odds ratios binned by pTriplo/pHaplo
-pdf(paste(out.prefix, "asc_spark_denovo_cnvs.odds_ratios.del.pdf", sep="."),
-    height=2.75, width=2.1)
-plot.or.by.scorebin(cnvs[which(cnvs$cnv=="DEL"), ], score="pHaplo", cnv.pct=T, n.bins=4,
-                    x.label="italic(\"De Novo\") ~ Deletions",
-                    parse.x.label=T, x.label.line=1.1,
-                    x.ax.labels=paste("\"Q\"[", 1:4, "]", sep=""),
-                    parse.x.ax.labels=T, cex.x.ax.labels=0.9,
-                    pt.color=cnv.colors[1], baseline.color=control.cnv.colors[1],
+# Plot odds ratios of CNVs ranked by pTriplo/pHaplo
+lapply(list(c("DEL", "pHaplo", "Deletions", 2),
+            c("DUP", "pTriplo", "Duplications", 2.15)),
+       function(vals){
+  pdf(paste(out.prefix, "asc_spark_denovo_cnvs.odds_ratios",
+            tolower(vals[1]), "pdf", sep="."),
+      height=3, width=2.25)
+  plot.or.by.scorebin(cnvs[which(cnvs$cnv==vals[1]), ], score=vals[2], cnv.pct=T, n.bins=3,
+                      x.label=paste("italic(\"De Novo\") ~", vals[3]),
+                      parse.x.label=T, x.label.line=vals[4],
+                      x.ax.labels=paste(c("Bottom", "Mid.", "Top"), "33%", sep="\n"),
+                      parse.x.ax.labels=F, cex.x.ax.labels=0.9, x.ax.labels.line=-0.25,
+                      pt.color=cnv.colors[vals[1]], baseline.color=control.cnv.colors[vals[1]],
+                      null.color=blueblack, blue.bg=FALSE,
+                      parmar=c(4, 2.5, 0.5, 0.25))
+  mtext(1, line=2.9, text=paste("Ranked by", vals[2]))
+  dev.off()
+})
+
+# Plot odds ratios of CNVs vs. sliding pTriplo/pHaplo thresholds
+lapply(list(c("pHaplo", "DEL", 0.2),
+            c("pTriplo", "DUP", 0.5)),
+       function(vals){
+pdf(paste(out.prefix, ".asc_spark_denovo_cnvs.odds_ratios.sliding_",
+          vals[1], "_cutoff.", tolower(vals[2]), ".pdf", sep=""),
+    height=2, width=2.5)
+plot.or.by.scorebin(cnvs[which(cnvs$cnv==vals[2]), ], score=vals[1], cnv.pct=F,
+                    marginal.ors=F, n.bins=100, print.ors=F, pt.type="l",
+                    pt.lwd=3, pt.color=cnv.colors[vals[2]], ci.type="polygon",
+                    ci.color=cnv.whites[vals[2]], x.label=paste(vals[1], "Cutoff"),
+                    parse.x.label=F, x.label.line=1.1, add.baseline=F,
+                    fit.ylims.to="mean", ylim.buff.cex=as.numeric(vals[3]),
                     null.color=blueblack, blue.bg=FALSE,
-                    parmar=c(3.25, 2.75, 0.5, 0.5))
-mtext(1, line=2.1, text="in Quartiles by pHaplo")
+                    parmar=c(2.25, 2.5, 0.5, 0.25))
+axis(1, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
+axis(1, at=seq(0, 100, 25), tick=F, line=-0.9, labels=seq(0, 1, 0.25), cex.axis=0.9)
 dev.off()
-pdf(paste(out.prefix, "asc_spark_denovo_cnvs.odds_ratios.dup.pdf", sep="."),
-    height=2.75, width=2.1)
-plot.or.by.scorebin(cnvs[which(cnvs$cnv=="DUP"), ], score="pTriplo", cnv.pct=T, n.bins=4,
-                    x.label="italic(\"De Novo\") ~ Duplications",
-                    parse.x.label=T, x.label.line=1.25,
-                    x.ax.labels=paste("\"Q\"[", 1:4, "]", sep=""),
-                    parse.x.ax.labels=T, cex.x.ax.labels=0.9,
-                    pt.color=cnv.colors[2], baseline.color=control.cnv.colors[2],
-                    null.color=blueblack, blue.bg=FALSE,
-                    parmar=c(3.25, 2.75, 0.5, 0.5))
-mtext(1, line=2.1, text="in Quartiles by pTriplo")
-dev.off()
-
-### TODO: Evaluate performance stratification vs. number of genes
-# DEV CODE
-calc.or(cnvs[which(cnvs$cnv == "DEL" & cnvs$n_genes==1 & cnvs$pHaplo<0.8), ])
-calc.or(cnvs[which(cnvs$cnv == "DEL" & cnvs$n_genes==1 & cnvs$pHaplo>0.8), ])
-# DEV CODE COMPARE VS LOEUF
-calc.or(cnvs[which(cnvs$cnv == "DEL" & cnvs$n_genes==1 & cnvs$gnomad_oe_lof_upper<0.4), ])
-calc.or(cnvs[which(cnvs$cnv == "DEL" & cnvs$n_genes==1 & cnvs$gnomad_oe_lof_upper>0.8), ])
-
-
-### TODO: Evaluate odds ratio vs. sliding score window
-# DEV CODE
-del.or.by.filter <- do.call("rbind", lapply(seq(0, 0.99, 0.01), function(k){
-  calc.or(cnvs[which(cnvs$cnv == "DEL" & cnvs$pHaplo>=k), ])
-}))
-dup.or.by.filter <- do.call("rbind", lapply(seq(0, 0.99, 0.01), function(k){
-  calc.or(cnvs[which(cnvs$cnv == "DUP" & cnvs$pTriplo>=k), ])
-}))
-par(mfrow=c(1, 2))
-plot(x=seq(0, 0.99, 0.01), y=del.or.by.filter[, 1], type="l", lwd=3, col=cnv.colors[1],
-     xlab="pHaplo Cutoff", ylab="ASD Odds Ratio (dnDELs)", ylim=c(0, 15),
-     main="ASD Odds Ratio, De Novo Deletions\nWhen Filtered by pHaplo")
-plot(x=seq(0, 0.99, 0.01), y=dup.or.by.filter[, 1], type="l", lwd=3, col=cnv.colors[2],
-     xlab="pTriplo Cutoff", ylab="ASD Odds Ratio (dnDUPs)", ylim=c(0, 30),
-     main="ASD Odds Ratio, De Novo Duplications\nWhen Filtered by pTriplo")
-
+})
 
 # Plot odds ratios stratified by high/low pHaplo & pTriplo
 strat.ors <- calc.or.stratified(cnvs, high.cutoff=0.8, low.cutoff=0.5, norm.vs.baseline=F)
@@ -360,44 +369,43 @@ pdf(paste(out.prefix, "asc_spark_denovo_cnvs.odds_ratios.stratified.pdf", sep=".
 plot.stratified.metric(strat.ors, y.title="\"log\"[2](\"ASD Odds Ratio\")")
 dev.off()
 
-### TODO: REVISE THIS
-# # Evaluate performance of various scores vs. proband/sibling labels
-# del.evals <- lapply(all.scores, function(score){
-#   evaluate.score.asd_cnv(cnvs[which(cnvs$cnv=="DEL"), ], score=score)
-# })
-# dup.evals <- lapply(all.scores, function(score){
-#   evaluate.score.asd_cnv(cnvs[which(cnvs$cnv=="DUP"), ], score=score)
-# })
-#
-# # Assign colors for score comparison
-# score.colors <- c(cnv.colors[1:2], rev(viridis(ncol(scores.other)-1)))
-# score.text.colors <- rev(c(rep("white", 2),
-#                        rep("black", floor((ncol(scores.other)-1) / 2)),
-#                        rep("white", ceiling((ncol(scores.other)-1) / 2))))
-#
-# # Plot ROC
-# pdf(paste(out.prefix, "asc_spark_denovo_cnvs.roc.del.pdf", sep="."),
-#     height=2.75, width=2.75)
-# plot.roc(del.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
-# dev.off()
-# pdf(paste(out.prefix, "asc_spark_denovo_cnvs.roc.dup.pdf", sep="."),
-#     height=2.75, width=2.75)
-# plot.roc(dup.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
-# dev.off()
-#
-# # Plot PRC
-# pdf(paste(out.prefix, "asc_spark_denovo_cnvs.prc.del.pdf", sep="."),
-#     height=2.75, width=2.75)
-# plot.prc(del.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
-# dev.off()
-# pdf(paste(out.prefix, "asc_spark_denovo_cnvs.prc.dup.pdf", sep="."),
-#     height=2.75, width=2.75)
-# plot.prc(dup.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
-# dev.off()
-#
-# # Plot legend
-# pdf(paste(out.prefix, "asc_spark_denovo_cnvs.roc_prc.legend.pdf", sep="."),
-#     height=2.2, width=2.7)
-# simple.legend(labels=rev(score.names[all.scores]), colors=rev(score.colors))
-# dev.off()
+# Evaluate performance of various scores vs. proband/sibling labels
+del.evals <- lapply(all.scores, function(score){
+  evaluate.score.asd_cnv(cnvs[which(cnvs$cnv=="DEL"), ], score=score)
+})
+dup.evals <- lapply(all.scores, function(score){
+  evaluate.score.asd_cnv(cnvs[which(cnvs$cnv=="DUP"), ], score=score)
+})
+
+# Assign colors for score comparison
+score.colors <- c(cnv.colors[1:2], rev(viridis(ncol(scores.other)-1)))
+score.text.colors <- rev(c(rep("white", 2),
+                       rep("black", floor((ncol(scores.other)-1) / 2)),
+                       rep("white", ceiling((ncol(scores.other)-1) / 2))))
+
+# Plot ROC
+pdf(paste(out.prefix, "asc_spark_denovo_cnvs.roc.del.pdf", sep="."),
+    height=2.75, width=2.75)
+plot.roc(del.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
+dev.off()
+pdf(paste(out.prefix, "asc_spark_denovo_cnvs.roc.dup.pdf", sep="."),
+    height=2.75, width=2.75)
+plot.roc(dup.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
+dev.off()
+
+# Plot PRC
+pdf(paste(out.prefix, "asc_spark_denovo_cnvs.prc.del.pdf", sep="."),
+    height=2.75, width=2.75)
+plot.prc(del.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
+dev.off()
+pdf(paste(out.prefix, "asc_spark_denovo_cnvs.prc.dup.pdf", sep="."),
+    height=2.75, width=2.75)
+plot.prc(dup.evals, colors=score.colors, auc.text.colors=score.text.colors, grid.col=NA)
+dev.off()
+
+# Plot legend
+pdf(paste(out.prefix, "asc_spark_denovo_cnvs.roc_prc.legend.pdf", sep="."),
+    height=2.2, width=2.7)
+simple.legend(labels=rev(score.names[all.scores]), colors=rev(score.colors))
+dev.off()
 

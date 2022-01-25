@@ -790,8 +790,8 @@ task score_genes {
   runtime {
     docker: "${rCNV_docker}"
     preemptible: 1
-    memory: "32 GB"
-    cpu: "16"
+    memory: "16 GB"
+    cpu: "8"
     bootDiskSizeGb: "20"
   }
 

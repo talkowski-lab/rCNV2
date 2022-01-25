@@ -4,14 +4,24 @@
 \alias{classify.genes.by.score}
 \title{Partition genes by dosage sensitivity}
 \usage{
-classify.genes.by.score(scores, hc.cutoff = 0.9, lc.cutoff = 0.5)
+classify.genes.by.score(
+  scores,
+  hi.hc = 0.9,
+  hi.lc = 0.5,
+  ts.hc = 0.9,
+  ts.lc = 0.5
+)
 }
 \arguments{
 \item{scores}{data.frame of gene scores as loaded by \code{\link[=load.scores]{load.scores()}}}
 
-\item{hc.cutoff}{minimum score for high-confidence designation [default: 0.9]}
+\item{hi.hc}{minimum score for high-confidence haploinsufficient genes [default: 0.9]}
 
-\item{lc.cutoff}{minimum score for low-confidence designatnion [default: 0.5]}
+\item{hi.lc}{minimum score for low-confidence haploinsufficient genes [default: 0.5]}
+
+\item{ts.hc}{minimum score for high-confidence triplosensitive genes [default: 0.9]}
+
+\item{ts.lc}{minimum score for low-confidence triplosensitive genes [default: 0.5]}
 }
 \value{
 list of gene symbols for each group

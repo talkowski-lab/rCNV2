@@ -316,7 +316,7 @@ out.prefix <- args$args[7]
 # Load credible sets and associations
 credsets <- load.credsets(credsets.in)
 assocs <- load.gene.associations(assocs.in)
-credsets.prejoint <- load.credsets(credsets.prejoint.in)
+credsets.prejoint <- read.table(credsets.prejoint.in, header=T, sep="\t", comment.char="")
 
 # Load PIPs for all genes
 pips <- list("Prior" = load.pips(prior.pips.in),
@@ -387,4 +387,4 @@ plot.pip.hist(pips[[4]])
 dev.off()
 
 # Compare prior/posterior/full model for selected genes
-
+gsets <- load.gene.lists()
