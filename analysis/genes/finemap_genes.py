@@ -17,9 +17,9 @@ import pybedtools as pbt
 import numpy as np
 import pandas as pd
 from copy import deepcopy
-from sklearn.preprocessing import scale
-from statsmodels.genmod.generalized_linear_model import GLM
-from statsmodels.genmod import families
+from sklearn.preprocessing import scale, StandardScaler
+from sklearn.model_selection import GridSearchCV
+from sklearn.linear_model import ElasticNet
 from functools import reduce
 from scipy.stats import norm
 import networkx as nx
@@ -633,6 +633,92 @@ def make_sig_genes_df(hpo_data, naive=False, sig_only=False, cs_val=0.95):
     return sig_df.sort_values('PIP', ascending=False)
 
 
+def load_features(features_in):
+    """
+    Load & standardize gene features
+    """
+
+    # Read data & drop coordinates
+    features = pd.read_csv(features_in, delimiter='\t')
+    for colname in '#chr chr start end'.split():
+        if colname in features.columns:
+            features.drop(labels=colname, axis=1, inplace=True)
+
+    # Fill missing values with column-wise means
+    for col in features.columns.tolist()[1:]:
+        missing = (features[col] == '.')
+        if missing.sum() > 0:
+            fmean = np.nanmean(features.loc[~missing, col].astype(float))
+            features.loc[missing, col] = fmean
+
+    # Move gene name to row index
+    features.set_axis(features.gene, axis=0, inplace=True)
+    features.drop(labels='gene', axis=1, inplace=True)
+
+    # Apply sklearn standard normalization to features
+    scaler = StandardScaler().fit(features)
+    scaled_features = pd.DataFrame(scaler.transform(features),
+                                   columns=features.columns,
+                                   index=features.index)
+
+    return features
+
+
+def make_training_df(sig_df, features, xgenes=[], use_max_pip=False, gs_genes=set(), 
+                     neg_genes=set(), include_known_genes_in_training=False):
+    """
+    Construct training dataframe for logit
+    """
+
+    # When fitting regression, take mean (or max) of PIPs for genes appearing multiple times
+    # This can happen due to multiple HPO associations with the same gene
+    if use_max_pip:
+        sig_df = sig_df.loc[:, 'gene PIP'.split()].groupby('gene').max()
+    else:
+        sig_df = sig_df.loc[:, 'gene PIP'.split()].groupby('gene').mean()
+
+    # Drop excluded genes from training data
+    sig_df = sig_df.loc[~sig_df.index.isin(xgenes), :]
+
+    # Inject known causal/non-causal genes at PIP=1 or PIP=0, if optioned
+    if include_known_genes_in_training:
+        add_genes = [g for g in gs_genes.union(neg_genes) \
+                     if g not in sig_df.index.tolist()]
+        add_df = pd.DataFrame(pd.NA * len(add_genes), index=add_genes, columns=['PIP'])
+        sig_df = sig_df.append(add_df)
+        gs_dict = {g : {'PIP' : 1.0} for g in gs_genes}
+        sig_df.update(pd.DataFrame.from_dict(gs_dict, orient='index'))
+        neg_dict = {g : {'PIP' : 0.0} for g in neg_genes}
+        sig_df.update(pd.DataFrame.from_dict(neg_dict, orient='index'))
+
+    # Join sig_df with features for logit model
+    logit_df = sig_df.merge(features, how='left', left_index=True, right_index=True)
+    logit_df['PIP'] = logit_df['PIP'].astype('float64')
+
+    return logit_df
+
+
+class LogitRegression(ElasticNet):
+    """
+    Custom class of logit-link elastic net GLM because sklearn.LogisticRegression
+    doesn't support continuous targets (i.e., inclusion probabilities)
+
+    See this link for a discussion of the issue:
+    https://stackoverflow.com/questions/44234682/how-to-use-sklearn-when-target-variable-is-a-proportion
+    """
+
+    def fit(self, x, p, err=1e-10):
+        p = np.asarray(p)
+        p[p == 0] = err
+        p[p == 1] = 1 - err
+        y = np.log((p) / (1 - p))
+        return super().fit(x, y)
+
+    def predict(self, x):
+        y = super().predict(x)
+        return 1 / (np.exp(-y) + 1)
+
+
 def rmse(pairs):
     """
     Compute root mean-squared error for a list of tuples
@@ -643,30 +729,17 @@ def rmse(pairs):
     return np.sqrt(np.sum(mse) / len(pairs))
 
 
-def functional_finemap(hpo_data_orig, gene_features_in, l1_l2_mix, logit_alpha, 
-                       cs_val=1.0, null_variance=0.42 ** 2, exclude_genes=None,
-                       use_max_pip=False, converge_rmse=10e-8, max_iter=100, 
-                       quiet=False):
+def functional_finemap(hpo_data_orig, features, l1_l2_mix, logit_alpha, 
+                       grid_search=False, cs_val=1.0, null_variance=0.42 ** 2, 
+                       exclude_genes=None, use_max_pip=False, gs_genes=[], 
+                       neg_genes=[], include_known_genes_in_training=False, 
+                       converge_rmse=10e-8, max_iter=100, quiet=False):
     """
     Conduct E-M optimized functional fine-mapping for all gene blocks & HPOs
     Two returns:
         - pd.DataFrame of HPO data updated with new finemapping results
         - statsmodels.iolib.table.SimpleTable of final logit coefficients
     """
-
-    # Load gene features, standardize, and subset to genes present in any gene block
-    features = pd.read_csv(gene_features_in, delimiter='\t')
-    for colname in '#chr chr start end'.split():
-        if colname in features.columns:
-            features.drop(labels=colname, axis=1, inplace=True)
-    for col in features.columns.tolist()[1:]:
-        missing = (features[col] == '.')
-        if missing.sum() > 0:
-            fmean = np.nanmean(features.loc[~missing, col].astype(float))
-            features.loc[missing, col] = fmean
-    all_genes = make_sig_genes_df(hpo_data_orig, cs_val=1.0).gene.tolist()
-    features.iloc[:, 1:] = scale(features.iloc[:, 1:])
-    features = features.loc[features.gene.isin(all_genes), :]
 
     # Load list of genes to be excluded from training, if optioned
     if exclude_genes is not None:
@@ -687,8 +760,7 @@ def functional_finemap(hpo_data_orig, gene_features_in, l1_l2_mix, logit_alpha,
         hpo_data = deepcopy(hpo_data_orig)
 
         if not quiet:
-            msg = '\nStarting fine-mapping with null variance (W) = {:.5}\n' + \
-                  '  Iter.\tPIP RMSE\tCoeff. RMSE'
+            msg = '\nStarting fine-mapping with null variance (W) = {:.5}'
             print(msg.format(W))
 
         # Re-finemap each block with specified null variance (for BMA)
@@ -699,44 +771,49 @@ def functional_finemap(hpo_data_orig, gene_features_in, l1_l2_mix, logit_alpha,
                 updated_finemap_res = finemap(gene_priors, hpo_data[hpo]['all_genes'], W)
                 hpo_data[hpo]['blocks'][block_id]['finemap_res'] = updated_finemap_res
 
+        # Make initial training dataframe
+        sig_df = make_sig_genes_df(hpo_data, cs_val=1.0)
+        train_df = make_training_df(sig_df, features, xgenes, use_max_pip, gs_genes, 
+                                    neg_genes, include_known_genes_in_training)
+
+        # Optimize logit hyperparameters with grid search (if optioned)
+        if grid_search:
+            if not quiet:
+                print('Conducting grid search to optimize hyperparameters')
+            grid_params = {'alpha' : [10 ** x for x in range(-3, 4, 1)],
+                           'l1_ratio' : [x / 10 for x in range(0, 11, 1)]}
+            base_class = LogitRegression(tol=0.01, max_iter=10000)
+            best_model = GridSearchCV(base_class, grid_params, verbose=1, n_jobs=-1).\
+                         fit(train_df.drop(labels='PIP', axis=1), train_df.PIP).\
+                         best_estimator_
+        else:
+            best_model = LogitRegression(C=logit_alpha, l1_ratio=l1_l2_mix,
+                                         tol=0.01, max_iter=10000)
+        print('Logit model parameters:\n {}\n'.format(best_model))
+
         # Iterate until convergence
+        if not quiet:
+            print('  Iter.\tPIP RMSE\tCoeff. RMSE\n')
         coeffs = [0 for x in features.columns.tolist()[1:]]
         k = 0
         rmse_PIP, rmse_coeffs, prev_rmse_PIP, prev_rmse_coeffs = 100, 100, 100, 100
         while rmse_PIP >= converge_rmse or rmse_coeffs >= converge_rmse:
             k += 1
-            # Join sig_df with features for logistic regression
-            sig_df = make_sig_genes_df(hpo_data, cs_val=1.0)
-            logit_df = sig_df.loc[:, 'gene PIP'.split()].\
-                              merge(features, how='left', on='gene')
-            logit_df['PIP'] = logit_df['PIP'].astype('float64')
+            
+            # Make training dataframe
+            train_df = make_training_df(sig_df, features, xgenes, use_max_pip, gs_genes, 
+                                        neg_genes, include_known_genes_in_training)
 
-            # Drop excluded genes from training data
-            logit_df = logit_df.loc[~logit_df['gene'].isin(xgenes), :]
-
-            # When fitting regression, take mean (or max) of PIPs for genes appearing multiple times
-            # This can happen due to multiple HPO associations with the same gene
-            if use_max_pip:
-                logit_df = logit_df.groupby('gene').max()
-            else:
-                logit_df = logit_df.groupby('gene').mean()
-
-            # Fit logit GLM & predict new priors
-            glm = GLM(logit_df.PIP, logit_df.drop(labels='PIP', axis=1),
-                      family=families.Binomial())
-            if logit_alpha is None:
-                logit = glm.fit()
-            else:
-                logit = glm.fit_regularized(L1_wt = 1 - l1_l2_mix, alpha=logit_alpha)
-            pred_priors = logit.predict(features.drop(labels='gene', axis=1))
-            new_priors = features.gene.to_frame().join(pred_priors.to_frame(name='prior'))
+            # Fit logit & predict new priors
+            fitted_model = best_model.fit(train_df.drop(labels='PIP', axis=1), train_df.PIP)
+            pred_priors = fitted_model.predict(features)
+            new_priors = pd.Series(pred_priors, index=features.index)
             
             # Re-finemap all blocks with new priors
             for hpo in hpo_data.keys():
                 for block_id, block_data in hpo_data[hpo]['blocks'].items():
                     genes = list(block_data['finemap_res'].keys())
-                    gene_priors = {gene : new_priors[new_priors.gene == gene].iloc[0]['prior'] \
-                                   for gene in genes}
+                    gene_priors = {gene : new_priors.get(gene, pd.NA) for gene in genes}
                     # Normalize new priors within each block such that sum(priors) = 1
                     sum_priors = np.sum(list(gene_priors.values()))
                     gene_priors = {g : p / sum_priors for g, p in gene_priors.items()}
@@ -750,7 +827,7 @@ def functional_finemap(hpo_data_orig, gene_features_in, l1_l2_mix, logit_alpha,
                                 .loc[:, 'PIP_old PIP_new'.split()]\
                                 .to_records(index=False).tolist()
             rmse_PIP = rmse(PIPs_oldnew)
-            new_coeffs = logit.params.to_list()
+            new_coeffs = fitted_model.coef_.tolist()
             coeffs_oldnew = tuple(zip(coeffs, new_coeffs))
             rmse_coeffs = rmse(coeffs_oldnew)
 
@@ -781,10 +858,7 @@ def functional_finemap(hpo_data_orig, gene_features_in, l1_l2_mix, logit_alpha,
 
         # Report completion & store results prior to BMA
         print('Finished after {:,} iterations'.format(k))
-        if logit_alpha is None:
-            tab_out = logit.summary().tables[1]
-        else:
-            tab_out = logit.params
+        tab_out = pd.Series(fitted_model.coef_, index=features.columns)
         finemap_res[W] = {'hpo_data' : hpo_data, 'coeffs' : tab_out}
 
     # Update original copy of hpo_data by averaging results for each block 
@@ -798,53 +872,12 @@ def functional_finemap(hpo_data_orig, gene_features_in, l1_l2_mix, logit_alpha,
 
     # Average logit coefficients
     coeff_tables = [finemap_res[W]['coeffs'] for W in null_variance]
-    logit_coeffs = coeff_avg(coeff_tables, logit_alpha)
+    logit_coeffs = pd.concat(coeff_tables, axis=1).apply(np.nanmean, axis=1)
+    logit_coeffs = pd.DataFrame(zip(logit_coeffs.index.tolist(), 
+                                    logit_coeffs.values.tolist()),
+                                columns='feature coefficient'.split())
 
     return hpo_data_orig, logit_coeffs
-
-
-def coeff_avg(coeff_tables, logit_alpha):
-    """
-    Average logit coefficients across all models
-    Input: list of statsmodels.iolib.table.SimpleTable
-    """
-
-    if logit_alpha is None:
-
-        cols = 'feature coeff stderr zscore pvalue lower upper'.split()
-
-        def ct2df(ct, k):
-            df = pd.read_html(ct.as_html(), header=0)[0]
-            fmtcols = ' '.join([cols[0]] + [x + '_{0}' for x in cols[1:]])
-            df.columns = fmtcols.format(k).split()
-            return df
-
-        ct_dfs = [ct2df(ct, k+1) for k, ct in enumerate(coeff_tables)]
-
-    else:
-
-        cols = 'feature coeff'.split()
-
-        def ct2df(ct, k):
-            features = ct.index.tolist()
-            values = ct.values.tolist()
-            df = pd.DataFrame(tuple(zip(features, values)), columns = cols)
-            return df
-
-        ct_dfs = [ct2df(ct, k+1) for k, ct in enumerate(coeff_tables)]
-
-    merged_df = reduce(lambda left, right: pd.merge(left, right, on='feature'), 
-                       ct_dfs)
-    avg_df = pd.DataFrame(merged_df.feature, columns=['feature'])
-    for col in cols[1:]:
-        subdf = merged_df.loc[:, [x for x in merged_df.columns if col in x]]
-        avg_df[col] = subdf.mean(axis=1)
-    
-    # Recompute P-values according to averaged Z-score
-    if logit_alpha is None:
-        avg_df['pvalue'] = [2 * norm.sf(abs(z)) for z in avg_df.zscore]
-
-    return avg_df
 
 
 def output_assoc_bed(hpo_data, sig_df, prejoint_sig_df, outfile, 
@@ -1366,12 +1399,17 @@ def main():
     parser.add_argument('--credible-sets', dest='cs_val', type=float, default=0.95,
                         help='Credible set value. [default: 0.95]')
     parser.add_argument('--regularization-alpha', dest='logit_alpha', type=float,
-                        help='Regularization penalty weight for logit glm. Must ' +
+                        help='Regularization penalty weight for logit model. Must ' +
                         'be in ~ [0, 1]. [default: no regularization]', default=0.2)
     parser.add_argument('--regularization-l1-l2-mix', dest='l1_l2_mix', type=float,
                         help='Regularization parameter (elastic net alpha) for ' +
-                        'logit glm. 0 = L1, 1 = L2, (0, 1) = elastic net. ' +
+                        'logit model. 0 = L1, 1 = L2, (0, 1) = elastic net. ' +
                         '[default: L2 regularization]', default=1)
+    parser.add_argument('--logit-grid-search', action='store_true', default=False,
+                        help='Perform grid search to optimize logit hyperparameters. ' +
+                        'Overrides --regularization-alpha and --regularization-l1-l2-mix. ' +
+                        'Performed once for each null variance estimate. ' +
+                        '[default: no grid search]')
     parser.add_argument('--distance', help='Distance to pad each significant gene ' +
                         'prior to fine-mapping. [default: 1Mb]', default=1000000, 
                         type=int)
@@ -1401,8 +1439,17 @@ def main():
                         '[default: 0.9]')
     parser.add_argument('--known-causal-gene-lists', help='.tsv list of paths to ' +
                         '.txt lists of known causal genes. Used for estimating null ' +
-                        'variance. Can be specified multiple times. [default: ' +
+                        'variance and (optionally) for fitting functional logit ' +
+                        'model. Can be specified multiple times. [default: ' +
                         'no known causal genes]', dest='gs_list')
+    parser.add_argument('--known-not-causal-gene-lists', help='.tsv list of paths to ' +
+                        '.txt lists of known non-causal genes. Used for fitting ' +
+                        'functional logit model. Can be specified multiple times. ' +
+                        '[default: no known non-causal genes]', dest='neg_list')
+    parser.add_argument('--include-known-genes-in-training', default=False, 
+                        action='store_true', help='Supplement empirical data with ' +
+                        'known causal and non-causal gene lists at fixed probabilities ' +
+                        'when training logit model. [default: only use empirical data]')
     parser.add_argument('--finemap-secondary', action='store_true', default=False,
                         help='Use secondary P-values for fine-mapping priors ' + 
                         '[default: use primary P-values]')
@@ -1455,14 +1502,24 @@ def main():
         cov_df = None
 
     # Load gold-standard causal gene lists to ensure their summary stats are loaded
+    gs_lists = {}
+    all_gs_genes = set()
     if args.gs_list is not None:
-        gs_lists = {}
-        all_gs_genes = set()
         with open(args.gs_list) as gsf:
             for gslist in gsf.read().splitlines():
                 gs_genes = open(gslist).read().splitlines()
                 gs_lists[gslist] = gs_genes
                 all_gs_genes.update(gs_genes)
+
+    # Load gold-standard non-causal genes to ensure their summary stats are loaded
+    neg_lists = {}
+    all_neg_genes = set()
+    if args.neg_list is not None:
+        with open(args.neg_list) as gsf:
+            for gslist in gsf.read().splitlines():
+                neg_genes = open(gslist).read().splitlines()
+                neg_lists[gslist] = neg_genes
+                all_neg_genes.update(neg_genes)
 
     # Process data per hpo
     hpo_data = load_all_hpos(args.statslist, args.secondary_p_cutoff, 
@@ -1471,7 +1528,8 @@ def main():
                              args.distance, args.nonsig_distance,
                              cov_df, args.min_covariance,
                              block_prefix, args.finemap_secondary, 
-                             not args.no_non_significant, all_gs_genes)
+                             not args.no_non_significant, 
+                             all_gs_genes.union(all_neg_genes))
 
     # Estimate null variance based on:
     #   1. all significant genes
@@ -1501,11 +1559,24 @@ def main():
             rename(columns={'HPO' : '#HPO'}).\
             to_csv(args.genetic_outfile, sep='\t', index=False, na_rep='NA')
 
+    # # DEV: REMOVE THIS
+    # import pickle as pkl
+    # # pklfile = open('dev_data.pkl', 'wb')
+    # # pkl.dump([hpo_data, Wsq], pklfile)
+    # with open('dev_data.pkl', 'rb') as pklfile:
+    #     hpo_data, Wsq = pkl.load(pklfile)
+
+    # Load & standardize gene features
+    features = load_features(args.gene_features)
+
     # Perform functional fine-mapping
-    hpo_df, logit_coeffs = functional_finemap(hpo_data, args.gene_features, 
+    hpo_df, logit_coeffs = functional_finemap(hpo_data, features, 
                                               args.l1_l2_mix, args.logit_alpha, 
-                                              1.0, Wsq, args.training_exclusion,
-                                              args.use_max_pip_per_gene)
+                                              args.logit_grid_search, 1.0, Wsq, 
+                                              args.training_exclusion,
+                                              args.use_max_pip_per_gene,
+                                              all_gs_genes, all_neg_genes, 
+                                              args.include_known_genes_in_training)
 
     # If optioned, write average of logit coefficients to --coeffs-out
     if args.coeffs_out is not None:

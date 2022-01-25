@@ -94,7 +94,7 @@ while read nocolon hpo; do
     done
   done
 done < refs/test_phenotypes.list
-# Collect bin coordinates
+# Collect gene coordinates
 zcat \
   meta_stats/$( head -n1 refs/test_phenotypes.list | cut -f1 ).rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz \
 | cut -f1-3 \
@@ -128,7 +128,6 @@ done
 if ! [ -e assoc_stat_plots ]; then
   mkdir assoc_stat_plots
 fi
-mkdir assoc_stat_plots
 ngenes=$( zcat meta_stats/${example_hpo}.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz \
           | cut -f1 | fgrep -v "#" | wc -l | addcom )
 /opt/rCNV2/analysis/paper/plot/large_segments/plot_example_miami.R \
@@ -169,7 +168,22 @@ echo -e "PTV Constrained\trefs/gene_lists/gnomad.v2.1.1.lof_constrained.genes.li
 > comparison_genesets.tsv
 echo -e "Mis. Constrained\trefs/gene_lists/gnomad.v2.1.1.mis_constrained.genes.list" \
 >> comparison_genesets.tsv
-
+cat refs/gene_lists/DDG2P.all_lof.genes.list \
+    refs/gene_lists/ClinGen.all_haploinsufficient.genes.list \
+| sort | uniq > all_lof_genes.list
+echo -e "Dominant LoF\tall_lof_genes.list" >> comparison_genesets.tsv
+cat refs/gene_lists/DDG2P.all_gof.genes.list \
+    refs/gene_lists/DDG2P.all_other.genes.list \
+    refs/gene_lists/ClinGen.all_triplosensitive.genes.list \
+| sort | uniq > all_gof_genes.list
+echo -e "Dominant GoF\tall_gof_genes.list" >> comparison_genesets.tsv
+if ! [ -e finemapped_gene_grids ]; then
+  mkdir finemapped_gene_grids
+fi
+while read nocolon hpo; do
+  echo -e "$hpo\trefs/gene_lists/$nocolon.HPOdb.genes.list"
+done < refs/test_phenotypes.list \
+> omim.gene_lists.tsv
 if ! [ -e finemapping_distribs ]; then
   mkdir finemapping_distribs
 fi
@@ -180,18 +194,12 @@ fi
   all_PIPs.prior.tsv \
   all_PIPs.posterior.tsv \
   all_PIPs.full_model.tsv \
+  comparison_genesets.tsv \
+  omim.gene_lists.tsv \
   finemapping_distribs/${prefix}
 
 
 # Plot annotated 2x2 tables of fine-mapped genes
-## TODO: ADD SPLITS BY SIGNIFICANCE & ADULT/DEV
-if ! [ -e finemapped_gene_grids ]; then
-  mkdir finemapped_gene_grids
-fi
-while read nocolon hpo; do
-  echo -e "$hpo\trefs/gene_lists/$nocolon.HPOdb.genes.list"
-done < refs/test_phenotypes.list \
-> omim.gene_lists.tsv
 /opt/rCNV2/analysis/paper/plot/gene_association/plot_finemapped_gene_table.R \
   rCNV.final_genes.credible_sets.bed.gz \
   rCNV.final_genes.associations.bed.gz \

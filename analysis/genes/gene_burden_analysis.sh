@@ -624,16 +624,16 @@ mkdir refs/
 gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/* refs/
 gsutil -m cp -r \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists \
-  ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/loose_unclustered_nahr_regions.w_genes.bed.gz \
   ${rCNV_bucket}/analysis/analysis_refs/rCNV2.hpos_by_severity.*list \
   ./
 gsutil -m cp \
   ${rCNV_bucket}/analysis/gene_scoring/gene_lists/* \
   ./gene_lists/
 
-# Make list of genes from predicted NAHR-mediated CNV regions for training exclusion
-zcat clustered_nahr_regions.bed.gz | fgrep -v "#" \
-| awk -v FS="\t" '{ if ($5>0) print $NF }' \
+# Make list of genes from predicted NAHR-mediated CNV regions <5Mb for training exclusion
+zcat loose_unclustered_nahr_regions.w_genes.bed.gz | fgrep -v "#" \
+| awk -v FS="\t" '{ if ($3-$2<=5000000 && $4>0) print $NF }' \
 | sed 's/;/\n/g' | sort | uniq > nahr.genes.list
 
 # Write tsv inputs
@@ -650,9 +650,11 @@ done < ${phenotype_list} \
 case ${CNV} in
   "DEL")
     echo "gene_lists/gold_standard.haploinsufficient.genes.list" > known_causal_gene_lists.tsv
+    echo "gene_lists/gold_standard.haplosufficient.genes.list" > known_not_causal_gene_lists.tsv
     ;;
   "DUP")
     echo "gene_lists/gold_standard.triplosensitive.genes.list" > known_causal_gene_lists.tsv
+    echo "gene_lists/gold_standard.triploinsensitive.genes.list" > known_not_causal_gene_lists.tsv
     ;;
 esac
 
@@ -664,8 +666,7 @@ esac
   --secondary-or-nominal \
   --fdr-q-cutoff ${FDR_cutoff} \
   --secondary-for-fdr \
-  --regularization-alpha ${finemap_elnet_alpha} \
-  --regularization-l1-l2-mix ${finemap_elnet_l1_l2_mix} \
+  --logit-grid-search \
   --use-max-pip-per-gene \
   --distance ${finemap_cluster_distance} \
   --nonsig-distance ${finemap_nonsig_distance} \
@@ -675,6 +676,8 @@ esac
   --confident-pip ${finemap_conf_pip} \
   --very-confident-pip ${finemap_vconf_pip} \
   --known-causal-gene-lists known_causal_gene_lists.tsv \
+  --known-not-causal-gene-lists known_not_causal_gene_lists.tsv \
+  --include-known-genes-in-training \
   --outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv \
   --all-genes-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.${finemap_output_label}.tsv \
   --naive-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.tsv \

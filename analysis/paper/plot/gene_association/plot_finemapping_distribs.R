@@ -29,8 +29,15 @@ load.pips <- function(path){
     pips$PIP[gene.idxs] <- mean(pips$PIP[gene.idxs], na.rm=T)
   }
 
+  # Add indicator if gene is associated with developmental HPOs
+  pips$developmental <- NA
+  for(gene in unique(pips$gene)){
+    gene.idxs <- which(pips$gene == gene)
+    pips$developmental[gene.idxs] <- any(pips$HPO[gene.idxs] %in% developmental.hpos)
+  }
+
   # Drop HPO and deduplicate
-  pips <- pips[, c("gene", "PIP", "cnv")]
+  pips <- pips[, c("gene", "PIP", "cnv", "developmental")]
 
   return(pips[which(!duplicated(pips)), ])
 }
@@ -274,6 +281,7 @@ plot.pip.hist <- function(allgenes, conf.cutoff=0.2, vconf.cutoff=0.8,
 ### RSCRIPT BLOCK ###
 #####################
 require(rCNV2, quietly=T)
+require(beeswarm, quietly=T)
 require(optparse, quietly=T)
 
 # List of command-line options
@@ -283,16 +291,18 @@ option_list <- list()
 args <- parse_args(OptionParser(usage=paste("%prog credsets.bed assocs.bed",
                                             "credsets.prejoint.bed prior.pips.tsv",
                                             "posterior.pips.tsv fullmodel.pips.tsv",
+                                            "genelists.tsv omim_genelists.tsv",
                                             "out.prefix"),
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Checks for appropriate positional arguments
-if(length(args$args) != 6){
-  stop(paste("Seven positional arguments required: credsets.bed, assocs.bed,",
+if(length(args$args) != 9){
+  stop(paste("Nine positional arguments required: credsets.bed, assocs.bed,",
              "credsets.prejoint.bed, prior.pips.tsv, posterior.pips.tsv,",
-             "fullmodel.pips.tsv, and out.prefix\n"))
+             "fullmodel.pips.tsv, genelists.tsv, omim_genelists.tsv,",
+             "and out.prefix\n"))
 }
 
 # Writes args & opts to vars
@@ -302,7 +312,9 @@ credsets.prejoint.in <- args$args[3]
 prior.pips.in <- args$args[4]
 posterior.pips.in <- args$args[5]
 final.pips.in <- args$args[6]
-out.prefix <- args$args[7]
+genelists.in <- args$args[7]
+omimlists.in <- args$args[8]
+out.prefix <- args$args[9]
 
 # # DEV PARAMETERS
 # credsets.in <- "~/scratch/rCNV.final_genes.credible_sets.bed.gz"
@@ -311,6 +323,8 @@ out.prefix <- args$args[7]
 # prior.pips.in <- "~/scratch/all_PIPs.prior.tsv"
 # posterior.pips.in <- "~/scratch/all_PIPs.posterior.tsv"
 # final.pips.in <- "~/scratch/all_PIPs.full_model.tsv"
+# genelists.in <- "~/scratch/comparison_genesets.tsv"
+# omimlists.in <- "~/scratch/omim.gene_lists.tsv"
 # out.prefix <- "~/scratch/finemap_distribs_test"
 
 # Load credible sets and associations
@@ -386,5 +400,21 @@ pdf(paste(out.prefix, "finemapped_distribs.credset_pip.pdf", sep="."),
 plot.pip.hist(pips[[4]])
 dev.off()
 
+# TODO: continue implementing this (maybe)
 # Compare prior/posterior/full model for selected genes
-gsets <- load.gene.lists()
+gsets <- load.gene.lists(genelists.in)
+sapply(1:length(gsets), function(i){
+  gset.name <- names(gsets)[i]
+  gset.outname <- gsub(" ", "_", tolower(gset.name), fixed=T)
+  genes <- gsets[[i]]
+
+  v <- list(pips$Prior$PIP[which(pips$Prior$gene %in% genes & pips$Prior$cnv=="DEL" & pips$Prior$developmental)],
+            pips$Posterior$PIP[which(pips$Posterior$gene %in% genes & pips$Posterior$cnv=="DEL" & pips$Posterior$developmental)],
+            pips$`Full Model`$PIP[which(pips$`Full Model`$gene %in% genes & pips$`Full Model`$cnv=="DEL" & pips$`Full Model`$developmental)])
+  beeswarm(v, main=gset.name, corral="wrap")
+  points(x=1:3, y=sapply(v, mean), pch=19, cex=2)
+})
+
+# Compare prior/posterior/full model for HPO-matched disease genes
+omim.lists <- load.gene.lists(omimlists.in)
+
