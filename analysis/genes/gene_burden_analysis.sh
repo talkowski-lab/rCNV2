@@ -641,7 +641,8 @@ while read prefix hpo; do
   for wrapper in 1; do
     echo "$hpo"
     echo "stats/$prefix.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz"
-    awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' ${meta_p_cutoffs_tsv}
+    awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' \
+      gene_burden.${freq_code}.${CNV}.bonferroni_pval.hpo_cutoffs.tsv
   done | paste -s
 done < ${phenotype_list} \
 > ${freq_code}.${CNV}.gene_fine_mapping.stats_input.tsv

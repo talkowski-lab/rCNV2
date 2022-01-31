@@ -192,8 +192,8 @@ mkdir basic_distribs
   rCNV.final_segments.loci.bed.gz \
   ${prefix}.master_segments.bed.gz \
   basic_distribs/${prefix}
-# Get range of effect sizes across all g-w sig associations
-zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f10 | sort -nk1,1 | head -n1
+# Get range of effect sizes across all sig associations
+zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f11 | sort -nk1,1 | head -n1
 zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f11 | sort -nk1,1 | tail -n1
 zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f11 \
 | awk '{ sum+=$1 }END{ print sum/NR }'
@@ -496,5 +496,25 @@ gsutil -m cp -r \
   assoc_stat_plots \
   association_grid \
   ${rCNV_bucket}/analysis/paper/plots/large_segments/
+
+
+
+#########################################################
+# Other useful analyses (i.e., for text in paper) below #
+#########################################################
+
+# Get number of lit GDs in discovery set
+for CNV in DEL DUP; do
+  zcat refs/lit_GDs.*.bed.gz | fgrep -w $CNV \
+  | bedtools intersect -u -a - \
+    -b <( zcat rCNV.final_segments.loci.bed.gz | fgrep -w $CNV )
+done | wc -l
+
+# Get list of lit GDs not in discovery set
+for CNV in DEL DUP; do
+  zcat refs/lit_GDs.*.bed.gz | fgrep -w $CNV \
+  | bedtools intersect -v -a - \
+    -b <( zcat rCNV.final_segments.loci.bed.gz | fgrep -w $CNV )
+done | wc -l
 
 

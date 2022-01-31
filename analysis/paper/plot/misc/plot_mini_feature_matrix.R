@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -12,11 +12,6 @@
 
 
 options(stringsAsFactors=F, scipen=1000)
-
-
-######################
-### DATA FUNCTIONS ###
-######################
 
 
 ##########################
@@ -63,12 +58,11 @@ plot.mini.heat <- function(feats, n.genes=500, n.feats=20, seed=2020){
 #####################
 ### RSCRIPT BLOCK ###
 #####################
+require(rCNV2, quietly=T)
 require(optparse, quietly=T)
 
 # List of command-line options
-option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
-)
+option_list <- list()
 
 # Get command-line arguments & options
 args <- parse_args(OptionParser(usage=paste("%prog features.bed.gz out.pdf", sep=" "),
@@ -84,17 +78,10 @@ if(length(args$args) != 2){
 # Writes args & opts to vars
 features.in <- args$args[1]
 out.pdf <- args$args[2]
-rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
 # features.in <- "~/scratch/gencode.v19.canonical.pext_filtered.all_features.no_variation.eigenfeatures.bed.gz"
 # out.pdf <- "~/scratch/test_mini_feat_matrix.pdf"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
 
 # Load features
 feats <- load.features(features.in, norm=T)
