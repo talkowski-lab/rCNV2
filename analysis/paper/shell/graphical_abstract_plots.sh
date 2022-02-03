@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -29,21 +29,22 @@ gsutil -m cp \
   ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.all_features.no_variation.bed.gz \
   ./
 
+
 # Miami plot of example phenotype
 /opt/rCNV2/analysis/paper/plot/misc/plot_dummy_miami.R \
   ${example_hpo_nocolon}.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
   ${example_hpo_nocolon}.rCNV.DUP.sliding_window.meta_analysis.stats.bed.gz \
   ${prefix}.example_miami.png
 
+
 # Mini scatterplot of gene scores
 /opt/rCNV2/analysis/paper/plot/misc/plot_mini_gene_score_scatter.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.gene_scores.tsv.gz \
   ${prefix}.mini_genescore_scatter.png
 
+
 # Dummy feature matrix for fine mapping
 /opt/rCNV2/analysis/paper/plot/misc/plot_mini_feature_matrix.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   gencode.v19.canonical.pext_filtered.all_features.no_variation.bed.gz \
   ${prefix}.mini_feature_matrix.pdf
 

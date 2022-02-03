@@ -241,7 +241,7 @@ for(cnv.split in c(TRUE, FALSE)){
 
 
 # Set global scatterplot values
-scatter.dims <- c(2, 3)
+scatter.dims <- c(2.25, 3)
 scatter.parmar <- c(2.15, 2.3, 0.4, 5.1)
 
 # Scatterplots of # HPOs vs. various features
@@ -336,7 +336,7 @@ sapply(c("size", "n_genes", "n_gnomAD_constrained_genes", "n_OMIM_genes",
                x.labs=x.labs,
                x.labs.line=-0.8,
                xtitle=x.title,
-               ytitle="Associated HPOs",
+               ytitle="Associated Phenos",
                x.title.line=x.title.line, y.title.line=1.4,
                parmar=scatter.parmar + parmar.mod)
   dev.off()

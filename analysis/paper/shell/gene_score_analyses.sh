@@ -373,6 +373,7 @@ if ! [ -e feature_distribs_by_ds_group ]; then
   mkdir feature_distribs_by_ds_group
 fi
 /opt/rCNV2/analysis/paper/plot/gene_scores/plot_ds_feature_distribs.R \
+  --score-cutoffs ${prefix}.gene_score_cutoffs.tsv \
   rCNV.gene_scores.tsv.gz \
   gencode.v19.canonical.pext_filtered.all_features.no_variation.transformed.bed.gz \
   refs/gene_feature_metadata.tsv \

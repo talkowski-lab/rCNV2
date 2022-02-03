@@ -289,7 +289,7 @@ for(comp in c("DEL_vs_DUP", "gw_vs_FDR", "NAHR_vs_nonrecurrent",
                  subset_to_regions=seg.df$region_id[which(seg.df$n_genes>0)],
                  x.labs=x.labs, violin=T, add.pvalue=T, cnv.split=cnv.split,
                  boxplot.colors=boxplot.colors, boxplot.fill=boxplot.fill,
-                 add.y.axis=T, ytitle=bquote(min(.(constr))), pt.cex=0.5,
+                 add.y.axis=T, ytitle=bquote("min" ~ (.(constr))), pt.cex=0.5,
                  parmar=c(1.2, 2.75, 1.65 + parmar.y.mod, 0.2))
       dev.off()
     }
@@ -352,9 +352,9 @@ segs.best.p[which(segs.best.p > 20)] <- 20
 segs.scatter(segs.all, x=segs.best.l2or, y=segs.best.p,
              horiz.lines.at=c(gw.sig, -log10(0.05/95)), horiz.lines.lty=c(5, 2),
              horiz.lines.color=c(graphabs.green, blueblack), blue.bg=FALSE,
-             xtitle="Max odds ratio, any phenotype",
+             xtitle="Max Odds Ratio (OR) in Any Pheno.",
              x.at=seq(0, x.max, 2), x.labs=c(2^seq(0, 6, 2), paste("2 ^", seq(8, x.max, 2))), parse.x.labs = T,
-             ytitle=bquote("Max -log"[10] * (italic(P)) * ", any phenotype"),
+             ytitle=bquote("Max -log"[10] * (italic(P)) ~ "in Any Phenotype"),
              y.at=seq(0, 20, 4), y.labs=c(seq(0, 16, 4), expression(phantom(x) >= 20)), parse.y.labs=TRUE,
              x.title.line=1.4, y.title.line=1.9, xlims=c(0, x.max), ylims=c(0, 20),
              add.lm=F, pt.cex=0.75, parmar=c(2.4, 3, 0.4, 0.4))

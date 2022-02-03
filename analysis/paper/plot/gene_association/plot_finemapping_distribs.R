@@ -23,16 +23,58 @@ load.pips <- function(path){
   colnames(pips)[1] <- gsub("X.", "", colnames(pips)[1], fixed=T)
 
   # Joint model is already averaged across phenotypes,
-  # but need to do the same for posterior and prior
+  # but need to do the same for posterior and prior while matching on CNV types
+  for(gene in unique(pips$gene)){
+    for(cnv in c("DEL", "DUP")){
+      gene.idxs <- which(pips$gene == gene & pips$cnv == cnv)
+      if(length(gene.idxs) > 0){
+        pips$PIP[gene.idxs] <- mean(pips$PIP[gene.idxs], na.rm=T)
+      }
+    }
+  }
+
+  # Add indicator if this gene is the top gene in its credible set
+  pips$top <- FALSE
   for(gene in unique(pips$gene)){
     gene.idxs <- which(pips$gene == gene)
-    pips$PIP[gene.idxs] <- mean(pips$PIP[gene.idxs], na.rm=T)
+    cs.ids <- pips$credible_set[gene.idxs]
+    cs.ids <- cs.ids[which(!is.na(cs.ids))]
+    if(length(cs.ids) > 0){
+      pips$top[gene.idxs] <- any(sapply(cs.ids, function(cs.id){
+        cs.idxs <- which(pips$credible_set == cs.id)
+        best.pip <- max(pips$PIP[cs.idxs], na.rm=T)
+        # Don't allow ties
+        if(length(which(pips$PIP[cs.idxs] == best.pip)) > 1){
+          FALSE
+        }else{
+          pips$PIP[intersect(gene.idxs, cs.idxs)] == best.pip
+        }
+      }))
+    }
+  }
+
+  # Add indicator if gene is associated with developmental HPOs
+  pips$developmental <- NA
+  for(gene in unique(pips$gene)){
+    gene.idxs <- which(pips$gene == gene)
+    pips$developmental[gene.idxs] <- any(pips$HPO[gene.idxs] %in% developmental.hpos)
   }
 
   # Drop HPO and deduplicate
-  pips <- pips[, c("gene", "PIP", "cnv")]
+  pips <- pips[, c("gene", "PIP", "cnv", "top", "developmental")]
 
   return(pips[which(!duplicated(pips)), ])
+}
+
+
+# Gather all genes with at least one HPO-matched assocation in OMIM
+get.hpomatched.genes <- function(credsets, omim.lists){
+  unique(unlist(sapply(1:nrow(credsets), function(i){
+    genes <- credsets$sig_genes[[i]]
+    hpos <- credsets$hpos[[i]]
+    hpo.genes <- unique(as.character(unlist(omim.lists[hpos])))
+    intersect(genes, hpo.genes)
+  })))
 }
 
 
@@ -270,10 +312,111 @@ plot.pip.hist <- function(allgenes, conf.cutoff=0.2, vconf.cutoff=0.8,
 }
 
 
+# Trio of beeswarms representing PIPs between prior/posterior/full model for a gene set of interest
+sequential.pip.swarm <- function(pips, genes, cnv, gset.name=NULL, dev.only=FALSE,
+                                 connect=T, bar.width=0.35, pt.spacing=0.4, pt.cex=0.8, corralWidth=0.8,
+                                 random.seed=2022, parmar=c(3.1, 2.75, 1.3, 0.25)){
+  # Get plot values
+  pip.df <- merge(pips$Prior[, c("gene", "cnv", "PIP", "top", "developmental")],
+                  pips$Posterior[, c("gene", "cnv", "PIP", "top")],
+                  by=c("gene", "cnv"), sort=F, all=T,
+                  suffixes=c(".prior", ".posterior"))
+  pip.df <- merge(pip.df, pips$`Full Model`[, c("gene", "cnv", "PIP", "top")],
+                  by=c("gene", "cnv"), sort=F, all=T)
+  colnames(pip.df)[which(colnames(pip.df) == "PIP")] <- "PIP.full"
+  colnames(pip.df)[which(colnames(pip.df) == "top")] <- "top.full"
+  pip.df <- pip.df[which(pip.df$cnv == cnv & pip.df$gene %in% genes),
+                   which(colnames(pip.df) != "cnv")]
+  if(dev.only){
+    pip.df <- pip.df[which(pip.df$developmental), ]
+  }
+
+  # Generate trackable swarmplot coordinates for each set of PIPs
+  # Note: requires hack of setting fake plot area first so that x values are scaled appropriately
+  pdf("/dev/null")
+  plot(NA, xlim=c(0, 1), ylim=c(0, 1))
+  plot.df <- cbind(swarmx(x=rep(0.5, nrow(pip.df)), y=pip.df$PIP.prior, compact=T,
+                          xsize=xinch(pt.spacing), ysize=yinch(pt.spacing)),
+                   swarmx(x=rep(1.5, nrow(pip.df)), y=pip.df$PIP.posterior, compact=T,
+                          xsize=xinch(pt.spacing), ysize=yinch(pt.spacing)),
+                   swarmx(x=rep(2.5, nrow(pip.df)), y=pip.df$PIP.full, compact=T,
+                          xsize=xinch(pt.spacing), ysize=yinch(pt.spacing)))
+  dev.off()
+  colnames(plot.df) <- as.vector(sapply(c("prior", "posterior", "full"),
+                                        function(suff){paste(c("x", "y"), suff, sep=".")}))
+  rownames(plot.df) <- pip.df$gene
+
+  # Bound each swarmed X (this is usually done by corral in beeswarm() but isn't offered in swarmx())
+  set.seed(random.seed)
+  for(cidx in grep("^x.", colnames(plot.df))){
+    x.at <- (cidx + 1) / 2
+    corral.lims <- c(x.at - 0.5) + c(-corralWidth / 2, corralWidth / 2)
+    oob.idxs <- which(plot.df[, cidx] < corral.lims[1] | plot.df[, cidx] > corral.lims[2])
+    plot.df[oob.idxs, cidx] <- runif(length(oob.idxs), min=corral.lims[1], max=corral.lims[2])
+  }
+
+  # Get point-wise plot properties
+  pw.bg <- c(sapply(pip.df$top.prior, function(top){
+    if(top){cnv.colors[cnv]}else{cnv.whites[cnv]}}),
+    sapply(pip.df$top.posterior, function(top){
+      if(top){cnv.colors[cnv]}else{cnv.whites[cnv]}}),
+    sapply(pip.df$top.full, function(top){
+      if(top){cnv.colors[cnv]}else{cnv.whites[cnv]}}))
+  pw.col <- c(sapply(pip.df$top.prior, function(top){
+    if(top){cnv.blacks[cnv]}else{control.cnv.colors[cnv]}}),
+    sapply(pip.df$top.posterior, function(top){
+      if(top){cnv.blacks[cnv]}else{control.cnv.colors[cnv]}}),
+    sapply(pip.df$top.full, function(top){
+      if(top){cnv.blacks[cnv]}else{control.cnv.colors[cnv]}}))
+  pw.order <- c(sapply(pip.df$top.prior, function(top){if(top){2}else{1}}),
+                sapply(pip.df$top.posterior, function(top){if(top){2}else{1}}),
+                sapply(pip.df$top.full, function(top){if(top){2}else{1}}))
+
+  # Prep plot area
+  par(mar=parmar, bty="n")
+  plot(NA, xlim=c(0, 3), ylim=c(0, 1), xaxs="i", yaxs="i", xaxt="n", yaxt="n",
+       xlab="", ylab="")
+
+  # Add connecting lines between points, if optioned
+  if(connect){
+    segments(x0=c(plot.df$x.prior, plot.df$x.posterior),
+             x1=c(plot.df$x.posterior, plot.df$x.full),
+             y0=c(plot.df$y.prior, plot.df$y.posterior),
+             y1=c(plot.df$y.posterior, plot.df$y.full),
+             col=ns.color.light, xpd=T)
+  }
+  abline(h=c(0.2, 0.8), lty=5, col=ns.color)
+
+  # Add points
+  for(order in 1:2){
+    points(x=unlist(plot.df[, paste("x", c("prior", "posterior", "full"), sep=".")])[which(pw.order == order)],
+           y=unlist(plot.df[, paste("y", c("prior", "posterior", "full"), sep=".")])[which(pw.order == order)],
+           col=pw.col[which(pw.order == order)], bg=pw.bg[which(pw.order == order)],
+           pch=21, cex=pt.cex, xpd=T)
+  }
+
+  # Add mean bars
+  segments(x0=(1:3)-0.5-(bar.width/2), x1=(1:3)-0.5+(bar.width/2),
+           y0=apply(plot.df[, paste("y", c("prior", "posterior", "full"), sep=".")], 2, mean),
+           y1=apply(plot.df[, paste("y", c("prior", "posterior", "full"), sep=".")], 2, mean),
+           lend="round", lwd=3, col=cnv.blacks[cnv])
+
+  # Add axis labels
+  text(x=(1:3)-0.3, y=par("usr")[1]-0.075, pos=2, srt=35,
+       labels=c("Prior", "Posterior", "Full Model"), xpd=T)
+  y.ax.at <- seq(0, 1, 0.2)
+  axis(2, at=y.ax.at, tck=-0.025, col=blueblack, labels=NA)
+  axis(2, at=y.ax.at, tick=F, las=2, line=-0.7, cex.axis=5.5/6)
+  mtext(2, line=1.75, text="Causal Probability")
+  mtext(3, text=paste(gset.name, "Genes"), line=0.25)
+}
+
+
 #####################
 ### RSCRIPT BLOCK ###
 #####################
 require(rCNV2, quietly=T)
+require(beeswarm, quietly=T)
 require(optparse, quietly=T)
 
 # List of command-line options
@@ -283,16 +426,18 @@ option_list <- list()
 args <- parse_args(OptionParser(usage=paste("%prog credsets.bed assocs.bed",
                                             "credsets.prejoint.bed prior.pips.tsv",
                                             "posterior.pips.tsv fullmodel.pips.tsv",
+                                            "genelists.tsv omim_genelists.tsv",
                                             "out.prefix"),
                                 option_list=option_list),
                    positional_arguments=TRUE)
 opts <- args$options
 
 # Checks for appropriate positional arguments
-if(length(args$args) != 6){
-  stop(paste("Seven positional arguments required: credsets.bed, assocs.bed,",
+if(length(args$args) != 9){
+  stop(paste("Nine positional arguments required: credsets.bed, assocs.bed,",
              "credsets.prejoint.bed, prior.pips.tsv, posterior.pips.tsv,",
-             "fullmodel.pips.tsv, and out.prefix\n"))
+             "fullmodel.pips.tsv, genelists.tsv, omim_genelists.tsv,",
+             "and out.prefix\n"))
 }
 
 # Writes args & opts to vars
@@ -302,7 +447,9 @@ credsets.prejoint.in <- args$args[3]
 prior.pips.in <- args$args[4]
 posterior.pips.in <- args$args[5]
 final.pips.in <- args$args[6]
-out.prefix <- args$args[7]
+genelists.in <- args$args[7]
+omimlists.in <- args$args[8]
+out.prefix <- args$args[9]
 
 # # DEV PARAMETERS
 # credsets.in <- "~/scratch/rCNV.final_genes.credible_sets.bed.gz"
@@ -311,6 +458,8 @@ out.prefix <- args$args[7]
 # prior.pips.in <- "~/scratch/all_PIPs.prior.tsv"
 # posterior.pips.in <- "~/scratch/all_PIPs.posterior.tsv"
 # final.pips.in <- "~/scratch/all_PIPs.full_model.tsv"
+# genelists.in <- "~/scratch/comparison_genesets.tsv"
+# omimlists.in <- "~/scratch/omim.gene_lists.tsv"
 # out.prefix <- "~/scratch/finemap_distribs_test"
 
 # Load credible sets and associations
@@ -386,5 +535,28 @@ pdf(paste(out.prefix, "finemapped_distribs.credset_pip.pdf", sep="."),
 plot.pip.hist(pips[[4]])
 dev.off()
 
-# Compare prior/posterior/full model for selected genes
-gsets <- load.gene.lists()
+# Compare prior/posterior/full model for selected gene sets
+gsets <- load.gene.lists(genelists.in)
+sapply(1:length(gsets), function(i){
+  gset.name <- names(gsets)[i]
+  gset.outname <- gsub(" ", "_", tolower(gset.name), fixed=T)
+  genes <- gsets[[i]]
+
+  sapply(c("DEL", "DUP"), function(cnv){
+    pdf(paste(out.prefix, "finemapped_distribs", gset.outname, cnv, "pdf", sep="."),
+        height=2.7, width=2.5)
+    sequential.pip.swarm(pips, genes, cnv, gset.name, corralWidth=0.7)
+    dev.off()
+  })
+})
+
+# Compare prior/posterior/full model for HPO-matched disease genes
+omim.lists <- load.gene.lists(omimlists.in)
+hpomatched.genes <- get.hpomatched.genes(credsets, omim.lists)
+sapply(c("DEL", "DUP"), function(cnv){
+  pdf(paste(out.prefix, "finemapped_distribs", "hpomatched_genes", cnv, "pdf", sep="."),
+      height=2.7, width=2.5)
+  sequential.pip.swarm(pips, hpomatched.genes, cnv, "HPO-Matched", corralWidth=0.7)
+  dev.off()
+})
+

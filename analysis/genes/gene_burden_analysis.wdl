@@ -59,6 +59,7 @@ workflow gene_burden_analysis {
   File raw_finemap_merged_features
   String rCNV_bucket
   String rCNV_docker
+  String rCNV_docker_finemap
   String athena_cloud_docker
   String fisher_cache_string
   String perm_cache_string
@@ -221,7 +222,7 @@ workflow gene_burden_analysis {
         gene_features=finemap_genomic_features,
         FDR_cutoff=FDR_cutoff,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker
+        rCNV_docker=rCNV_docker_finemap
     }
     
     # Expression features
@@ -246,7 +247,7 @@ workflow gene_burden_analysis {
         gene_features=finemap_expression_features,
         FDR_cutoff=FDR_cutoff,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker
+        rCNV_docker=rCNV_docker_finemap
     }
     
     # Chromatin features
@@ -271,7 +272,7 @@ workflow gene_burden_analysis {
         gene_features=finemap_chromatin_features,
         FDR_cutoff=FDR_cutoff,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker
+        rCNV_docker=rCNV_docker_finemap
     }
     
     # Protein features
@@ -296,7 +297,7 @@ workflow gene_burden_analysis {
         gene_features=finemap_protein_features,
         FDR_cutoff=FDR_cutoff,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker
+        rCNV_docker=rCNV_docker_finemap
     }
 
     # Constraint features
@@ -321,7 +322,7 @@ workflow gene_burden_analysis {
         gene_features=finemap_constraint_features,
         FDR_cutoff=FDR_cutoff,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker
+        rCNV_docker=rCNV_docker_finemap
     }
 
     # Variation features
@@ -346,7 +347,7 @@ workflow gene_burden_analysis {
         gene_features=finemap_variation_features,
         FDR_cutoff=FDR_cutoff,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker
+        rCNV_docker=rCNV_docker_finemap
     }
     
     # Merged features
@@ -371,7 +372,7 @@ workflow gene_burden_analysis {
         gene_features=finemap_merged_features,
         FDR_cutoff=FDR_cutoff,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker
+        rCNV_docker=rCNV_docker_finemap
     }
     
     # Merged features (no variation)
@@ -396,7 +397,7 @@ workflow gene_burden_analysis {
         gene_features=finemap_merged_no_variation_features,
         FDR_cutoff=FDR_cutoff,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker
+        rCNV_docker=rCNV_docker_finemap
     }
   }
 
@@ -408,7 +409,7 @@ workflow gene_burden_analysis {
       credset_beds=finemap_merged_no_variation.joint_credsets_bed,
       freq_code="rCNV",
       rCNV_bucket=rCNV_bucket,
-      rCNV_docker=rCNV_docker
+      rCNV_docker=rCNV_docker_finemap
   }
 
   # Once complete, plot finemap results
@@ -431,7 +432,7 @@ workflow gene_burden_analysis {
         raw_features_merged=raw_finemap_merged_features,
         phenotype_list=phenotype_list,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker
+        rCNV_docker=rCNV_docker_finemap
     }
   }
 
@@ -1052,16 +1053,16 @@ task finemap_genes {
     gsutil -m cp ${rCNV_bucket}/analysis/analysis_refs/* refs/
     gsutil -m cp -r \
       ${rCNV_bucket}/cleaned_data/genes/gene_lists \
-      ${rCNV_bucket}/analysis/paper/data/large_segments/clustered_nahr_regions.bed.gz \
+      ${rCNV_bucket}/analysis/paper/data/large_segments/loose_unclustered_nahr_regions.w_genes.bed.gz \
       ${rCNV_bucket}/analysis/analysis_refs/rCNV2.hpos_by_severity.*list \
       ./
     gsutil -m cp \
       ${rCNV_bucket}/analysis/gene_scoring/gene_lists/* \
       ./gene_lists/
 
-    # Make list of genes from predicted NAHR-mediated CNV regions for training exclusion
-    zcat clustered_nahr_regions.bed.gz | fgrep -v "#" \
-    | awk -v FS="\t" '{ if ($5>0) print $NF }' \
+    # Make list of genes from predicted NAHR-mediated CNV regions <5Mb for training exclusion
+    zcat loose_unclustered_nahr_regions.w_genes.bed.gz | fgrep -v "#" \
+    | awk -v FS="\t" '{ if ($3-$2<=5000000 && $4>0) print $NF }' \
     | sed 's/;/\n/g' | sort | uniq > nahr.genes.list
 
     # Write tsv inputs
@@ -1070,7 +1071,7 @@ task finemap_genes {
         echo "$hpo"
         echo "stats/$prefix.${freq_code}.${CNV}.gene_burden.meta_analysis.stats.bed.gz"
         awk -v x=$prefix -v FS="\t" '{ if ($1==x) print $2 }' \
-            gene_burden.${freq_code}.${CNV}.bonferroni_pval.hpo_cutoffs.tsv
+          gene_burden.${freq_code}.${CNV}.bonferroni_pval.hpo_cutoffs.tsv
       done | paste -s
     done < ${phenotype_list} \
     > ${freq_code}.${CNV}.gene_fine_mapping.stats_input.tsv
@@ -1079,9 +1080,11 @@ task finemap_genes {
     case ${CNV} in
       "DEL")
         echo "gene_lists/gold_standard.haploinsufficient.genes.list" > known_causal_gene_lists.tsv
+        echo "gene_lists/gold_standard.haplosufficient.genes.list" > known_not_causal_gene_lists.tsv
         ;;
       "DUP")
         echo "gene_lists/gold_standard.triplosensitive.genes.list" > known_causal_gene_lists.tsv
+        echo "gene_lists/gold_standard.triploinsensitive.genes.list" > known_not_causal_gene_lists.tsv
         ;;
     esac
 
@@ -1093,8 +1096,7 @@ task finemap_genes {
       --secondary-or-nominal \
       --fdr-q-cutoff ${FDR_cutoff} \
       --secondary-for-fdr \
-      --regularization-alpha ${finemap_elnet_alpha} \
-      --regularization-l1-l2-mix ${finemap_elnet_l1_l2_mix} \
+      --logit-grid-search \
       --use-max-pip-per-gene \
       --distance ${finemap_cluster_distance} \
       --nonsig-distance ${finemap_nonsig_distance} \
@@ -1104,6 +1106,8 @@ task finemap_genes {
       --confident-pip ${finemap_conf_pip} \
       --very-confident-pip ${finemap_vconf_pip} \
       --known-causal-gene-lists known_causal_gene_lists.tsv \
+      --known-not-causal-gene-lists known_not_causal_gene_lists.tsv \
+      --include-known-genes-in-training \
       --outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.${finemap_output_label}.tsv \
       --all-genes-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.all_genes_from_blocks.${finemap_output_label}.tsv \
       --naive-outfile ${freq_code}.${CNV}.gene_fine_mapping.gene_stats.naive_priors.tsv \
