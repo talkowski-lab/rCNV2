@@ -26,7 +26,7 @@ enumerate.all.excess.dnms <- function(segs, dnms, csq, gbed){
   dnms.ordered <- merge(gbed, dnms, by="gene", sort=F, all=F)
   dnms.chromsplit <- lapply(sort(unique(dnms.ordered$chrom)), function(contig){
     dnms.ordered[which(dnms.ordered$chrom == contig), ]
-    })
+  })
 
   # Compute rolling sum of excess DNMs for all possible k-gene blocks
   lapply(1:max.n.genes, function(k){
@@ -62,24 +62,24 @@ assign.excess.pct <- function(segs, enumerated.excesses){
 # Quantify enrichment of segments in high percentiles of DNM excess
 quantify.excesses <- function(segs, outfile, quantiles=c(0.5, 0.75, 0.9, 0.95)){
   res <- do.call("rbind", lapply(colnames(segs)[grep("_excess_pct", colnames(segs), fixed=T)],
-                          function(cname){
-    do.call("rbind", lapply(list(c("DEL"), c("DUP"), c("DEL", "DUP")), function(cnv.types){
-      n.segs <- length(which(segs$cnv %in% cnv.types))
+                                 function(cname){
+                                   do.call("rbind", lapply(list(c("DEL"), c("DUP"), c("DEL", "DUP")), function(cnv.types){
+                                     n.segs <- length(which(segs$cnv %in% cnv.types))
 
-      # Compute enrichments per quantile
-      res <- do.call("rbind", lapply(quantiles, function(q){
-        n.pass <- length(which(segs[, cname] >= q & segs$cnv %in% cnv.types))
-        stats <- binom.test(n.pass, n.segs, p=(1-q), alternative="greater")
-        c(cname, paste(cnv.types, collapse="_"), "binomial", q, n.segs, (1-q)*n.segs, n.pass,
-          stats$p.value, stats$estimate / (1-q))
-      }))
+                                     # Compute enrichments per quantile
+                                     res <- do.call("rbind", lapply(quantiles, function(q){
+                                       n.pass <- length(which(segs[, cname] >= q & segs$cnv %in% cnv.types))
+                                       stats <- binom.test(n.pass, n.segs, p=(1-q), alternative="greater")
+                                       c(cname, paste(cnv.types, collapse="_"), "binomial", q, n.segs, (1-q)*n.segs, n.pass,
+                                         stats$p.value, stats$estimate / (1-q))
+                                     }))
 
-      # Perform K-S test to evaluate overall deviation from expectation (uniform)
-      stats <- ks.test(segs[which(segs$cnv %in% cnv.types), cname], "punif")
-      rbind(res, c(cname, paste(cnv.types, collapse="_"), "K-S", NA, n.segs,
-                   NA, NA, stats$p.value, NA))
-    }))
-  }))
+                                     # Perform K-S test to evaluate overall deviation from expectation (uniform)
+                                     stats <- ks.test(segs[which(segs$cnv %in% cnv.types), cname], "punif")
+                                     rbind(res, c(cname, paste(cnv.types, collapse="_"), "K-S", NA, n.segs,
+                                                  NA, NA, stats$p.value, NA))
+                                   }))
+                                 }))
   res <- as.data.frame(res)
   colnames(res) <- c("feature", "cnv", "test", "quantile", "n_segs", "expected",
                      "observed", "p_value", "fold_enrichment")
@@ -222,7 +222,7 @@ dnm.excess.cdf.highlights <- function(segs, dnms, cohort, csq,
   res <- lapply(segs$region_id, get.dnm.excess.byGene, segs=segs, dnms=dnms, csq=csq)
   names(res) <- segs$region_id
   bar.pal <- rev(viridis(top.n.genes + 1))
-  csq.lab <- c("lof" = "PTVs", "mis" = "Mis.", "syn" = "Syn.")[csq]
+  csq.lab <- c("lof" = "PTV", "mis" = "Misense", "syn" = "Synonymous")[csq]
   cnv.lab <- c("lof" = "DEL", "mis" = "DUP", "syn" = "rCNV")[csq]
 
   # Prep plot area
@@ -308,7 +308,9 @@ dnm.excess.cdf.highlights <- function(segs, dnms, cohort, csq,
     axis(3, at=x, tick=F, line=-0.7, cex.axis=5.5/6,
          labels=paste(round(100 * x, 0), "%", sep=""))
   })
-  x.ax.title <- bquote("Prop. of Excess" ~ italic("dn") * .(csq.lab) ~ "per" ~ .(cnv.lab) ~ "Segment")
+  axis(3, at=-0.185, line=-1.1, tick=F, cex.axis=5.5/6,
+       labels=paste(cnv.lab, "Segment"), xpd=T)
+  x.ax.title <- bquote("Prop. of Excess" ~ .(csq.lab) ~ "DNMs per Segment")
   mtext(3, line=1.25, text=x.ax.title)
 
   # Add bottom X axis
@@ -320,12 +322,14 @@ dnm.excess.cdf.highlights <- function(segs, dnms, cohort, csq,
 }
 
 # Plot matrix of excess de novo cdfs for all loci
-dnm.excess.cdf.barplots <- function(segs, dnms, cohort, csq, n.max.genes=5, norm=F,
-                                    pct.cutoff=0.5, sort.firstwo.only=FALSE,
+dnm.excess.cdf.barplots <- function(segs, dnms, cohort, csq, n.max.genes=5, min.excess=0,
+                                    norm=F, pct.cutoff=0.5, sort.firstwo.only=FALSE,
                                     order.by="decile", fancy.sort=FALSE,
-                                    xtitle.suffix="Segments", ytitle=NULL,
-                                    legend=F, cnv.marker.wex=0.035,
-                                    parmar=c(1.1, 2.6, 0.4, 0.1)){
+                                    annotate.top.n=0, annotate.vex=0.125,
+                                    annotate.bracket.vex=0.6, annotate.cutoff=0.95,
+                                    print.report=FALSE, xtitle.suffix="Segments",
+                                    ytitle=NULL, legend=F, cnv.marker.wex=0.035,
+                                    parmar=c(1.1, 2.6, 0.4, 0.25)){
   # Subset segments based on pct.cutoff
   pct.colname <- paste(cohort, "dnm", csq, "excess_pct", sep="_")
   keep.idx <- which(segs[, pct.colname] >= pct.cutoff & segs$n_genes > 0)
@@ -339,6 +343,17 @@ dnm.excess.cdf.barplots <- function(segs, dnms, cohort, csq, n.max.genes=5, norm
     })
     order(ranks[, 1], ranks[, 2], ranks[, 3], ranks[, 4], ranks[, 5], ranks[, 6],
           ranks[, 7], ranks[, 8], ranks[, 9], ranks[, 10], ranks[, 11])
+  }
+  # Helper function for ordering segments by 20-iles
+  order.by.5pct <- function(res){
+    bins <- seq(1, 0, -0.05)
+    ranks <- sapply(bins, function(d){
+      apply(res, 1, function(vals){min(which(vals>=d))})
+    })
+    order(ranks[, 1], ranks[, 2], ranks[, 3], ranks[, 4], ranks[, 5], ranks[, 6],
+          ranks[, 7], ranks[, 8], ranks[, 9], ranks[, 10], ranks[, 11], ranks[, 12],
+          ranks[, 13], ranks[, 14], ranks[, 15], ranks[, 16], ranks[, 17],
+          ranks[, 18], ranks[, 19], ranks[, 20], ranks[, 21])
   }
   # Helper function for ordering segments by quintile
   order.by.quintile <- function(res){
@@ -360,6 +375,7 @@ dnm.excess.cdf.barplots <- function(segs, dnms, cohort, csq, n.max.genes=5, norm
 
   # Get plot data
   res <- calc.dnm.excess.cdf.matrix(segs, dnms, csq, n.max.genes)
+  res <- res[which(apply(res, 1, max, na.rm=T) >= min.excess), ]
   if(norm==T){
     res <- t(apply(res, 1, function(vals){vals/max(vals, na.rm=T)}))
     if(sort.firstwo.only==FALSE){
@@ -371,6 +387,8 @@ dnm.excess.cdf.barplots <- function(segs, dnms, cohort, csq, n.max.genes=5, norm
           res <- res[order.by.decile(res), ]
         }else if(order.by=="quintile"){
           res <- res[order.by.quintile(res), ]
+        }else if(order.by=="5pct"){
+          res <- res[order.by.5pct(res), ]
         }
       }
     }else{
@@ -382,13 +400,24 @@ dnm.excess.cdf.barplots <- function(segs, dnms, cohort, csq, n.max.genes=5, norm
           res <- res[order.by.decile(res[, c(1, 2, ncol(res))]), ]
         }else if(order.by=="quintile"){
           res <- res[order.by.quintile(res[, c(1, 2, ncol(res))]), ]
+        }else if(order.by=="5pct"){
+          res <- res[order.by.5pct(res[, c(1, 2, ncol(res))]), ]
         }
       }
     }
   }
   res <- res[which(!is.na(res[, 1])), ]
   colors <- rev(viridis(n.max.genes + 1))
-  ymax <- max(res, na.rm=T)
+  ymax <- (1+(annotate.vex*annotate.top.n))*max(res, na.rm=T)
+
+  # Print stats for reference
+  if(print.report){
+    cat(paste(nrow(res), "total segments with at least", min.excess, "DNM excess\n"))
+    anno.vals <- sapply(1:annotate.top.n, function(i){
+      cat(paste(length(which(res[, i] >= annotate.cutoff)), "segments with",
+                annotate.cutoff, "of excess captured in", i, "genes\n"))
+    })
+  }
 
   # Prep plot area
   par(bty="n", mar=parmar)
@@ -406,27 +435,95 @@ dnm.excess.cdf.barplots <- function(segs, dnms, cohort, csq, n.max.genes=5, norm
          lwd=0.1, xpd=T)
   })
 
+  # Annotate % of segs explained by top N genes, if optioned
+  if(annotate.top.n > 0){
+    anno.bracket.ymod <- (annotate.bracket.vex * annotate.vex) / 2
+    anno.ymid <- rev(ymax-((1:annotate.top.n)-0.5)*annotate.vex)
+    anno.vals <- sapply(1:annotate.top.n, function(i){
+      length(which(res[, i] >= annotate.cutoff))
+    })
+    segments(x0=c(0, anno.vals), x1=c(0, anno.vals),
+             y0=max(res, na.rm=T), y1=c(max(anno.ymid), rev(anno.ymid)),
+             col=bluewhite, lend="butt")
+    segments(x0=anno.vals, x1=anno.vals, y0=0, y1=max(res, na.rm=T),
+             lty=2, col=blueblack)
+    segments(x0=0, x1=rev(anno.vals), y0=anno.ymid, y1=anno.ymid, col=blueblack)
+    segments(x0=c(rep(0, annotate.top.n), rev(anno.vals)),
+             x1=c(rep(0, annotate.top.n), rev(anno.vals)),
+             y0=rep(anno.ymid-anno.bracket.ymod, 2),
+             y1=rep(anno.ymid+anno.bracket.ymod, 2),
+             col=blueblack)
+    sapply(1:annotate.top.n, function(i){
+      if(i == 1){
+        gene.range <- 1
+        gene.suffix <- ""
+      }else{
+        gene.range <- paste(1, i, sep="-")
+        gene.suffix <- "s"
+      }
+      anno.parts <- c(paste("'' >= '", paste(100 * annotate.cutoff, "%", sep=""), "'", sep=""),
+                      "'of excess'",
+                      "'in'",
+                      paste("'", gene.range, "'", sep=""),
+                      paste("'gene", gene.suffix, "'", sep=""))
+      if(anno.vals[i]/nrow(res) <= 0.3){
+        lab <- paste(anno.parts, collapse=" ~ ")
+        lab.xmod <- 0.05
+      }else if(anno.vals[i]/nrow(res) <= 0.56){
+        lab <- paste(anno.parts[c(1, 3:5)], collapse=" ~ ")
+        lab.xmod <- 0.05
+      }else if(anno.vals[i]/nrow(res) <= 0.67){
+        lab <- paste(anno.parts[3:5], collapse=" ~ ")
+        lab.xmod <- 0.025
+      }else{
+        lab <- anno.parts[4]
+        lab.xmod <- 0.025
+      }
+      n.val.char <- nchar(round(100*anno.vals[i]/nrow(res), 0))
+      text(x=max(c(0.035*n.val.char*nrow(res), anno.vals[i]-(lab.xmod*par("usr")[2]))),
+           y=rev(anno.ymid)[i]-0.015,
+           pos=4.5, cex=4/6, labels=parse(text=lab), xpd=T)
+      anno.rect.xmod <- (0.03+(0.02 * n.val.char)) * diff(par("usr")[1:2])
+      rect(xleft=(anno.vals[i]/2)-anno.rect.xmod,
+           xright=(anno.vals[i]/2)+anno.rect.xmod,
+           ybottom=rev(anno.ymid)[i]-anno.bracket.ymod,
+           ytop=rev(anno.ymid)[i]+anno.bracket.ymod,
+           col=blueblack, border=blueblack, xpd=T)
+      text(x=anno.vals[i]/2, y=rev(anno.ymid)[i], cex=4.5/6, xpd=T, col="white",
+           labels=paste(round(100*anno.vals[i]/nrow(res), 0), "%", sep=""))
+    })
+  }
+
   # Add axes
   abline(h=0, col=blueblack)
   axis(1, at=c(-10e10, 10e10), col=blueblack, labels=NA)
-  mtext(1, line=0.15, text=parse(text=paste(prettyNum(nrow(res)), "~", xtitle.suffix)))
-  axis(2, at=c(0, 10e10), col=blueblack, labels=NA, tck=0)
-  axis(2, at=axTicks(2), labels=NA, col=blueblack, tck=-0.025)
-  axis(2, at=axTicks(2), tick=F, las=2, line=-0.65)
-  mtext(2, line=1.55, text=ytitle)
+  mtext(1, line=0.25, text=parse(text=paste(prettyNum(nrow(res)), "~", xtitle.suffix)))
+  if(norm){
+    y.ax.at <- seq(0, 1, 0.2)
+  }else{
+    y.ax.at <- axTicks(2)
+  }
+  axis(2, at=c(0, max(res, na.rm=T)), col=blueblack, labels=NA, tck=0)
+  axis(2, at=y.ax.at, labels=NA, col=blueblack, tck=-0.025)
+  axis(2, at=y.ax.at, tick=F, las=2, line=-0.65)
+  axis(2, at=mean(range(y.ax.at)), tick=F, line=0.55, labels=ytitle)
 
   # Add legend, if optioned
   if(legend==T){
     res.sums <- apply(res, 2, sum, na.rm=T)
     res.pct <- round(100 * rev(rev(res.sums) - c(rev(res.sums)[-1], 0)) / max(res.sums))
-    legend.labs <- c(as.expression(bquote(.(paste("Top Gene (", res.pct[1], "%)", sep="")))),
+    legend.labs <- c(as.expression(""),
+                     as.expression(bquote(.(paste("Top Gene (", res.pct[1], "%)", sep="")))),
                      as.expression(bquote(2^"nd" ~ "Gene" ~ .(paste("(", res.pct[2], "%)", sep="")))),
                      as.expression(bquote(3^"rd" ~ "Gene" ~ .(paste("(", res.pct[3], "%)", sep="")))),
                      sapply(4:n.max.genes, function(x){
                        as.expression(bquote(.(x)^"th" ~ "Gene" ~ .(paste("(", res.pct[x], "%)", sep=""))))
-                       }),
+                     }),
                      as.expression(bquote("All Others" ~ .(paste("(", res.pct[n.max.genes+1], "%)", sep="")))))
-    legend("topright", fill=colors, legend=legend.labs, bty="n", border=NA)
+    l.tmp <- legend("topright", fill=c(NA, colors), legend=legend.labs,
+                    bty="n", border=NA, cex=5/6, x.intersp=0.5)
+    text(x=par("usr")[2], y=l.tmp$text$y[1], pos=2, cex=5/6,
+         labels="DNM Excess per Gene:")
   }
 }
 
@@ -540,7 +637,7 @@ sapply(names(dnms), function(cohort){
       cnv.types <- c("DEL", "DUP")
     }
     pdf(paste(out.prefix, cohort, csq, "excess_dnm_distrib_bygene.best_loci.pdf", sep="."),
-        height=3.75, width=5)
+        height=3.75, width=5.25)
     dnm.excess.cdf.highlights(ndd.segs[which(ndd.segs$cnv %in% cnv.types), ],
                               dnms[[cohort]], cohort, csq, top.n.segs=12, top.n.genes=5)
     dev.off()
@@ -550,45 +647,62 @@ sapply(names(dnms), function(cohort){
 # Collapsed distribution of excess DNMs across all NDD segments
 pct.cutoff <- 0
 sapply(names(dnms), function(cohort){
+  if(cohort == "DDD_plus_ASC"){
+    min.excess.for.norm <- 1.9
+    min.excess.ineq <- ">="
+  }else if(cohort == "DDD"){
+    min.excess.for.norm <- 0.9
+    min.excess.ineq <- ">="
+  }else{
+    min.excess.for.norm <- 0.1
+    min.excess.ineq <- ">"
+  }
   sapply(csqs, function(csq){
     cnv.marker.wex <- 0
+    ytitle.2 <- "Fraction of Excess"
     if(csq=="lof"){
       cnv.types <- c("DEL")
       cnv.lab <- "DEL"
-      ytitle.1 <- bquote("Excess" ~ italic("dn") * "PTVs")
-      ytitle.2 <- bquote("Prop. of Excess" ~ italic("dn") * "PTVs")
-      xtitle.suffix.2 <- paste('"DEL Segs. with Excess" ~ italic("dn") * "PTV"', sep="")
+      ytitle.1 <- "Excess PTV DNMs"
+      xtitle.suffix.1 <- paste('"NDD-Associated', cnv.lab, 'Segs."')
+      xtitle.suffix.2 <- paste("'Segs (Excess PTV' ",  min.excess.ineq," '",
+                               round(min.excess.for.norm, 0), ")'", sep="")
     }else if(csq=="mis"){
       cnv.types <- c("DUP")
       cnv.lab <- "DUP"
-      ytitle.1 <- bquote("Excess" ~ italic("dn") * "Mis.")
-      ytitle.2 <- bquote("Prop. of Excess" ~ italic("dn") * "Mis.")
-      xtitle.suffix.2 <- paste('"DUP Segs. with Excess" ~ italic("dn") * "Mis."', sep="")
+      ytitle.1 <- "Excess Missense DNMs"
+      xtitle.suffix.1 <- paste('"NDD-Associated', cnv.lab, 'Segs."')
+      xtitle.suffix.2 <- paste("'Segs (Excess Mis.' ",  min.excess.ineq," '",
+                               round(min.excess.for.norm, 0), ")'", sep="")
     }else{
       cnv.types <- c("DEL", "DUP")
       cnv.lab <- "rCNV"
       cnv.marker.wex <- 0.035
-      ytitle.1 <- bquote("Excess" ~ italic("dn") * "Syn.")
-      ytitle.2 <- bquote("Prop. of Excess" ~ italic("dn") * "Syn.")
-      xtitle.suffix.2 <- paste('"Segs. with Excess" ~ italic("dn") * "Syn."', sep="")
+      ytitle.1 <- "Excess Syn. DNMs"
+      xtitle.suffix.1 <- "'NDD-Associated Segs.'"
+      xtitle.suffix.2 <- paste("'Segs (Excess Syn.' ",  min.excess.ineq," '",
+                               round(min.excess.for.norm, 0), ")'", sep="")
     }
     pdf(paste(out.prefix,  cohort, csq, "excess_dnm_distrib_bygene.pdf", sep="."),
-        height=2, width=3)
+        height=2, width=2.75)
     dnm.excess.cdf.barplots(ndd.segs[which(ndd.segs$cnv %in% cnv.types), ],
                             dnms[[cohort]], cohort=cohort, csq=csq,
                             norm=F, legend=T, pct.cutoff=pct.cutoff,
                             cnv.marker.wex=cnv.marker.wex,
-                            xtitle.suffix=paste('"NDD-Associated', cnv.lab, 'Segs."'),
-                            ytitle=ytitle.1)
+                            xtitle.suffix=xtitle.suffix.1, ytitle=ytitle.1)
     dev.off()
+    cat(paste(cohort, csq, "\n"))
     pdf(paste(out.prefix, cohort, csq, "excess_dnm_distrib_bygene.norm.pdf", sep="."),
-        height=2, width=3)
+        height=2, width=2.5)
     dnm.excess.cdf.barplots(ndd.segs[which(ndd.segs$cnv %in% cnv.types), ],
                             dnms[[cohort]], cohort=cohort, csq=csq,
-                            norm=T, legend=F, pct.cutoff=pct.cutoff,
-                            cnv.marker.wex=cnv.marker.wex, fancy.sort=TRUE,
-                            xtitle.suffix=xtitle.suffix.2,
-                            ytitle=ytitle.2)
+                            min.excess=min.excess.for.norm, norm=T, legend=F,
+                            pct.cutoff=pct.cutoff, cnv.marker.wex=cnv.marker.wex,
+                            fancy.sort=FALSE, order.by="deciles",
+                            sort.firstwo.only=TRUE, annotate.top.n=2,
+                            annotate.cutoff=0.9, print.report=TRUE,
+                            xtitle.suffix=xtitle.suffix.2, ytitle=ytitle.2,
+                            parmar=c(1.1, 2.6, 0.1, 1))
     dev.off()
   })
 })

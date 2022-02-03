@@ -112,7 +112,7 @@ segs <- load.sizes(tsv.in, segs)
 
 # Plot correlation of sizes
 pdf(paste(out.prefix, "original_vs_refined_sizes.pdf", sep="."),
-    height=2.5, width=2.8)
+    height=2.25, width=2.8)
 segs.scatter(segs, x=log10(segs$original_size), y=log10(segs$size),
              xlims=log10(c(100000, max(segs$size))),
              ylims=log10(c(100000, max(segs$size))),

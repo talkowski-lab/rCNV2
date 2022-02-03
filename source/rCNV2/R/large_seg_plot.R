@@ -148,8 +148,8 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
       cor.coeffs <- c(del.cor$estimate, dup.cor$estimate)^2
       cor.pvals <- c(del.cor$p.value, dup.cor$p.value)
       x.sds <- sapply(list(x[del.idx], x[dup.idx]), sd, na.rm=T)
-      cor.betas <- c(del.fit$fit$coefficients[2] * x.sds[1],
-                     dup.fit$fit$coefficients[2] * x.sds[2])
+      cor.betas <- c(del.fit$fit$coefficients["X"],
+                     dup.fit$fit$coefficients["X"])
       lm.y.ends <- sapply(list(del.fit$fit, dup.fit$fit), predict,
                           newdata=data.frame("X"=par("usr")[2]))
       plot.height <- diff(par("usr")[3:4])
@@ -162,7 +162,7 @@ segs.scatter <- function(segs, x, y, subset_to_regions=NULL,
         axis(4, at=cor.text.y[i], line=-0.75, tick=F, las=2,
              label=names(cnv.colors)[i], col.axis=cnv.colors[i])
         axis(4, at=cor.text.y[i]-cor.text.ybuf, line=-0.6, tick=F, las=2,
-             label=bquote(beta == .(format(round(cor.betas[i], 2), nsmall=2))),
+             label=bquote(widehat(italic(B)) == .(format(round(cor.betas[i], 2), nsmall=2))),
              cex.axis=5/6)
         axis(4, at=cor.text.y[i]-(2*cor.text.ybuf), line=-0.6, tick=F, las=2,
              label=bquote(R^2 == .(format(round(cor.coeffs[i], 2), nsmall=2))),
