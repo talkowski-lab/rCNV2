@@ -85,7 +85,7 @@ RUN apt-get -qqy clean && \
     gcloud --help
 
 # Install R packages not available through conda
-RUN Rscript -e "sapply(c('EQL'),\
+RUN Rscript -e "sapply(c('EQL', 'beeswarm'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 ARG rCNV2_Rpkg_source="/opt/rCNV2/source/rCNV2_0.1.0.tar.gz"
 RUN Rscript -e "install.packages('$rCNV2_Rpkg_source', source=TRUE, repos=NULL)"

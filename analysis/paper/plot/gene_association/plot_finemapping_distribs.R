@@ -83,11 +83,11 @@ get.hpomatched.genes <- function(credsets, omim.lists){
 ##########################
 # Plot histogram of number of genes per credible set
 plot.cs.size.hist <- function(credsets, sig.only=TRUE,  bin.width=1,
-                              parmar=c(2.15, 2.85, 1, 0.6)){
+                              parmar=c(2.15, 2.25, 1, 0.6)){
   # Get plotting data
   if(sig.only){
     col <- "n_sig_in_credset"
-    x.title <- "Sig. Genes per Credible Set"
+    x.title <- "Sig. Genes per Cred. Set"
   }else{
     col <- "n_genes"
     x.title <- "Genes per Credible Set"
@@ -127,7 +127,7 @@ plot.cs.size.hist <- function(credsets, sig.only=TRUE,  bin.width=1,
   axis(2, c(0, 10e10), tck=0, labels=NA, col=blueblack)
   axis(2, y.ax.at, tck=-0.025, labels=NA, col=blueblack)
   axis(2, y.ax.at, tick=F, las=2, line=-0.6)
-  mtext(2, line=1.9, text="Credible Sets")
+  mtext(2, line=1.3, text="Credible Sets")
 }
 
 
@@ -254,7 +254,7 @@ pip.split.hist <- function(stats1, stats2, label1, label2, bin.width=0.05,
 
 # Plot histogram of PIPs for all genes in all credible sets
 plot.pip.hist <- function(allgenes, conf.cutoff=0.2, vconf.cutoff=0.8,
-                          breaks=seq(0, 1, 0.025), parmar=c(2.15, 2.85, 1, 0.6)){
+                          breaks=seq(0, 1, 0.025), parmar=c(2.15, 2.55, 1, 0.6)){
   # Get plotting data
   pips <- lapply(c("DEL", "DUP"), function(cnv){
     all.hits <- allgenes[which(allgenes$cnv==cnv & !is.na(allgenes$credible_set)),
@@ -304,18 +304,20 @@ plot.pip.hist <- function(allgenes, conf.cutoff=0.2, vconf.cutoff=0.8,
   x.ax.at <- axTicks(1)
   axis(1, x.ax.at, tck=-0.025, labels=NA, col=blueblack)
   sapply(x.ax.at, function(x){axis(1, x, tick=F, line=-0.7)})
-  mtext(1, line=1.25, text="Posterior Inclusion Prob. (PIP)")
+  mtext(1, line=1.25, text="PIP")
   axis(2, c(0, 10e10), tck=0, labels=NA, col=blueblack)
   axis(2, y.ax.at, tck=-0.025, labels=NA, col=blueblack)
   axis(2, y.ax.at, tick=F, las=2, line=-0.6)
-  mtext(2, line=1.9, text="Genes in Credible Sets")
+  mtext(2, line=1.6, text="Genes")
 }
 
 
 # Trio of beeswarms representing PIPs between prior/posterior/full model for a gene set of interest
 sequential.pip.swarm <- function(pips, genes, cnv, gset.name=NULL, dev.only=FALSE,
-                                 connect=T, bar.width=0.35, pt.spacing=0.4, pt.cex=0.8, corralWidth=0.8,
-                                 random.seed=2022, parmar=c(3.1, 2.75, 1.3, 0.25)){
+                                 conf.cutoff=0.2, vconf.cutoff=0.8,
+                                 connect=T, bar.width=0.35, pt.spacing=0.4,
+                                 pt.cex=0.6, corralWidth=0.7, random.seed=2022,
+                                 parmar=c(3.1, 2.75, 1.3, 0.25)){
   # Get plot values
   pip.df <- merge(pips$Prior[, c("gene", "cnv", "PIP", "top", "developmental")],
                   pips$Posterior[, c("gene", "cnv", "PIP", "top")],
@@ -376,6 +378,9 @@ sequential.pip.swarm <- function(pips, genes, cnv, gset.name=NULL, dev.only=FALS
   par(mar=parmar, bty="n")
   plot(NA, xlim=c(0, 3), ylim=c(0, 1), xaxs="i", yaxs="i", xaxt="n", yaxt="n",
        xlab="", ylab="")
+  rect(xleft=par("usr")[1], xright=par("usr")[2],
+       ybottom=c(conf.cutoff, vconf.cutoff), ytop=rep(par("usr")[2], 2),
+       border=NA, bty="n", col=adjustcolor(bluewhite, alpha=0.5))
 
   # Add connecting lines between points, if optioned
   if(connect){
@@ -385,7 +390,7 @@ sequential.pip.swarm <- function(pips, genes, cnv, gset.name=NULL, dev.only=FALS
              y1=c(plot.df$y.posterior, plot.df$y.full),
              col=ns.color.light, xpd=T)
   }
-  abline(h=c(0.2, 0.8), lty=5, col=ns.color)
+  abline(h=c(0.2, 0.8), lty=5, col=blueblack)
 
   # Add points
   for(order in 1:2){
@@ -483,7 +488,7 @@ sapply(c(TRUE, FALSE), function(sig.only){
     suffix <- "all_genes"
   }
   pdf(paste(out.prefix, "credset_size_hist", suffix, ".pdf", sep="."),
-      height=2.1, width=2.5)
+      height=2.2, width=2.3)
   plot.cs.size.hist(credsets, sig.only, parmar=c(2.25, 2.85, 0.3, 1))
   dev.off()
 })
@@ -496,13 +501,13 @@ cat(paste("Fine-mapping reduced the average number of significant genes per bloc
 # Scatterplot of effect of fine-mapping on number of genes per association
 n_gene_range <- c(0, max(credsets[, c("n_sig_genes", "n_sig_in_credset")]))
 pdf(paste(out.prefix, "genes_per_credset_before_vs_after.scatter.pdf", sep="."),
-    height=2.5, width=2.6)
+    height=2.2, width=2.2)
 credsets.scatter(credsets, credsets$n_sig_genes, credsets$n_sig_in_credset, add.lm=T,
                  xlims=n_gene_range, ylims=n_gene_range,
                  abline.a=0, abline.b=1, abline.lty=5, blue.bg=FALSE, pt.cex=0.7,
-                 xtitle="Genes Before Fine-Mapping", x.title.line=1.25,
-                 ytitle="Genes After Fine-Mapping",
-                 parmar = c(2.4, 2.7, 0.25, 0.5))
+                 xtitle="Genes Before\nFine-Mapping", x.title.line=1.25,
+                 ytitle="Genes After\nFine-Mapping",
+                 parmar = c(3.7, 3.7, 0.25, 0.5))
 dev.off()
 
 # Plot pairwise comparisons of pips
@@ -531,11 +536,12 @@ sapply(list(c(1, 2), c(1, 3), c(2, 3)), function(idxs){
 
 # Plot histograms of PIPs for all genes in credible sets
 pdf(paste(out.prefix, "finemapped_distribs.credset_pip.pdf", sep="."),
-    height=2.1, width=2.7)
+    height=2.2, width=2.4)
 plot.pip.hist(pips[[4]])
 dev.off()
 
 # Compare prior/posterior/full model for selected gene sets
+pip.swarm.pdf.dims <- c(2.5, 2.4)
 gsets <- load.gene.lists(genelists.in)
 sapply(1:length(gsets), function(i){
   gset.name <- names(gsets)[i]
@@ -544,8 +550,8 @@ sapply(1:length(gsets), function(i){
 
   sapply(c("DEL", "DUP"), function(cnv){
     pdf(paste(out.prefix, "finemapped_distribs", gset.outname, cnv, "pdf", sep="."),
-        height=2.7, width=2.5)
-    sequential.pip.swarm(pips, genes, cnv, gset.name, corralWidth=0.7)
+        height=pip.swarm.pdf.dims[1], width=pip.swarm.pdf.dims[2])
+    sequential.pip.swarm(pips, genes, cnv, gset.name)
     dev.off()
   })
 })
@@ -555,8 +561,8 @@ omim.lists <- load.gene.lists(omimlists.in)
 hpomatched.genes <- get.hpomatched.genes(credsets, omim.lists)
 sapply(c("DEL", "DUP"), function(cnv){
   pdf(paste(out.prefix, "finemapped_distribs", "hpomatched_genes", cnv, "pdf", sep="."),
-      height=2.7, width=2.5)
-  sequential.pip.swarm(pips, hpomatched.genes, cnv, "HPO-Matched", corralWidth=0.7)
+      height=pip.swarm.pdf.dims[1], width=pip.swarm.pdf.dims[2])
+  sequential.pip.swarm(pips, hpomatched.genes, cnv, "HPO-Matched")
   dev.off()
 })
 

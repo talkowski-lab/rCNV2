@@ -40,7 +40,7 @@ add.heat.cells <- function(mat, pal, x.start=0, y.start=0, lwd=1, outer.lwd=1){
   sapply(1:n.cols, function(i){
     rect(xleft=rep(x.start+i-1, n.rows), xright=rep(x.start+i, n.rows),
          ybottom=y.start+(1:n.rows)-1, ytop=y.start+(1:n.rows),
-         col=pal[mat[, i]], border="white", lwd=lwd)
+         col=pal[mat[, i]], border="gray25", lwd=lwd)
   })
   rect(xleft=x.start, xright=x.start+n.cols,
        ybottom=y.start, ytop=y.start+n.rows,
@@ -225,7 +225,7 @@ feat2eigen.mat <- make.cor.mat(features, eigen)
 # Set color palette
 # pal <- colorRampPalette(c(cnv.colors[1], control.cnv.colors[1], redwhite,
 #                           bluewhite, control.cnv.colors[2], cnv.colors[2]))(201)
-pal <- colorRampPalette(c("#D42BD4", "white", "#22DD22"))(201)
+pal <- colorRampPalette(c("#FF52FF", "gray10", "#7CFF00"))(201)
 
 # Plot heatmap
 pdf.scalar <- 2
