@@ -85,6 +85,9 @@ RUN apt-get -qqy clean && \
     gcloud --help
 
 # Install R packages not available through conda
+# (Note that beeswarm _is_ available through conda but we need >=v0.4, and there 
+#  is a very complex dependency issue in conda that makes it easier to install 
+#  directly with R here)
 RUN Rscript -e "sapply(c('EQL', 'beeswarm'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 ARG rCNV2_Rpkg_source="/opt/rCNV2/source/rCNV2_0.1.0.tar.gz"

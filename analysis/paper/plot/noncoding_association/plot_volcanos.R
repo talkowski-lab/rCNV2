@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -21,9 +21,9 @@ options(stringsAsFactors=F, scipen=1000)
 plot.volcano <- function(stats, cnv, pt.cex=0.2, blue.bg=FALSE,
                          parmar=c(2.25, 2.25, 0.25, 0.25)){
   # Get plot data
-  plot.df <- stats[which(stats$cnv==cnv), c("meta.lnOR", "meta.neg.log10_p")]
+  plot.df <- stats[which(stats$cnv==cnv), c("meta.lnOR", "meta.neglog10_p")]
   xlims <- range(stats$meta.lnOR, na.rm=T)
-  ylims <- range(stats$meta.neg.log10_p, na.rm=T)
+  ylims <- range(stats$meta.neglog10_p, na.rm=T)
   x.label <- paste(c("DEL"="Deletion", "DUP"="Duplication")[cnv], "Odds Ratio")
   if(blue.bg==TRUE){
     plot.bg <- bluewhite
@@ -36,7 +36,7 @@ plot.volcano <- function(stats, cnv, pt.cex=0.2, blue.bg=FALSE,
     plot.bty <- "n"
     grid.col <- NA
   }
-  
+
   # Assign point colors
   plot.df$color <- apply(plot.df, 1, function(vals){
     sig <- (vals[2] > -log10(0.05))
@@ -54,23 +54,23 @@ plot.volcano <- function(stats, cnv, pt.cex=0.2, blue.bg=FALSE,
       }
     }
   })
-  
+
   # Prep plot area
   par(bty="n", mar=parmar)
   plot(NA, xlim=xlims, ylim=ylims, xaxt="n", yaxt="n", xlab="", ylab="")
   x.ax.at <- log(c(1/(2^(4:0)), 2^(1:4)))
   y.ax.at <- -10:10
-  
+
   # Add background shading
-  rect(xleft=par("usr")[1], xright=par("usr")[2], 
+  rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
        bty=plot.bty, border=plot.border, col=plot.bg)
   abline(h=y.ax.at, v=x.ax.at, col=grid.col)
-  
+
   # Add points & nomsig marker
   points(plot.df[, 1:2], pch=19, cex=pt.cex, col=plot.df$color)
   abline(h=-log10(0.05), lty=5, col=cnv.blacks[cnv])
-  
+
   # Add text to top corners noting number of nomsig tracks
   n.nomsig.ctrl <- length(which(plot.df$color==ns.color.dark))
   n.nomsig.case <- length(which(plot.df$color==cnv.colors[cnv]))
@@ -79,7 +79,7 @@ plot.volcano <- function(stats, cnv, pt.cex=0.2, blue.bg=FALSE,
        labels=prettyNum(n.nomsig.ctrl))
   text(x=par("usr")[2], y=par("usr")[4]-y.buf, col=cnv.colors[cnv], pos=2,
        labels=prettyNum(n.nomsig.case))
-  
+
   # Add axes
   axis(1, at=c(-10e10, 10e10), col=blueblack, tck=0, labels=NA)
   axis(1, at=x.ax.at, tck=-0.025, col=blueblack, labels=NA)
@@ -98,11 +98,12 @@ plot.volcano <- function(stats, cnv, pt.cex=0.2, blue.bg=FALSE,
 ### RSCRIPT BLOCK ###
 #####################
 require(optparse, quietly=T)
-require(funr, quietly=T)
+require(rCNV2, quietly=T)
 
 # List of command-line options
 option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
+  make_option(c("--saddlepoint-adj"), action="store_true", default=FALSE,
+              help="Update Z-scores and P-values with saddlepoint re-approximation of the null [default: %default]")
 )
 
 # Get command-line arguments & options
@@ -119,25 +120,15 @@ if(length(args$args) != 2){
 # Writes args & opts to vars
 stats.in <- args$args[1]
 out.prefix <- args$args[2]
-rcnv.config <- opts$`rcnv-config`
+spa <- opts$`saddlepoint-adj`
 
 # # DEV PARAMETERS
 # stats.in <- "~/scratch/rCNV.burden_stats.tsv.gz"
 # out.prefix <- "~/scratch/volcano_test"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/noncoding_association/"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
-
-# Source common functions
-script.dir <- funr::get_script_path()
-source(paste(script.dir, "common_functions.R", sep="/"))
+# spa <- T
 
 # Load track stats
-stats <- load.track.stats(stats.in)
+stats <- load.track.stats(stats.in, spa)
 
 # Generate one volcano plot each for DEL & DUP
 sapply(c("DEL", "DUP"), function(cnv){

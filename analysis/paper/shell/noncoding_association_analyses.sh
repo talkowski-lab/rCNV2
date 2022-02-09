@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -18,7 +18,7 @@ gcloud auth login
 
 # Set global parameters
 export rCNV_bucket="gs://rcnv_project"
-export prefix="rCNV2_analysis_d1"
+export prefix="rCNV2_analysis_d2"
 
 
 # Download necessary data (note: requires permissions)
@@ -31,8 +31,7 @@ mkdir refs/
 gsutil -m cp -r \
   ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
   ${rCNV_bucket}/refs/GRCh37.* \
-  ${rCNV_bucket}/analysis/analysis_refs/test_phenotypes.list \
-  ${rCNV_bucket}/analysis/analysis_refs/HPOs_by_metacohort.table.tsv \
+  ${rCNV_bucket}/analysis/analysis_refs/* \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists \
   ${rCNV_bucket}/refs/REP_state_manifest.tsv \
   refs/
@@ -48,9 +47,9 @@ fgrep -wvf \
 mkdir genes_per_cnv
 for CNV in DEL DUP; do
   # Annotate all CNVs based on any exon overlap
-  for i in $( seq 1 4 ); do
+  while read meta cohorts; do
     /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
-      cnv/meta${i}.rCNV.bed.gz \
+      cnv/${meta}.rCNV.bed.gz \
       refs/gencode.v19.canonical.pext_filtered.gtf.gz \
       --min-cds-ovr "10e-10" \
       -t ${CNV} \
@@ -61,9 +60,9 @@ for CNV in DEL DUP; do
       --bgzip \
       --cnvs-out /dev/stdout \
     | cut -f4,6-7,9 | gzip -c \
-    > genes_per_cnv/rCNV.${CNV}.meta${i}.genes_per_cnv.tsv.gz
-    echo -e "meta${i}\tgenes_per_cnv/rCNV.${CNV}.meta${i}.genes_per_cnv.tsv.gz"
-  done \
+    > genes_per_cnv/rCNV.${CNV}.${meta}.genes_per_cnv.tsv.gz
+    echo -e "${meta}\tgenes_per_cnv/rCNV.${CNV}.${meta}.genes_per_cnv.tsv.gz"
+  done < <( fgrep -v mega refs/rCNV_metacohort_list.txt ) \
   > genes_per_cnv.${CNV}.input.tsv
   # Summarize CNV counts by gene list per phenotype
   /opt/rCNV2/analysis/paper/scripts/noncoding_association/summarize_ncCNV_counts.py \
@@ -74,7 +73,6 @@ for CNV in DEL DUP; do
     --gzip
 done
 /opt/rCNV2/analysis/paper/plot/noncoding_association/plot_unconstrained_effect_sizes.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   unconstrained_cnv_counts.DEL.tsv.gz \
   unconstrained_cnv_counts.DUP.tsv.gz \
   refs/HPOs_by_metacohort.table.tsv \
@@ -83,28 +81,27 @@ done
 
 # Make supplementary table of noncoding track stats
 /opt/rCNV2/analysis/paper/scripts/noncoding_association/format_track_stats_table.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --saddlepoint-adj \
   rCNV.burden_stats.tsv.gz \
   ${prefix}
 
 
 # Plot annotation track distributions & stats
 /opt/rCNV2/analysis/paper/plot/noncoding_association/plot_track_stats.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.burden_stats.tsv.gz \
   ${prefix}
 
 
 # Volcano plots of DEL & DUP track-level burden tests
 /opt/rCNV2/analysis/paper/plot/noncoding_association/plot_volcanos.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --saddlepoint-adj \
   rCNV.burden_stats.tsv.gz \
   ${prefix}
 
 
 # Plot ChromHMM enrichments as positive controls
 /opt/rCNV2/analysis/paper/plot/noncoding_association/chromhmm_enrichments.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --saddlepoint-adj \
   rCNV.burden_stats.tsv.gz \
   refs/REP_state_manifest.tsv \
   ${prefix}
@@ -112,7 +109,6 @@ done
 
 # Plot CRB distributions & stats
 /opt/rCNV2/analysis/paper/plot/noncoding_association/plot_crb_stats.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.crbs.bed.gz \
   ${prefix}
 

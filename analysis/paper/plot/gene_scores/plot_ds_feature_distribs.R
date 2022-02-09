@@ -51,7 +51,7 @@ score.cutoffs.in <- opts$`score-cutoffs`
 # features.in <- "~/scratch/gencode.v19.canonical.pext_filtered.all_features.no_variation.transformed.bed.gz"
 # feature.meta.in <- "~/scratch/gene_feature_metadata.tsv"
 # out.prefix <- "~/scratch/test_gene_score_feature_regressions"
-# score.cutoffs.in <- "~/scratch/rCNV2.gene_score_cutoff.test.tsv"
+# score.cutoffs.in <- NULL
 
 # Load scores & classify genes into subgroups based on scores
 scores <- load.scores(scores.in)
@@ -64,12 +64,21 @@ feats <- load.features(features.in, norm=T)
 feats <- mod.features(feats)
 feat.meta <- load.gene.feature.metadata(feature.meta.in)
 
+# Set plotting labels based on --score-cutoffs
+if(is.null(score.cutoffs.in)){
+  hc.lab <- bquote("Score" >= 0.9)
+  lc.lab <- "0.5-0.9"
+}else{
+  hc.lab <- "High Conf."
+  lc.lab <- "Low Conf."
+}
+
 # Iterate over features and plot one comparison for each
 sapply(2:ncol(feats), function(i){
   out.pdf <- paste(out.prefix, gsub("/", "", colnames(feats)[i], fixed=T),
                    "feature_distribs.pdf", sep=".")
   pdf(out.pdf, height=2.4, width=3)
-  plot.feature.bydsgroup(feats, ds.groups, feat.idx=i,
+  plot.feature.bydsgroup(feats, ds.groups, hc.lab=hc.lab, lc.lab=lc.lab, feat.idx=i,
                          title=feat.meta$name[which(feat.meta$feature==colnames(feats)[i])],
                          swarm.max=5000, blue.bg=FALSE)
   dev.off()

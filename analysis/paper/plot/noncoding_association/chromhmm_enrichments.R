@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -71,17 +71,17 @@ plot.enrich <- function(stats, cnv, states, parmar=c(0.25, 8.75, 2.25, 1)){
   enrich <- calc.all.chmm.enrichments(stats, cnv, states)
   colors <- sapply(rownames(enrich), function(x){states$color[which(states$mnemonic==x)]})
   n.rows <- nrow(enrich)
-  
+
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=c(-0.1, 1), ylim=c(0, n.rows),
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
-  
+
   # Add background markings
   x.ax.at <- seq(0, 1, 0.25)
   abline(v=x.ax.at, col=bluewhite)
   abline(v=0.5, col=blueblack)
-  
+
   # Add bars per state
   sapply(1:nrow(enrich), function(i){
     # Get state-specific values
@@ -90,13 +90,13 @@ plot.enrich <- function(stats, cnv, states, parmar=c(0.25, 8.75, 2.25, 1)){
     s.color <- colors[i]
     rcols <- as.character(c(ns.color.dark, ns.color, control.cnv.colors[cnv], cnv.colors[cnv]))
     border.col <- cnv.blacks[cnv]
-    
+
     # Add Y-axis legend & label
     axis(2, at=i-0.5, tick=F, line=-1, las=2, cex.axis=5/6,
          labels=states$description[which(states$mnemonic==rownames(enrich)[i])])
     rect(xleft=-0.075, xright=-0.025, ybottom=yvals[1], ytop=yvals[2],
          col=s.color, border=blueblack)
-    
+
     # Plot bars
     rect(xleft=xvals[1:4], xright=xvals[2:5],
          ybottom=yvals[1], ytop=yvals[2],
@@ -107,14 +107,14 @@ plot.enrich <- function(stats, cnv, states, parmar=c(0.25, 8.75, 2.25, 1)){
          ybottom=yvals[1], ytop=yvals[2],
          col=NA, border=blueblack)
   })
-  
+
   # Add axes
   abline(v=0, col=blueblack)
   axis(4, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
   axis(3, at=c(0, 10e10), col=blueblack, tck=0, labels=NA)
   axis(3, at=x.ax.at, tck=-0.025, labels=NA, col=blueblack)
   sapply(x.ax.at, function(x){
-    axis(3, at=x, tick=F, line=-0.75, cex.axis=5/6, 
+    axis(3, at=x, tick=F, line=-0.75, cex.axis=5/6,
          labels=paste(round(100*x), "%", sep=""))
   })
   axis(3, at=0.5, tick=F, line=0.2, labels="Tissues in Roadmap")
@@ -125,11 +125,12 @@ plot.enrich <- function(stats, cnv, states, parmar=c(0.25, 8.75, 2.25, 1)){
 ### RSCRIPT BLOCK ###
 #####################
 require(optparse, quietly=T)
-require(funr, quietly=T)
+require(rCNV2, quietly=T)
 
 # List of command-line options
 option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
+  make_option(c("--saddlepoint-adj"), action="store_true", default=FALSE,
+              help="Update Z-scores and P-values with saddlepoint re-approximation of the null [default: %default]")
 )
 
 # Get command-line arguments & options
@@ -147,26 +148,16 @@ if(length(args$args) != 3){
 stats.in <- args$args[1]
 chromhmm.manifest.in <- args$args[2]
 out.prefix <- args$args[3]
-rcnv.config <- opts$`rcnv-config`
+spa <- opts$`saddlepoint-adj`
 
 # # DEV PARAMETERS
 # stats.in <- "~/scratch/rCNV.burden_stats.tsv.gz"
 # chromhmm.manifest.in <- "~/scratch/REP_state_manifest.tsv"
 # out.prefix <- "~/scratch/chromhmm_enrich_test"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/noncoding_association/"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
-
-# Source common functions
-script.dir <- funr::get_script_path()
-source(paste(script.dir, "common_functions.R", sep="/"))
+# spa <- T
 
 # Load track stats
-stats <- load.track.stats(stats.in)
+stats <- load.track.stats(stats.in, spa)
 
 # Load ChromHMM manifest
 states <- load.chromhmm.manifest(chromhmm.manifest.in)

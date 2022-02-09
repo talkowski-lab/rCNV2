@@ -24,7 +24,7 @@ alias addcom="sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta'"
 
 
 # Download necessary data (note: requires permissions)
-gsutil -m cp \
+gsutil -m cp -r \
   ${rCNV_bucket}/results/gene_association/* \
   ${rCNV_bucket}/results/segment_association/* \
   ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.naive_priors.tsv \
@@ -32,6 +32,7 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.merged_no_variation_features.tsv \
   ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.naive_priors.tsv \
   ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.credible_sets_per_hpo.merged_no_variation_features.bed \
+  ${rCNV_bucket}/analysis/gene_burden/cds_optimization_data \
   ./
 mkdir meta_stats/
 gsutil -m cp -r \
@@ -69,6 +70,16 @@ fi
   refs/gencode.v19.canonical.pext_filtered.all_features.no_variation.eigenfeatures.bed.gz \
   refs/gene_feature_metadata.tsv \
   feature_heatmap/${prefix}
+
+
+# Plot CDS overlap optimization
+if ! [ -e assoc_stat_plots ]; then
+  mkdir assoc_stat_plots
+fi
+/opt/rCNV2/analysis/paper/plot/gene_association/plot_cds_optimization.R \
+  cds_optimization_data/DEL.cds_optimization_results.tsv \
+  cds_optimization_data/DUP.cds_optimization_results.tsv \
+  assoc_stat_plots/${prefix}
 
 
 # Plot correlation of primary & secondary P-values for all phenotypes & CNV classes
@@ -115,6 +126,7 @@ done
   --dup-cutoff ${dup_cutoff} \
   --del-nomsig-bed ./nomsig_genes.DEL.bed \
   --dup-nomsig-bed ./nomsig_genes.DUP.bed \
+  --primary-vs-secondary-png-dim 2 \
   meta_stats/matrices/${prefix}.DEL.meta_neg_log10_p.all_hpos.bed.gz \
   meta_stats/matrices/${prefix}.DUP.meta_neg_log10_p.all_hpos.bed.gz \
   meta_stats/matrices/${prefix}.DEL.meta_neg_log10_p_secondary.all_hpos.bed.gz \
@@ -231,6 +243,28 @@ fi
   finemapping_distribs/${prefix}
 
 
+# Gather total number of significant associations prior to finemapping
+for cnv in DEL DUP; do
+  # Make input for get_significant_genes_v2.py
+  while read nocolon hpo; do
+    echo $hpo
+    echo -e "meta_stats/$nocolon.rCNV.$cnv.gene_burden.meta_analysis.stats.bed.gz"
+    echo $del_cutoff
+  done < refs/test_phenotypes.list | paste - - - > $cnv.stats.list
+
+  # Extract all significant genes
+  opt/rCNV2/analysis/genes/get_significant_genes_v2.py \
+    $cnv.stats.list \
+    --secondary-p-cutoff 0.05 \
+    --min-nominal 2 \
+    --secondary-or-nominal \
+    --fdr-q-cutoff 0.01 \
+    --secondary-for-fdr \
+    --outfile $cnv.all_sig_genes.tsv
+  cat $cnv.all_sig_genes.tsv
+done | fgrep -v "#" | wc -l
+
+
 # Calculate fraction of credible sets not overlapping significant large segment
 for CNV in DEL DUP; do
   zcat rCNV.final_segments.loci.bed.gz \
@@ -256,6 +290,14 @@ zcat rCNV.final_genes.genes.bed.gz \
 | wc -l
 
 
+# Count number of fine-mapped genes that are LoF or missense constrained but not present in OMIM, ClinGen, or DDG2P
+zcat rCNV.final_genes.genes.bed.gz | fgrep -v "#" | cut -f4 \
+| fgrep -wf - refs/gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
+| fgrep -wvf <( cat refs/gene_lists/ClinGen.all_*.genes.list \
+                    refs/gene_lists/DDG2P.all_*.genes.list \
+                    refs/gene_lists/HP0000118.HPOdb.genes.list ) \
+| wc -l
+
 # Count number of fine-mapped triplosensitive genes not present in ClinGen TS or DDG2P GoF/other (for abstract)
 zcat rCNV.final_genes.genes.bed.gz \
 | fgrep -v "#" | fgrep -w DUP | cut -f4 | sort | uniq \
@@ -263,6 +305,7 @@ zcat rCNV.final_genes.genes.bed.gz \
                     refs/gene_lists/DDG2P.all_gof.genes.list \
                     refs/gene_lists/DDG2P.all_other.genes.list ) \
 | wc -l
+
 # Further count number of fine-mapped novel triplo genes with established LoF mechanism in ClinGen/DDG2P
 zcat rCNV.final_genes.genes.bed.gz \
 | fgrep -v "#" | fgrep -w DUP | cut -f4 | sort | uniq \

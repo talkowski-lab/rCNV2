@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -22,19 +22,19 @@ reformat.table <- function(stats){
   # Sort rows & reorder columns
   row.order <- with(stats, order(family, source, trackname, cnv))
   col.order <- c("family", "source", "trackname", "cnv", "n_elements", "min_size",
-                 "median_size", "mean_size", "max_size", "total_bp", 
-                 "meta.neg.log10_p", "meta.lnOR")
+                 "median_size", "mean_size", "max_size", "total_bp",
+                 "meta.neglog10_p", "meta.lnOR")
   stats <- stats[row.order, col.order]
-  stats$meta.neg.log10_p <- 10^-stats$meta.neg.log10_p
+  stats$meta.neglog10_p <- 10^-stats$meta.neglog10_p
   stats$meta.lnOR <- exp(stats$meta.lnOR)
-  
+
   # Rename columns
   colnames(stats)[which(colnames(stats) == "family")] <- "annotation_family"
   colnames(stats)[which(colnames(stats) == "trackname")] <- "annotation"
   colnames(stats)[which(colnames(stats) == "total_bp")] <- "total_basepairs"
-  colnames(stats)[which(colnames(stats) == "meta.neg.log10_p")] <- "cnv_p_value"
+  colnames(stats)[which(colnames(stats) == "meta.neglog10_p")] <- "cnv_p_value"
   colnames(stats)[which(colnames(stats) == "meta.lnOR")] <- "cnv_odds_ratio"
-  
+
   return(stats)
 }
 
@@ -43,11 +43,12 @@ reformat.table <- function(stats){
 ### RSCRIPT BLOCK ###
 #####################
 require(optparse, quietly=T)
-require(funr, quietly=T)
+require(rCNV2, quietly=T)
 
 # List of command-line options
 option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
+  make_option(c("--saddlepoint-adj"), action="store_true", default=FALSE,
+              help="Update Z-scores and P-values with saddlepoint re-approximation of the null [default: %default]")
 )
 
 # Get command-line arguments & options
@@ -64,25 +65,15 @@ if(length(args$args) != 2){
 # Writes args & opts to vars
 stats.in <- args$args[1]
 out.prefix <- args$args[2]
-rcnv.config <- opts$`rcnv-config`
+spa <- opts$`saddlepoint-adj`
 
 # # DEV PARAMETERS
 # stats.in <- "~/scratch/rCNV.burden_stats.tsv.gz"
 # out.prefix <- "~/scratch/track_stats_test"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/noncoding_association/"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
-
-# Source common functions
-script.dir <- funr::get_script_path()
-source(paste(gsub("scripts/", "plot/", script.dir, fixed=T), "common_functions.R", sep="/"))
+# spa <- TRUE
 
 # Load track stats
-stats <- load.track.stats(stats.in)
+stats <- load.track.stats(stats.in, spa)
 
 # Reformat stats table
 stable <- reformat.table(stats)

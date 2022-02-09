@@ -195,7 +195,7 @@ plot.or.by.scorebin <- function(cnvs, score, n.bins=3, cnv.pct=TRUE, marginal.or
                                 x.label=NULL, parse.x.label=T, x.label.line=2,
                                 x.ax.labels=NULL, parse.x.ax.labels=T,
                                 cex.x.ax.labels=1, x.ax.labels.line=-1,
-                                fit.ylims.to="ci", ylim.buff.cex=1/3,
+                                ylims=NULL, fit.ylims.to="ci", ylim.buff.cex=1/3,
                                 parmar=c(3.5, 3.5, 0.5, 0.5)){
   # Gather plot data
   baseline <- log2(calc.or(cnvs)[1])
@@ -206,12 +206,14 @@ plot.or.by.scorebin <- function(cnvs, score, n.bins=3, cnv.pct=TRUE, marginal.or
   }
   ors <- log2(ors)
   or.vals <- as.numeric(unlist(ors))
-  if(fit.ylims.to == "ci"){
-    ylims <- range(or.vals[which(!is.infinite(or.vals) & !is.nan(or.vals) & !is.na(or.vals))])
-  }else if(fit.ylims.to == "mean"){
-    ylims <- range(ors[which(!is.infinite(ors[, 1]) & !is.nan(ors[, 1]) & !is.na(ors[, 1])), 1])
-    ylim.buff <- diff(ylims) * ylim.buff.cex
-    ylims <- ylims + c(-ylim.buff, ylim.buff)
+  if(is.null(ylims)){
+    if(fit.ylims.to == "ci"){
+      ylims <- range(or.vals[which(!is.infinite(or.vals) & !is.nan(or.vals) & !is.na(or.vals))])
+    }else if(fit.ylims.to == "mean"){
+      ylims <- range(ors[which(!is.infinite(ors[, 1]) & !is.nan(ors[, 1]) & !is.na(ors[, 1])), 1])
+      ylim.buff <- diff(ylims) * ylim.buff.cex
+      ylims <- ylims + c(-ylim.buff, ylim.buff)
+    }
   }
   if(blue.bg==TRUE){
     plot.bg <- bluewhite
@@ -244,7 +246,7 @@ plot.or.by.scorebin <- function(cnvs, score, n.bins=3, cnv.pct=TRUE, marginal.or
   pt.x.at <- (1:n.bins)-0.5
   if(ci.type == "bars"){
     segments(x0=pt.x.at, x1=pt.x.at, y0=ors$lower, y1=ors$upper, lend="round",
-             lwd=2.5, col=ci.color)
+             lwd=2.5, col=ci.color, xpd=T)
   }else if(ci.type == "polygon"){
     polygon(x=c(pt.x.at, rev(pt.x.at)), y=c(ors$lower, rev(ors$upper)),
             bty="n", border=NA, col=ci.color)
@@ -329,11 +331,12 @@ lapply(list(c("DEL", "pHaplo", "Deletions", 2),
        function(vals){
   pdf(paste(out.prefix, "asc_spark_denovo_cnvs.odds_ratios",
             tolower(vals[1]), "pdf", sep="."),
-      height=3, width=2.25)
-  plot.or.by.scorebin(cnvs[which(cnvs$cnv==vals[1]), ], score=vals[2], cnv.pct=T, n.bins=3,
+      height=2.75, width=2.25)
+  plot.or.by.scorebin(cnvs[which(cnvs$cnv==vals[1]), ], score=vals[2], cnv.pct=T,
+                      n.bins=3, ylims=log2(c(0.5, 64)),
                       x.label=paste("italic(\"De Novo\") ~", vals[3]),
                       parse.x.label=T, x.label.line=vals[4],
-                      x.ax.labels=paste(c("Bottom", "Mid.", "Top"), "33%", sep="\n"),
+                      x.ax.labels=paste(c("Bottom", "Middle", "Top"), "Third", sep="\n"),
                       parse.x.ax.labels=F, cex.x.ax.labels=0.9, x.ax.labels.line=-0.25,
                       pt.color=cnv.colors[vals[1]], baseline.color=control.cnv.colors[vals[1]],
                       null.color=blueblack, blue.bg=FALSE,

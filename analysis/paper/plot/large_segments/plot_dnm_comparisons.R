@@ -222,7 +222,7 @@ dnm.excess.cdf.highlights <- function(segs, dnms, cohort, csq,
   res <- lapply(segs$region_id, get.dnm.excess.byGene, segs=segs, dnms=dnms, csq=csq)
   names(res) <- segs$region_id
   bar.pal <- rev(viridis(top.n.genes + 1))
-  csq.lab <- c("lof" = "PTV", "mis" = "Misense", "syn" = "Synonymous")[csq]
+  csq.lab <- c("lof" = "PTV", "mis" = "Missense", "syn" = "Synonymous")[csq]
   cnv.lab <- c("lof" = "DEL", "mis" = "DUP", "syn" = "rCNV")[csq]
 
   # Prep plot area

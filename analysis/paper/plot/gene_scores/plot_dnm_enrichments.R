@@ -171,7 +171,7 @@ plot.dnm.oe <- function(scores, score, meta, cohort, csqs, n.bins=10,
   sapply(length(plot.dat):1, function(i){
     segments(x0=x.at+(x.mod*(2-i)), x1=x.at+(x.mod*(2-i)),
              y0=plot.dat[[i]][, 2], y1=plot.dat[[i]][, 3],
-             col=snv.colors[i], lend="round", lwd=1.5)
+             col=snv.colors[i], lend="round", lwd=2)
     points(x=x.at+(x.mod*(2-i)), y=plot.dat[[i]][, 1], pch=19, col=snv.colors[i])
   })
 
@@ -309,6 +309,16 @@ meta <- load.gene.metadata(meta.in)
 meta <- meta[which(meta$gene %in% scores$gene), ]
 meta <- calc.exp.dnms(meta, dnm.cohorts, csqs, neutral.genes)
 
+# Sum exp and obs columns for ASC + DDD for main panel
+for(csq in csqs){
+    obscol <- paste("ddd_plus_asc_dn", csq, sep="_")
+    expcol <- paste("ddd_plus_asc_dn", csq, "exp", sep="_")
+    meta[, obscol] <- apply(meta[, paste(c("ddd", "asc"), "dn", csq, sep="_")],
+                            1, sum, na.rm=T)
+    meta[, expcol] <- apply(meta[, paste(c("ddd", "asc"), "dn", csq, "exp", sep="_")],
+                            1, sum, na.rm=T)
+}
+
 # Plot DNM enrichment per score per exome cohort
 sapply(c("pHaplo", "pTriplo"), function(score){
   sapply(dnm.cohorts, function(cohort){
@@ -317,6 +327,15 @@ sapply(c("pHaplo", "pTriplo"), function(score){
     plot.dnm.oe(scores, score, meta, cohort, csqs, ymax=6, blue.bg=FALSE)
     dev.off()
   })
+})
+
+# Plot reshaped DNM enrichment plots for DDD+ASC for main panel
+sapply(c("pHaplo", "pTriplo"), function(score){
+  pdf(paste(out.prefix, "dnm_enrichments", "ddd_plus_asc", score, "reshaped", "pdf", sep="."),
+      height=2.75, width=3.1)
+  plot.dnm.oe(scores, score, meta, "ddd_plus_asc", csqs,
+              ylab="DNM Fold-Enrichment", ymax=5.2, blue.bg=FALSE)
+  dev.off()
 })
 
 # Plot fraction of genes disrupted by de novo BCA

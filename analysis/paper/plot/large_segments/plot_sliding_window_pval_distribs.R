@@ -328,7 +328,9 @@ option_list <- list(
   make_option(c("--del-nomsig-bed"), default="./del_nomsig.bed",
               help="Path to BED file with coordinates of nominally significant deletion windows."),
   make_option(c("--dup-nomsig-bed"), default="./dup_nomsig.bed",
-              help="Path to BED file with coordinates of nominally significant duplication windows.")
+              help="Path to BED file with coordinates of nominally significant duplication windows."),
+  make_option(c("--primary-vs-secondary-png-dim"), default=2.25,
+              help="Height and width of primary vs. secondary P-value scatterplot, in inches.")
 )
 
 # Get command-line arguments & options
@@ -359,6 +361,7 @@ del.cutoff <- -log10(as.numeric(opts$`del-cutoff`))
 dup.cutoff <- -log10(as.numeric(opts$`dup-cutoff`))
 del.nomsig.bed <- opts$`del-nomsig-bed`
 dup.nomsig.bed <- opts$`dup-nomsig-bed`
+prim.vs.sec.png.dim <- opts$`primary-vs-secondary-png-dim`
 
 # # DEV PARAMETERS
 # primary.del.pvals.in <- "~/scratch/rCNV2_analysis_d2.DEL.meta_neg_log10_p.all_hpos.bed.gz"
@@ -372,6 +375,7 @@ dup.nomsig.bed <- opts$`dup-nomsig-bed`
 # dup.cutoff <- 6
 # del.nomsig.bed <- "~/scratch/del_nomsig.bed"
 # dup.nomsig.bed <- "~/scratch/dup_nomsig.bed"
+# prim.vs.sec.png.dim <- 2.25
 
 # Load pvalue matrices & compute lambdas
 del.1 <- load.pval.matrix(primary.del.pvals.in)
@@ -423,13 +427,13 @@ dev.off()
 
 # Scatterplots of primary vs. secondary P-values
 png(paste(out.prefix, "primary_vs_secondary_pvalue.DEL.png", sep="."),
-    height=2.25*300, width=2.25*300, res=300)
+    height=prim.vs.sec.png.dim*300, width=prim.vs.sec.png.dim*300, res=300)
 primary.vs.secondary.scatter(del.1$pvals, del.2$pvals, cutoff.1=del.cutoff,
                              sig.color=cnv.colors[1], nonsig.color=control.cnv.colors[1],
                              pt.cex=0.175, blue.bg=FALSE, parmar=c(2.5, 2.5, 0.15, 0.15))
 dev.off()
 png(paste(out.prefix, "primary_vs_secondary_pvalue.DUP.png", sep="."),
-    height=2.25*300, width=2.25*300, res=300)
+    height=prim.vs.sec.png.dim*300, width=prim.vs.sec.png.dim*300, res=300)
 primary.vs.secondary.scatter(dup.1$pvals, dup.2$pvals, cutoff.1=dup.cutoff,
                              sig.color=cnv.colors[2], nonsig.color=control.cnv.colors[2],
                              pt.cex=0.175, blue.bg=FALSE, parmar=c(2.5, 2.5, 0.15, 0.15))
