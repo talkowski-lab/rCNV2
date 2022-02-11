@@ -35,6 +35,10 @@ gsutil -m cp -r \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists \
   ${rCNV_bucket}/refs/REP_state_manifest.tsv \
   refs/
+mkdir meta_stats/
+gsutil -m cp \
+  gs://rcnv_project/analysis/crb_burden/**rCNV.loose_noncoding.*.crb_burden.meta_analysis.stats.bed.gz \
+  meta_stats/
 
 
 # Plot observed effect size distributions split by gene set membership
@@ -111,6 +115,28 @@ done
 /opt/rCNV2/analysis/paper/plot/noncoding_association/plot_crb_stats.R \
   rCNV.crbs.bed.gz \
   ${prefix}
+
+
+# Get all significant CRBs
+for cnv in DEL DUP; do
+  # Make input for get_significant_genes_v2.py
+  while read nocolon hpo; do
+    echo $hpo
+    echo -e "meta_stats/$nocolon.rCNV.loose_noncoding.$cnv.crb_burden.meta_analysis.stats.bed.gz"
+    head -n1 refs/crb_burden.rCNV.loose_noncoding.DEL.bonferroni_pval.hpo_cutoffs.tsv | cut -f2
+  done < refs/test_phenotypes.list | paste - - - > $cnv.stats.list
+
+  # Extract all significant CRBs
+  # Note: can use same script as for extracting significant genes because format of sumstats is identical
+  /opt/rCNV2/analysis/genes/get_significant_genes_v2.py \
+    $cnv.stats.list \
+    --secondary-p-cutoff 0.05 \
+    --min-nominal 2 \
+    --secondary-or-nominal \
+    --fdr-q-cutoff 0.01 \
+    --secondary-for-fdr \
+    --outfile $cnv.all_sig_crbs.tsv
+done
 
 
 # Copy all plots to final gs:// directory

@@ -95,6 +95,10 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/
 
 
+# Attempt replication for all discovery segments in ASC gCNV callset
+
+
+
 # Build master BED of all regions, including final segments, known GDs, and 
 # other predicted NAHR-mediated CNVs
 cat <( echo -e "#chr\tstart\tend\tnahr_id\tcnv\tn_genes\tgenes" ) \

@@ -12,7 +12,7 @@
 
 
 options(stringsAsFactors=F, scipen=1000)
-asc_spark_samplesizes = c("ASD" = 13694, "Control" = 5007)
+asc_spark_samplesizes = c("ASD" = 13786, "Control" = 5098)
 
 
 ######################

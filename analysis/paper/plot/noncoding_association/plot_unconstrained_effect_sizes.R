@@ -118,7 +118,7 @@ lnor.dotplot <- function(lnors, hpo="HP:0000118",
   axis(2, at=(1:3)-0.5, tick=F, las=2, cex.axis=5/6, line=-0.8,
        labels=c("All rCNVs",
                 "rCNVs overlapping exons\nfrom at least one\nnon-unconstrained gene",
-                "Noncoding rCNVs +\nrCNVs overlapping exons\nonly from unconstrained genes"))
+                "Noncoding rCNVs +\nrCNVs overlapping exons\nfrom unconstrained genes"))
 
   # Add x-axis
   axis(3, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)

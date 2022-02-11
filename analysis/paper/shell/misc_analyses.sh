@@ -31,6 +31,7 @@ gsutil -m cp -r \
   ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.merged_no_variation_features.tsv \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists \
   ${rCNV_bucket}/analysis/gene_scoring/gene_lists \
+  ${rCNV_bucket}/analysis/paper/data/global/${prefix}.global_burden_stats.tsv.gz \
   ./
 
 
@@ -56,6 +57,28 @@ for CNV in DEL DUP; do
   | bedtools merge -i - \
   | wc -l
 done
+# (As above, but split by significance)
+for CNV in DEL DUP; do
+  # Genome- or exome-wide
+  zcat rCNV.final_segments.loci.bed.gz \
+       rCNV.final_genes.credible_sets.bed.gz \
+  | fgrep -w $CNV | grep -e '[genome|exome]_wide' \
+  | cut -f1-3 \
+  | sort -Vk1,1 -k2,2n -k3,3n \
+  | bedtools merge -i - \
+  > gw_ew.$CNV.bed
+  cat gw_ew.$CNV.bed | wc -l
+  # FDR
+  zcat rCNV.final_segments.loci.bed.gz \
+       rCNV.final_genes.credible_sets.bed.gz \
+  | fgrep -w $CNV | fgrep -w FDR \
+  | cut -f1-3 \
+  | sort -Vk1,1 -k2,2n -k3,3n \
+  | bedtools merge -i - \
+  | bedtools intersect -v -a - -b gw_ew.$CNV.bed \
+  | wc -l
+  rm gw_ew.$CNV.bed
+done
 
 
 # Compute total number of significant associations
@@ -68,9 +91,39 @@ for CNV in DEL DUP; do
   | bedtools merge -i - \
   | wc -l
 done
+# (As above, but split by significance)
+for CNV in DEL DUP; do
+  # Genome- or exome-wide
+  zcat rCNV.final_segments.associations.bed.gz \
+       rCNV.final_genes.credible_sets.bed.gz \
+  | fgrep -w $CNV | grep -e '[genome|exome]_wide' \
+  | awk -v FS="\t" -v OFS="\t" '{ print $6"_"$1, $2, $3 }' \
+  | sort -Vk1,1 -k2,2n -k3,3n \
+  | bedtools merge -i - \
+  > gw_ew.$CNV.bed
+  cat gw_ew.$CNV.bed | wc -l
+  # FDR
+  zcat rCNV.final_segments.associations.bed.gz \
+       rCNV.final_genes.credible_sets.bed.gz \
+  | fgrep -w $CNV | fgrep -w FDR \
+  | awk -v FS="\t" -v OFS="\t" '{ print $6"_"$1, $2, $3 }' \
+  | sort -Vk1,1 -k2,2n -k3,3n \
+  | bedtools merge -i - \
+  | bedtools intersect -v -a - -b gw_ew.$CNV.bed \
+  | wc -l
+  rm gw_ew.$CNV.bed
+done
 
 
-# Get total number of fine-mapped candidate driver genes
+# Get number of candidate novel TS disease genes
+zcat rCNV.final_genes.genes.bed.gz | fgrep -w DUP | cut -f4 \
+| fgrep -wvf gene_lists/DDG2P.all_gof.genes.list \
+| fgrep -wvf gene_lists/ClinGen.all_triplosensitive.genes.list \
+| sort | uniq | wc -l
+
+
+
+# Get total number of fine-mapped candidate driver genes by CNV type
 zcat rCNV.final_genes.genes.bed.gz \
 | fgrep -v "#" | cut -f4 | sort | uniq | wc -l 
 
@@ -89,6 +142,17 @@ cat gene_lists/gnomad.v2.1.1.*_constrained.genes.list | sort | uniq \
 | fgrep -wf - <( zcat rCNV.final_genes.genes.bed.gz ) | cut -f4,5,12 \
 | sort -nrk3,3 | head -n10
 
+
+# Get median & IQR of GD effect sizes across phenotypes
+# (Note: category 3 = GDs & 7 = constrained genes outside of GDs)
+for categ in 3 7; do
+  cat << EOF > get_OR_distrib.cat$categ.R
+x <- read.table("${prefix}.global_burden_stats.tsv.gz", header=T, comment.char="")
+round(summary(exp(x[which(x\$category==$categ & x\$CNV=="CNV"), "meta_lnOR"])), 2)
+EOF
+Rscript get_OR_distrib.cat$categ.R
+rm get_OR_distrib.cat$categ.R
+done
 
 # Get interquartile range of CNV sizes
 Rscript -e "summary(abs(apply(read.table('cnv/mega.rCNV.bed.gz', \
