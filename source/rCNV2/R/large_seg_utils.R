@@ -92,7 +92,8 @@ load.segment.table <- function(segs.in){
                                                       "Redin_BCAs")),
                           grep("^n_", colnames(segs), fixed=F),
                           grep("_dnm_", colnames(segs), fixed=T),
-                          grep("_express", colnames(segs), fixed=T)))
+                          grep("_express", colnames(segs), fixed=T),
+                          grep("_replication_", colnames(segs), fixed=T)))
   segs[, numcol.idxs] <- apply(segs[, numcol.idxs], 2, as.numeric)
 
   # Convert boolean dummy columns to logicals

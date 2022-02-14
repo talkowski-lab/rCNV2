@@ -42,6 +42,7 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/wgs_common_cnvs.*.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/rCNV2_common_cnvs.*.bed.gz \
+  ${rCNV_bucket}/analysis/paper/data/misc/asc_spark_* \
   refs/
 wget -P refs/ https://storage.googleapis.com/gcp-public-data--gnomad/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
 mkdir meta_stats/
@@ -96,7 +97,12 @@ gsutil -m cp \
 
 
 # Attempt replication for all discovery segments in ASC gCNV callset
-
+/opt/rCNV2/analysis/paper/scripts/large_segments/get_replication_counts.py \
+  --exclude-samples refs/asc_spark_2021_rare_cnvs.ssc_sample_exclusion.list \
+  --recip 0.5 \
+  --outfile asc_spark_2021_rare_cnvs.replication_counts.tsv \
+  rCNV.final_segments.loci.bed.gz \
+  refs/asc_spark_2021_rare_cnvs.cleaned.b37.bed.gz
 
 
 # Build master BED of all regions, including final segments, known GDs, and 
@@ -166,6 +172,7 @@ cat \
   --bca-tsv refs/redin_bca_breakpoints.bed.gz \
   --gtex-matrix refs/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
   --meta-sumstats pooled_sumstats.tsv \
+  --asc-replication-counts asc_spark_2021_rare_cnvs.replication_counts.tsv \
   --neuro-hpos refs/neuro_hpos.list \
   --dev-hpos refs/rCNV2.hpos_by_severity.developmental.list \
   --gd-recip "10e-10" \
@@ -201,6 +208,12 @@ zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f11 | sort -n
 zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f11 | sort -nk1,1 | tail -n1
 zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f11 \
 | awk '{ sum+=$1 }END{ print sum/NR }'
+
+
+# Run ASC replication analysis
+/opt/rCNV2/analysis/paper/scripts/large_segments/asc_replication_analysis.R \
+  rCNV.final_segments.loci.bed.gz \
+  ${prefix}.master_segments.bed.gz
 
 
 # NOTE: AS OF DEC 3, 2021, PLOT CODE FOR PERMUTATIONS HAS BEEN MOVED TO THE CLOUD
