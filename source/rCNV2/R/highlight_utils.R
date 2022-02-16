@@ -11,6 +11,41 @@
 # Utility functions used for locus highlight plots
 
 
+#' Parse region for locus highlight
+#'
+#' Parse a tabix-style coordinate string for locus highlight
+#'
+#' @param region tabix-style string of region to be plotted
+#' @param genome.in path to BEDTools-style .genome file
+#' @param export.values boolean indicator to export values to .GlobalEnv \[default: TRUE\]
+#' @param return.values boolean indicator to return values as vector \[default: FALSE\]
+#'
+#' @details if necessary, start and end coordinates will be bounded to the global
+#' start and end coordinates of that chromosome as per `genome.in`
+#'
+#' @return vector (if `return.values` is `TRUE`)
+#'
+#' @export parse.region.for.highlight
+#' @export
+parse.region.for.highlight <- function(region, genome.in, export.values=TRUE,
+                                       return.values=FALSE){
+  genome <- read.table(genome.in, sep="\t", header=F)
+  region.parts <- unlist(strsplit(region, split=":"))
+  chrom <- region.parts[1]
+  chrom.end <- genome[which(genome[, 1] == chrom), 2]
+  start <- max(c(1, as.numeric(unlist(strsplit(region.parts[2], split="-"))[1])))
+  end <- min(c(as.numeric(unlist(strsplit(region.parts[2], split="-"))[2]), chrom.end))
+  if(export.values){
+    assign("chrom", chrom, envir=.GlobalEnv)
+    assign("start", start, envir=.GlobalEnv)
+    assign("end", end, envir=.GlobalEnv)
+  }
+  if(return.values){
+    return(c(chrom, start, end))
+  }
+}
+
+
 #' Load genes from GTF for plotting
 #'
 #' Extract gene features from a GTF for plotting
@@ -111,7 +146,10 @@ load.sumstats.for.region <- function(bedpath, region, rstudio.local=FALSE){
 #' @export
 load.pips.for.genelist <- function(pips.in, genes, hpo){
   pips <- read.table(pips.in, header=T, sep="\t", comment.char="")
-  return(pips[which(pips[, 1] == hpo & pips$gene %in% genes), c("gene", "PIP")])
+  pips <- pips[which(pips[, 1] == hpo & pips$gene %in% genes),
+               c("gene", "PIP_final", "credible_set")]
+  colnames(pips)[2] <- "PIP"
+  return(pips)
 }
 
 
@@ -228,21 +266,23 @@ load.chromhmm.tracks <- function(chromhmm.tracks.in, chromhmm.manifest.in, regio
 #'
 #' Load CNVs from a single BED for a single region, and split by case/control
 #'
-#' @param bedpath path to .bed with CNVs
+#' @param bedpaths paths to one or more .bed files with CNVs
 #' @param region coordinates of region to be extracted
 #' @param cnv filter to this CNV type \[default: do not filter by CNV type\]
 #' @param case.hpos vector of case HPOs to evaluate \[default: c("HP:0000118")\]
 #' @param ctrl.hpo control HPO \[default: "HEALTHY_CONTROL"\]
 #' @param rstudio.local boolean to indicate local Rstudio environment \[default: FALSE\]
 #'
-#' @details `region` coordinates must be a `tabix`-compatbile string
+#' @details `region` coordinates must be a `tabix`-compatbile string. If multiple
+#' .bed files are provided as a vector to `bedpaths`, the contents of these files
+#' will be concatenated after loading.
 #'
 #' @return list with the following two elements:
 #' 1. `$case` data.frame of case CNVs
 #' 2. `$ctrl` data.frame of control CNVs
 #'
 #' @export
-load.cnvs.from.region <- function(bedpath, region, cnv=NULL,
+load.cnvs.from.region <- function(bedpaths, region, cnv=NULL,
                                   case.hpos=c("HP:0000118"),
                                   ctrl.hpo="HEALTHY_CONTROL",
                                   rstudio.local=FALSE){
@@ -252,11 +292,14 @@ load.cnvs.from.region <- function(bedpath, region, cnv=NULL,
   }
 
   # Tabix region of interest
-  if(!file.exists(paste(bedpath, "tbi", sep="."))){
-    stop(paste("tabix index not found for input file", bedpath))
-  }
   require(bedr, quietly=T)
-  cnvs <- bedr::tabix(region, bedpath, check.chr=FALSE)
+  cnvs <- as.data.frame(do.call("rbind", lapply(bedpaths, function(bedpath){
+    if(!file.exists(paste(bedpath, "tbi", sep="."))){
+      stop(paste("tabix index not found for input file", bedpath))
+    }
+    bedr::tabix(region, bedpath, check.chr=FALSE)
+  })))
+
   if(!is.null(cnvs)){
     # Ensure consistent column names
     colnames(cnvs) <- c("chr", "start", "end", "cnv_id", "cnv", "pheno")
@@ -308,7 +351,7 @@ load.cnvs.from.region.multi <- function(cnvlist, region, cnv=NULL,
   # cnvlist should be a tsv of (cohort, path) pairs
   cnv.list <- read.table(cnvlist, header=F, sep="\t")
   cnvs <- lapply(1:nrow(cnv.list), function(i){
-    load.cnvs(cnv.list[i, 2], region, cnv, case.hpo, ctrl.hpo, rstudio.local)
+    load.cnvs.from.region(cnv.list[i, 2], region, cnv, case.hpo, ctrl.hpo, rstudio.local)
   })
   names(cnvs) <- cnv.list[, 1]
   return(cnvs)
@@ -324,7 +367,7 @@ load.cnvs.from.region.multi <- function(cnvlist, region, cnv=NULL,
 #' @param end right-most plotting coordinate
 #' @param dx plotting resolution along X axis, specified as total number of steps \[default: 100\]
 #' @param cnv.height relative height for each CNV \[default: 1\]
-#' @param cnv.buffer relative buffer between adjacent CNVs \[default: 0.15\]
+#' @param cnv.buffer relative buffer between adjacent CNVs \[default: 0\]
 #' @param bevel.switch.pct fraction of start/end of each CNV to be beveled \[default: 0.025\]
 #' @param col CNV color \[default: blueblack\]
 #' @param highlight.hpo highlight CNVs from this HPO in a different color
@@ -340,7 +383,7 @@ load.cnvs.from.region.multi <- function(cnvlist, region, cnv=NULL,
 #'
 #' @export
 pileup.cnvs.for.highlight <- function(cnvs, start=NULL, end=NULL, dx=100,
-                                      cnv.height=1, cnv.buffer=0.15,
+                                      cnv.height=1, cnv.buffer=0,
                                       bevel.switch.pct=0.025, col=blueblack,
                                       highlight.hpo=NA, highlight.col=NULL){
   # Set range of values to evaluate
@@ -398,8 +441,12 @@ pileup.cnvs.for.highlight <- function(cnvs, start=NULL, end=NULL, dx=100,
       cnv.y[length(cnv.x.idxs)] <- counts$count[cnv.x.idxs[length(cnv.x.idxs)]] - cnv.height + cnv.y.buf
 
       # Assign color
-      if(highlight.hpo %in% cnv.hpos){
-        cnv.color <- highlight.col
+      if(!is.na(highlight.hpo)){
+        if(highlight.hpo %in% cnv.hpos){
+          cnv.color <- highlight.col
+        }else{
+          cnv.color <- col
+        }
       }else{
         cnv.color <- col
       }

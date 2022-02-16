@@ -7,10 +7,10 @@
 \method{plot}{idio.stick}(
   genome.in,
   chrom,
-  start,
-  end,
   y.at,
-  tick.height = 0.1,
+  start = NA,
+  end = NA,
+  tick.height = -0.03,
   wex = 0.925,
   y.label = TRUE
 )
@@ -20,13 +20,13 @@
 
 \item{chrom}{chromosome to be plotted}
 
-\item{start}{left-most coordinate of highlight region}
-
-\item{end}{right-most coordinate of highlight region}
-
 \item{y.at}{where the idiogram should be drawn, in Y coordinates}
 
-\item{tick.height}{relative height of idiogram ticks [default: 0.1]}
+\item{start}{left-most coordinate of highlight region [default: no highlight]}
+
+\item{end}{right-most coordinate of highlight region [default: no highlight]}
+
+\item{tick.height}{relative height of idiogram ticks [default: -0.03]}
 
 \item{wex}{relative width expansion factor [default: 0.925]}
 

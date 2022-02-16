@@ -10,7 +10,7 @@
   n.ctrl,
   y0,
   cnv.type,
-  highlight.hpo = NULL,
+  highlight.hpo = NA,
   max.freq = NULL,
   start = NULL,
   end = NULL,

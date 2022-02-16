@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -18,7 +18,7 @@ gcloud auth login
 
 # Set global parameters
 export rCNV_bucket="gs://rcnv_project"
-export prefix="rCNV2_analysis_d1"
+export prefix="rCNV2_analysis_d2"
 
 
 # Download necessary data (note: requires permissions)
@@ -31,7 +31,8 @@ gsutil -m cp \
   meta_stats/
 find meta_stats/ -name "*bed.gz" | xargs -I {} tabix -p bed -f {}
 gsutil -m cp -r \
-  ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv \
+  ${rCNV_bucket}/analysis/gene_burden/fine_mapping/rCNV.*.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_no_variation_features.tsv \
+  ${rCNV_bucket}/results/* \
   ./
 
 
@@ -58,6 +59,28 @@ done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt | cut -f1 ) \
 example_hpo="HP0012759"
 gw_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
              refs/sliding_window.rCNV.DEL.bonferroni_pval.hpo_cutoffs.tsv )
+
+
+# Simple dev case for new script - SHANK3 deletions
+Rscript -e "install.packages('opt/rCNV2/source/rCNV2_0.1.0.tar.gz', repos=NULL)" && \
+/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_locus_highlight.R \
+  --case-hpos "HP:0000707" \
+  --highlights "22:50166930-51171641" \
+  --sumstats meta_stats/HP0012759.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
+  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
+  --pips rCNV.DEL.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_no_variation_features.tsv \
+  --gw-sig-label-side bottom \
+  --standardize-frequencies \
+  --collapse-cohorts \
+  --cnv-panel-height 1.2 \
+  --pdf-height 3.5 \
+  22:49310000-51270000 \
+  cnvs.input.tsv \
+  "DEL" \
+  refs/HPOs_by_metacohort.table.tsv \
+  refs/GRCh37.genome \
+  locus_highlight_test
+
 
 
 #####################

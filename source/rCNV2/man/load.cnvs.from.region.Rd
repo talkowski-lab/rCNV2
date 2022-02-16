@@ -5,7 +5,7 @@
 \title{Load CNVs for a region of interest}
 \usage{
 load.cnvs.from.region(
-  bedpath,
+  bedpaths,
   region,
   cnv = NULL,
   case.hpos = c("HP:0000118"),
@@ -14,7 +14,7 @@ load.cnvs.from.region(
 )
 }
 \arguments{
-\item{bedpath}{path to .bed with CNVs}
+\item{bedpaths}{paths to one or more .bed files with CNVs}
 
 \item{region}{coordinates of region to be extracted}
 
@@ -37,5 +37,7 @@ list with the following two elements:
 Load CNVs from a single BED for a single region, and split by case/control
 }
 \details{
-\code{region} coordinates must be a \code{tabix}-compatbile string
+\code{region} coordinates must be a \code{tabix}-compatbile string. If multiple
+.bed files are provided as a vector to \code{bedpaths}, the contents of these files
+will be concatenated after loading.
 }

@@ -17,33 +17,38 @@
 #'
 #' @param genome.in BEDTools-style .genome file
 #' @param chrom chromosome to be plotted
-#' @param start left-most coordinate of highlight region
-#' @param end right-most coordinate of highlight region
 #' @param y.at where the idiogram should be drawn, in Y coordinates
-#' @param tick.height relative height of idiogram ticks \[default: 0.1\]
+#' @param start left-most coordinate of highlight region \[default: no highlight\]
+#' @param end right-most coordinate of highlight region \[default: no highlight\]
+#' @param tick.height relative height of idiogram ticks \[default: -0.03\]
 #' @param wex relative width expansion factor \[default: 0.925\]
 #' @param y.label boolean indicator to add chromosome label to the Y axis \[default: TRUE\]
 #'
 #' @export plot.idio.stick
 #' @export
-plot.idio.stick <- function(genome.in, chrom, start, end, y.at, tick.height=0.1,
+plot.idio.stick <- function(genome.in, chrom, y.at, start=NA, end=NA, tick.height=-0.03,
                             wex=0.925, y.label=TRUE){
   # Load & scale genomic coordinates for chromosome of interest
   g <- read.table(genome.in, sep="\t", header=F)
-  len <- g[which(g[, 1] == chrom), 2]
+  len <- as.numeric(g[which(g[, 1] == chrom), 2])
   pbuf <- ((1-wex)/2) * diff(par("usr")[1:2])
   pstart <- par("usr")[1] + pbuf
   pend <- par("usr")[2] - pbuf
 
   # Scale highlight coordinates
   iwidth <- pend - pstart
-  h.start <- pstart + ((start / len) * iwidth)
-  h.end <- pstart + ((end / len) * iwidth)
+  highlight <- (!is.na(start) & !is.na(end))
+  if(highlight){
+    h.start <- pstart + ((start / len) * iwidth)
+    h.end <- pstart + ((end / len) * iwidth)
+  }
 
   # Plot idiogram stick + highlight box
   segments(x0=pstart, x1=pend, y0=y.at, y1=y.at, col="gray50")
-  rect(xleft=h.start, xright=h.end, ybottom=y.at-tick.height, ytop=y.at+tick.height,
-       col="red")
+  if(highlight){
+    rect(xleft=h.start, xright=h.end, ybottom=y.at-tick.height,
+         ytop=y.at+tick.height, col="red")
+  }
   if(y.label){
     axis(2, at=y.at, tick=F, line=-0.85, labels=paste("chr", chrom, sep=""), las=2)
   }
@@ -358,7 +363,7 @@ plot.pvalues.for.highlight <- function(ss, y0, cnv.type, panel.height=0.2,
 
 #' Plot odds ratios for locus highlight
 #'
-#' Add panel of natural log-scaled odds ratios to locus highlight
+#' Add panel of log-odds ratios to locus highlight
 #'
 #' @param ss summary statistics to be plotted as loaded by [load.sumstats.for.region]
 #' @param y0 vertical midpoint for panel
@@ -368,9 +373,9 @@ plot.pvalues.for.highlight <- function(ss, y0, cnv.type, panel.height=0.2,
 #'
 #' @seealso [load.sumstats.for.region]
 #'
-#' @export plot.ors.forhighlight
+#' @export plot.ors.for.highlight
 #' @export
-plot.ors.forhighlight <- function(ss, y0, cnv.type, panel.height=0.2, pt.cex=0.7){
+plot.ors.for.highlight <- function(ss, y0, cnv.type, panel.height=0.2, pt.cex=0.7){
   # Get panel parameters
   half.height <- 0.5*panel.height
   ybottom <- y0 - half.height
@@ -388,6 +393,7 @@ plot.ors.forhighlight <- function(ss, y0, cnv.type, panel.height=0.2, pt.cex=0.7
   # Scale odds ratios according to y0 and panel.height
   pos <- as.numeric(ss$pos)
   ors.orig <- apply(ss[, grep("meta_lnOR", colnames(ss), fixed=T)], 2, as.numeric)
+  ors.orig <- log2(exp(ors.orig))
   ors.scalar <- max(ors.orig[, 1], na.rm=T)
   ors.scaled <- (panel.height / (ceiling(ors.scalar) + 1)) * ors.orig
   ors.scaled[which(ors.scaled > panel.height)] <- panel.height
@@ -414,7 +420,7 @@ plot.ors.forhighlight <- function(ss, y0, cnv.type, panel.height=0.2, pt.cex=0.7
   axis(2, at=y0 + y.ax.tick.spacing, tck=-0.0075, col=blueblack, labels=NA)
   axis(2, at=y0+c(-half.height, half.height), tick=F, las=2, line=-0.65,
        labels=c(0, ceiling(ors.scalar) + 1), cex.axis=y.ax.label.cex)
-  axis(2, at=y0, line=-0.2, tick=F, labels=bquote("ln" * ("OR"[.(cnv.type)])), las=2)
+  axis(2, at=y0, line=-0.2, tick=F, labels=bquote("log" [2] * ("OR"[.(cnv.type)])), las=2)
 
   # Add cleanup top & bottom lines
   abline(h=c(ytop, ybottom), col=blueblack)
@@ -683,8 +689,11 @@ plot.features.from.bedgraph <- function(bed, y0, col=blueblack, panel.height=0.2
 #' of `case.legend.topbottom`.
 #'
 #' @seealso [load.cnvs.from.region], [pileup.cnvs.for.highlight]
+#'
+#' @export plot.cnv.panel.for.highlight
+#' @export
 plot.cnv.panel.for.highlight <- function(cnvs, n.case, n.ctrl, y0, cnv.type,
-                                         highlight.hpo=NULL, max.freq=NULL,
+                                         highlight.hpo=NA, max.freq=NULL,
                                          start=NULL, end=NULL, y.axis.title="CNV\nFreq.",
                                          expand.pheno.label=TRUE, case.legend.side="left",
                                          case.legend.topbottom="top", ctrl.legend.side="left",
@@ -717,8 +726,7 @@ plot.cnv.panel.for.highlight <- function(cnvs, n.case, n.ctrl, y0, cnv.type,
   }
 
   # Collect raw (unscaled) CNV pileups
-  raw.pileups <- lapply(cnvs, pileup.cnvs.for.highlight, start=start, end=end,
-                        dx=dx, cnv.buffer=0)
+  raw.pileups <- lapply(cnvs, pileup.cnvs.for.highlight, start=start, end=end, dx=dx)
   max.case.n <- max(unlist(lapply(raw.pileups$case$cnvs, function(l){max(l$y)})))
   max.ctrl.n <- max(unlist(lapply(raw.pileups$ctrl$cnvs, function(l){max(l$y)})))
 
@@ -735,19 +743,24 @@ plot.cnv.panel.for.highlight <- function(cnvs, n.case, n.ctrl, y0, cnv.type,
   ctrl.cnv.height <- half.height / ceiling(n.ctrl * max.freq)
 
   # Gather scaled CNV pileups
-  case.pileup <- pileup.cnvs(cnvs$case, start=start, end=end, dx=dx, cnv.height=case.cnv.height,
-                             col=col.case.other, highlight.hpo=highlight.hpo, highlight.col=col.case.highlight)
-  ctrl.pileup <- pileup.cnvs(cnvs$ctrl, start=start, end=end, dx=dx, cnv.height=ctrl.cnv.height,
-                             col=col.ctrl)
+  case.pileup <- pileup.cnvs.for.highlight(cnvs$case, start=start, end=end, dx=dx,
+                                           cnv.height=case.cnv.height,
+                                           col=col.case.other,
+                                           highlight.hpo=highlight.hpo,
+                                           highlight.col=col.case.highlight)
+  ctrl.pileup <- pileup.cnvs.for.highlight(cnvs$ctrl, start=start, end=end, dx=dx,
+                                           cnv.height=ctrl.cnv.height, col=col.ctrl)
 
   # Add horizontal gridlines
   y.ax.tick.spacing <- seq(-half.height, half.height, length.out=7)
   abline(h=c(y0, y0 + y.ax.tick.spacing, y0 - y.ax.tick.spacing), col="white")
 
   # Plot midline, pileups, and outlines
-  lapply(case.pileup$cnvs, function(l){polygon(l$x, y0 + l$y, border=NA, col=l$color)})
+  lapply(case.pileup$cnvs, function(l){polygon(l$x, y0 + l$y, border=l$color,
+                                               col=l$color, lwd=0.1)})
   points(case.pileup$counts[, 1], case.pileup$counts[, 2] + y0, type="l", col=col.case.other)
-  lapply(ctrl.pileup$cnvs, function(l){polygon(l$x, y0 - l$y, border=NA, col=l$color)})
+  lapply(ctrl.pileup$cnvs, function(l){polygon(l$x, y0 - l$y, border=l$color,
+                                               col=l$color, lwd=0.1)})
   points(ctrl.pileup$counts[, 1], -ctrl.pileup$counts[, 2] + y0, type="l", col=col.ctrl)
   abline(h=y0, col=col.midline)
 
@@ -841,9 +854,9 @@ plot.cnv.panel.for.highlight <- function(cnvs, n.case, n.ctrl, y0, cnv.type,
 #' @param text.cex character expansion scalar for text \[default: 5/6\]
 #' @param pt.cex expansion scalar for points \[default: 1.3\]
 #'
-#' @export add.cnv.key.for.highlight
+#' @export plot.cnv.key.for.highlight
 #' @export
-add.cnv.key.for.highlight <- function(cnv.type, y0, total.n.ctrls, all.case.hpos,
+plot.cnv.key.for.highlight <- function(cnv.type, y0, total.n.ctrls, all.case.hpos,
                                       total.n.cases, highlight.case.hpo=NA,
                                       total.n.cases.highlight=NA, panel.height=0.2,
                                       text.cex=5/6, pt.cex=1.3){

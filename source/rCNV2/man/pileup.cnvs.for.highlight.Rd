@@ -10,7 +10,7 @@ pileup.cnvs.for.highlight(
   end = NULL,
   dx = 100,
   cnv.height = 1,
-  cnv.buffer = 0.15,
+  cnv.buffer = 0,
   bevel.switch.pct = 0.025,
   col = blueblack,
   highlight.hpo = NA,
@@ -28,7 +28,7 @@ pileup.cnvs.for.highlight(
 
 \item{cnv.height}{relative height for each CNV [default: 1]}
 
-\item{cnv.buffer}{relative buffer between adjacent CNVs [default: 0.15]}
+\item{cnv.buffer}{relative buffer between adjacent CNVs [default: 0]}
 
 \item{bevel.switch.pct}{fraction of start/end of each CNV to be beveled [default: 0.025]}
 
