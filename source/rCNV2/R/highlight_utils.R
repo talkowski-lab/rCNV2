@@ -70,7 +70,7 @@ load.genes.from.gtf <- function(gtf.in, region, rstudio.local=FALSE){
     stop(paste("tabix index not found for input file", gtf.in))
   }
   require(bedr, quietly=T)
-  gtf <- bedr::tabix(region, gtf.in, check.chr=FALSE)
+  gtf <- bedr::tabix(region, gtf.in, check.chr=FALSE, verbose=FALSE)
 
   # Reformat entries
   if(!is.null(gtf)){
@@ -122,7 +122,7 @@ load.sumstats.for.region <- function(bedpath, region, rstudio.local=FALSE){
     stop(paste("tabix index not found for input file", bedpath))
   }
   require(bedr, quietly=T)
-  ss <- bedr::tabix(region, bedpath, check.chr=FALSE)
+  ss <- bedr::tabix(region, bedpath, check.chr=FALSE, verbose=FALSE)
 
   # Add midpoint
   ss$pos <- (ss$start + ss$stop)/2
@@ -139,17 +139,21 @@ load.sumstats.for.region <- function(bedpath, region, rstudio.local=FALSE){
 #'
 #' @param pips.in path to .tsv of PIPs per gene
 #' @param genes vector of gene symbols to retain
-#' @param hpo HPO of interest
+#' @param hpos HPO(s) of interest \[default: do not filter on HPO\]
 #'
 #' @return data.frame
 #'
 #' @export
-load.pips.for.genelist <- function(pips.in, genes, hpo){
-  pips <- read.table(pips.in, header=T, sep="\t", comment.char="")
-  pips <- pips[which(pips[, 1] == hpo & pips$gene %in% genes),
-               c("gene", "PIP_final", "credible_set")]
-  colnames(pips)[2] <- "PIP"
-  return(pips)
+load.pips.for.genelist <- function(pips.in, genes, hpos=NULL){
+  pips <- read.table(pips.in, header=T, sep="\t", comment.char="", check.names=F)
+  pips <- pips[which(pips$gene %in% genes),
+               c("gene", "PIP_final", "credible_set", "#HPO")]
+  colnames(pips) <- c("gene", "PIP", "credible_set", "HPO")
+  if(!is.null(hpos)){
+    pips <- pips[which(pips$HPO == hpo), ]
+  }
+  pips <- pips[, 1:3]
+  return(pips[which(!duplicated(pips)), ])
 }
 
 
@@ -204,7 +208,7 @@ load.feature.bed.for.highlight <- function(bedpath, region, keep.col=4,
     stop(paste("tabix index not found for input file", bedpath))
   }
   require(bedr, quietly=T)
-  bed <- bedr::tabix(region, bedpath, check.chr=FALSE)
+  bed <- bedr::tabix(region, bedpath, check.chr=FALSE, verbose=FALSE)
   if(!is.null(bed)){
     bed <- bed[, c(1:3, keep.col)]
     colnames(bed) <- c("chr", "start", "end", "value")
@@ -297,7 +301,7 @@ load.cnvs.from.region <- function(bedpaths, region, cnv=NULL,
     if(!file.exists(paste(bedpath, "tbi", sep="."))){
       stop(paste("tabix index not found for input file", bedpath))
     }
-    bedr::tabix(region, bedpath, check.chr=FALSE)
+    bedr::tabix(region, bedpath, check.chr=FALSE, verbose=FALSE)
   })))
 
   if(!is.null(cnvs)){

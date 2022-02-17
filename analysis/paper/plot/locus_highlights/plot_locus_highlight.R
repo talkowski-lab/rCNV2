@@ -38,20 +38,31 @@ option_list <- list(
   make_option(c("--case-hpos"), default="HP:0000118",
               help=paste("semicolon-delimited list of case HPOs to plot.",
                          "[default: use all cases]")),
+  make_option(c("--highlight-hpo"), default=NA, type="character",
+              help="HPO to highlight in CNV panels. [default: no highlighted HPO]"),
   make_option(c("--highlights"), help=paste("semicolon-delimited list of regions",
                                             "to highlight. [default: no highlights]")),
   make_option(c("--highlight-color"), default=highlight.color,
               help="color to use for region highlights. [default: %default]"),
   make_option(c("--sumstats"), help="BED of summary statistics."),
+  make_option(c("--cytobands", help=paste("BED of cytobands. If provided, will",
+                                          "annotate idiogram with cytoband.",
+                                          "[default: no annotation]"))),
   make_option(c("--gtf"), help="GTF for plotting gene bodies. Must be tabix indexed."),
   make_option(c("--label-genes"), help=paste("semicolon-delimited list of gene",
                                              "symbols to label. [default: no labels]")),
+  make_option(c("--autolabel-n-genes"), default=4, type="numeric",
+              help=paste("automatically label all genes for loci involving no more",
+                         "than this many genes [default: %default]")),
   make_option(c("--pips"), help="BED file of PIPs for all genes."),
   make_option(c("--min-cases"), default=300, type="numeric",
-              help="minimum number of cases required for a cohort to be plotted"),
+              help=paste("minimum number of cases required for a cohort to be",
+                         "plotted. [default: %default]")),
   make_option(c("--gw-sig"), type="numeric", default=10^-6,
-              help="P-value cutoff to mark as genome-wide significant."),
-  make_option(c("--gw-sig-label-side"), default="top",
+              help="P-value cutoff to mark as genome-wide significant. [default: %default]"),
+  make_option(c("--gw-sig-label"), type="character", default="Genome-wide significance",
+              help="Text label to annotate above --gw-sig [default: %default]"),
+  make_option(c("--gw-sig-label-side"), default="above",
               help=paste("orientation of genome-wide significance label relative",
                          "to horizontal line. [default: %default]")),
   make_option(c("--standardize-frequencies"), action="store_true", default=FALSE,
@@ -70,7 +81,7 @@ option_list <- list(
   make_option(c("--or-panel-height"), default=0.4, type="numeric",
               help=paste("hight of odds ratio panel. Only used if --sumstats are",
                          "provided. [default: %default]")),
-  make_option(c("--gene-panel-space"), default=0.1, type="numeric",
+  make_option(c("--gene-panel-space"), default=0.15, type="numeric",
               help=paste("spacing between gene strip panels and next panels. Only",
                          "used if --gtf is provided. [default: %default]")),
   make_option(c("--gene-panel-height"), default=0.1, type="numeric",
@@ -116,14 +127,18 @@ sample.size.table <- args$args[4]
 genome.in <- args$args[5]
 out.prefix <- args$args[6]
 case.hpo.str <- opts$`case-hpos`
+highlight.hpo <- opts$`highlight-hpo`
 highlights.str <- opts$`highlights`
 highlight.color <- opts$`highlight-color`
 sumstats.in <- opts$sumstats
+cytobands.in <- opts$cytobands
 gtf.in <- opts$gtf
 label.genes.str <- opts$`label-genes`
+autolabel.n.genes <- opts$`autolabel-n-genes`
 pips.in <- opts$pips
 min.cases <- opts$`min-cases`
 gw.sig <- opts$`gw-sig`
+gw.sig.label <- opts$`gw-sig-label`
 gw.sig.label.side <- opts$`gw-sig-label-side`
 standardize.freqs <- opts$`standardize-frequencies`
 collapse.cohorts <- opts$`collapse-cohorts`
@@ -150,7 +165,7 @@ parse.region.for.highlight(region, genome.in)
 # Parse highlight regions
 if(!is.null(highlights.str)){
   highlight.df <- data.frame(do.call("rbind",
-                                     lapply(strsplit(highlights.str, split=";"),
+                                     lapply(unlist(strsplit(highlights.str, split=";")),
                                             parse.region.for.highlight,
                                             genome.in=genome.in, return.values=TRUE,
                                             export.values=FALSE)))
@@ -167,6 +182,12 @@ all.case.hpos <- sort(unique(unlist(strsplit(case.hpo.str, split=";"))))
 
 # Load sample sizes
 n.samples <- get.sample.sizes.for.highlight(sample.size.table, all.case.hpos)
+if(!is.na(highlight.hpo)){
+  n.samples.highlight <- get.sample.sizes.for.highlight(sample.size.table,
+                                                        highlight.hpo)
+}else{
+  n.samples.highlight <- NA
+}
 
 # Load all CNVs
 cnvs <- load.cnvs.from.region.multi(cnvlist.in, region, cnv.type, all.case.hpos)
@@ -210,7 +231,7 @@ if(!is.null(gtf.in)){
 
 # Load PIPs, if optioned
 if(!is.null(pips.in)){
-  pips <- load.pips.for.genelist(pips.in, unique(genes$gene), all.case.hpos[1])
+  pips <- load.pips.for.genelist(pips.in, unique(genes$gene))
   credset.genes <- unique(pips$gene[which(!is.na(pips$credible_set))])
 }
 
@@ -220,6 +241,8 @@ if(!is.null(label.genes.str)){
 }else{
   if(!is.null(pips.in)){
     label.genes <- unique(pips$gene[which(pips$PIP == max(pips$PIP))])
+  }else if(length(unique(genes$gene)) <= autolabel.n.genes){
+    label.genes <- sort(unique(genes$gene))
   }else{
     label.genes <- c()
   }
@@ -258,19 +281,21 @@ plot(NA, xlim=c(start, end), ylim=c(total.height.plus.key, top.panels.height),
      yaxt="n", xaxt="n", ylab="", xlab="")
 
 # Add stick idiogram
-plot.idio.stick(genome.in, chrom, start=highlight.start, end=highlight.end,
-                idio.panel.y0)
+plot.idio.stick(genome.in, chrom, idio.panel.y0, start=highlight.start,
+                end=highlight.end, cytobands=cytobands.in)
 
 # Add background shading
-rect(xleft=highlight.start, xright=highlight.end,
+rect(xleft=highlight.df$start, xright=highlight.df$end,
      ybottom=total.height, ytop=0,
      col=adjustcolor(highlight.color, alpha=0.3), border=NA)
 blueshade.ybottoms <- c(cnv.panel.y0s+(0.5*cnv.panel.height),
                         pval.panel.y0+(0.5*pval.panel.height),
-                        or.panel.y0+(0.5*or.panel.height))
+                        or.panel.y0+(0.5*or.panel.height),
+                        pip.panel.y0+(0.5*pip.panel.height))
 blueshade.ytops <- c(cnv.panel.y0s-(0.5*cnv.panel.height),
                      pval.panel.y0-(0.5*pval.panel.height),
-                     or.panel.y0-(0.5*or.panel.height))
+                     or.panel.y0-(0.5*or.panel.height),
+                     pip.panel.y0-(0.5*pip.panel.height))
 rect(xleft=par("usr")[1], xright=par("usr")[2],
      ybottom=blueshade.ybottoms,
      ytop=blueshade.ytops,
@@ -285,6 +310,7 @@ plot.coord.line(start, end, coord.panel.y0, highlight.df$start, highlight.df$end
 if(!is.null(sumstats.in)){
   plot.pvalues.for.highlight(ss, y0=pval.panel.y0, panel.height=pval.panel.height,
                              cnv.type=cnv.type, gw.sig=gw.sig,
+                             gw.sig.label=gw.sig.label,
                              gw.sig.label.side=gw.sig.label.side)
   plot.ors.for.highlight(ss, y0=or.panel.y0, panel.height=or.panel.height,
                          cnv.type=cnv.type)
@@ -335,8 +361,8 @@ sapply(1:length(cnvs), function(i){
   cohort.label <- if(collapse.cohorts){NA}else{cohort.abbrevs[names(cnvs)[i]]}
   plot.cnv.panel.for.highlight(cnvs[[i]], n.case=n.samples$case[i],
                                n.ctrl=n.samples$ctrl[i], y0=cnv.panel.y0s[i],
-                               cnv.type=cnv.type, max.freq=max.freq,
-                               panel.height=cnv.panel.height,
+                               cnv.type=cnv.type, highlight.hpo=highlight.hpo,
+                               max.freq=max.freq, panel.height=cnv.panel.height,
                                y.axis.title=NA, expand.pheno.label=F,
                                add.cohort.label=TRUE,
                                cohort.label=cohort.label)
@@ -345,6 +371,8 @@ sapply(1:length(cnvs), function(i){
 # Add key for CNV panels
 plot.cnv.key.for.highlight(cnv.type, cnv.key.y0, total.n.ctrls=sum(n.samples$ctrl),
                            all.case.hpos, total.n.cases=sum(n.samples$case),
+                           highlight.case.hpo=highlight.hpo,
+                           total.n.cases.highlight=sum(n.samples.highlight$case),
                            panel.height=cnv.key.height)
 
 # Close output pdf

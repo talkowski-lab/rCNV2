@@ -40,7 +40,9 @@ gsutil -m cp -r \
 mkdir refs/ 
 gsutil -m cp \
   ${rCNV_bucket}/analysis/analysis_refs/** \
+  ${rCNV_bucket}/refs/GRCh37.cytobands.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/hpo/${prefix}.reordered_hpos.txt \
+  ${rCNV_bucket}/cleaned_data/phenotypes/hpo_logs_metadata/phenotype_groups.HPO_metadata.txt \
   ${rCNV_bucket}/refs/GRCh37.autosomes.genome \
   ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
   ${rCNV_bucket}/refs/REP_state_manifest.tsv \
@@ -59,12 +61,36 @@ done < <( fgrep -v "mega" refs/rCNV_metacohort_list.txt | cut -f1 ) \
 example_hpo="HP0012759"
 gw_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
              refs/sliding_window.rCNV.DEL.bonferroni_pval.hpo_cutoffs.tsv )
+ew_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
+             refs/gene_burden.rCNV.DEL.bonferroni_pval.hpo_cutoffs.tsv )
+
+
+# Plot one standardized locus highlight plot for each large segment and credible set
+for dir in all_large_segments all_credsets; do
+  if ! [ -e $dir ]; then
+    mkdir $dir
+  fi
+done
+/opt/rCNV2/analysis/paper/scripts/locus_highlights/enumerate_locus_highlight_plot_calls.py \
+  --segments segment_association/rCNV.final_segments.loci.bed.gz \
+  --phenotable refs/phenotype_groups.HPO_metadata.txt \
+  --bonf-cutoff "$gw_cutoff" \
+  --target-directory all_large_segments/ \
+> plot_all_locus_highlights.sh
+/opt/rCNV2/analysis/paper/scripts/locus_highlights/enumerate_locus_highlight_plot_calls.py \
+  --credsets gene_association/rCNV.final_genes.credible_sets.bed.gz \
+  --phenotable refs/phenotype_groups.HPO_metadata.txt \
+  --bonf-cutoff "$ew_cutoff" \
+  --target-directory all_credsets/ \
+>> plot_all_locus_highlights.sh
+bash plot_all_locus_highlights.sh 
 
 
 # Simple dev case for new script - SHANK3 deletions
 Rscript -e "install.packages('opt/rCNV2/source/rCNV2_0.1.0.tar.gz', repos=NULL)" && \
 /opt/rCNV2/analysis/paper/plot/locus_highlights/plot_locus_highlight.R \
   --case-hpos "HP:0000707" \
+  --highlight-hpo "HP:0012759" \
   --highlights "22:50166930-51171641" \
   --sumstats meta_stats/HP0012759.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
   --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \

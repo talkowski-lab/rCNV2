@@ -20,14 +20,15 @@
 #' @param y.at where the idiogram should be drawn, in Y coordinates
 #' @param start left-most coordinate of highlight region \[default: no highlight\]
 #' @param end right-most coordinate of highlight region \[default: no highlight\]
+#' @param cytobands .bed file of cytobands \[default: no cytoband annotation\]
 #' @param tick.height relative height of idiogram ticks \[default: -0.03\]
 #' @param wex relative width expansion factor \[default: 0.925\]
 #' @param y.label boolean indicator to add chromosome label to the Y axis \[default: TRUE\]
 #'
 #' @export plot.idio.stick
 #' @export
-plot.idio.stick <- function(genome.in, chrom, y.at, start=NA, end=NA, tick.height=-0.03,
-                            wex=0.925, y.label=TRUE){
+plot.idio.stick <- function(genome.in, chrom, y.at, start=NA, end=NA, cytobands=NULL,
+                            tick.height=-0.03, wex=0.925, y.label=TRUE){
   # Load & scale genomic coordinates for chromosome of interest
   g <- read.table(genome.in, sep="\t", header=F)
   len <- as.numeric(g[which(g[, 1] == chrom), 2])
@@ -51,6 +52,14 @@ plot.idio.stick <- function(genome.in, chrom, y.at, start=NA, end=NA, tick.heigh
   }
   if(y.label){
     axis(2, at=y.at, tick=F, line=-0.85, labels=paste("chr", chrom, sep=""), las=2)
+  }
+
+  # Add cytoband annotation, if optioned
+
+  if(!is.null(cytobands)){
+    cyto.lab <- get.cytoband.range(chrom, start, end, cytobands)
+    text(x=mean(c(h.start, h.end)), y=y.at+(3*abs(tick.height)), pos=3,
+         labels=cyto.lab, cex=5/6, xpd=T)
   }
 }
 
@@ -216,19 +225,21 @@ plot.gene.bodies <- function(genes, y0, transcripts=FALSE, mark.tss=FALSE,
            ytop=row.mids[row.idx]+(0.5*utr.height),
            border=col, lwd=1, col=col)
     }
-    if(gene %in% label.genes){
-      if(row.mids[row.idx] >= y0){
-        glabel.pos <- 3
-        glabel.y <- row.mids[row.idx]-(0.25*row.height)
-      }else{
-        glabel.pos <- 1
-        glabel.y <- row.mids[row.idx]+(0.25*row.height)
+    if(length(label.genes) > 0){
+      if(gene %in% label.genes){
+        if(row.mids[row.idx] >= y0){
+          glabel.pos <- 3
+          glabel.y <- row.mids[row.idx]-(0.25*row.height)
+        }else{
+          glabel.pos <- 1
+          glabel.y <- row.mids[row.idx]+(0.25*row.height)
+        }
+        glab.coords <- as.numeric(tx.coords[1, 1:2])
+        glab.coords[1] <- max(c(par("usr")[1], glab.coords[1]))
+        glab.coords[2] <- min(c(par("usr")[2], glab.coords[2]))
+        text(x=mean(glab.coords), y=glabel.y, xpd=T,
+             cex=5/6, font=3, labels=gene, pos=glabel.pos)
       }
-      glab.coords <- as.numeric(tx.coords[1, 1:2])
-      glab.coords[1] <- max(c(par("usr")[1], glab.coords[1]))
-      glab.coords[2] <- min(c(par("usr")[2], glab.coords[2]))
-      text(x=mean(glab.coords), y=glabel.y, xpd=T,
-           cex=5/6, font=3, labels=gene, pos=glabel.pos)
     }
   })
 
@@ -392,12 +403,17 @@ plot.ors.for.highlight <- function(ss, y0, cnv.type, panel.height=0.2, pt.cex=0.
 
   # Scale odds ratios according to y0 and panel.height
   pos <- as.numeric(ss$pos)
-  ors.orig <- apply(ss[, grep("meta_lnOR", colnames(ss), fixed=T)], 2, as.numeric)
+  or.col.idxs <- grep("meta_lnOR", colnames(ss), fixed=T)
+  ss[, or.col.idxs] <- apply(ss[, or.col.idxs], 2, as.numeric)
+  ss <- na.omit(ss)
+  ss <- ss[order(ss$pos), ]
+  ors.orig <- ss[, or.col.idxs]
   ors.orig <- log2(exp(ors.orig))
   ors.scalar <- max(ors.orig[, 1], na.rm=T)
   ors.scaled <- (panel.height / (ceiling(ors.scalar) + 1)) * ors.orig
-  ors.scaled[which(ors.scaled > panel.height)] <- panel.height
-  ors.scaled[which(ors.scaled < 0)] <- 0
+  ors.scaled <- as.data.frame(t(apply(ors.scaled, 1, function(vals){
+    sapply(vals, function(x){max(c(min(c(x, panel.height)), 0))})
+  })))
   ors <- ors.scaled + y0 - half.height
 
   # Only keep points with non-NA ORs
@@ -477,10 +493,11 @@ plot.pips.for.highlight <- function(pips, genes, y0, panel.height=0.2,
   # Merge gene coordinates & PIPs
   gcoords <- genes[which(genes$gene %in% pips$gene & genes$feature=="transcript"),
                    c("start", "end", "gene")]
-  pdat <- merge(gcoords, pips, all=F, sort=F, by="gene")
+  pdat <- merge(gcoords, pips[, c("gene", "PIP")], all=F, sort=F, by="gene")
+  pdat <- pdat[which(!duplicated(pdat)), ]
 
   # Scale PIPs according to y0 and panel.height
-  max.pip <- ceiling(11*max(pdat$PIP, na.rm=T)) / 10
+  max.pip <- min(c(1, ceiling(11*max(pdat$PIP, na.rm=T)) / 10))
   pdat$y <- (pdat$PIP * panel.height / min(c(1, max.pip))) + y0 - half.height
 
   # Add horizontal gridlines
@@ -515,7 +532,7 @@ plot.pips.for.highlight <- function(pips, genes, y0, panel.height=0.2,
 
   # Label any genes, if optioned
   if(!is.na(label.genes)){
-    sapply(label.genes, function(gene){
+    sapply(label.genes[which(label.genes %in% pdat$gene)], function(gene){
       best.pip <- pdat$PIP[which(pdat$gene==gene)]
       best.y <- pdat$y[which(pdat$gene==gene)]
       if(best.pip > 0.6 * max.pip){
@@ -857,9 +874,9 @@ plot.cnv.panel.for.highlight <- function(cnvs, n.case, n.ctrl, y0, cnv.type,
 #' @export plot.cnv.key.for.highlight
 #' @export
 plot.cnv.key.for.highlight <- function(cnv.type, y0, total.n.ctrls, all.case.hpos,
-                                      total.n.cases, highlight.case.hpo=NA,
-                                      total.n.cases.highlight=NA, panel.height=0.2,
-                                      text.cex=5/6, pt.cex=1.3){
+                                       total.n.cases, highlight.case.hpo=NA,
+                                       total.n.cases.highlight=NA, panel.height=0.2,
+                                       text.cex=5/6, pt.cex=1.3){
   # Get plot data
   x.at <- par("usr")[1] + (c(0.075, 0.65) * diff(par("usr")[1:2]))
   y.buf <- panel.height/3

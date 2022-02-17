@@ -10,6 +10,7 @@
   y.at,
   start = NA,
   end = NA,
+  cytobands = NULL,
   tick.height = -0.03,
   wex = 0.925,
   y.label = TRUE
@@ -25,6 +26,8 @@
 \item{start}{left-most coordinate of highlight region [default: no highlight]}
 
 \item{end}{right-most coordinate of highlight region [default: no highlight]}
+
+\item{cytobands}{.bed file of cytobands [default: no cytoband annotation]}
 
 \item{tick.height}{relative height of idiogram ticks [default: -0.03]}
 

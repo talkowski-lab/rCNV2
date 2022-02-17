@@ -4,14 +4,14 @@
 \alias{load.pips.for.genelist}
 \title{Load PIPs for a list of genes}
 \usage{
-load.pips.for.genelist(pips.in, genes, hpo)
+load.pips.for.genelist(pips.in, genes, hpos = NULL)
 }
 \arguments{
 \item{pips.in}{path to .tsv of PIPs per gene}
 
 \item{genes}{vector of gene symbols to retain}
 
-\item{hpo}{HPO of interest}
+\item{hpos}{HPO(s) of interest [default: do not filter on HPO]}
 }
 \value{
 data.frame
