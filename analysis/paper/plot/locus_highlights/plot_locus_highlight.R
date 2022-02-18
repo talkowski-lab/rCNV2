@@ -54,6 +54,8 @@ option_list <- list(
   make_option(c("--autolabel-n-genes"), default=4, type="numeric",
               help=paste("automatically label all genes for loci involving no more",
                          "than this many genes [default: %default]")),
+  make_option(c("--constraint"), help=paste("BED of constraint features. If supplied,",
+                                            "will annotate all genes with LOEUF")),
   make_option(c("--pips"), help="BED file of PIPs for all genes."),
   make_option(c("--min-cases"), default=300, type="numeric",
               help=paste("minimum number of cases required for a cohort to be",
@@ -69,6 +71,10 @@ option_list <- list(
               help="standardize Y axis limits for all CNV panels. [default: %default]"),
   make_option(c("--collapse-cohorts"), action="store_true", default=FALSE,
               help="collapse all cohorts into a single CNV panel. [default: %default]"),
+  make_option(c("--subgroup-cohorts"), action="store_true", default=FALSE,
+              help=paste("subgroup cohorts into CNV panels for diagnostic",
+                         "labs, case-control studies, and biobanks.",
+                         " [default: %default]")),
   make_option(c("--pval-panel-space"), default=0.3, type="numeric",
               help=paste("spacing between P-value panel and next panel. Only used",
                          "if --sumstats are provided. [default: %default]")),
@@ -87,7 +93,13 @@ option_list <- list(
   make_option(c("--gene-panel-height"), default=0.1, type="numeric",
               help=paste("hight of gene strip panels. Only used if --gtf is",
                          "provided. [default: %default]")),
-  make_option(c("--pip-panel-space"), default=0.1, type="numeric",
+  make_option(c("--constraint-panel-space"), default=0.1, type="numeric",
+              help=paste("spacing between constraint panel and next panel. Only used",
+                         "if --constraint is provided. [default: %default]")),
+  make_option(c("--constraint-panel-height"), default=0.4, type="numeric",
+              help=paste("hight of constraint panel. Only used if --constraint is",
+                         "provided. [default: %default]")),
+  make_option(c("--pip-panel-space"), default=0.2, type="numeric",
               help=paste("spacing between PIP panel and next panel. Only used",
                          "if --pips are provided. [default: %default]")),
   make_option(c("--pip-panel-height"), default=0.4, type="numeric",
@@ -97,6 +109,8 @@ option_list <- list(
               help="spacing between each CNV panel and next panel. [default: %default]"),
   make_option(c("--cnv-panel-height"), default=0.65, type="numeric",
               help="hight of each CNV panel. [default: %default]"),
+  make_option(c("--par-mar"), default="0.5;6;0.2;0.5",
+              help="Semicolon-delimited list of values to pass to par(mar=...)"),
   make_option(c("--pdf-height"), help=paste("height of output .pdf (at 6pt font",
                                             "resolution). [default %default]"),
               default=4.75, type="numeric"),
@@ -135,6 +149,7 @@ cytobands.in <- opts$cytobands
 gtf.in <- opts$gtf
 label.genes.str <- opts$`label-genes`
 autolabel.n.genes <- opts$`autolabel-n-genes`
+constraint.in <- opts$constraint
 pips.in <- opts$pips
 min.cases <- opts$`min-cases`
 gw.sig <- opts$`gw-sig`
@@ -142,12 +157,15 @@ gw.sig.label <- opts$`gw-sig-label`
 gw.sig.label.side <- opts$`gw-sig-label-side`
 standardize.freqs <- opts$`standardize-frequencies`
 collapse.cohorts <- opts$`collapse-cohorts`
+subgroup.cohorts <- opts$`subgroup-cohorts`
 pval.panel.space <- if(!is.null(sumstats.in)){opts$`pval-panel-space`}else{0}
 pval.panel.height <- if(!is.null(sumstats.in)){opts$`pval-panel-height`}else{0}
 or.panel.space <- if(!is.null(sumstats.in)){opts$`or-panel-space`}else{0}
 or.panel.height <- if(!is.null(sumstats.in)){opts$`or-panel-height`}else{0}
 gene.panel.space <- if(!is.null(gtf.in)){opts$`gene-panel-space`}else{0}
 gene.panel.height <- if(!is.null(gtf.in)){opts$`gene-panel-height`}else{0}
+constraint.panel.space <- if(!is.null(constraint.in)){opts$`constraint-panel-space`}else{0}
+constraint.panel.height <- if(!is.null(constraint.in)){opts$`constraint-panel-height`}else{0}
 pip.panel.space <- if(!is.null(pips.in)){opts$`pip-panel-space`}else{0}
 pip.panel.height <- if(!is.null(pips.in)){opts$`pip-panel-height`}else{0}
 credset.panel.space <- if(!is.null(pips.in)){gene.panel.space}else{0}
@@ -156,7 +174,7 @@ othergene.panel.space <- if(!is.null(pips.in)){gene.panel.space}else{0}
 othergene.panel.height <- if(!is.null(pips.in)){gene.panel.height}else{0}
 cnv.panel.space <- opts$`cnv-panel-space`
 cnv.panel.height <- opts$`cnv-panel-height`
-
+parmar <- as.numeric(unlist(strsplit(opts$`par-mar`, split=";")))
 pdf.dims <- c(opts$`pdf-height`, opts$`pdf-width`)
 
 # Parse coordinates
@@ -204,6 +222,23 @@ if(collapse.cohorts){
   cnvs <- list(load.cnvs.from.region(cnvlist[, 2], region, cnv.type, all.case.hpos))
   n.samples$case <- sum(n.samples$case)
   n.samples$ctrl <- sum(n.samples$ctrl)
+}else if(subgroup.cohorts){
+  subgroup.labels <- c("Diagnostic Labs", "Case-Control Studies", "Biobanks")
+  cnvlist <- read.table(cnvlist.in, header=F, sep="\t")[keep.idxs, ]
+  cnvs <- lapply(list(diagnostic.labs, case.control.cohorts, biobanks),
+                 function(clist){
+                   load.cnvs.from.region(cnvlist[which(cnvlist[, 1] %in% clist), 2],
+                                         region, cnv.type, all.case.hpos)
+                 })
+  names(cnvs) <- subgroup.labels
+  n.samples$case <- sapply(list(diagnostic.labs, case.control.cohorts, biobanks),
+                           function(clist){
+                             sum(n.samples$case[which(cnvlist[, 1] %in% clist)])
+                           })
+  n.samples$ctrl <- sapply(list(diagnostic.labs, case.control.cohorts, biobanks),
+                           function(clist){
+                             sum(n.samples$ctrl[which(cnvlist[, 1] %in% clist)])
+                           })
 }
 
 # Get maximum CNV frequency to be plotted, if optioned
@@ -227,6 +262,11 @@ if(!is.null(sumstats.in)){
 # Load genes, if optioned
 if(!is.null(gtf.in)){
   genes <- load.genes.from.gtf(gtf.in, region)
+}
+
+# Load constraint features, if optioned
+if(!is.null(constraint.in)){
+  constr.df <- load.features(constraint.in)
 }
 
 # Load PIPs, if optioned
@@ -253,13 +293,15 @@ if(!is.null(label.genes.str)){
 pval.panel.y0 <- -((0.5*coord.panel.height) + coord.panel.space + (0.5*coord.panel.height))
 or.panel.y0 <- pval.panel.y0 - (0.5*pval.panel.height) - or.panel.space - (0.5*or.panel.height)
 gene.panel.y0 <- or.panel.y0 - (0.5*or.panel.height) - gene.panel.space - (0.5*gene.panel.height)
-pip.panel.y0 <- gene.panel.y0 - (0.5*gene.panel.height) - pip.panel.space - (0.5*pip.panel.height)
+constraint.panel.y0 <- gene.panel.y0 - (0.5*gene.panel.height) - constraint.panel.space - (0.5*constraint.panel.height)
+pip.panel.y0 <- constraint.panel.y0 - (0.5*constraint.panel.height) - pip.panel.space - (0.5*pip.panel.height)
 credset.panel.y0 <- pip.panel.y0 - (0.5*pip.panel.height) - gene.panel.space - (0.5*gene.panel.height)
 othergene.panel.y0 <- credset.panel.y0 - (0.5*gene.panel.height) - gene.panel.space - (0.5*gene.panel.height)
 upper.panels.height <- -sum(c((0.5 * coord.panel.height), coord.panel.space,
                               pval.panel.space, pval.panel.height,
                               or.panel.space, or.panel.height,
                               gene.panel.space, gene.panel.height,
+                              constraint.panel.space, constraint.panel.height,
                               pip.panel.space, pip.panel.height,
                               credset.panel.space, credset.panel.height,
                               othergene.panel.space, othergene.panel.height))
@@ -276,7 +318,7 @@ total.height.plus.key <- cnv.key.y0 + (0.5*cnv.key.height)
 # Prepare output pdf
 pdf(paste(out.prefix, "locus_highlight.pdf", sep="."),
     height=pdf.dims[1]*2, width=pdf.dims[2]*2)
-par(mar=c(0.5, 6, 0, 0.5), bty="n")
+par(mar=parmar, bty="n")
 plot(NA, xlim=c(start, end), ylim=c(total.height.plus.key, top.panels.height),
      yaxt="n", xaxt="n", ylab="", xlab="")
 
@@ -291,10 +333,12 @@ rect(xleft=highlight.df$start, xright=highlight.df$end,
 blueshade.ybottoms <- c(cnv.panel.y0s+(0.5*cnv.panel.height),
                         pval.panel.y0+(0.5*pval.panel.height),
                         or.panel.y0+(0.5*or.panel.height),
+                        constraint.panel.y0+(0.5*constraint.panel.height),
                         pip.panel.y0+(0.5*pip.panel.height))
 blueshade.ytops <- c(cnv.panel.y0s-(0.5*cnv.panel.height),
                      pval.panel.y0-(0.5*pval.panel.height),
                      or.panel.y0-(0.5*or.panel.height),
+                     constraint.panel.y0-(0.5*constraint.panel.height),
                      pip.panel.y0-(0.5*pip.panel.height))
 rect(xleft=par("usr")[1], xright=par("usr")[2],
      ybottom=blueshade.ybottoms,
@@ -326,6 +370,14 @@ if(!is.null(gtf.in)){
 }
 
 
+# Add constraint panel, if optioned
+if(!is.null(constraint.in)){
+  plot.constraint.track(constr.df, genes, y0=constraint.panel.y0,
+                        panel.height=constraint.panel.height,
+                        label.genes=label.genes)
+}
+
+
 # Add PIPs and finemapped genes, if optioned
 if(!is.null(pips.in)){
   plot.pips.for.highlight(pips, genes, y0=pip.panel.y0, panel.height=pip.panel.height,
@@ -344,6 +396,7 @@ if(!is.null(pips.in)){
                    col=ns.color, y.axis.title="Other Genes")
 }
 
+
 # Add labels for CNV panels
 cnv.names <- c("DEL"="Deletion", "DUP"="Duplication")
 if(collapse.cohorts){
@@ -358,7 +411,13 @@ mtext(2, at=mean(cnv.panel.y0s), line=3.5,
 
 # Plot CNV panels
 sapply(1:length(cnvs), function(i){
-  cohort.label <- if(collapse.cohorts){NA}else{cohort.abbrevs[names(cnvs)[i]]}
+  cohort.label <- if(collapse.cohorts){
+    NA
+  }else if(subgroup.cohorts){
+    subgroup.labels[i]
+  }else{
+    cohort.abbrevs[names(cnvs)[i]]
+  }
   plot.cnv.panel.for.highlight(cnvs[[i]], n.case=n.samples$case[i],
                                n.ctrl=n.samples$ctrl[i], y0=cnv.panel.y0s[i],
                                cnv.type=cnv.type, highlight.hpo=highlight.hpo,

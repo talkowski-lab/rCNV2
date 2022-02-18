@@ -304,7 +304,7 @@ load.cnvs.from.region <- function(bedpaths, region, cnv=NULL,
     bedr::tabix(region, bedpath, check.chr=FALSE, verbose=FALSE)
   })))
 
-  if(!is.null(cnvs)){
+  if(nrow(cnvs) > 0){
     # Ensure consistent column names
     colnames(cnvs) <- c("chr", "start", "end", "cnv_id", "cnv", "pheno")
 
@@ -426,21 +426,24 @@ pileup.cnvs.for.highlight <- function(cnvs, start=NULL, end=NULL, dx=100,
       # Bevel edges by single dx
       # Bevel left edge according to the CNV that came before
       max.change.dist <- ceiling(bevel.switch.pct * dx)
-      if(i == 1 | cnv.x.idxs[1] == 1){
-        dist.to.nearest.change <- 10e10
-      }else{
-        same.height.idxs <- which(prev.counts$count == max(counts$count[cnv.x.idxs]))
-        if(length(same.height.idxs) > 0){
-          dist.to.nearest.change <- min(cnv.x.idxs) - max(same.height.idxs)
-        }else{
+      if(length(cnv.x.idxs) > 0){
+        if(i == 1 | cnv.x.idxs[1] == 1){
           dist.to.nearest.change <- 10e10
+        }else{
+          same.height.idxs <- which(prev.counts$count == max(counts$count[cnv.x.idxs]))
+          if(length(same.height.idxs) > 0){
+            dist.to.nearest.change <- min(cnv.x.idxs) - max(same.height.idxs)
+          }else{
+            dist.to.nearest.change <- 10e10
+          }
+        }
+        if(dist.to.nearest.change > max.change.dist){
+          cnv.y[1] <- counts$count[cnv.x.idxs[1]] - cnv.height + cnv.y.buf
+        }else{
+          cnv.y[length(cnv.y)] <- counts$count[cnv.x.idxs[1]] - cnv.y.buf
         }
       }
-      if(dist.to.nearest.change > max.change.dist){
-        cnv.y[1] <- counts$count[cnv.x.idxs[1]] - cnv.height + cnv.y.buf
-      }else{
-        cnv.y[length(cnv.y)] <- counts$count[cnv.x.idxs[1]] - cnv.y.buf
-      }
+
       # Always bevel right edge sloping outward
       cnv.y[length(cnv.x.idxs)] <- counts$count[cnv.x.idxs[length(cnv.x.idxs)]] - cnv.height + cnv.y.buf
 

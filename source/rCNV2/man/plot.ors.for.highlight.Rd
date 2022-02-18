@@ -4,7 +4,15 @@
 \alias{plot.ors.for.highlight}
 \title{Plot odds ratios for locus highlight}
 \usage{
-\method{plot}{ors.for.highlight}(ss, y0, cnv.type, panel.height = 0.2, pt.cex = 0.7)
+\method{plot}{ors.for.highlight}(
+  ss,
+  y0,
+  cnv.type,
+  max.distinct = 50,
+  dx = 0.01,
+  panel.height = 0.2,
+  pt.cex = 0.8
+)
 }
 \arguments{
 \item{ss}{summary statistics to be plotted as loaded by \link{load.sumstats.for.region}}
@@ -13,9 +21,15 @@
 
 \item{cnv.type}{CNV type to be plotted}
 
+\item{max.distinct}{maximum number of distinct points to plot before
+switching to a continuous line [default: 50]}
+
+\item{dx}{with of CI shading for distinct points supplied as a
+fraction of the X axis [default: 0.01]}
+
 \item{panel.height}{relative height of panel [default: 0.2]}
 
-\item{pt.cex}{character expansion scalar for points [default: 0.7]}
+\item{pt.cex}{expansion scalar for points [default: 0.7]}
 }
 \description{
 Add panel of log-odds ratios to locus highlight

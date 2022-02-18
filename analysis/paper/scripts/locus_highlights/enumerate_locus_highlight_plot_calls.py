@@ -12,8 +12,12 @@ Format calls to plot_locus_highlight.R for all
 
 import pandas as pd
 import numpy as np
+import subprocess
 import argparse
 from sys import stdout
+
+
+get_fdr_script = '/opt/rCNV2/analysis/other/estimate_p_for_fdr.R'
 
 
 def format_segment_calls(segs_in, phenos, outfile, target_dir='./', 
@@ -68,6 +72,23 @@ def format_segment_calls(segs_in, phenos, outfile, target_dir='./',
                 highlight_hpo = phenos.HPO[phenos.HPO.isin(all_hpos)].values[1]
             else:
                 highlight_hpo = None
+        if highlight_hpo is not None:
+            sumstat_hpo = highlight_hpo
+        else:
+            sumstat_hpo = main_hpo
+        ss_path = ss_template.format(sumstat_hpo.replace(':', ''), cnv)
+
+        # Check FDR-equivalent P-value if necessary
+        sig = sdat.get('best_sig_level')
+        if sig == 'genome_wide':
+            sig_label = 'Genome-wide significance'
+            p_cutoff = bonf_cutoff
+        else:
+            sig_label = 'FDR < 1%'
+            fdr_res = subprocess.run([get_fdr_script, ss_path], 
+                                      stdout=subprocess.PIPE, 
+                                      stderr=subprocess.DEVNULL)
+            p_cutoff = float(fdr_res.stdout.decode().rstrip())
 
         # Write script call to outfile
         outfile.write('echo "Plotting {}..."\n'.format(rid))
@@ -75,14 +96,16 @@ def format_segment_calls(segs_in, phenos, outfile, target_dir='./',
         outline += ' --case-hpos "{}"'.format(main_hpo)
         if highlight_hpo is not None:
             outline += ' --highlight-hpo "{}"'.format(highlight_hpo)
-            sumstat_hpo = highlight_hpo
-        else:
-            sumstat_hpo = main_hpo
         outline += ' --highlights "{}"'.format(highlights)
-        outline += ' --sumstats ' + ss_template.format(sumstat_hpo.replace(':', ''), cnv)
+        outline += ' --sumstats {}'.format(ss_path)
         outline += ' --cytobands refs/GRCh37.cytobands.bed.gz'
         outline += ' --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz'
-        outline += ' --gw-sig "{}"'.format(bonf_cutoff)
+        outline += ' --gw-sig "{}"'.format(p_cutoff)
+        outline += ' --gw-sig-label "{}"'.format(sig_label)
+        outline += ' --subgroup-cohorts'
+        outline += ' --pdf-height 4'
+        outline += ' --cnv-panel-height 1.1'
+        outline += ' --cnv-panel-space 0.2'
         outline += ' --standardize-frequencies {} cnvs.input.tsv {}'.format(region, cnv)
         outline += ' refs/HPOs_by_metacohort.table.tsv refs/GRCh37.genome'
         outline += ' {}/{} 1> /dev/null 2>&1\n'.format(target_dir.strip('/'), rid)
@@ -155,6 +178,23 @@ def format_credset_calls(credsets_in, phenos, outfile, target_dir='./',
                 highlight_hpo = phenos.HPO[phenos.HPO.isin(all_hpos)].values[1]
             else:
                 highlight_hpo = None
+        if highlight_hpo is not None:
+            sumstat_hpo = highlight_hpo
+        else:
+            sumstat_hpo = main_hpo
+        ss_path = ss_template.format(sumstat_hpo.replace(':', ''), cnv)
+
+        # Check FDR-equivalent P-value if necessary
+        sig = csdat.get('best_sig_level')
+        if sig == 'exome_wide':
+            sig_label = 'Exome-wide significance'
+            p_cutoff = bonf_cutoff
+        else:
+            sig_label = 'FDR < 1%'
+            fdr_res = subprocess.run([get_fdr_script, ss_path], 
+                                      stdout=subprocess.PIPE, 
+                                      stderr=subprocess.DEVNULL)
+            p_cutoff = float(fdr_res.stdout.decode().rstrip())
 
         # Write script call to outfile
         outfile.write('echo "Plotting {}..."\n'.format(csid))
@@ -170,9 +210,14 @@ def format_credset_calls(credsets_in, phenos, outfile, target_dir='./',
         outline += ' --cytobands refs/GRCh37.cytobands.bed.gz'
         outline += ' --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz'
         outline += ' --label-genes "{}"'.format(';'.join(label_genes))
+        outline += ' --constraint refs/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz'
         outline += ' --pips {}'.format(pip_path)
-        outline += ' --gw-sig "{}"'.format(bonf_cutoff)
-        outline += ' --gw-sig-label "Exome-wide significance"'
+        outline += ' --gw-sig "{}"'.format(p_cutoff)
+        outline += ' --gw-sig-label "{}"'.format(sig_label)
+        outline += ' --subgroup-cohorts'
+        outline += ' --pdf-height 4.5'
+        outline += ' --cnv-panel-height 1.1'
+        outline += ' --cnv-panel-space 0.2'
         outline += ' --standardize-frequencies {} cnvs.input.tsv {}'.format(region, cnv)
         outline += ' refs/HPOs_by_metacohort.table.tsv refs/GRCh37.genome'
         outline += ' {}/{} 1> /dev/null 2>&1\n'.format(target_dir.strip('/'), csid)

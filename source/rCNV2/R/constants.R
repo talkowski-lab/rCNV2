@@ -104,6 +104,8 @@ load.rcnv.env <- function(load.strings=TRUE, load.colors=TRUE, load.scales=TRUE)
                        "meta5" = "UKBB",
                        "meta6" = "EstBB",
                        "meta7" = "BioVU"),
+      diagnostic.labs = c("meta1", "meta2"),
+      case.control.cohorts = c("meta3", "meta4"),
       biobanks = c("meta5", "meta6", "meta7"),
       raw.cohort.abbrevs = c("Coe" = "Coe",
                              "BCH" = "BCH",

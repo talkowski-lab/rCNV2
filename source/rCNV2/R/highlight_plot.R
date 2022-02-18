@@ -298,7 +298,7 @@ plot.bracket <- function(xleft, xright, y0, height, col=blueblack, staple.wex=0.
 #' @param y0 vertical midpoint for panel
 #' @param cnv.type CNV type to be plotted
 #' @param panel.height relative height of panel \[default: 0.6\]
-#' @param pt.cex character expansion scalar for points \[default: 0.6\]
+#' @param pt.cex expansion scalar for points \[default: 0.6\]
 #' @param gw.sig value to annotate as genome-wide significance
 #' \[default: do not annotate genome-wide significance\]
 #' @param min.y minimum -log10(P) for the maximum Y axis \[default: 9\]
@@ -379,14 +379,19 @@ plot.pvalues.for.highlight <- function(ss, y0, cnv.type, panel.height=0.2,
 #' @param ss summary statistics to be plotted as loaded by [load.sumstats.for.region]
 #' @param y0 vertical midpoint for panel
 #' @param cnv.type CNV type to be plotted
+#' @param max.distinct maximum number of distinct points to plot before
+#' switching to a continuous line \[default: 50\]
+#' @param dx with of CI shading for distinct points supplied as a
+#' fraction of the X axis \[default: 0.01\]
 #' @param panel.height relative height of panel \[default: 0.2\]
-#' @param pt.cex character expansion scalar for points \[default: 0.7\]
+#' @param pt.cex expansion scalar for points \[default: 0.7\]
 #'
 #' @seealso [load.sumstats.for.region]
 #'
 #' @export plot.ors.for.highlight
 #' @export
-plot.ors.for.highlight <- function(ss, y0, cnv.type, panel.height=0.2, pt.cex=0.7){
+plot.ors.for.highlight <- function(ss, y0, cnv.type, max.distinct=50, dx=0.01,
+                                   panel.height=0.2, pt.cex=0.8){
   # Get panel parameters
   half.height <- 0.5*panel.height
   ybottom <- y0 - half.height
@@ -402,11 +407,11 @@ plot.ors.for.highlight <- function(ss, y0, cnv.type, panel.height=0.2, pt.cex=0.
   }
 
   # Scale odds ratios according to y0 and panel.height
-  pos <- as.numeric(ss$pos)
   or.col.idxs <- grep("meta_lnOR", colnames(ss), fixed=T)
   ss[, or.col.idxs] <- apply(ss[, or.col.idxs], 2, as.numeric)
   ss <- na.omit(ss)
   ss <- ss[order(ss$pos), ]
+  pos <- as.numeric(ss$pos)
   ors.orig <- ss[, or.col.idxs]
   ors.orig <- log2(exp(ors.orig))
   ors.scalar <- max(ors.orig[, 1], na.rm=T)
@@ -416,19 +421,21 @@ plot.ors.for.highlight <- function(ss, y0, cnv.type, panel.height=0.2, pt.cex=0.
   })))
   ors <- ors.scaled + y0 - half.height
 
-  # Only keep points with non-NA ORs
-  keep.idx <- which(apply(ors, 1, function(vals){all(!is.na(vals))}))
-  pos <- pos[keep.idx]
-  ors <- ors[keep.idx, ]
-
   # Add horizontal gridlines
   y.ax.tick.spacing <- seq(-half.height, half.height, length.out=6)
   abline(h=c(y0 + y.ax.tick.spacing), col="white")
 
   # Add points & shading
-  polygon(x=c(pos, rev(pos)), y=c(ors[, 2], rev(ors[, 3])),
-          col=adjustcolor(ci.col, alpha=0.5), border=NA, bty="n")
-  points(x=pos, y=ors[, 1], lwd=3, col=line.col, type="l")
+  if(length(pos) <= max.distinct){
+    xbuf <- 0.5 * dx * diff(par("usr")[1:2])
+    rect(xleft=pos-xbuf, xright=pos+xbuf, ybottom=ors[, 2], ytop=ors[, 3],
+         col=adjustcolor(ci.col, alpha=0.5), border=NA, bty="n")
+    points(x=pos, y=ors[, 1], col=line.col, pch=15, cex=pt.cex)
+  }else{
+    polygon(x=c(pos, rev(pos)), y=c(ors[, 2], rev(ors[, 3])),
+            col=adjustcolor(ci.col, alpha=0.5), border=NA, bty="n")
+    points(x=pos, y=ors[, 1], lwd=3, col=line.col, type="l")
+  }
 
   # Add Y-axis
   y.ax.label.cex <- 5/6
@@ -461,6 +468,84 @@ plot.na.rect <- function(xleft, xright, y0, panel.height=0.2, text=NULL){
   rect(xleft=xleft, xright=xright, ybottom=y0 - half.height, ytop=y0 + half.height,
        border=blueblack, col=control.cnv.colors[2], density=15)
   text(x=mean(c(xleft, xright)), y=y0, labels=text, cex=5/6, font=3)
+}
+
+
+#' Plot constraint track for locus highlight
+#'
+#' Add plot of LOEUF values for all genes for locus highlight
+#'
+#' @param constr.df data.frame of constraint features per gene as loaded by [load.features()]
+#' @param genes data.frame of gene features to plot as loaded by [load.genes.from.gtf()]
+#' @param y0 vertical midpoint for panel
+#' @param panel.height relative height of panel \[default: 0.2\]
+#' @param label.genes vector of gene symbols to label \[default: don't label genes\]
+#'
+#' @seealso [load.features], [load.genes.from.gtf]
+#'
+#' @export plot.constraint.track
+#' @export
+plot.constraint.track <- function(constr.df, genes, y0, panel.height=0.2,
+                                  label.genes=NULL){
+  # Get panel parameters
+  half.height <- 0.5*panel.height
+  ybottom <- y0 - half.height
+  ytop <- y0 + half.height
+
+  # Merge gene coordinates & pLI values
+  gcoords <- genes[which(genes$gene %in% constr.df$gene & genes$feature=="transcript"),
+                   c("start", "end", "gene")]
+  colnames(constr.df)[which(colnames(constr.df) == "gnomad_oe_lof_upper")] <- "LOEUF"
+  pdat <- merge(gcoords, constr.df[, c("gene", "LOEUF")], all=F, sort=F, by="gene")
+  pdat <- pdat[which(!duplicated(pdat)), ]
+
+  # Assign colors to genes based on LOEUF range consistent with gnomAD browser
+  gcols <- sapply(pdat$LOEUF, function(x){
+    if(x<0.33){"#FF2600"}else if(x<0.66){"#FF9300"}else if(x<1){"#FFC000"}else{ns.color}
+  })
+
+  # Scale LOEUF according to y0 and panel.height
+  pdat$LOEUF <- sapply(pdat$LOEUF, function(x){1-min(c(1, x))})
+  max.loeuf <- max(c(1, ceiling(11*max(pdat$LOEUF, na.rm=T)) / 10))
+  pdat$y <- (pdat$LOEUF * panel.height / min(c(1, max.loeuf))) + y0 - half.height
+
+  # Add horizontal gridlines
+  y.ax.tick.spacing <- seq(-half.height, half.height, length.out=6)
+  abline(h=c(y0 + y.ax.tick.spacing), col="white")
+
+  # Add Y-axis
+  y.ax.label.cex <- 5/6
+  axis(2, at=c(ybottom, ytop), tick=0, labels=NA, col=blueblack)
+  axis(2, at=y0 + y.ax.tick.spacing, tck=-0.0075, col=blueblack, labels=NA)
+  axis(2, at=y0+half.height, tick=F, las=2, line=-0.65,
+       labels=0, cex.axis=y.ax.label.cex)
+  axis(2, at=y0-half.height, tick=F, las=2, line=-0.65,
+       labels=bquote("" >= 1), cex.axis=y.ax.label.cex)
+  axis(2, at=y0, line=-0.2, tick=F, labels="LOEUF", las=2)
+
+  # Add cleanup top & bottom lines
+  abline(h=c(ytop, ybottom), col=blueblack)
+  segments(x0=par("usr")[2], x1=par("usr")[2], y0=ybottom, y1=ytop, col=blueblack, xpd=T)
+
+  # Add segments for each gene
+  segments(x0=pdat$start, x1=pdat$end, y0=pdat$y, y1=pdat$y,
+           lwd=4, lend="butt", col=gcols)
+
+  # Label genes, if optioned
+  if(!is.null(label.genes)){
+    sapply(label.genes[which(label.genes %in% pdat$gene)], function(gene){
+      gidx <- which(pdat$gene == gene)
+      if(pdat$LOEUF[gidx] <= 0.5 * max.loeuf){
+        pos <- 3
+        y.buf <- -0.1*panel.height
+      }else{
+        pos <- 1
+        y.buf <- 0.1*panel.height
+      }
+      text(x=mean(as.numeric(pdat[gidx, c("start", "end")])),
+           y=pdat$y[gidx]+y.buf, labels=gene, font=3, cex=5/6, pos=pos)
+    })
+  }
 }
 
 

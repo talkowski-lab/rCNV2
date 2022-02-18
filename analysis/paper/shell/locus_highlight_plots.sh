@@ -45,6 +45,7 @@ gsutil -m cp \
   ${rCNV_bucket}/cleaned_data/phenotypes/hpo_logs_metadata/phenotype_groups.HPO_metadata.txt \
   ${rCNV_bucket}/refs/GRCh37.autosomes.genome \
   ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
+  ${rCNV_bucket}/cleaned_data/genes/metadata/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
   ${rCNV_bucket}/refs/REP_state_manifest.tsv \
   refs/
 
@@ -83,7 +84,96 @@ done
   --bonf-cutoff "$ew_cutoff" \
   --target-directory all_credsets/ \
 >> plot_all_locus_highlights.sh
-bash plot_all_locus_highlights.sh 
+bash plot_all_locus_highlights.sh
+
+
+# Highlight panel for KIF13A duplications
+if ! [ -e main_highlights ]; then
+  mkdir main_highlights
+fi
+fdr_cutoff=$( /opt/rCNV2/analysis/other/estimate_p_for_fdr.R \
+                meta_stats/HP0031466.rCNV.DUP.sliding_window.meta_analysis.stats.bed.gz \
+                2>/dev/null )
+/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_locus_highlight.R \
+  --case-hpos "HP:0000708" \
+  --highlight-hpo "HP:0031466" \
+  --highlights "6:17763923-17987800;6:17763923-17987800" \
+  --sumstats meta_stats/HP0031466.rCNV.DUP.sliding_window.meta_analysis.stats.bed.gz \
+  --cytobands refs/GRCh37.cytobands.bed.gz \
+  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
+  --label-genes "KIF13A" \
+  --constraint refs/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
+  --pips rCNV.DUP.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_no_variation_features.tsv \
+  --gw-sig "$fdr_cutoff" \
+  --gw-sig-label "FDR < 1%" \
+  --standardize-frequencies \
+  --collapse-cohorts \
+  --cnv-panel-height 1.2 \
+  --pdf-height 3.25 \
+  6:17250000-18250000 \
+  cnvs.input.tsv \
+  DUP \
+  refs/HPOs_by_metacohort.table.tsv \
+  refs/GRCh37.genome \
+  main_highlights/KIF13A
+
+
+# Highlight panel for GMEB2 duplications
+if ! [ -e main_highlights ]; then
+  mkdir main_highlights
+fi
+/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_locus_highlight.R \
+  --case-hpos "HP:0000707" \
+  --highlight-hpo "HP:0002011" \
+  --highlights "20:62152076-62251229;20:62218954-62251229" \
+  --sumstats meta_stats/HP0002011.rCNV.DUP.sliding_window.meta_analysis.stats.bed.gz \
+  --cytobands refs/GRCh37.cytobands.bed.gz \
+  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
+  --label-genes "GMEB2" \
+  --constraint refs/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
+  --pips rCNV.DUP.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_no_variation_features.tsv \
+  --gw-sig "$ew_cutoff" \
+  --gw-sig-label "Exome-Wide significance" \
+  --standardize-frequencies \
+  --collapse-cohorts \
+  --cnv-panel-height 1.2 \
+  --pdf-height 3.25 \
+  20:61900000-62500000 \
+  cnvs.input.tsv \
+  DUP \
+  refs/HPOs_by_metacohort.table.tsv \
+  refs/GRCh37.genome \
+  main_highlights/GMEB2
+
+
+# Highlight panel for ANKRD11 duplications
+if ! [ -e main_highlights ]; then
+  mkdir main_highlights
+fi
+/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_locus_highlight.R \
+  --case-hpos "HP:0033127" \
+  --highlight-hpo "HP:0009121" \
+  --highlights "15:99192199-100273626" \
+  --sumstats meta_stats/HP0009121.rCNV.DUP.sliding_window.meta_analysis.stats.bed.gz \
+  --cytobands refs/GRCh37.cytobands.bed.gz \
+  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
+  --label-genes "IGF1R" \
+  --constraint refs/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
+  --pips rCNV.DUP.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_no_variation_features.tsv \
+  --gw-sig "$ew_cutoff" \
+  --gw-sig-label "Exome-Wide Significance" \
+  --standardize-frequencies \
+  --collapse-cohorts \
+  --cnv-panel-height 1.2 \
+  --pdf-height 3.25 \
+  15:98471248-100994577 \
+  cnvs.input.tsv \
+  DUP \
+  refs/HPOs_by_metacohort.table.tsv \
+  refs/GRCh37.genome \
+  main_highlights/IGF1R
+
+
 
 
 # Simple dev case for new script - SHANK3 deletions
@@ -107,152 +197,6 @@ Rscript -e "install.packages('opt/rCNV2/source/rCNV2_0.1.0.tar.gz', repos=NULL)"
   refs/GRCh37.genome \
   locus_highlight_test
 
-
-
-#####################
-#  CBLN2 Deletions  #
-#####################
-/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_CBLN2_locus.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
-  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
-  --gw-sig "$gw_cutoff" \
-  cnvs.input.tsv \
-  meta_stats/HP0012759.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
-  refs/HPOs_by_metacohort.table.tsv \
-  refs/GRCh37.genome \
-  ${prefix}
-
-
-
-####################
-#  IER5 Deletions  #
-####################
-/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_IER5_locus.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
-  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
-  --gw-sig "$gw_cutoff" \
-  cnvs.input.tsv \
-  meta_stats/HP0012759.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
-  refs/HPOs_by_metacohort.table.tsv \
-  refs/GRCh37.genome \
-  ${prefix}
-
-
-#######################
-#  RAF1 Duplications  #
-#######################
-/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_RAF1_locus.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
-  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
-  --gw-sig "$gw_cutoff" \
-  cnvs.input.tsv \
-  meta_stats/UNKNOWN.rCNV.DUP.sliding_window.meta_analysis.stats.bed.gz \
-  refs/HPOs_by_metacohort.table.tsv \
-  refs/GRCh37.genome \
-  ${prefix}
-
-
-#######################
-#  1q44 Duplications  #
-#######################
-/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_1q44_locus.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
-  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
-  --gw-sig "$gw_cutoff" \
-  cnvs.input.tsv \
-  meta_stats/HP0001626.rCNV.DUP.sliding_window.meta_analysis.stats.bed.gz \
-  refs/HPOs_by_metacohort.table.tsv \
-  refs/GRCh37.genome \
-  ${prefix}
-
-
-########################
-#  GMEB2 Duplications  #
-########################
-/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_GMEB2_locus.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
-  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
-  --gw-sig "$gw_cutoff" \
-  --pips rCNV.DUP.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv \
-  cnvs.input.tsv \
-  meta_stats/HP0012639.rCNV.DUP.sliding_window.meta_analysis.stats.bed.gz \
-  refs/HPOs_by_metacohort.table.tsv \
-  refs/GRCh37.genome \
-  ${prefix}
-
-
-##########################
-#  ANKRD11 Duplications  #
-##########################
-/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_ANKRD11_locus.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
-  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
-  --gw-sig "$gw_cutoff" \
-  --pips rCNV.DUP.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv \
-  cnvs.input.tsv \
-  meta_stats/HP0001507.rCNV.DUP.sliding_window.meta_analysis.stats.bed.gz \
-  refs/HPOs_by_metacohort.table.tsv \
-  refs/GRCh37.genome \
-  ${prefix}
-
-
-######################
-#  SHANK3 Deletions  #
-######################
-/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_SHANK3_locus.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
-  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
-  --gw-sig "$gw_cutoff" \
-  --pips rCNV.DEL.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv \
-  cnvs.input.tsv \
-  meta_stats/HP0012759.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
-  refs/HPOs_by_metacohort.table.tsv \
-  refs/GRCh37.genome \
-  ${prefix}
-
-
-#######################
-#  SMARCA2 Deletions  #
-#######################
-/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_SMARCA2_locus.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
-  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
-  --gw-sig "$gw_cutoff" \
-  cnvs.input.tsv \
-  meta_stats/HP0012759.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
-  refs/HPOs_by_metacohort.table.tsv \
-  refs/GRCh37.genome \
-  ${prefix}
-
-
-###################
-#  QKI Deletions  #
-###################
-/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_QKI_locus.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
-  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
-  --gw-sig "$gw_cutoff" \
-  --pips rCNV.DEL.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv \
-  cnvs.input.tsv \
-  meta_stats/UNKNOWN.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
-  refs/HPOs_by_metacohort.table.tsv \
-  refs/GRCh37.genome \
-  ${prefix}
-
-
-######################
-#  SLC2A3 Deletions  #
-######################
-/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_SLC2A3_locus.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
-  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
-  --gw-sig "$gw_cutoff" \
-  --pips rCNV.DEL.gene_fine_mapping.gene_stats.merged_no_variation_features.all_genes_from_blocks.tsv \
-  cnvs.input.tsv \
-  meta_stats/HP0001250.rCNV.DEL.sliding_window.meta_analysis.stats.bed.gz \
-  refs/HPOs_by_metacohort.table.tsv \
-  refs/GRCh37.genome \
-  ${prefix}
 
 
 #####################

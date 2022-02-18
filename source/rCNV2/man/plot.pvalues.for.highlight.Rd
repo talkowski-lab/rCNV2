@@ -25,7 +25,7 @@
 
 \item{panel.height}{relative height of panel [default: 0.6]}
 
-\item{pt.cex}{character expansion scalar for points [default: 0.6]}
+\item{pt.cex}{expansion scalar for points [default: 0.6]}
 
 \item{gw.sig}{value to annotate as genome-wide significance
 [default: do not annotate genome-wide significance]}

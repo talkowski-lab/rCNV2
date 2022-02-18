@@ -41,20 +41,34 @@ for CNV in DEL DUP; do
   | bedtools intersect -v -r -f 0.2 -a - \
       -b <( zcat refs/lit_GDs.*.bed.gz | fgrep -w $CNV ) \
   | bgzip -c > segments.$CNV.prefiltered.bed.gz
-  zcat segment_association/rCNV.final_genes.credible_sets.bed.gz | fgrep -w $CNV \
+  zcat gene_association/rCNV.final_genes.credible_sets.bed.gz | fgrep -w $CNV \
   | bedtools intersect -v -r -f 0.2 -a - \
       -b <( zcat refs/lit_GDs.*.bed.gz | fgrep -w $CNV ) \
-  | bgzip -c > segments.$CNV.credsets.bed.gz
+  | bgzip -c > credsets.$CNV.prefiltered.bed.gz
 done 
 
 
 # LoF or missense-constrained genes with no known disease associations
 for CNV in DEL DUP; do
-  zcat segments.$CNV.credsets.bed.gz | fgrep -w $CNV | cut -f17
+  echo -e "\n$CNV:"
+  zcat credsets.$CNV.prefiltered.bed.gz | fgrep -w $CNV | cut -f17 \
+  | fgrep -wf <( cat gene_lists/gnomad.v2.1.1.lof_constrained.genes.list \
+                     gene_lists/gnomad.v2.1.1.mis_constrained.genes.list ) \
+  | fgrep -wvf <( cat gene_lists/HP0000118.HPOdb.genes.list \
+                      gene_lists/DDG2P.*.genes.list \
+                      gene_lists/ClinGen.*.genes.list ) \
+  | fgrep -wf - <( zcat credsets.$CNV.prefiltered.bed.gz | fgrep -w $CNV ) \
+  | awk -v OFS="\t" '{ print $17, $4, $6, $1, $2, $3, $21 }'
 done
 
 
 # Known haploinsufficient genes with duplication associations
+zcat gene_association/rCNV.final_genes.credible_sets.bed.gz \
+| fgrep -w DUP | cut -f17 \
+| fgrep -wf <( cat gene_lists/DDG2P.all_lof.genes.list \
+                   gene_lists/ClinGen.all_haploinsufficient.genes.list ) \
+| fgrep -wf - <( zcat gene_association/rCNV.final_genes.credible_sets.bed.gz | fgrep -w $CNV ) \
+| awk -v OFS="\t" '{ print $17, $4, $6, $1, $2, $3, $21 }'
 
 
 
