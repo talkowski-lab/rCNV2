@@ -120,6 +120,7 @@ def format_credset_calls(credsets_in, phenos, outfile, target_dir='./',
     """
 
     ss_template = 'meta_stats/{}.rCNV.{}.gene_burden.meta_analysis.stats.bed.gz'
+    ss_template_segs = 'meta_stats/{}.rCNV.{}.sliding_window.meta_analysis.stats.bed.gz'
     pip_template = 'rCNV.{}.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_no_variation_features.tsv'
 
     cs_df = pd.read_csv(credsets_in, sep='\t').rename(columns={'#chr' : 'chrom'})
@@ -183,6 +184,7 @@ def format_credset_calls(credsets_in, phenos, outfile, target_dir='./',
         else:
             sumstat_hpo = main_hpo
         ss_path = ss_template.format(sumstat_hpo.replace(':', ''), cnv)
+        ss_segs_path = ss_template_segs.format(sumstat_hpo.replace(':', ''), cnv)
 
         # Check FDR-equivalent P-value if necessary
         sig = csdat.get('best_sig_level')
@@ -206,7 +208,7 @@ def format_credset_calls(credsets_in, phenos, outfile, target_dir='./',
         else:
             sumstat_hpo = main_hpo
         outline += ' --highlights "{}"'.format(highlights)
-        outline += ' --sumstats ' + ss_template.format(sumstat_hpo.replace(':', ''), cnv)
+        outline += ' --sumstats {}'.format(ss_path)
         outline += ' --cytobands refs/GRCh37.cytobands.bed.gz'
         outline += ' --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz'
         outline += ' --label-genes "{}"'.format(';'.join(label_genes))

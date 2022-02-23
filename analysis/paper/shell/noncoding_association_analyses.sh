@@ -26,13 +26,11 @@ gsutil -m cp -r ${rCNV_bucket}/cleaned_data/cnv ./
 gsutil -m cp \
   ${rCNV_bucket}/cleaned_data/genome_annotations/rCNV.burden_stats.tsv.gz \
   ${rCNV_bucket}/cleaned_data/genome_annotations/rCNV.crbs.bed.gz \
+  ${rCNV_bucket}/analysis/crb_burden/other_data/unconstrained_cnv_counts.*.tsv.gz \
   ./
 mkdir refs/
 gsutil -m cp -r \
-  ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
-  ${rCNV_bucket}/refs/GRCh37.* \
   ${rCNV_bucket}/analysis/analysis_refs/* \
-  ${rCNV_bucket}/cleaned_data/genes/gene_lists \
   ${rCNV_bucket}/refs/REP_state_manifest.tsv \
   refs/
 mkdir meta_stats/
@@ -43,39 +41,6 @@ gsutil -m cp \
 
 # Plot observed effect size distributions split by gene set membership
 # Used to justify inclusion of some coding effects in noncoding association test
-fgrep -wvf \
-  refs/gene_lists/HP0000118.HPOdb.genes.list \
-  refs/gene_lists/gnomad.v2.1.1.likely_unconstrained.genes.list \
-| sort -V | uniq \
-> loose_noncoding_whitelist.genes.list
-mkdir genes_per_cnv
-for CNV in DEL DUP; do
-  # Annotate all CNVs based on any exon overlap
-  while read meta cohorts; do
-    /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
-      cnv/${meta}.rCNV.bed.gz \
-      refs/gencode.v19.canonical.pext_filtered.gtf.gz \
-      --min-cds-ovr "10e-10" \
-      -t ${CNV} \
-      --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
-      --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
-      --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
-      -o /tmp/junk.bed.gz \
-      --bgzip \
-      --cnvs-out /dev/stdout \
-    | cut -f4,6-7,9 | gzip -c \
-    > genes_per_cnv/rCNV.${CNV}.${meta}.genes_per_cnv.tsv.gz
-    echo -e "${meta}\tgenes_per_cnv/rCNV.${CNV}.${meta}.genes_per_cnv.tsv.gz"
-  done < <( fgrep -v mega refs/rCNV_metacohort_list.txt ) \
-  > genes_per_cnv.${CNV}.input.tsv
-  # Summarize CNV counts by gene list per phenotype
-  /opt/rCNV2/analysis/paper/scripts/noncoding_association/summarize_ncCNV_counts.py \
-    --genes-per-cnv genes_per_cnv.${CNV}.input.tsv \
-    --hpos <( cut -f2 refs/test_phenotypes.list ) \
-    --unconstrained-genes loose_noncoding_whitelist.genes.list \
-    --summary-counts unconstrained_cnv_counts.${CNV}.tsv.gz \
-    --gzip
-done
 /opt/rCNV2/analysis/paper/plot/noncoding_association/plot_unconstrained_effect_sizes.R \
   unconstrained_cnv_counts.DEL.tsv.gz \
   unconstrained_cnv_counts.DUP.tsv.gz \

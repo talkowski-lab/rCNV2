@@ -25,9 +25,14 @@ mkdir refs/
 gsutil -m cp \
   ${rCNV_bucket}/refs/** \
   ${rCNV_bucket}/analysis/analysis_refs/* \
+  ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
+  ${rCNV_bucket}/cleaned_data/genes/gene_lists \
   refs/
 mkdir cnvs/
-gsutil -m cp ${rCNV_bucket}/cleaned_data/cnv/noncoding/** cnvs/
+gsutil -m cp \
+  ${rCNV_bucket}/cleaned_data/cnv/*bed.gz* \
+  ${rCNV_bucket}/cleaned_data/cnv/noncoding/** \
+  cnvs/
 
 
 # Prepare clustered somatic hypermutability reference blacklist
@@ -454,6 +459,56 @@ gsutil -m cp \
 
 
 
+# Count number of CNVs per cohort by pheno based on genic overlap
+fgrep -wvf \
+  refs/gene_lists/HP0000118.HPOdb.genes.list \
+  refs/gene_lists/gnomad.v2.1.1.likely_unconstrained.genes.list \
+| sort -V | uniq \
+> loose_noncoding_whitelist.genes.list
+mkdir genes_per_cnv
+for CNV in DEL DUP; do
+  while read meta cohorts; do
+    # Get conditional exclusion genes for that cohort as BED
+    zcat refs/gencode.v19.canonical.pext_filtered.cohort_exclusion.bed.gz \
+    | fgrep -w $meta | cut -f1-3 | bedtools merge -i - \
+    | bgzip -c > $meta.cond_excl_genes.bed.gz
+
+    # Annotate all CNVs based on any exon overlap
+    /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
+      cnvs/$meta.rCNV.bed.gz \
+      refs/gencode.v19.canonical.pext_filtered.gtf.gz \
+      --min-cds-ovr "10e-10" \
+      -t $CNV \
+      --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
+      --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+      --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
+      --blacklist $meta.cond_excl_genes.bed.gz \
+      -o /tmp/junk.bed.gz \
+      --bgzip \
+      --cnvs-out /dev/stdout \
+    | cut -f4,6-7,9 | gzip -c \
+    > genes_per_cnv/rCNV.$CNV.$meta.genes_per_cnv.tsv.gz
+    echo -e "$meta\tgenes_per_cnv/rCNV.$CNV.$meta.genes_per_cnv.tsv.gz"
+  done < <( fgrep -v mega refs/rCNV_metacohort_list.txt ) \
+  > genes_per_cnv.$CNV.input.tsv
+
+  # Summarize CNV counts by gene list per phenotype
+  /opt/rCNV2/analysis/paper/scripts/noncoding_association/summarize_ncCNV_counts.py \
+    --genes-per-cnv genes_per_cnv.$CNV.input.tsv \
+    --hpos <( cut -f2 refs/test_phenotypes.list ) \
+    --unconstrained-genes loose_noncoding_whitelist.genes.list \
+    --summary-counts unconstrained_cnv_counts.$CNV.tsv.gz \
+    --developmental-hpos refs/rCNV2.hpos_by_severity.developmental.list \
+    --gzip
+done
+# Copy counts to Google bucket for future use
+gsutil -m cp \
+  unconstrained_cnv_counts.*.tsv.gz \
+  ${rCNV_bucket}/analysis/crb_burden/other_data/
+
+
+
+
 
 # Development parameters for curate_annotations.wdl
 prefix="all_tracks"
@@ -463,6 +518,22 @@ max_element_size=200000
 min_element_overlap=1.0
 p_cutoff=0.05
 track_prefix="test_annotations"
+
+# Local dev only: localize CNV counts by gene context
+# gsutil -m cp \
+#   ${rCNV_bucket}/analysis/crb_burden/other_data/unconstrained_cnv_counts.*.tsv.gz \
+#   ./
+
+# Combine CNV counts by gene context into a single file
+find / -name "unconstrained_cnv_counts.*.tsv.gz" | xargs -I {} mv {} ./ && \
+cat \
+  <( zcat unconstrained_cnv_counts.DEL.tsv.gz | head -n1 \
+     | awk -v OFS="\t" '{ print $0, "cnv" }' ) \
+  <( zcat unconstrained_cnv_counts.DEL.tsv.gz | grep -ve '^#' \
+     | awk -v OFS="\t" '{ print $0, "DEL" }' ) \
+  <( zcat unconstrained_cnv_counts.DUP.tsv.gz | grep -ve '^#' \
+     | awk -v OFS="\t" '{ print $0, "DUP" }' ) \
+| gzip -c > unconstrained_cnv_counts.tsv.gz
 
 # Make dummy file of 10 annotations for development purposes
 gsutil -m cat ${rCNV_bucket}/cleaned_data/genome_annotations/tracklists/misc_genome_annotations.track_urls.list \
@@ -512,6 +583,8 @@ done < <( fgrep -v mega refs/rCNV_metacohort_list.txt | cut -f1 ) \
   --track-stats ${prefix}.stats.tsv \
   --frac-overlap ${min_element_overlap} \
   --norm-by-samplesize \
+  --conditional-exclusion refs/GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz \
+  --counts-by-gene-context unconstrained_cnv_counts.tsv.gz \
   --outfile ${prefix}.stats.with_counts.tsv.gz \
   --gzip 
 
@@ -533,7 +606,7 @@ gzip -f ${prefix}.burden_stats.tsv
 
 # # Dev code:
 # prefix="crb_clustering_test"
-# min_prop_tracks_per_crb=0.05
+# min_prop_tracks_per_crb=0.01
 # min_prop_track_representation=0.01
 # clustering_neighborhood_dist=5000
 # min_crb_separation=10000

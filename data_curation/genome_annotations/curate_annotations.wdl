@@ -30,19 +30,24 @@ workflow curate_annotations {
   Int crb_blacklist_buffer
   Int crb_blacklist_buffer_min_size
   String rCNV_bucket
-  String rCNV_docker_track_curation
-  String rCNV_docker_meta_analysis
-  String rCNV_docker_crb_clustering
+  String rCNV_docker
   String prefix
 
   Array[Array[String]] contigs = read_tsv(contiglist)
+
+  # Get table of samples per cohort by CNV genic context
+  call get_cnv_counts_by_gene_content as get_counts_by_context {
+    input:
+      rCNV_bucket=rCNV_bucket,
+      rCNV_docker=rCNV_docker
+  }
 
   # Process Roadmap ChromHMM tracks
   call shard_tracklist as shard_tracklist_chromhmm {
     input:
       tracklist=chromhmm_tracklist,
       tracks_per_shard=tracks_per_shard,
-      rCNV_docker=rCNV_docker_track_curation,
+      rCNV_docker=rCNV_docker,
       prefix="${prefix}.chromhmm_shards"
   }
   scatter ( shard in shard_tracklist_chromhmm.shards ) {
@@ -53,7 +58,7 @@ workflow curate_annotations {
         max_element_size=max_element_size,
         min_element_overlap=min_element_overlap,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_track_curation,
+        rCNV_docker=rCNV_docker,
         prefix="${prefix}.chromhmm_shard",
         track_prefix=""
     }
@@ -61,7 +66,7 @@ workflow curate_annotations {
   call merge_shards as merge_chromhmm {
     input:
       stat_shards=curate_and_burden_chromhmm.stats,
-      rCNV_docker=rCNV_docker_track_curation,
+      rCNV_docker=rCNV_docker,
       prefix="${prefix}.chromhmm"
   }
 
@@ -70,7 +75,7 @@ workflow curate_annotations {
     input:
       tracklist=encode_dnaaccessibility_tracklist,
       tracks_per_shard=tracks_per_shard,
-      rCNV_docker=rCNV_docker_track_curation,
+      rCNV_docker=rCNV_docker,
       prefix="${prefix}.encode_dnaaccessibility_shards"
   }
   scatter ( shard in shard_tracklist_encode_dnaaccessibility.shards ) {
@@ -81,7 +86,7 @@ workflow curate_annotations {
         max_element_size=max_element_size,
         min_element_overlap=min_element_overlap,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_track_curation,
+        rCNV_docker=rCNV_docker,
         prefix="${prefix}.encode_dnaaccessibility_shard",
         track_prefix="encode_dnaaccessibility"
     }
@@ -89,7 +94,7 @@ workflow curate_annotations {
   call merge_shards as merge_encode_dnaaccessibility {
     input:
       stat_shards=curate_and_burden_encode_dnaaccessibility.stats,
-      rCNV_docker=rCNV_docker_track_curation,
+      rCNV_docker=rCNV_docker,
       prefix="${prefix}.encode_dnaaccessibility"
   }
 
@@ -98,7 +103,7 @@ workflow curate_annotations {
     input:
       tracklist=encode_histone_mods_tracklist,
       tracks_per_shard=tracks_per_shard,
-      rCNV_docker=rCNV_docker_track_curation,
+      rCNV_docker=rCNV_docker,
       prefix="${prefix}.encode_histone_mods_shards"
   }
   scatter ( shard in shard_tracklist_encode_histone_mods.shards ) {
@@ -109,7 +114,7 @@ workflow curate_annotations {
         max_element_size=max_element_size,
         min_element_overlap=min_element_overlap,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_track_curation,
+        rCNV_docker=rCNV_docker,
         prefix="${prefix}.encode_histone_mods_shard",
         track_prefix="encode_histone_mods"
     }
@@ -117,7 +122,7 @@ workflow curate_annotations {
   call merge_shards as merge_encode_histone_mods {
     input:
       stat_shards=curate_and_burden_encode_histone_mods.stats,
-      rCNV_docker=rCNV_docker_track_curation,
+      rCNV_docker=rCNV_docker,
       prefix="${prefix}.encode_histone_mods"
   }
 
@@ -126,7 +131,7 @@ workflow curate_annotations {
     input:
       tracklist=encode_tfbs_tracklist,
       tracks_per_shard=tracks_per_shard,
-      rCNV_docker=rCNV_docker_track_curation,
+      rCNV_docker=rCNV_docker,
       prefix="${prefix}.encode_tfbs_shards"
   }
   scatter ( shard in shard_tracklist_encode_tfbs.shards ) {
@@ -136,7 +141,7 @@ workflow curate_annotations {
         min_element_size=min_element_size,
         max_element_size=max_element_size,
         min_element_overlap=min_element_overlap,
-        rCNV_docker=rCNV_docker_track_curation,
+        rCNV_docker=rCNV_docker,
         rCNV_bucket=rCNV_bucket,
         prefix="${prefix}.encode_tfbs_shard",
         track_prefix="encode_tfbs"
@@ -145,7 +150,7 @@ workflow curate_annotations {
   call merge_shards as merge_encode_tfbs {
     input:
       stat_shards=curate_and_burden_encode_tfbs.stats,
-      rCNV_docker=rCNV_docker_track_curation,
+      rCNV_docker=rCNV_docker,
       prefix="${prefix}.encode_tfbs"
   }
 
@@ -154,7 +159,7 @@ workflow curate_annotations {
     input:
       tracklist=encode_transcription_tracklist,
       tracks_per_shard=tracks_per_shard,
-      rCNV_docker=rCNV_docker_track_curation,
+      rCNV_docker=rCNV_docker,
       prefix="${prefix}.encode_transcription_shards"
   }
   scatter ( shard in shard_tracklist_encode_transcription.shards ) {
@@ -165,7 +170,7 @@ workflow curate_annotations {
         max_element_size=max_element_size,
         min_element_overlap=min_element_overlap,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_track_curation,
+        rCNV_docker=rCNV_docker,
         prefix="${prefix}.encode_transcription_shard",
         track_prefix="encode_transcription"
     }
@@ -173,7 +178,7 @@ workflow curate_annotations {
   call merge_shards as merge_encode_transcription {
     input:
       stat_shards=curate_and_burden_encode_transcription.stats,
-      rCNV_docker=rCNV_docker_track_curation,
+      rCNV_docker=rCNV_docker,
       prefix="${prefix}.encode_transcription"
   }
 
@@ -182,7 +187,7 @@ workflow curate_annotations {
     input:
       tracklist=enhancer_databases_tracklist,
       tracks_per_shard=tracks_per_shard,
-      rCNV_docker=rCNV_docker_track_curation,
+      rCNV_docker=rCNV_docker,
       prefix="${prefix}.enhancer_databases_shards"
   }
   scatter ( shard in shard_tracklist_enhancer_databases.shards ) {
@@ -193,7 +198,7 @@ workflow curate_annotations {
         max_element_size=max_element_size,
         min_element_overlap=min_element_overlap,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_track_curation,
+        rCNV_docker=rCNV_docker,
         prefix="${prefix}.enhancer_databases_shard",
         track_prefix="enhancer_databases"
     }
@@ -201,7 +206,7 @@ workflow curate_annotations {
   call merge_shards as merge_enhancer_databases {
     input:
       stat_shards=curate_and_burden_enhancer_databases.stats,
-      rCNV_docker=rCNV_docker_track_curation,
+      rCNV_docker=rCNV_docker,
       prefix="${prefix}.enhancer_databases"
   }
 
@@ -210,7 +215,7 @@ workflow curate_annotations {
     input:
       tracklist=misc_tracklist,
       tracks_per_shard=tracks_per_shard,
-      rCNV_docker=rCNV_docker_track_curation,
+      rCNV_docker=rCNV_docker,
       prefix="${prefix}.misc_shards"
   }
   scatter ( shard in shard_tracklist_misc.shards ) {
@@ -221,7 +226,7 @@ workflow curate_annotations {
         max_element_size=max_element_size,
         min_element_overlap=min_element_overlap,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_track_curation,
+        rCNV_docker=rCNV_docker,
         prefix="${prefix}.misc_shard",
         track_prefix="misc"
     }
@@ -229,7 +234,7 @@ workflow curate_annotations {
   call merge_shards as merge_misc {
     input:
       stat_shards=curate_and_burden_misc.stats,
-      rCNV_docker=rCNV_docker_track_curation,
+      rCNV_docker=rCNV_docker,
       prefix="${prefix}.misc"
   }
 
@@ -237,7 +242,7 @@ workflow curate_annotations {
   call merge_shards as merge_all {
     input:
       stat_shards=[merge_chromhmm.merged_stats, merge_encode_dnaaccessibility.merged_stats, merge_encode_histone_mods.merged_stats, merge_encode_tfbs.merged_stats, merge_encode_transcription.merged_stats, merge_enhancer_databases.merged_stats, merge_misc.merged_stats],
-      rCNV_docker=rCNV_docker_track_curation,
+      rCNV_docker=rCNV_docker,
       prefix="${prefix}.all"
   }
 
@@ -247,7 +252,7 @@ workflow curate_annotations {
       stats=merge_all.merged_stats,
       p_cutoff=p_cutoff,
       rCNV_bucket=rCNV_bucket,
-      rCNV_docker=rCNV_docker_meta_analysis,
+      rCNV_docker=rCNV_docker,
       prefix=prefix,
       clear_sig="TRUE"
   }
@@ -257,7 +262,7 @@ workflow curate_annotations {
     input:
       tracklist=meta_burden_test.signif_tracks,
       tracks_per_shard=tracks_per_shard,
-      rCNV_docker=rCNV_docker_meta_analysis,
+      rCNV_docker=rCNV_docker,
       prefix="${prefix}.signif_tracks"
   }
 
@@ -269,7 +274,7 @@ workflow curate_annotations {
         min_element_size=min_element_size,
         max_element_size=max_element_size,
         rCNV_bucket=rCNV_bucket,
-        rCNV_docker=rCNV_docker_meta_analysis,
+        rCNV_docker=rCNV_docker,
         prefix="${prefix}.signif_shard"
     }
   }
@@ -288,7 +293,7 @@ workflow curate_annotations {
       blacklist_buffer_min_size=crb_blacklist_buffer_min_size,
       contig=contig[0],
       rCNV_bucket=rCNV_bucket,
-      rCNV_docker=rCNV_docker_crb_clustering,
+      rCNV_docker=rCNV_docker,
       prefix=prefix
     }
   }
@@ -297,21 +302,21 @@ workflow curate_annotations {
       beds=cluster_elements.final_crbs,
       outfile_prefix="${prefix}.crbs",
       out_bucket="${rCNV_bucket}/cleaned_data/genome_annotations/",
-      rCNV_docker=rCNV_docker_crb_clustering
+      rCNV_docker=rCNV_docker
   }
   call merge_final_beds as merge_crb_elements {
     input:
       beds=cluster_elements.final_crb_elements,
       outfile_prefix="${prefix}.crb_elements",
       out_bucket="${rCNV_bucket}/cleaned_data/genome_annotations/",
-      rCNV_docker=rCNV_docker_crb_clustering
+      rCNV_docker=rCNV_docker
   }
   call merge_final_beds as merge_crb_whitelists {
     input:
       beds=cluster_elements.crb_whitelist,
       outfile_prefix="${prefix}.crb_whitelist",
       out_bucket="${rCNV_bucket}/cleaned_data/genome_annotations/",
-      rCNV_docker=rCNV_docker_crb_clustering
+      rCNV_docker=rCNV_docker
   }
   
   
@@ -319,6 +324,81 @@ workflow curate_annotations {
   output {
     File final_crbs = merge_crbs.merged_bed
     File final_crb_elements = merge_crb_elements.merged_bed
+  }
+}
+
+
+# Collect stats on # of CNVs per phenotype by genic context
+task get_cnv_counts_by_gene_content {
+  String rCNV_bucket
+  String rCNV_docker
+
+  command <<<
+    set -euo pipefail
+
+    # Download necessary reference files
+    mkdir refs/
+    gsutil -m cp \
+      ${rCNV_bucket}/refs/** \
+      ${rCNV_bucket}/analysis/analysis_refs/* \
+      ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
+      ${rCNV_bucket}/cleaned_data/genes/gene_lists \
+      refs/
+    mkdir cnvs/
+    gsutil -m cp \
+      ${rCNV_bucket}/cleaned_data/cnv/*bed.gz* \
+      cnvs/
+
+    # Count number of CNVs per cohort by pheno based on genic overlap
+    fgrep -wvf \
+      refs/gene_lists/HP0000118.HPOdb.genes.list \
+      refs/gene_lists/gnomad.v2.1.1.likely_unconstrained.genes.list \
+    | sort -V | uniq \
+    > loose_noncoding_whitelist.genes.list
+    mkdir genes_per_cnv
+    for CNV in DEL DUP; do
+      while read meta cohorts; do
+        # Get conditional exclusion genes for that cohort as BED
+        zcat refs/gencode.v19.canonical.pext_filtered.cohort_exclusion.bed.gz \
+        | fgrep -w $meta | cut -f1-3 | bedtools merge -i - \
+        | bgzip -c > $meta.cond_excl_genes.bed.gz
+
+        # Annotate all CNVs based on any exon overlap
+        /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
+          cnvs/$meta.rCNV.bed.gz \
+          refs/gencode.v19.canonical.pext_filtered.gtf.gz \
+          --min-cds-ovr "10e-10" \
+          -t $CNV \
+          --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
+          --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
+          --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
+          --blacklist $meta.cond_excl_genes.bed.gz \
+          -o /tmp/junk.bed.gz \
+          --bgzip \
+          --cnvs-out /dev/stdout \
+        | cut -f4,6-7,9 | gzip -c \
+        > genes_per_cnv/rCNV.$CNV.$meta.genes_per_cnv.tsv.gz
+        echo -e "$meta\tgenes_per_cnv/rCNV.$CNV.$meta.genes_per_cnv.tsv.gz"
+      done < <( fgrep -v mega refs/rCNV_metacohort_list.txt ) \
+      > genes_per_cnv.$CNV.input.tsv
+
+      # Summarize CNV counts by gene list per phenotype
+      /opt/rCNV2/analysis/paper/scripts/noncoding_association/summarize_ncCNV_counts.py \
+        --genes-per-cnv genes_per_cnv.$CNV.input.tsv \
+        --hpos <( cut -f2 refs/test_phenotypes.list ) \
+        --unconstrained-genes loose_noncoding_whitelist.genes.list \
+        --summary-counts unconstrained_cnv_counts.$CNV.tsv.gz \
+        --developmental-hpos refs/rCNV2.hpos_by_severity.developmental.list \
+        --gzip
+    done
+    # Copy counts to Google bucket for future use
+    gsutil -m cp \
+      unconstrained_cnv_counts.*.tsv.gz \
+      ${rCNV_bucket}/analysis/crb_burden/other_data/
+  >>>
+
+  output {
+    Array[File] cnv_counts_tsv = glob("unconstrained_cnv_counts.*.tsv.gz")
   }
 }
 
@@ -416,6 +496,7 @@ task curate_and_burden {
   Int min_element_size
   Int max_element_size
   Float min_element_overlap
+  Array[File] cnv_counts_tsv
   String rCNV_bucket
   String rCNV_docker
   String prefix
@@ -430,6 +511,17 @@ task curate_and_burden {
       ${rCNV_bucket}/refs/** \
       ${rCNV_bucket}/analysis/analysis_refs/* \
       refs/
+
+    # Combine CNV counts by gene context into a single file
+    find / -name "unconstrained_cnv_counts.*.tsv.gz" | xargs -I {} mv {} ./ && \
+    cat \
+      <( zcat unconstrained_cnv_counts.DEL.tsv.gz | head -n1 \
+         | awk -v OFS="\t" '{ print $0, "cnv" }' ) \
+      <( zcat unconstrained_cnv_counts.DEL.tsv.gz | grep -ve '^#' \
+         | awk -v OFS="\t" '{ print $0, "DEL" }' ) \
+      <( zcat unconstrained_cnv_counts.DUP.tsv.gz | grep -ve '^#' \
+         | awk -v OFS="\t" '{ print $0, "DUP" }' ) \
+    | gzip -c > unconstrained_cnv_counts.tsv.gz
 
     # Curate all annotations in an arbitrary input list of paths
     while IFS=$'\t' read path tprefix; do
@@ -481,8 +573,10 @@ task curate_and_burden {
       --track-stats ${prefix}.stats.tsv \
       --frac-overlap ${min_element_overlap} \
       --norm-by-samplesize \
+      --conditional-exclusion refs/GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz \
+      --counts-by-gene-context unconstrained_cnv_counts.tsv.gz \
       --outfile ${prefix}.stats.with_counts.tsv.gz \
-      --gzip 
+      --gzip
   >>>
 
   runtime {
@@ -549,6 +643,7 @@ task merge_tracklists {
     File merged_tracklist = "${prefix}.all_tracks.list"
   }
 }
+
 
 # Conduct meta-analysis burden test for all tracks
 task meta_burden_test {

@@ -179,5 +179,5 @@ lnors <- list("DEL"=meta.all(del.counts, cohorts),
 # Dotplot of effect sizes by genic context
 pdf(paste(out.prefix, "cnv_lnORs_by_genic_context.pdf", sep="."),
     height=2.5, width=4.5)
-lnor.dotplot(lnors, hpo="HP:0012759")
+lnor.dotplot(lnors, hpo="HP:0000118")
 dev.off()
