@@ -37,6 +37,22 @@ load.counts <- function(counts.in, samples){
     max(c(0, samples[which(samples$hpo==hpo), cohort] - alt))
   })
 
+  # Add fourth gene set reflecting unconstrained_only after removing
+  # samples from "not_unconstrained" from denominator
+  fourth.df <- as.data.frame(t(apply(counts[which(counts$gset == "unconstrained_only"), ],
+                                     1, function(vals){
+    cohort <- vals[1]; hpo <- vals[2]; alt <- vals[4]; ref <- as.numeric(vals[5])
+    gset <- "unconstrained_only_denom_subbed"
+    n_sub <- as.numeric(counts$alt[which(counts$cohort == cohort
+                                         & counts$hpo == hpo
+                                         & counts$gset == "not_unconstrained")])
+    c(cohort, hpo, gset, alt, max(c(0, ref - n_sub)))
+  })))
+  colnames(fourth.df) <- colnames(counts)
+  counts <- rbind(counts, fourth.df)
+  counts[, c("alt", "ref")] <- apply(counts[, c("alt", "ref")], 2, as.numeric)
+
+
   # Reformat data to match expected inputs for meta-analysis functions
   hpos <- unique(counts$hpo[which(counts$hpo != "HEALTHY_CONTROL")])
   gsets <- unique(counts$gset)
@@ -161,7 +177,7 @@ rcnv.config <- opts$`rcnv-config`
 # # DEV PARAMETERS
 # del.counts.in <- "~/scratch/unconstrained_cnv_counts.DEL.tsv.gz"
 # dup.counts.in <- "~/scratch/unconstrained_cnv_counts.DUP.tsv.gz"
-# pheno.table.in <- "~/scratch/HPOs_by_metacohort.table.tsv"
+# pheno.table.in <- "~/scratch/HPOs_by_metacohort.w_DEV.table.tsv"
 # out.prefix <- "~/scratch/unconstrained_lnORs_test"
 
 # Load sample size table
@@ -179,5 +195,5 @@ lnors <- list("DEL"=meta.all(del.counts, cohorts),
 # Dotplot of effect sizes by genic context
 pdf(paste(out.prefix, "cnv_lnORs_by_genic_context.pdf", sep="."),
     height=2.5, width=4.5)
-lnor.dotplot(lnors, hpo="HP:0000118")
+lnor.dotplot(lnors, hpo="HP:0012759")
 dev.off()

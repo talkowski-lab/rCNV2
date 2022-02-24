@@ -57,6 +57,7 @@ workflow curate_annotations {
         min_element_size=min_element_size,
         max_element_size=max_element_size,
         min_element_overlap=min_element_overlap,
+        cnv_counts_tsv=get_counts_by_context.cnv_counts_tsv,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker,
         prefix="${prefix}.chromhmm_shard",
@@ -85,6 +86,7 @@ workflow curate_annotations {
         min_element_size=min_element_size,
         max_element_size=max_element_size,
         min_element_overlap=min_element_overlap,
+        cnv_counts_tsv=get_counts_by_context.cnv_counts_tsv,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker,
         prefix="${prefix}.encode_dnaaccessibility_shard",
@@ -113,6 +115,7 @@ workflow curate_annotations {
         min_element_size=min_element_size,
         max_element_size=max_element_size,
         min_element_overlap=min_element_overlap,
+        cnv_counts_tsv=get_counts_by_context.cnv_counts_tsv,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker,
         prefix="${prefix}.encode_histone_mods_shard",
@@ -141,6 +144,7 @@ workflow curate_annotations {
         min_element_size=min_element_size,
         max_element_size=max_element_size,
         min_element_overlap=min_element_overlap,
+        cnv_counts_tsv=get_counts_by_context.cnv_counts_tsv,
         rCNV_docker=rCNV_docker,
         rCNV_bucket=rCNV_bucket,
         prefix="${prefix}.encode_tfbs_shard",
@@ -169,6 +173,7 @@ workflow curate_annotations {
         min_element_size=min_element_size,
         max_element_size=max_element_size,
         min_element_overlap=min_element_overlap,
+        cnv_counts_tsv=get_counts_by_context.cnv_counts_tsv,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker,
         prefix="${prefix}.encode_transcription_shard",
@@ -197,6 +202,7 @@ workflow curate_annotations {
         min_element_size=min_element_size,
         max_element_size=max_element_size,
         min_element_overlap=min_element_overlap,
+        cnv_counts_tsv=get_counts_by_context.cnv_counts_tsv,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker,
         prefix="${prefix}.enhancer_databases_shard",
@@ -225,6 +231,7 @@ workflow curate_annotations {
         min_element_size=min_element_size,
         max_element_size=max_element_size,
         min_element_overlap=min_element_overlap,
+        cnv_counts_tsv=get_counts_by_context.cnv_counts_tsv,
         rCNV_bucket=rCNV_bucket,
         rCNV_docker=rCNV_docker,
         prefix="${prefix}.misc_shard",
@@ -334,11 +341,11 @@ task get_cnv_counts_by_gene_content {
   String rCNV_docker
 
   command <<<
-    set -euo pipefail
+    set -e
 
     # Download necessary reference files
     mkdir refs/
-    gsutil -m cp \
+    gsutil -m cp -r \
       ${rCNV_bucket}/refs/** \
       ${rCNV_bucket}/analysis/analysis_refs/* \
       ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
@@ -357,6 +364,7 @@ task get_cnv_counts_by_gene_content {
     > loose_noncoding_whitelist.genes.list
     mkdir genes_per_cnv
     for CNV in DEL DUP; do
+      echo "Starting $CNV"
       while read meta cohorts; do
         # Get conditional exclusion genes for that cohort as BED
         zcat refs/gencode.v19.canonical.pext_filtered.cohort_exclusion.bed.gz \
@@ -373,7 +381,7 @@ task get_cnv_counts_by_gene_content {
           --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
           --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
           --blacklist $meta.cond_excl_genes.bed.gz \
-          -o /tmp/junk.bed.gz \
+          -o junk.bed.gz \
           --bgzip \
           --cnvs-out /dev/stdout \
         | cut -f4,6-7,9 | gzip -c \
@@ -392,10 +400,19 @@ task get_cnv_counts_by_gene_content {
         --gzip
     done
     # Copy counts to Google bucket for future use
+    echo "Copying to Google Bucket"
     gsutil -m cp \
       unconstrained_cnv_counts.*.tsv.gz \
       ${rCNV_bucket}/analysis/crb_burden/other_data/
   >>>
+
+  runtime {
+    docker: "${rCNV_docker}"
+    preemptible: 1
+    memory: "8 GB"
+    bootDiskSizeGb: "20"
+    disks: "local-disk 50 HDD"
+  }
 
   output {
     Array[File] cnv_counts_tsv = glob("unconstrained_cnv_counts.*.tsv.gz")

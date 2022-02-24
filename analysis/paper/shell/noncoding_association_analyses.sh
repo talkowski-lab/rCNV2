@@ -41,10 +41,17 @@ gsutil -m cp \
 
 # Plot observed effect size distributions split by gene set membership
 # Used to justify inclusion of some coding effects in noncoding association test
+total_dev=$( fgrep -v "#" refs/rCNV2.hpos_by_severity.developmental.counts.tsv \
+             | awk '{ sum+=$2 }END{ print sum }' )
+echo -e "DEVELOPMENTAL\tStrong-effect HPOs\t$total_dev" \
+| paste - <( fgrep -v "#" refs/rCNV2.hpos_by_severity.developmental.counts.tsv \
+             | cut -f2 | paste -s ) \
+| paste - <( echo $total_dev ) | cat refs/HPOs_by_metacohort.table.tsv - \
+> HPOs_by_metacohort.w_DEV.table.tsv
 /opt/rCNV2/analysis/paper/plot/noncoding_association/plot_unconstrained_effect_sizes.R \
   unconstrained_cnv_counts.DEL.tsv.gz \
   unconstrained_cnv_counts.DUP.tsv.gz \
-  refs/HPOs_by_metacohort.table.tsv \
+  HPOs_by_metacohort.w_DEV.table.tsv \
   ${prefix}
 
 

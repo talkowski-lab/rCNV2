@@ -467,6 +467,7 @@ fgrep -wvf \
 > loose_noncoding_whitelist.genes.list
 mkdir genes_per_cnv
 for CNV in DEL DUP; do
+  echo "Starting $CNV"
   while read meta cohorts; do
     # Get conditional exclusion genes for that cohort as BED
     zcat refs/gencode.v19.canonical.pext_filtered.cohort_exclusion.bed.gz \
@@ -483,7 +484,7 @@ for CNV in DEL DUP; do
       --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
       --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
       --blacklist $meta.cond_excl_genes.bed.gz \
-      -o /tmp/junk.bed.gz \
+      -o .junk.bed.gz \
       --bgzip \
       --cnvs-out /dev/stdout \
     | cut -f4,6-7,9 | gzip -c \
@@ -500,6 +501,7 @@ for CNV in DEL DUP; do
     --summary-counts unconstrained_cnv_counts.$CNV.tsv.gz \
     --developmental-hpos refs/rCNV2.hpos_by_severity.developmental.list \
     --gzip
+  echo "Finished $CNV"
 done
 # Copy counts to Google bucket for future use
 gsutil -m cp \

@@ -191,7 +191,7 @@ def main():
                     for ptype in phenotypes:
                         cbt = cnvs[cohort][ptype][ctype]
                         xbt = xlist[cohort]
-                        tfilt = tbt.intersect(xbt, v=True)
+                        tfilt = tbt.cut(range(3)).intersect(xbt, v=True)
                         hits = len(cbt.intersect(tfilt, u=True, F=args.frac_overlap))
                         tvals_out_sub.append(str(hits))
                         if args.norm_by_samplesize:
