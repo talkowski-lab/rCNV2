@@ -183,7 +183,7 @@ def main():
 
             # Process each track
             tname = str(track_vals[0])
-            tbt = pbt.BedTool(str(track_vals[-1]))
+            tbt = pbt.BedTool(str(track_vals[-1])).cut(range(3)).saveas()
             tvals_out_base = track_vals[:-1]
             for ctype in cnv_types:
                 tvals_out_sub = tvals_out_base + [ctype]
@@ -191,7 +191,7 @@ def main():
                     for ptype in phenotypes:
                         cbt = cnvs[cohort][ptype][ctype]
                         xbt = xlist[cohort]
-                        tfilt = tbt.cut(range(3)).intersect(xbt, v=True)
+                        tfilt = tbt.intersect(xbt, v=True)
                         hits = len(cbt.intersect(tfilt, u=True, F=args.frac_overlap))
                         tvals_out_sub.append(str(hits))
                         if args.norm_by_samplesize:
