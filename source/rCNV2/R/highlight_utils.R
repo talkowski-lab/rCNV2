@@ -104,6 +104,7 @@ load.genes.from.gtf <- function(gtf.in, region, rstudio.local=FALSE){
 #'
 #' @param bedpath path to .bed file with summary statistics
 #' @param region coordinates of region to be extracted
+#' @param keep.intervals boolean to retain start/end coordinates \[default: compute midpoint\]
 #' @param rstudio.local boolean to indicate local Rstudio environment \[default: FALSE\]
 #'
 #' @details `region` coordinates must be a `tabix`-compatbile string
@@ -111,7 +112,8 @@ load.genes.from.gtf <- function(gtf.in, region, rstudio.local=FALSE){
 #' @return data.frame
 #'
 #' @export
-load.sumstats.for.region <- function(bedpath, region, rstudio.local=FALSE){
+load.sumstats.for.region <- function(bedpath, region, keep.intervals=FALSE,
+                                     rstudio.local=FALSE){
   # Required for bedr in local Rstudio only:
   if(rstudio.local){
     Sys.setenv(PATH = paste(Sys.getenv("PATH"), "~/anaconda3/envs/py3/bin", sep = ":"))
@@ -123,13 +125,18 @@ load.sumstats.for.region <- function(bedpath, region, rstudio.local=FALSE){
   }
   require(bedr, quietly=T)
   ss <- bedr::tabix(region, bedpath, check.chr=FALSE, verbose=FALSE)
+  colnames(ss)[which(colnames(ss) == "stop")] <- "end"
 
-  # Add midpoint
-  ss$pos <- (ss$start + ss$stop)/2
-
-  # Return columns of interest
-  return(ss[, c("chr", "pos", "meta_neg_log10_p", "meta_lnOR",
-                "meta_lnOR_lower", "meta_lnOR_upper")])
+  # Return based on value of keep.intervals
+  if(keep.intervals){
+    return(ss[, c("chr", "start", "end", "meta_neg_log10_p", "meta_lnOR",
+                  "meta_lnOR_lower", "meta_lnOR_upper")])
+  }else{
+    # Add midpoint unless keep.intervals is TRUE
+    ss$pos <- (ss$start + ss$stop)/2
+    return(ss[, c("chr", "pos", "meta_neg_log10_p", "meta_lnOR",
+                  "meta_lnOR_lower", "meta_lnOR_upper")])
+  }
 }
 
 
@@ -304,24 +311,28 @@ load.cnvs.from.region <- function(bedpaths, region, cnv=NULL,
     bedr::tabix(region, bedpath, check.chr=FALSE, verbose=FALSE)
   })))
 
+  # Sort & filter CNVs
+  empty.df <- data.frame("chr"=character(), "start"=numeric(),
+                         "end"=numeric(), "cnv_id"=character(),
+                         "cnv"=character(), "pheno"=character())
   if(nrow(cnvs) > 0){
     # Ensure consistent column names
     colnames(cnvs) <- c("chr", "start", "end", "cnv_id", "cnv", "pheno")
-
-    # Sort & filter CNVs
     cnvs <- cnvs[with(cnvs, order(start, end)), ]
     if(!is.null(cnv)){
       cnvs <- cnvs[which(cnvs$cnv==cnv), ]
     }
-    case.cnv.idxs <- which(sapply(cnvs$pheno, function(pstr){
-      any(case.hpos %in% unlist(strsplit(pstr, split=";", fixed=T)))
-    }))
-    case.cnvs <- cnvs[case.cnv.idxs, ]
-    ctrl.cnvs <- cnvs[grep(ctrl.hpo, cnvs$pheno, fixed=T), ]
+    if(nrow(cnvs) > 0){
+      case.cnv.idxs <- which(sapply(cnvs$pheno, function(pstr){
+        any(case.hpos %in% unlist(strsplit(pstr, split=";", fixed=T)))
+      }))
+      case.cnvs <- cnvs[case.cnv.idxs, ]
+      ctrl.cnvs <- cnvs[grep(ctrl.hpo, cnvs$pheno, fixed=T), ]
+    }else{
+      case.cnvs <- empty.df
+      ctrl.cnvs <- empty.df
+    }
   }else{
-    empty.df <- data.frame("chr"=character(), "start"=numeric(),
-                           "end"=numeric(), "cnv_id"=character(),
-                           "cnv"=character(), "pheno"=character())
     case.cnvs <- empty.df
     ctrl.cnvs <- empty.df
   }

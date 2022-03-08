@@ -608,9 +608,9 @@ gzip -f ${prefix}.burden_stats.tsv
 
 # # Dev code:
 # prefix="crb_clustering_test"
-# min_prop_tracks_per_crb=0.01
-# min_prop_track_representation=0.01
-# clustering_neighborhood_dist=5000
+# min_prop_tracks_per_crb=0.01304348
+# min_prop_track_representation=0.01304348
+# clustering_neighborhood_dist=10000
 # min_crb_separation=10000
 # max_crb_size=500000
 # blacklist_buffer=100000

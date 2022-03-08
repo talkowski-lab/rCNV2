@@ -98,14 +98,14 @@ meta.all <- function(counts, cohorts){
 ##########################
 # Dotplot of effect sizes based on genic context
 lnor.dotplot <- function(lnors, hpo="HP:0000118",
-                         parmar=c(0.25, 10, 2.25, 0.25)){
+                         parmar=c(0.25, 9, 2.25, 0.25)){
   # Get plot data
   plot.dat <- lapply(lnors, function(df){exp(df[which(df$hpo==hpo), 1:3])})
   xlims <- range(do.call("rbind", plot.dat), na.rm=T)
 
   # Prep plot area
   par(mar=parmar, bty="n")
-  plot(NA, xlim=xlims, ylim=c(3, 0),
+  plot(NA, xlim=xlims, ylim=c(4, 0),
        xaxt="n", yaxt="n", xlab="", ylab="", yaxs="i")
 
   # Add background shading and gridlines
@@ -114,7 +114,7 @@ lnor.dotplot <- function(lnors, hpo="HP:0000118",
        ybottom=par("usr")[3], ytop=par("usr")[4],
        border=NA, bty="n", col=bluewhite)
   rect(xleft=par("usr")[1], xright=par("usr")[2],
-       ybottom=0:3-0.1, ytop=(0:3)+0.1,
+       ybottom=0:4-0.1, ytop=(0:4)+0.1,
        col="white", border=NA, bty="n")
   abline(v=x.ax.at, col="white")
   abline(v=1, col=blueblack)
@@ -123,18 +123,19 @@ lnor.dotplot <- function(lnors, hpo="HP:0000118",
   y.mods <- 0.1 * c(-1, 1)
   sapply(1:2, function(i){
     segments(x0=plot.dat[[i]][, 2], x1=plot.dat[[i]][, 3],
-             y0=(1:3)-0.5+y.mods[i], y1=(1:3)-0.5+y.mods[i],
+             y0=(1:4)-0.5+y.mods[i], y1=(1:4)-0.5+y.mods[i],
              lwd=1.5, lend="round", col=cnv.colors[i])
-    points(x=plot.dat[[i]][, 1], y=(1:3)-0.5+y.mods[i],
+    points(x=plot.dat[[i]][, 1], y=(1:4)-0.5+y.mods[i],
            pch=19, col=cnv.colors[i])
   })
 
   # Add y-axis labels
-  sapply(1:3, function(i){axis(2, at=c(i-0.9, i-0.1), tck=0, labels=NA, col=blueblack)})
-  axis(2, at=(1:3)-0.5, tick=F, las=2, cex.axis=5/6, line=-0.8,
-       labels=c("All rCNVs",
-                "rCNVs overlapping exons\nfrom at least one\nnon-unconstrained gene",
-                "Noncoding rCNVs +\nrCNVs overlapping exons\nfrom unconstrained genes"))
+  sapply(1:4, function(i){axis(2, at=c(i-0.9, i-0.1), tck=0, labels=NA, col=blueblack)})
+  axis(2, at=(1:4)-0.5, tick=F, las=2, cex.axis=5/6, line=-0.8,
+       labels=c("1. All rCNVs",
+                "2. rCNVs overlapping exons\nfrom at least one\nnon-unconstrained gene",
+                "3. Noncoding rCNVs +\nrCNVs excluding [2]",
+                "4. [3] after excluding\nall samples from [2]"))
 
   # Add x-axis
   axis(3, at=c(-10e10, 10e10), tck=0, labels=NA, col=blueblack)
@@ -194,6 +195,6 @@ lnors <- list("DEL"=meta.all(del.counts, cohorts),
 
 # Dotplot of effect sizes by genic context
 pdf(paste(out.prefix, "cnv_lnORs_by_genic_context.pdf", sep="."),
-    height=2.5, width=4.5)
+    height=3.25, width=4.5)
 lnor.dotplot(lnors, hpo="HP:0012759")
 dev.off()

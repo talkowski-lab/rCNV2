@@ -185,6 +185,8 @@ plot.ors.horiz <- function(stats, category, hpos, ylims=NULL, title=NULL,
   }else{
     bottom.channel.idxs <- channel.idxs
   }
+  hpo.colors.by.severity <- adjustcolor(sapply(hpos, get.hpo.color, color.by="severity"),
+                                        alpha=0.3)
 
   # Prep plot area
   par(bty="n")
@@ -194,11 +196,11 @@ plot.ors.horiz <- function(stats, category, hpos, ylims=NULL, title=NULL,
   if(channels.above){
     if(invert.channels.above){
       top.channel.col <- "white"
-      top.channel.border <- bluewhite
+      top.channel.border <- hpo.colors.by.severity
       rect(xleft=0, xright=length(hpos), ybottom=y.mid, ytop=10e10, xpd=T,
            col=bluewhite, border=NA, bty="n")
     }else{
-      top.channel.col <- bluewhite
+      top.channel.col <- hpo.colors.by.severity
       top.channel.border <- "white"
     }
     rect(xleft=top.channel.idxs[-length(top.channel.idxs)]+x.buffer,
@@ -209,12 +211,12 @@ plot.ors.horiz <- function(stats, category, hpos, ylims=NULL, title=NULL,
   if(channels.below){
     if(invert.channels.below){
       bottom.channel.col <- "white"
-      bottom.channel.border <- NA
+      bottom.channel.border <- hpo.colors.by.severity
       rect(xleft=0, xright=length(hpos), ybottom=y.mid, ytop=-10e10, xpd=T,
            col=bluewhite, border=NA, bty="n")
     }else{
-      bottom.channel.col <- bluewhite
-      bottom.channel.border <- NA
+      bottom.channel.col <- hpo.colors.by.severity
+      bottom.channel.border <- "white"
     }
     rect(xleft=bottom.channel.idxs[-length(bottom.channel.idxs)]+x.buffer,
          xright=bottom.channel.idxs[-1]-x.buffer,
@@ -267,7 +269,7 @@ plot.ors.horiz <- function(stats, category, hpos, ylims=NULL, title=NULL,
 }
 
 # Plot diagonal text labels
-plot.text.diag <- function(hpos, meta, y.at=c(0.2, 2), background=T,
+plot.text.diag <- function(hpos, meta, y.at=4, background=T,
                            x.buffer=0.1, box.vex=0.5, angle=40,
                            angle.text.mod=12, text.xadj=-0.8){
   # Get basic plotting info
@@ -279,52 +281,48 @@ plot.text.diag <- function(hpos, meta, y.at=c(0.2, 2), background=T,
 
   # Prep plot area & add y-axis titles
   par(bty="n")
-  plot(x=NA, y=NA, xlim=c(0, nhpos), ylim=c(0, 11),
+  plot(x=NA, y=NA, xlim=c(0, nhpos), ylim=c(0, 11.2),
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
+
+  # Get shading colors
+  hpo.shading.colors <- sapply(hpos, get.hpo.color, color.by="severity")
 
   # First row of square indicators
   rect(xleft=(1:nhpos)-1+x.buffer, xright=(1:nhpos)-x.buffer,
-       ybottom=10, ytop=11, col=bluewhite, border=NA, bty="n")
-  sapply(1:nhpos, function(i){
-    hpo.color.top <- get.hpo.color(hpos[i], color.by="neuro")
-    hpo.color.bottom <- get.hpo.color(hpos[i], color.by="severity")
-    polygon(x=i+c(-1+x.buffer, -1+x.buffer, -x.buffer, -x.buffer),
-            y=10.5+c(-box.vex/2, box.vex/2, box.vex/2, -box.vex/2),
-            xpd=T, border=blueblack, col=hpo.color.top)
-    polygon(x=i+c(-1+x.buffer, -x.buffer, -x.buffer, -1+x.buffer),
-            y=10.5+c(-box.vex/2, box.vex/2, -box.vex/2, -box.vex/2),
-            xpd=T, border=blueblack, col=hpo.color.bottom)
-  })
+       ybottom=10, ytop=par("usr")[4], border=NA, bty="n",
+       col=adjustcolor(hpo.shading.colors, alpha=0.3))
+  hpo.box.colors <- sapply(hpos, get.hpo.color, color.by="neuro")
+  rect(xleft=(1:nhpos)-1+x.buffer, xright=(1:nhpos)-x.buffer,
+       ybottom=10.5+c(-box.vex/2), ytop=10.5-c(-box.vex/2),
+       xpd=T, border=blueblack, col=hpo.box.colors)
 
   # Draw diagonal shading
   sapply(1:nhpos, function(x){
-    polygon(x=c(x-1+x.buffer, x-x.buffer, x-x.buffer-(10*diag.xmod), x-1+x.buffer-(10*diag.xmod)),
-            y=c(10, 10, 0, 0), xpd=T, col=bluewhite, border=NA, bty="n")
+    polygon(x=c(x-1+x.buffer, x-x.buffer, x-x.buffer-(10*diag.xmod),
+                x-1+x.buffer-(10*diag.xmod)),
+            y=c(10, 10, 0, 0), xpd=T, col=adjustcolor(hpo.shading.colors[x], alpha=0.3),
+            border=NA, bty="n")
   })
-  abline(h=y.at + c(3, 2*y.at[1]), col="white", xpd=T, lwd=1.5)
-  col.header.y.at <- c(-0.15, 3, y.at[2]+(2*y.at[1]), 10)
-  sapply(1:3, function(i){
+  abline(h=y.at, col="white", xpd=T, lwd=1.5)
+  col.header.y.at <- c(-0.15, y.at, 10)
+  sapply(1:2, function(i){
     y0 <- col.header.y.at[i]+0.15
     y1 <- col.header.y.at[i+1]-0.15
-    segments(x0=-11.4+(diag.xmod*y0), x1=-11.4+(diag.xmod*y1),
+    segments(x0=(diag.xmod*(-10+y0))-0.25, x1=(diag.xmod*(-10+y1))-0.25,
              y0=y0, y1=y1, xpd=T, col=blueblack)
   })
 
   # Add text labels
-  text(x=(1:nhpos)+text.xadj-((10-y.at[1])*diag.xmod), y=rep(y.at[1], nhpos), pos=4,
-       srt=angle + angle.text.mod, labels=hpo.labels, xpd=T)
-  text(x=(1:nhpos)-((10-y.at[2])*diag.xmod), y=rep(y.at[2], nhpos), pos=2,
+  text(x=(1:nhpos)-0.5-((10-y.at)*diag.xmod), y=rep(y.at-0.5, nhpos), pos=2,
        srt=angle + angle.text.mod, xpd=T,
        labels=prettyNum(meta$samples[match(hpos, meta$HPO)], big.mark=","))
-  text(x=(1:nhpos)-x.buffer, y=rep(10-y.at[1], nhpos), pos=2,
+  text(x=(1:nhpos)-(0.25*diag.xmod), y=rep(10-0.25, nhpos), pos=2,
        srt=angle + angle.text.mod, labels=hpo.abbrevs[hpos], xpd=T)
 
   # Add column titles
-  text(x=c(text.xadj-((10-y.at[1])*diag.xmod),
-           -x.buffer-((10-y.at[2])*diag.xmod),
-           -x.buffer)-0.3, y=c(y.at, 10),
-       font=2, pos=c(4, 2, 2), srt=angle + angle.text.mod, xpd=T,
-       labels=c("HPO", "Cases", "Description"))
+  text(x=c(-((10-y.at)*diag.xmod), 0)-0.5, y=c(y.at, 10),
+       font=2, pos=c(2, 2), srt=angle + angle.text.mod, xpd=T, cex=1.25,
+       labels=c("# Cases", "Phenotype"))
 }
 
 
@@ -391,7 +389,6 @@ plot.global.effects.byOR <- function(stats, meta, panel.heights,
   # Sort HPOs by effect size of constrained gene deletions
   hpos.ordered <- hpos[order(-cat7.ors[, 3])]
   last.dev.idx <- max(which(hpos.ordered %in% developmental.hpos))
-  # hpos.ordered <- hpos[order(-apply(cbind(cat3.ors, cat7.ors), 1, mean))]
 
   # Category 3: Known GDs
   plot.ors.horiz(stats, 3, hpos.ordered, pt.cex=pt.cex, ylims=or.lims,
@@ -408,8 +405,12 @@ plot.global.effects.byOR <- function(stats, meta, panel.heights,
   # Add HPO information in bottom half of plot
   parmar[3] <- 0
   par(mar=parmar)
-  plot.text.diag(hpos.ordered, meta, y.at=c(0.1, 5.1), box.vex=0.7,
-                 angle=42, angle.text.mod=4.25, text.xadj=-0.82)
+  plot.text.diag(hpos.ordered, meta, y.at=3.25, box.vex=0.8,
+                 angle=48, angle.text.mod=-3.5, text.xadj=-0.82)
+  segments(x0=c(par("usr")[1], last.dev.idx),
+           x1=c(last.dev.idx, par("usr")[2]),
+           y0=par("usr")[4], y1=par("usr")[4],
+           lwd=4, col=severity.colors[2:3], xpd=T, lend="butt")
 }
 
 
@@ -460,11 +461,11 @@ plot.global.effects.byhpo(stats, meta, panel.widths,
 dev.off()
 
 # Plot slimmer figure ordered by average effect size
-panel.heights <- c(4, 4, 5)
+panel.heights <- c(4, 4, 3.5)
 pdf(paste(out.prefix, "ordered_by_effect_size.pdf", sep="."),
-    height=5, width=10)
+    height=5, width=9.8)
 plot.global.effects.byOR(stats, meta, panel.heights,
                          vertical.gridlines=T, gridline.step=5,
-                         pt.cex=1.15, parmar=c(0.2, 14, 1.5, 0.2))
+                         pt.cex=1.15, parmar=c(0.2, 12, 1.5, 0.2))
 dev.off()
 

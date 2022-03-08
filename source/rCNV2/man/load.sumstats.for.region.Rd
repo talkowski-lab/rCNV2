@@ -4,12 +4,19 @@
 \alias{load.sumstats.for.region}
 \title{Load sumstats from BED}
 \usage{
-load.sumstats.for.region(bedpath, region, rstudio.local = FALSE)
+load.sumstats.for.region(
+  bedpath,
+  region,
+  keep.intervals = FALSE,
+  rstudio.local = FALSE
+)
 }
 \arguments{
 \item{bedpath}{path to .bed file with summary statistics}
 
 \item{region}{coordinates of region to be extracted}
+
+\item{keep.intervals}{boolean to retain start/end coordinates [default: compute midpoint]}
 
 \item{rstudio.local}{boolean to indicate local Rstudio environment [default: FALSE]}
 }

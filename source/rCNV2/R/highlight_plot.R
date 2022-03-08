@@ -328,8 +328,20 @@ plot.pvalues.for.highlight <- function(ss, y0, cnv.type, panel.height=0.2,
     pt.col <- cnv.blacks[2]
   }
 
+  # Infer plotting mode
+  if("start" %in% colnames(ss)){
+    pmode <- "rects"
+  }else{
+    pmode <- "points"
+  }
+
   # Scale p-values according to y0 and panel.height
-  pos <- as.numeric(ss$pos)
+  if(pmode == "rects"){
+    starts <- as.numeric(ss$start)
+    ends <- as.numeric(ss$end)
+  }else{
+    pos <- as.numeric(ss$pos)
+  }
   pvals.orig <- as.numeric(ss$meta_neg_log10_p)
   max.pval.orig <- max(c(9, (ceiling(max(pvals.orig, na.rm=T)) + 1)))
   pval.scale.factor <- (panel.height / max.pval.orig)
@@ -354,7 +366,11 @@ plot.pvalues.for.highlight <- function(ss, y0, cnv.type, panel.height=0.2,
   }
 
   # Add points
-  points(x=pos, y=pvals, pch=19, col=pt.col, cex=pt.cex)
+  if(pmode == "rects"){
+    segments(x0=starts, x1=ends, y0=pvals, y1=pvals, lwd=4, lend="square", col=pt.col)
+  }else{
+    points(x=pos, y=pvals, pch=19, col=pt.col, cex=pt.cex)
+  }
 
   # Add Y-axis
   y.ax.label.cex <- 5/6
@@ -406,12 +422,25 @@ plot.ors.for.highlight <- function(ss, y0, cnv.type, max.distinct=50, dx=0.01,
     ci.col <- control.cnv.colors[2]
   }
 
+  # Infer plotting mode
+  if("start" %in% colnames(ss)){
+    pmode <- "rects"
+  }else{
+    pmode <- "points"
+  }
+
   # Scale odds ratios according to y0 and panel.height
   or.col.idxs <- grep("meta_lnOR", colnames(ss), fixed=T)
   ss[, or.col.idxs] <- apply(ss[, or.col.idxs], 2, as.numeric)
   ss <- na.omit(ss)
-  ss <- ss[order(ss$pos), ]
-  pos <- as.numeric(ss$pos)
+  if(pmode == "rects"){
+    ss <- ss[order(ss$start), ]
+    starts <- as.numeric(ss$start)
+    ends <- as.numeric(ss$end)
+  }else{
+    ss <- ss[order(ss$pos), ]
+    pos <- as.numeric(ss$pos)
+  }
   ors.orig <- ss[, or.col.idxs]
   ors.orig <- log2(exp(ors.orig))
   ors.scalar <- max(ors.orig[, 1], na.rm=T)
@@ -426,15 +455,22 @@ plot.ors.for.highlight <- function(ss, y0, cnv.type, max.distinct=50, dx=0.01,
   abline(h=c(y0 + y.ax.tick.spacing), col="white")
 
   # Add points & shading
-  if(length(pos) <= max.distinct){
-    xbuf <- 0.5 * dx * diff(par("usr")[1:2])
-    rect(xleft=pos-xbuf, xright=pos+xbuf, ybottom=ors[, 2], ytop=ors[, 3],
+  if(pmode == "rects"){
+    rect(xleft=starts, xright=ends, ybottom=ors[, 2], ytop=ors[, 3],
          col=adjustcolor(ci.col, alpha=0.5), border=NA, bty="n")
-    points(x=pos, y=ors[, 1], col=line.col, pch=15, cex=pt.cex)
+    segments(x0=starts, x1=ends, y0=ors[, 1], y1=ors[, 1],
+             lwd=4, lend="square", col=line.col)
   }else{
-    polygon(x=c(pos, rev(pos)), y=c(ors[, 2], rev(ors[, 3])),
-            col=adjustcolor(ci.col, alpha=0.5), border=NA, bty="n")
-    points(x=pos, y=ors[, 1], lwd=3, col=line.col, type="l")
+    if(length(pos) <= max.distinct){
+      xbuf <- 0.5 * dx * diff(par("usr")[1:2])
+      rect(xleft=pos-xbuf, xright=pos+xbuf, ybottom=ors[, 2], ytop=ors[, 3],
+           col=adjustcolor(ci.col, alpha=0.5), border=NA, bty="n")
+      points(x=pos, y=ors[, 1], col=line.col, pch=15, cex=pt.cex)
+    }else{
+      polygon(x=c(pos, rev(pos)), y=c(ors[, 2], rev(ors[, 3])),
+              col=adjustcolor(ci.col, alpha=0.5), border=NA, bty="n")
+      points(x=pos, y=ors[, 1], lwd=3, col=line.col, type="l")
+    }
   }
 
   # Add Y-axis
@@ -529,7 +565,7 @@ plot.constraint.track <- function(constr.df, genes, y0, panel.height=0.2,
 
   # Add segments for each gene
   segments(x0=pdat$start, x1=pdat$end, y0=pdat$y, y1=pdat$y,
-           lwd=4, lend="butt", col=gcols)
+           lwd=4, lend="square", col=gcols)
 
   # Label genes, if optioned
   if(!is.null(label.genes)){
@@ -607,13 +643,13 @@ plot.pips.for.highlight <- function(pips, genes, y0, panel.height=0.2,
     other.idxs <- which(!(pdat$gene %in% highlight.genes))
     segments(x0=pdat$start[highlight.idxs], x1=pdat$end[highlight.idxs],
              y0=pdat$y[highlight.idxs], y1=pdat$y[highlight.idxs],
-             lwd=4, lend="butt", col=highlight.col)
+             lwd=4, lend="square", col=highlight.col)
   }else{
     other.idxs <- 1:nrow(pdat)
   }
   segments(x0=pdat$start[other.idxs], x1=pdat$end[other.idxs],
            y0=pdat$y[other.idxs], y1=pdat$y[other.idxs],
-           lwd=4, lend="butt", col=col)
+           lwd=4, lend="square", col=col)
 
   # Label any genes, if optioned
   if(!is.na(label.genes)){
@@ -780,6 +816,7 @@ plot.features.from.bedgraph <- function(bed, y0, col=blueblack, panel.height=0.2
 #' @param case.legend.topbottom vertical alignment for case legend \[default "top"]
 #' @param ctrl.legend.side side to plot control legend \[default: "left"\]
 #' @param cc.legend.colors vector of colors to apply to case & control legends \[default: blueblack\]
+#' @param cnv.lwd line width for each CNV \[default: 0.05\]
 #' @param add.cohort.label boolean indicator to print `cohort.label` on plot \[default: FALSE\]
 #' @param cohort.label text of cohort label \[default: no label\]
 #' @param panel.height relative height of panel \[default: 2\]
@@ -799,7 +836,7 @@ plot.cnv.panel.for.highlight <- function(cnvs, n.case, n.ctrl, y0, cnv.type,
                                          start=NULL, end=NULL, y.axis.title="CNV\nFreq.",
                                          expand.pheno.label=TRUE, case.legend.side="left",
                                          case.legend.topbottom="top", ctrl.legend.side="left",
-                                         cc.legend.colors=rep(blueblack, 2),
+                                         cc.legend.colors=rep(blueblack, 2), cnv.lwd=0.05,
                                          add.cohort.label=FALSE, cohort.label=NULL,
                                          panel.height=2, dx=100){
   # Standardize inputs
@@ -858,11 +895,11 @@ plot.cnv.panel.for.highlight <- function(cnvs, n.case, n.ctrl, y0, cnv.type,
   abline(h=c(y0, y0 + y.ax.tick.spacing, y0 - y.ax.tick.spacing), col="white")
 
   # Plot midline, pileups, and outlines
-  lapply(case.pileup$cnvs, function(l){polygon(l$x, y0 + l$y, border=l$color,
-                                               col=l$color, lwd=0.1)})
+  lapply(case.pileup$cnvs, function(l){polygon(l$x, y0 + l$y, border="white",
+                                               col=l$color, lwd=cnv.lwd)})
   points(case.pileup$counts[, 1], case.pileup$counts[, 2] + y0, type="l", col=col.case.other)
-  lapply(ctrl.pileup$cnvs, function(l){polygon(l$x, y0 - l$y, border=l$color,
-                                               col=l$color, lwd=0.1)})
+  lapply(ctrl.pileup$cnvs, function(l){polygon(l$x, y0 - l$y, border="white",
+                                               col=l$color, lwd=cnv.lwd)})
   points(ctrl.pileup$counts[, 1], -ctrl.pileup$counts[, 2] + y0, type="l", col=col.ctrl)
   abline(h=y0, col=col.midline)
 

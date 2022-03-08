@@ -27,6 +27,7 @@ gsutil -m cp \
   ${rCNV_bucket}/cleaned_data/genome_annotations/rCNV.burden_stats.tsv.gz \
   ${rCNV_bucket}/cleaned_data/genome_annotations/rCNV.crbs.bed.gz \
   ${rCNV_bucket}/analysis/crb_burden/other_data/unconstrained_cnv_counts.*.tsv.gz \
+  ${rCNV_bucket}/results/segment_association/* \
   ./
 mkdir refs/
 gsutil -m cp -r \
@@ -110,6 +111,16 @@ for cnv in DEL DUP; do
     --outfile $cnv.all_sig_crbs.tsv
 done
 
+
+# Check if any CRBs don't overlap with significant large segments
+for CNV in DEL DUP; do
+  zcat rCNV.crbs.bed.gz | fgrep -v "#" \
+  | awk -v OFS="\t" '{ print $4, $1, $2, $3 }' | sort -k1,1 \
+  | join -j 1 -t $'\t' <( cat $CNV.all_sig_crbs.tsv | fgrep -v "#" | sort -k1,1 ) - \
+  | awk -v OFS="\t" -v CNV=$CNV '{ print $3, $4, $5, $1, $2, CNV }' \
+  # | bedtools intersect -v -a - \
+  #   -b <( zcat rCNV.final_segments.loci.bed.gz | fgrep -w $CNV )
+done
 
 # Copy all plots to final gs:// directory
 gsutil -m cp -r \

@@ -49,6 +49,10 @@ mkdir meta_stats/
 gsutil -m cp \
   ${rCNV_bucket}/analysis/sliding_windows/**.rCNV.**.sliding_window.meta_analysis.stats.bed.gz \
   meta_stats/
+# mkdir cohort_stats/
+# gsutil -m cp \
+#   ${rCNV_bucket}/analysis/sliding_windows/**meta*.rCNV.*.sliding_window.stats.bed.gz \
+#   cohort_stats/
 gsutil -m cp -r \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists \
   ${rCNV_bucket}/analysis/paper/data/hpo/rCNV2_analysis_d2.hpo_jaccard_matrix.tsv \
@@ -66,6 +70,28 @@ del_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
               refs/sliding_window.rCNV.DEL.bonferroni_pval.hpo_cutoffs.tsv )
 dup_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
               refs/sliding_window.rCNV.DUP.bonferroni_pval.hpo_cutoffs.tsv )
+
+
+# # Plot genome-wide effect size correlations among all phenotypes
+# if [ -e cross_cohort_effect_sizes ]; then
+#   rm -rf cross_cohort_effect_sizes
+# fi
+# mkdir cross_cohort_effect_sizes
+# while read nocolon hpo; do
+#   echo "$hpo"
+#   for CNV in DEL DUP; do
+#     while read meta cohorts; do
+#       echo -e "$meta\tcohort_stats/$meta.$nocolon.rCNV.$CNV.sliding_window.stats.bed.gz"
+#     done < <( fgrep -v mega refs/rCNV_metacohort_list.txt ) \
+#     > $nocolon.$CNV.cohort_effect_size_comparison.input.txt
+#   done
+#   time /opt/rCNV2/analysis/paper/plot/large_segments/plot_cross_cohort_effect_size_comparisons.R \
+#     --conditional-exclusion refs/GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz \
+#     --min-cases 300 \
+#     $nocolon.DEL.cohort_effect_size_comparison.input.txt \
+#     $nocolon.DUP.cohort_effect_size_comparison.input.txt \
+#     cross_cohort_effect_sizes/$nocolon.cohort_effect_size_comparison.png
+# done < refs/test_phenotypes.list
 
 
 # Compute effect size and max P-value per phenotype per gw-sig segment
@@ -506,6 +532,7 @@ cat <( zcat ${prefix}.final_segments.loci.all_sumstats.tsv.gz ) \
 
 # Copy all plots to gs:// bucket (note: requires permissions)
 gsutil -m cp -r \
+  cross_cohort_effect_sizes \
   basic_distribs \
   effect_size_plots \
   pleiotropy_plots \

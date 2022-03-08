@@ -18,16 +18,8 @@
 require(optparse, quietly=T)
 require(rCNV2, quietly=T)
 
-# Set defaults not exposed to user
+# Set options
 options(stringsAsFactors=F, scipen=1000)
-coord.panel.height <- 0.2
-coord.panel.space <- 0.2
-coord.panel.y0 <- 0
-idio.panel.height <- 0.1
-idio.panel.space <- 0.2
-idio.panel.y0 <- (0.5 * coord.panel.height) + idio.panel.space + (0.5*idio.panel.height)
-# Top panels = those at or above y=0 (idiogram & coordinate line)
-top.panels.height <- sum(c(idio.panel.height, idio.panel.space, 0.5*coord.panel.height))
 
 
 #####################
@@ -45,6 +37,9 @@ option_list <- list(
   make_option(c("--highlight-color"), default=highlight.color,
               help="color to use for region highlights. [default: %default]"),
   make_option(c("--sumstats"), help="BED of summary statistics."),
+  make_option(c("--genic-sumstats"), action="store_true", default=FALSE,
+              help=paste("flag to indicate --sumstats should be plotted on a",
+                         "per-gene basis. [default: %default]")),
   make_option(c("--cytobands", help=paste("BED of cytobands. If provided, will",
                                           "annotate idiogram with cytoband.",
                                           "[default: no annotation]"))),
@@ -54,6 +49,9 @@ option_list <- list(
   make_option(c("--autolabel-n-genes"), default=4, type="numeric",
               help=paste("automatically label all genes for loci involving no more",
                          "than this many genes [default: %default]")),
+  make_option(c("--genes-before-sumstats"), action="store_true", default=FALSE,
+              help=paste("plot genes above summary statistics if both --sumstats",
+                         "and --gtf are provided [default: sumstats first]")),
   make_option(c("--constraint"), help=paste("BED of constraint features. If supplied,",
                                             "will annotate all genes with LOEUF")),
   make_option(c("--pips"), help="BED file of PIPs for all genes."),
@@ -75,40 +73,53 @@ option_list <- list(
               help=paste("subgroup cohorts into CNV panels for diagnostic",
                          "labs, case-control studies, and biobanks.",
                          " [default: %default]")),
+  make_option(c("--idio-panel-space"), default=0.2, type="numeric",
+              help=paste("spacing between idiogram and coordinate panel.",
+                         "[default: %default]")),
+  make_option(c("--idio-panel-height"), default=0.1, type="numeric",
+              help=paste("height of idiogram. [default: %default]")),
+  make_option(c("--coord-panel-space"), default=0.2, type="numeric",
+              help=paste("spacing between coordinate panel and next panel.",
+                         "[default: %default]")),
+  make_option(c("--coord-panel-height"), default=0.2, type="numeric",
+              help=paste("height of coordinate panel. [default: %default]")),
   make_option(c("--pval-panel-space"), default=0.3, type="numeric",
               help=paste("spacing between P-value panel and next panel. Only used",
                          "if --sumstats are provided. [default: %default]")),
   make_option(c("--pval-panel-height"), default=0.4, type="numeric",
-              help=paste("hight of P-value panel. Only used if --sumstats are",
+              help=paste("height of P-value panel. Only used if --sumstats are",
                          "provided. [default: %default]")),
   make_option(c("--or-panel-space"), default=0.15, type="numeric",
               help=paste("spacing between odds ratio panel and next panel. Only",
                          "used if --sumstats are provided. [default: %default]")),
   make_option(c("--or-panel-height"), default=0.4, type="numeric",
-              help=paste("hight of odds ratio panel. Only used if --sumstats are",
+              help=paste("height of odds ratio panel. Only used if --sumstats are",
                          "provided. [default: %default]")),
   make_option(c("--gene-panel-space"), default=0.15, type="numeric",
               help=paste("spacing between gene strip panels and next panels. Only",
                          "used if --gtf is provided. [default: %default]")),
   make_option(c("--gene-panel-height"), default=0.1, type="numeric",
-              help=paste("hight of gene strip panels. Only used if --gtf is",
+              help=paste("height of gene strip panels. Only used if --gtf is",
                          "provided. [default: %default]")),
   make_option(c("--constraint-panel-space"), default=0.1, type="numeric",
               help=paste("spacing between constraint panel and next panel. Only used",
                          "if --constraint is provided. [default: %default]")),
   make_option(c("--constraint-panel-height"), default=0.4, type="numeric",
-              help=paste("hight of constraint panel. Only used if --constraint is",
+              help=paste("height of constraint panel. Only used if --constraint is",
                          "provided. [default: %default]")),
   make_option(c("--pip-panel-space"), default=0.2, type="numeric",
               help=paste("spacing between PIP panel and next panel. Only used",
                          "if --pips are provided. [default: %default]")),
   make_option(c("--pip-panel-height"), default=0.4, type="numeric",
-              help=paste("hight of PIP panel. Only used if --pips are",
+              help=paste("height of PIP panel. Only used if --pips are",
                          "provided. [default: %default]")),
   make_option(c("--cnv-panel-space"), default=0.15, type="numeric",
               help="spacing between each CNV panel and next panel. [default: %default]"),
   make_option(c("--cnv-panel-height"), default=0.65, type="numeric",
-              help="hight of each CNV panel. [default: %default]"),
+              help="height of each CNV panel. [default: %default]"),
+  make_option(c("--dx"), default=100, type="numeric",
+              help=paste("CNV resolution for plotting, specified as number of",
+                         "bins to subdivide X axis into. [default: %default]")),
   make_option(c("--par-mar"), default="0.5;6;0.2;0.5",
               help="Semicolon-delimited list of values to pass to par(mar=...)"),
   make_option(c("--pdf-height"), help=paste("height of output .pdf (at 6pt font",
@@ -145,10 +156,12 @@ highlight.hpo <- opts$`highlight-hpo`
 highlights.str <- opts$`highlights`
 highlight.color <- opts$`highlight-color`
 sumstats.in <- opts$sumstats
+retain.ss.coords <- opts$`genic-sumstats`
 cytobands.in <- opts$cytobands
 gtf.in <- opts$gtf
 label.genes.str <- opts$`label-genes`
 autolabel.n.genes <- opts$`autolabel-n-genes`
+genes.before.sumstats <- opts$`genes-before-sumstats`
 constraint.in <- opts$constraint
 pips.in <- opts$pips
 min.cases <- opts$`min-cases`
@@ -158,6 +171,10 @@ gw.sig.label.side <- opts$`gw-sig-label-side`
 standardize.freqs <- opts$`standardize-frequencies`
 collapse.cohorts <- opts$`collapse-cohorts`
 subgroup.cohorts <- opts$`subgroup-cohorts`
+idio.panel.space <- opts$`idio-panel-space`
+idio.panel.height <- opts$`idio-panel-height`
+coord.panel.space <- opts$`coord-panel-space`
+coord.panel.height <- opts$`coord-panel-height`
 pval.panel.space <- if(!is.null(sumstats.in)){opts$`pval-panel-space`}else{0}
 pval.panel.height <- if(!is.null(sumstats.in)){opts$`pval-panel-height`}else{0}
 or.panel.space <- if(!is.null(sumstats.in)){opts$`or-panel-space`}else{0}
@@ -174,6 +191,7 @@ othergene.panel.space <- if(!is.null(pips.in)){gene.panel.space}else{0}
 othergene.panel.height <- if(!is.null(pips.in)){gene.panel.height}else{0}
 cnv.panel.space <- opts$`cnv-panel-space`
 cnv.panel.height <- opts$`cnv-panel-height`
+cnv.dx <- opts$`dx`
 parmar <- as.numeric(unlist(strsplit(opts$`par-mar`, split=";")))
 pdf.dims <- c(opts$`pdf-height`, opts$`pdf-width`)
 
@@ -246,7 +264,8 @@ if(standardize.freqs & !collapse.cohorts){
   max.freq <- 1.025 * max(sapply(1:length(cnvs), function(i){
     sapply(1:2, function(k){
       max.n.cnvs <- max(pileup.cnvs.for.highlight(cnvs[[i]][[k]], start=start,
-                                                  end=end)$counts$count, na.rm=T)
+                                                  end=end, dx=cnv.dx)$counts$count,
+                        na.rm=T)
       max.n.cnvs / n.samples[[k]][i]
     })
   }), na.rm=T)
@@ -256,7 +275,7 @@ if(standardize.freqs & !collapse.cohorts){
 
 # Load meta-analysis summary stats, if optioned
 if(!is.null(sumstats.in)){
-  ss <- load.sumstats.for.region(sumstats.in, region)
+  ss <- load.sumstats.for.region(sumstats.in, region, keep.intervals=retain.ss.coords)
 }
 
 # Load genes, if optioned
@@ -289,11 +308,22 @@ if(!is.null(label.genes.str)){
 }
 
 # Configure panel layout
+coord.panel.y0 <- 0
+idio.panel.y0 <- (0.5 * coord.panel.height) + idio.panel.space + (0.5*idio.panel.height)
+# Top panels = those at or above y=0 (idiogram & coordinate line)
+top.panels.height <- sum(c(idio.panel.height, idio.panel.space, 0.5*coord.panel.height))
 # Upper panels = all panels below y=0 but above CNV pileups
-pval.panel.y0 <- -((0.5*coord.panel.height) + coord.panel.space + (0.5*coord.panel.height))
-or.panel.y0 <- pval.panel.y0 - (0.5*pval.panel.height) - or.panel.space - (0.5*or.panel.height)
-gene.panel.y0 <- or.panel.y0 - (0.5*or.panel.height) - gene.panel.space - (0.5*gene.panel.height)
-constraint.panel.y0 <- gene.panel.y0 - (0.5*gene.panel.height) - constraint.panel.space - (0.5*constraint.panel.height)
+if(genes.before.sumstats){
+  gene.panel.y0 <- -((0.5*coord.panel.height) + gene.panel.space + (0.5*gene.panel.height))
+  pval.panel.y0 <- gene.panel.y0 - (0.5*gene.panel.height) - pval.panel.space - (0.5*pval.panel.height)
+  or.panel.y0 <- pval.panel.y0 - (0.5*pval.panel.height) - or.panel.space - (0.5*or.panel.height)
+  constraint.panel.y0 <- or.panel.y0 - (0.5*or.panel.height) - constraint.panel.space - (0.5*constraint.panel.height)
+}else{
+  pval.panel.y0 <- -((0.5*coord.panel.height) + pval.panel.space + (0.5*pval.panel.height))
+  or.panel.y0 <- pval.panel.y0 - (0.5*pval.panel.height) - or.panel.space - (0.5*or.panel.height)
+  gene.panel.y0 <- or.panel.y0 - (0.5*or.panel.height) - gene.panel.space - (0.5*gene.panel.height)
+  constraint.panel.y0 <- gene.panel.y0 - (0.5*gene.panel.height) - constraint.panel.space - (0.5*constraint.panel.height)
+}
 pip.panel.y0 <- constraint.panel.y0 - (0.5*constraint.panel.height) - pip.panel.space - (0.5*pip.panel.height)
 credset.panel.y0 <- pip.panel.y0 - (0.5*pip.panel.height) - gene.panel.space - (0.5*gene.panel.height)
 othergene.panel.y0 <- credset.panel.y0 - (0.5*gene.panel.height) - gene.panel.space - (0.5*gene.panel.height)
@@ -308,7 +338,7 @@ upper.panels.height <- -sum(c((0.5 * coord.panel.height), coord.panel.space,
 # Lower panels = CNV pileup
 cnv.panel.y0s <- upper.panels.height - sapply(1:length(cnvs), function(i){
   ((i-1)*(cnv.panel.height+cnv.panel.space)) + (0.5*cnv.panel.height)
-}) + (1.1*cnv.panel.space)
+}) - (1.1*cnv.panel.space)
 total.height <- min(cnv.panel.y0s - (0.5*cnv.panel.height))
 cnv.key.height <- 0.25
 cnv.key.spacing <- 0.15
@@ -349,6 +379,7 @@ rect(xleft=par("usr")[1], xright=par("usr")[2],
 plot.coord.line(start, end, coord.panel.y0, highlight.df$start, highlight.df$end,
                 highlight.col=highlight.color, tick.height=0.04, vlines=TRUE,
                 vlines.bottom=total.height)
+
 
 # Add association summary stats, if optioned
 if(!is.null(sumstats.in)){
@@ -404,7 +435,7 @@ if(collapse.cohorts){
 }else{
   cnv.title <- paste(cnv.names[cnv.type], "Evidence per Cohort")
 }
-text(x=mean(c(start, end)), y=upper.panels.height+(0.85*cnv.panel.space),
+text(x=mean(c(start, end)), y=upper.panels.height-(0.85*cnv.panel.space),
      labels=cnv.title, pos=3, cex=5.5/6)
 mtext(2, at=mean(cnv.panel.y0s), line=3.5,
       text=paste(cnv.names[cnv.type], "Frequency"))
@@ -423,8 +454,8 @@ sapply(1:length(cnvs), function(i){
                                cnv.type=cnv.type, highlight.hpo=highlight.hpo,
                                max.freq=max.freq, panel.height=cnv.panel.height,
                                y.axis.title=NA, expand.pheno.label=F,
-                               add.cohort.label=TRUE,
-                               cohort.label=cohort.label)
+                               add.cohort.label=TRUE, cohort.label=cohort.label,
+                               dx=cnv.dx)
 })
 
 # Add key for CNV panels
