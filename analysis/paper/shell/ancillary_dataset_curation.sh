@@ -30,7 +30,7 @@ gsutil -m cp -r \
   ${rCNV_bucket}/raw_data/other/redin_2017.bca_breakpoints.all.tsv.gz \
   ${rCNV_bucket}/analysis/analysis_refs/GRCh37.genome \
   ${rCNV_bucket}/refs/gnomad_v2.1_sv.nonneuro.sites.vcf* \
-  ${rCNV_bucket}/raw_data/other/fu_asc_spark_denovo_cnvs.raw.bed.gz \
+  ${rCNV_bucket}/raw_data/other/fu_asc_spark_*_cnvs.raw.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/loose_unclustered_nahr_regions.w_genes.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
   ./
@@ -159,7 +159,7 @@ done \
 for CNV in DEL DUP; do
   /opt/rCNV2/data_curation/other/match_segs_by_gene_content.py \
     -a fu_asc_spark_denovo_cnvs.cleaned.b37.${CNV}.annotated.bed.gz \
-    -b loose_unclustered_nahr_regions.annotated.bed.gz \
+    -b loose_unclustered_nahr_regions.w_genes.bed.gz \
     -r -f 0.5
 done \
 | fgrep -v "#" | sed 's/_dnCNV_/\t/g' \
@@ -168,6 +168,25 @@ done \
 | cat <( echo -e "#chr\tstart\tend\tsample\tcnv\tpheno\tn_genes\tgenes" ) - \
 | bgzip -c \
 > asc_spark_2021_denovo_cnvs.cleaned.b37.annotated.NAHR.bed.gz
+
+
+# Process ASC/SPARK rare CNVs in probands & siblings
+/opt/rCNV2/data_curation/other/curate_asc_spark_rare_cnvs.py \
+  --bgzip \
+  --outbed fu_asc_spark_rare_cnvs.cleaned.hg38.bed.gz \
+  fu_asc_spark_rare_cnvs.raw.bed.gz
+liftOver -minMatch=0.5 -bedPlus=3 \
+  fu_asc_spark_rare_cnvs.cleaned.hg38.bed.gz \
+  hg38ToHg19.over.chain.gz \
+  fu_asc_spark_rare_cnvs.cleaned.hg19.bed \
+  fu_asc_spark_rare_cnvs.cleaned.hg38.liftFail.txt
+sed 's/^chr//g' fu_asc_spark_rare_cnvs.cleaned.hg19.bed \
+| sort -Vk1,1 -k2,2n -k3,3n \
+| awk -v OFS="\t" '{ print $1, $2, $3, "Fu_2021_gCNV_"NR, $4, $5, $6 }' \
+| cat <( echo -e "#chrom\tstart\tend\tcnv_id\tcnv\tsample\tphenotype" ) - \
+| bgzip -c \
+> asc_spark_2021_rare_cnvs.cleaned.b37.bed.gz
+tabix -f asc_spark_2021_rare_cnvs.cleaned.b37.bed.gz
 
 
 # Copy curated DNMs, BCAs, mutation rates, and de novo CNVs to gs:// bucket (note: requires permissions)
@@ -181,5 +200,6 @@ gsutil -m cp \
   gene_mutation_rates.tsv.gz \
   asc_spark_2021_denovo_cnvs.cleaned.b37.annotated.nonNAHR.bed.gz \
   asc_spark_2021_denovo_cnvs.cleaned.b37.annotated.NAHR.bed.gz \
+  asc_spark_2021_rare_cnvs.cleaned.b37.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/misc/
 

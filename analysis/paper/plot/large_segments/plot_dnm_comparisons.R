@@ -222,7 +222,7 @@ dnm.excess.cdf.highlights <- function(segs, dnms, cohort, csq,
   res <- lapply(segs$region_id, get.dnm.excess.byGene, segs=segs, dnms=dnms, csq=csq)
   names(res) <- segs$region_id
   bar.pal <- rev(viridis(top.n.genes + 1))
-  csq.lab <- c("lof" = "PTV", "mis" = "Misense", "syn" = "Synonymous")[csq]
+  csq.lab <- c("lof" = "PTV", "mis" = "Missense", "syn" = "Synonymous")[csq]
   cnv.lab <- c("lof" = "DEL", "mis" = "DUP", "syn" = "rCNV")[csq]
 
   # Prep plot area
@@ -262,7 +262,7 @@ dnm.excess.cdf.highlights <- function(segs, dnms, cohort, csq,
       if(j<3){text.col <- "black"}else{text.col <- ns.color.light}
       if(length(grep("Others", names(vals)[j])) == 1){
         lab <- names(vals)[j]
-      }else if(vals.scaled.marginal[j] > 0.4){
+      }else if(vals.scaled.marginal[j] > 0.43){
         lab <- bquote(bolditalic(.(names(vals)[j])) ~ (.(paste("+", round(vals[j], 0), " ", csq.lab, sep=""))))
       }else if(vals.scaled.marginal[j] > 0.3){
         lab <- bquote(bolditalic(.(names(vals)[j])) ~ (.(paste("+", round(vals[j], 0), sep=""))))
@@ -381,7 +381,24 @@ dnm.excess.cdf.barplots <- function(segs, dnms, cohort, csq, n.max.genes=5, min.
     if(sort.firstwo.only==FALSE){
       res <- res[order(res[, 5], res[, 4], res[, 3], res[, 2], res[, 1], decreasing=T), ]
       if(fancy.sort){
-        res <- res[fancy.order(res), ]
+        if(annotate.top.n > 0){
+          res.order <- unlist(sapply(1:(annotate.top.n+1), function(i){
+            if(i == 1){
+              top.idxs <- which(res[, i] >= annotate.cutoff)
+              top.idxs[fancy.order(res[top.idxs, , drop=F])]
+            }else if(i <= annotate.top.n){
+              next.idxs <- which(res[, i-1] < annotate.cutoff
+                                 & res[, i] >= annotate.cutoff)
+              next.idxs[fancy.order(res[next.idxs, , drop=F])]
+            }else{
+              last.idxs <- which(res[, i-1] < annotate.cutoff)
+              last.idxs[fancy.order(res[last.idxs, , drop=F])]
+            }
+          }))
+          res <- res[res.order, ]
+        }else{
+          res <- res[fancy.order(res), ]
+        }
       }else{
         if(order.by=="decile"){
           res <- res[order.by.decile(res), ]
@@ -609,7 +626,7 @@ enumerated.excesses <- lapply(names(dnms), function(cohort){
 names(enumerated.excesses) <- names(dnms)
 
 # Annotate each segment with its relative excess percentile
-ndd.segs <- assign.excess.pct(segs, enumerated.excesses)
+ndd.segs <- assign.excess.pct(ndd.segs, enumerated.excesses)
 
 # Quantify deletion and duplication excesses and write to file
 quantify.excesses(ndd.segs, paste(out.prefix, "quantified_dnm_excesses.tsv", sep="."))
@@ -698,8 +715,8 @@ sapply(names(dnms), function(cohort){
                             dnms[[cohort]], cohort=cohort, csq=csq,
                             min.excess=min.excess.for.norm, norm=T, legend=F,
                             pct.cutoff=pct.cutoff, cnv.marker.wex=cnv.marker.wex,
-                            fancy.sort=FALSE, order.by="deciles",
-                            sort.firstwo.only=TRUE, annotate.top.n=2,
+                            fancy.sort=TRUE, order.by="deciles",
+                            sort.firstwo.only=FALSE, annotate.top.n=2,
                             annotate.cutoff=0.9, print.report=TRUE,
                             xtitle.suffix=xtitle.suffix.2, ytitle=ytitle.2,
                             parmar=c(1.1, 2.6, 0.1, 1))

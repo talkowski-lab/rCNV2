@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -18,7 +18,7 @@ gcloud auth login
 
 # Set global parameters
 export rCNV_bucket="gs://rcnv_project"
-export prefix="rCNV2_analysis_d1"
+export prefix="rCNV2_analysis_d2"
 
 
 # Download necessary data (note: requires permissions)
@@ -26,85 +26,59 @@ gsutil -m cp -r ${rCNV_bucket}/cleaned_data/cnv ./
 gsutil -m cp \
   ${rCNV_bucket}/cleaned_data/genome_annotations/rCNV.burden_stats.tsv.gz \
   ${rCNV_bucket}/cleaned_data/genome_annotations/rCNV.crbs.bed.gz \
+  ${rCNV_bucket}/analysis/crb_burden/other_data/unconstrained_cnv_counts.*.tsv.gz \
+  ${rCNV_bucket}/results/segment_association/* \
   ./
 mkdir refs/
 gsutil -m cp -r \
-  ${rCNV_bucket}/cleaned_data/genes/gencode.v19.canonical.pext_filtered.gtf.gz* \
-  ${rCNV_bucket}/refs/GRCh37.* \
-  ${rCNV_bucket}/analysis/analysis_refs/test_phenotypes.list \
-  ${rCNV_bucket}/analysis/analysis_refs/HPOs_by_metacohort.table.tsv \
-  ${rCNV_bucket}/cleaned_data/genes/gene_lists \
+  ${rCNV_bucket}/analysis/analysis_refs/* \
   ${rCNV_bucket}/refs/REP_state_manifest.tsv \
   refs/
+mkdir meta_stats/
+gsutil -m cp \
+  gs://rcnv_project/analysis/crb_burden/**rCNV.loose_noncoding.*.crb_burden.meta_analysis.stats.bed.gz \
+  meta_stats/
 
 
 # Plot observed effect size distributions split by gene set membership
 # Used to justify inclusion of some coding effects in noncoding association test
-fgrep -wvf \
-  refs/gene_lists/HP0000118.HPOdb.genes.list \
-  refs/gene_lists/gnomad.v2.1.1.likely_unconstrained.genes.list \
-| sort -V | uniq \
-> loose_noncoding_whitelist.genes.list
-mkdir genes_per_cnv
-for CNV in DEL DUP; do
-  # Annotate all CNVs based on any exon overlap
-  for i in $( seq 1 4 ); do
-    /opt/rCNV2/analysis/genes/count_cnvs_per_gene.py \
-      cnv/meta${i}.rCNV.bed.gz \
-      refs/gencode.v19.canonical.pext_filtered.gtf.gz \
-      --min-cds-ovr "10e-10" \
-      -t ${CNV} \
-      --blacklist refs/GRCh37.segDups_satellites_simpleRepeats_lowComplexityRepeats.bed.gz \
-      --blacklist refs/GRCh37.somatic_hypermutable_sites.bed.gz \
-      --blacklist refs/GRCh37.Nmask.autosomes.bed.gz \
-      -o /tmp/junk.bed.gz \
-      --bgzip \
-      --cnvs-out /dev/stdout \
-    | cut -f4,6-7,9 | gzip -c \
-    > genes_per_cnv/rCNV.${CNV}.meta${i}.genes_per_cnv.tsv.gz
-    echo -e "meta${i}\tgenes_per_cnv/rCNV.${CNV}.meta${i}.genes_per_cnv.tsv.gz"
-  done \
-  > genes_per_cnv.${CNV}.input.tsv
-  # Summarize CNV counts by gene list per phenotype
-  /opt/rCNV2/analysis/paper/scripts/noncoding_association/summarize_ncCNV_counts.py \
-    --genes-per-cnv genes_per_cnv.${CNV}.input.tsv \
-    --hpos <( cut -f2 refs/test_phenotypes.list ) \
-    --unconstrained-genes loose_noncoding_whitelist.genes.list \
-    --summary-counts unconstrained_cnv_counts.${CNV}.tsv.gz \
-    --gzip
-done
+total_dev=$( fgrep -v "#" refs/rCNV2.hpos_by_severity.developmental.counts.tsv \
+             | awk '{ sum+=$2 }END{ print sum }' )
+echo -e "DEVELOPMENTAL\tStrong-effect HPOs\t$total_dev" \
+| paste - <( fgrep -v "#" refs/rCNV2.hpos_by_severity.developmental.counts.tsv \
+             | cut -f2 | paste -s ) \
+| paste - <( echo $total_dev ) | cat refs/HPOs_by_metacohort.table.tsv - \
+> HPOs_by_metacohort.w_DEV.table.tsv
 /opt/rCNV2/analysis/paper/plot/noncoding_association/plot_unconstrained_effect_sizes.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   unconstrained_cnv_counts.DEL.tsv.gz \
   unconstrained_cnv_counts.DUP.tsv.gz \
-  refs/HPOs_by_metacohort.table.tsv \
+  HPOs_by_metacohort.w_DEV.table.tsv \
   ${prefix}
 
 
 # Make supplementary table of noncoding track stats
 /opt/rCNV2/analysis/paper/scripts/noncoding_association/format_track_stats_table.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --saddlepoint-adj \
   rCNV.burden_stats.tsv.gz \
   ${prefix}
 
 
 # Plot annotation track distributions & stats
 /opt/rCNV2/analysis/paper/plot/noncoding_association/plot_track_stats.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.burden_stats.tsv.gz \
   ${prefix}
 
 
 # Volcano plots of DEL & DUP track-level burden tests
 /opt/rCNV2/analysis/paper/plot/noncoding_association/plot_volcanos.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --saddlepoint-adj \
   rCNV.burden_stats.tsv.gz \
   ${prefix}
 
 
 # Plot ChromHMM enrichments as positive controls
 /opt/rCNV2/analysis/paper/plot/noncoding_association/chromhmm_enrichments.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
+  --saddlepoint-adj \
   rCNV.burden_stats.tsv.gz \
   refs/REP_state_manifest.tsv \
   ${prefix}
@@ -112,10 +86,41 @@ done
 
 # Plot CRB distributions & stats
 /opt/rCNV2/analysis/paper/plot/noncoding_association/plot_crb_stats.R \
-  --rcnv-config /opt/rCNV2/config/rCNV2_rscript_config.R \
   rCNV.crbs.bed.gz \
   ${prefix}
 
+
+# Get all significant CRBs
+for cnv in DEL DUP; do
+  # Make input for get_significant_genes_v2.py
+  while read nocolon hpo; do
+    echo $hpo
+    echo -e "meta_stats/$nocolon.rCNV.loose_noncoding.$cnv.crb_burden.meta_analysis.stats.bed.gz"
+    head -n1 refs/crb_burden.rCNV.loose_noncoding.DEL.bonferroni_pval.hpo_cutoffs.tsv | cut -f2
+  done < refs/test_phenotypes.list | paste - - - > $cnv.stats.list
+
+  # Extract all significant CRBs
+  # Note: can use same script as for extracting significant genes because format of sumstats is identical
+  /opt/rCNV2/analysis/genes/get_significant_genes_v2.py \
+    $cnv.stats.list \
+    --secondary-p-cutoff 0.05 \
+    --min-nominal 2 \
+    --secondary-or-nominal \
+    --fdr-q-cutoff 0.01 \
+    --secondary-for-fdr \
+    --outfile $cnv.all_sig_crbs.tsv
+done
+
+
+# Check if any CRBs don't overlap with significant large segments
+for CNV in DEL DUP; do
+  zcat rCNV.crbs.bed.gz | fgrep -v "#" \
+  | awk -v OFS="\t" '{ print $4, $1, $2, $3 }' | sort -k1,1 \
+  | join -j 1 -t $'\t' <( cat $CNV.all_sig_crbs.tsv | fgrep -v "#" | sort -k1,1 ) - \
+  | awk -v OFS="\t" -v CNV=$CNV '{ print $3, $4, $5, $1, $2, CNV }' \
+  # | bedtools intersect -v -a - \
+  #   -b <( zcat rCNV.final_segments.loci.bed.gz | fgrep -w $CNV )
+done
 
 # Copy all plots to final gs:// directory
 gsutil -m cp -r \

@@ -4,32 +4,42 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2022-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
-# Common functions for noncoding association analyses in rCNV2 paper
+# Utility functions used for noncoding association analyses
 
 
-options(stringsAsFactors=F, scipen=1000)
-
-
-######################
-### DATA FUNCTIONS ###
-######################
-# Extract summary statistics from a single gene or CRB BED
-load.sumstats <- function(stats.in){
+#' Load CRB sumstats
+#'
+#' Extract summary statistics from a single gene or CRB BED
+#'
+#' @param stats.in path to .bed file of CRB association stats
+#'
+#' @export
+load.crb.sumstats <- function(stats.in){
   # Read data & drop coordinates
   stats <- read.table(stats.in, header=T, sep="\t", check.names=F, comment.char="")[, -c(1:3)]
-  
+
   # Clean data types
   stats[, -c(1, 4, 6)] <- apply(stats[, -c(1, 4, 6)], 2, as.numeric)
-  
+
   return(stats)
 }
 
-# Assign noncoding annotation family based on annotation track & source
-assign.family <- function(track, source){
+
+#' Assign noncoding annotation families
+#'
+#' Assign noncoding annotation family based on annotation track & source
+#'
+#' @param track track name
+#' @param source name of track source
+#'
+#' @return string of track family
+#'
+#' @export
+assign.track.family <- function(track, source){
   mappings <- c("boca" = "dhs",
                 "dbSUPER" = "super.enhancers",
                 "encode_dnaaccessibility" = "dhs",
@@ -62,38 +72,73 @@ assign.family <- function(track, source){
   }
 }
 
-# Load burden test statistics for all tracks
-load.track.stats <- function(stats.in){
+
+#' Load track burden sumstats
+#'
+#' Load burden test statistics for all tracks
+#'
+#' @param stats.in path to track burden summary statistics file
+#' @param spa update P-values with saddlepoint re-approximation of the null \[default: FALSE\]
+#'
+#' @return data.frame
+#'
+#' @export
+load.track.stats <- function(stats.in, spa=F){
   # Read data
   stats <- read.table(stats.in, header=T, sep="\t", comment.char="")
   colnames(stats)[1] <- gsub("X.", "", colnames(stats)[1], fixed=T)
-  
+
+  # Update P-values with saddlepoint reapproximation, if optioned
+  # Do this separately for DEL and DUP
+  if(spa){
+    for(cnv in c("DEL", "DUP")){
+      require(EQL, quietly=T)
+      cnv.idxs <- which(stats$cnv == cnv)
+      spa.res <- saddlepoint.adj(stats$meta.zscore[cnv.idxs])
+      stats$meta.zscore[cnv.idxs] <- spa.res$zscores
+      # Must recompute P-values for Z<0 because saddlepoint.adj only does one-tailed tests
+      stats$meta.neglog10_p[cnv.idxs] <- sapply(spa.res$zscores, function(z){
+        if(z >= 0){
+          -pnorm(z, lower.tail=F, log.p=T)/log(10)
+        }else{
+          -pnorm(z, lower.tail=T, log.p=T)/log(10)
+        }
+      })
+      stats$meta.neglog10_fdr_q[cnv.idxs] <- -log10(p.adjust(spa.res$pvalues, method="fdr"))
+    }
+  }
+
   # Partition feature source name from track name, and assign family
   stats$source <- sapply(stats$trackname, function(str){unlist(strsplit(str, split=".", fixed=T))[1]})
   stats$trackname <- sapply(stats$trackname, function(str){paste(unlist(strsplit(str, split=".", fixed=T))[-1], collapse=".")})
-  stats$family <- apply(stats[, c("trackname", "source")], 1, function(vals){assign.family(vals[1], vals[2])})
-  
+  stats$family <- apply(stats[, c("trackname", "source")], 1, function(vals){assign.track.family(vals[1], vals[2])})
+
   # Drop unnecessary columns
-  stats <- stats[, -c(grep("meta[1-4]", colnames(stats)), 
+  stats <- stats[, -c(grep("meta[0-9]+", colnames(stats)),
                       which(colnames(stats) %in% c("original_path")))]
-  
+
   return(stats)
 }
 
-# Load BED of CRBs
+
+#' Load CRBs
+#'
+#' Load BED of CRBs
+#'
+#' @param crbs.in path to CRB .bed file
+#'
+#' @return data.frame of CRBs
+#'
+#' @export
 load.crbs <- function(crbs.in){
   # Read data
   crbs <- read.table(crbs.in, header=T, sep="\t", comment.char="")
   colnames(crbs)[1] <- gsub("X.", "", colnames(crbs)[1], fixed=T)
-  
+
   # Compute size
   crbs$size <- crbs$end - crbs$start
-  
+
   return(crbs)
 }
 
-
-##########################
-### PLOTTING FUNCTIONS ###
-##########################
 

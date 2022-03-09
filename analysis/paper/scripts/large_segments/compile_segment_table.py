@@ -581,6 +581,8 @@ def main():
                         'gene annotations.')
     parser.add_argument('--meta-sumstats', help='Tsv of meta-analysis summary statistics ' +
                         'per phenotype per region. Computed with calc_all_seg_stats.py')
+    parser.add_argument('--asc-replication-counts', help='Tsv of CNV counts from ' +
+                        'Fu et al., medRxiv, 2021, for replication.')
     parser.add_argument('--neuro-hpos', help='List of neurological HPOs.')
     parser.add_argument('--dev-hpos', help='List of developmental HPOs.')
     parser.add_argument('--min-expression', default=1, help='Minimum expression ' +
@@ -774,6 +776,16 @@ def main():
     all_df['bonf_sig_gd'] = pd.get_dummies((all_df.any_gd == 1) & \
                                            (all_df.meta_best_p >= gd_bonf_cutoff), 
                                            drop_first=True)
+
+    # Annotate with ASC 2021 replication counts
+    if args.asc_replication_counts is not None:
+        rep_df = pd.read_csv(args.asc_replication_counts, sep='\t').\
+                    rename(columns={'#region_id' : 'rid'})
+        rep_df.set_index(rep_df.rid, inplace=True)
+        all_df['asc_spark_replication_cases'] = \
+            all_df.region_id.map(rep_df.replication_ASD).astype(pd.Int64Dtype())
+        all_df['asc_spark_replication_controls'] = \
+            all_df.region_id.map(rep_df.replication_control).astype(pd.Int64Dtype())
 
     # Sort & write out merged BED
     all_df.sort_values(by='chr start end cnv region_id'.split(), inplace=True)

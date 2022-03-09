@@ -213,7 +213,7 @@ exclusion_bed=GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz #Note: th
 meta_model_prefix="fe"
 i=1
 bin_overlap=0.5
-pad_controls=50000
+pad_controls=0
 
 # Copy all filtered CNV data, sliding windows, and other references 
 # from the project Google Bucket (note: requires permissions)

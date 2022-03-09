@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2020 Ryan L. Collins <rlcollins@g.harvard.edu> 
+# Copyright (c) 2020-Present Ryan L. Collins <rlcollins@g.harvard.edu> 
 # and the Talkowski Laboratory
 # Distributed under terms of the MIT license.
 
@@ -20,7 +20,8 @@ import subprocess
 
 
 def parse_cnvs(tsv_in, cohort, hpos, counts_out, gpass=[], 
-               control_hpo='HEALTHY_CONTROL', max_genes_for_summary=20000):
+               control_hpo='HEALTHY_CONTROL', max_genes_for_summary=20000,
+               dev_hpos=None):
     """
     Parse tsv of genes per CNV
     """
@@ -35,6 +36,10 @@ def parse_cnvs(tsv_in, cohort, hpos, counts_out, gpass=[],
     hpo_counts = {h : {'all' : 0,
                        'not_unconstrained' : 0,
                        'unconstrained_only' : 0} for h in hpos}
+    if dev_hpos is not None:
+        hpo_counts['DEVELOPMENTAL'] = {'all' : 0,
+                                       'not_unconstrained' : 0,
+                                       'unconstrained_only' : 0}
 
     # Iterate over CNVs and process one at a time
     for cnvid, phenos, ngenes, gstr in csv.reader(fin, delimiter='\t'):
@@ -63,9 +68,16 @@ def parse_cnvs(tsv_in, cohort, hpos, counts_out, gpass=[],
                     hpo_counts[hpo]['not_unconstrained'] += 1
                 else:
                     hpo_counts[hpo]['unconstrained_only'] += 1
+            if dev_hpos is not None:
+                if len(dev_hpos.intersection(set(phenos.split(';')))) > 0:
+                    hpo_counts['DEVELOPMENTAL']['all'] += 1
+                    if nonpass_hit:
+                        hpo_counts['DEVELOPMENTAL']['not_unconstrained'] += 1
+                    else:
+                        hpo_counts['DEVELOPMENTAL']['unconstrained_only'] += 1
 
     # Write counts to counts_out
-    for hpo in hpos:
+    for hpo in hpo_counts.keys():
         for gset in 'all not_unconstrained unconstrained_only'.split():
             hit = hpo_counts[hpo][gset]
             cline = '\t'.join([str(x) for x in [cohort, hpo, gset, hit]])
@@ -94,6 +106,8 @@ def main():
                         '--summary-counts.')
     parser.add_argument('--summary-counts', required=True, help='Output .tsv of ' +
                         'CNV counts per HPO.')
+    parser.add_argument('--developmental-hpos', help='List of HPOs to group ' +
+                        'into a single developmental category.')
     parser.add_argument('-z', '--gzip', dest='gzip', action='store_true',
                         help='Compress output tsvs with gzip.')
     args = parser.parse_args()
@@ -114,11 +128,18 @@ def main():
     if args.control_hpo not in hpos:
         hpos.append(args.control_hpo)
 
+    # Load developmental HPOs, if optioned
+    if args.developmental_hpos is not None:
+        dev_hpos = set([x.rstrip() for x in open(args.developmental_hpos).readlines()])
+    else:
+        dev_hpos = None
+
     # Process CNV files for each cohort
     with open(args.genes_per_cnv) as tsvin:
         for cohort, cnvin in csv.reader(tsvin, delimiter='\t'):
             parse_cnvs(cnvin, cohort, hpos, counts_out, gpass, 
-                       args.control_hpo, args.max_genes_for_summary)
+                       args.control_hpo, args.max_genes_for_summary,
+                       dev_hpos)
     counts_out.close()
 
     # Gzip, if optioned

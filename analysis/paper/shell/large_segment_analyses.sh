@@ -42,12 +42,17 @@ gsutil -m cp \
   ${rCNV_bucket}/analysis/paper/data/large_segments/lit_GDs.*.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/wgs_common_cnvs.*.bed.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/rCNV2_common_cnvs.*.bed.gz \
+  ${rCNV_bucket}/analysis/paper/data/misc/asc_spark_* \
   refs/
 wget -P refs/ https://storage.googleapis.com/gcp-public-data--gnomad/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz
 mkdir meta_stats/
 gsutil -m cp \
   ${rCNV_bucket}/analysis/sliding_windows/**.rCNV.**.sliding_window.meta_analysis.stats.bed.gz \
   meta_stats/
+# mkdir cohort_stats/
+# gsutil -m cp \
+#   ${rCNV_bucket}/analysis/sliding_windows/**meta*.rCNV.*.sliding_window.stats.bed.gz \
+#   cohort_stats/
 gsutil -m cp -r \
   ${rCNV_bucket}/cleaned_data/genes/gene_lists \
   ${rCNV_bucket}/analysis/paper/data/hpo/rCNV2_analysis_d2.hpo_jaccard_matrix.tsv \
@@ -65,6 +70,28 @@ del_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
               refs/sliding_window.rCNV.DEL.bonferroni_pval.hpo_cutoffs.tsv )
 dup_cutoff=$( awk -v FS="\t" -v hpo=${example_hpo} '{ if ($1==hpo) print $2 }' \
               refs/sliding_window.rCNV.DUP.bonferroni_pval.hpo_cutoffs.tsv )
+
+
+# # Plot genome-wide effect size correlations among all phenotypes
+# if [ -e cross_cohort_effect_sizes ]; then
+#   rm -rf cross_cohort_effect_sizes
+# fi
+# mkdir cross_cohort_effect_sizes
+# while read nocolon hpo; do
+#   echo "$hpo"
+#   for CNV in DEL DUP; do
+#     while read meta cohorts; do
+#       echo -e "$meta\tcohort_stats/$meta.$nocolon.rCNV.$CNV.sliding_window.stats.bed.gz"
+#     done < <( fgrep -v mega refs/rCNV_metacohort_list.txt ) \
+#     > $nocolon.$CNV.cohort_effect_size_comparison.input.txt
+#   done
+#   time /opt/rCNV2/analysis/paper/plot/large_segments/plot_cross_cohort_effect_size_comparisons.R \
+#     --conditional-exclusion refs/GRCh37.200kb_bins_10kb_steps.raw.cohort_exclusion.bed.gz \
+#     --min-cases 300 \
+#     $nocolon.DEL.cohort_effect_size_comparison.input.txt \
+#     $nocolon.DUP.cohort_effect_size_comparison.input.txt \
+#     cross_cohort_effect_sizes/$nocolon.cohort_effect_size_comparison.png
+# done < refs/test_phenotypes.list
 
 
 # Compute effect size and max P-value per phenotype per gw-sig segment
@@ -93,6 +120,15 @@ gzip -f ${prefix}.lit_gds.all_sumstats.tsv
 gsutil -m cp \
   ${prefix}.lit_gds.all_sumstats.tsv.gz \
   ${rCNV_bucket}/analysis/paper/data/large_segments/
+
+
+# Attempt replication for all discovery segments in ASC gCNV callset
+/opt/rCNV2/analysis/paper/scripts/large_segments/get_replication_counts.py \
+  --exclude-samples refs/asc_spark_2021_rare_cnvs.ssc_sample_exclusion.list \
+  --recip 0.5 \
+  --outfile asc_spark_2021_rare_cnvs.replication_counts.tsv \
+  rCNV.final_segments.loci.bed.gz \
+  refs/asc_spark_2021_rare_cnvs.cleaned.b37.bed.gz
 
 
 # Build master BED of all regions, including final segments, known GDs, and 
@@ -162,6 +198,7 @@ cat \
   --bca-tsv refs/redin_bca_breakpoints.bed.gz \
   --gtex-matrix refs/gencode.v19.canonical.pext_filtered.GTEx_v7_expression_stats.median.tsv.gz \
   --meta-sumstats pooled_sumstats.tsv \
+  --asc-replication-counts asc_spark_2021_rare_cnvs.replication_counts.tsv \
   --neuro-hpos refs/neuro_hpos.list \
   --dev-hpos refs/rCNV2.hpos_by_severity.developmental.list \
   --gd-recip "10e-10" \
@@ -197,6 +234,12 @@ zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f11 | sort -n
 zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f11 | sort -nk1,1 | tail -n1
 zcat rCNV.final_segments.associations.bed.gz | fgrep -v "#" | cut -f11 \
 | awk '{ sum+=$1 }END{ print sum/NR }'
+
+
+# Run ASC replication analysis
+/opt/rCNV2/analysis/paper/scripts/large_segments/asc_replication_analysis.R \
+  rCNV.final_segments.loci.bed.gz \
+  ${prefix}.master_segments.bed.gz
 
 
 # NOTE: AS OF DEC 3, 2021, PLOT CODE FOR PERMUTATIONS HAS BEEN MOVED TO THE CLOUD
@@ -489,6 +532,7 @@ cat <( zcat ${prefix}.final_segments.loci.all_sumstats.tsv.gz ) \
 
 # Copy all plots to gs:// bucket (note: requires permissions)
 gsutil -m cp -r \
+  cross_cohort_effect_sizes \
   basic_distribs \
   effect_size_plots \
   pleiotropy_plots \

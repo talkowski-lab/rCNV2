@@ -350,7 +350,7 @@ dev.off()
 
 # Plot large quintile-binned panel of pHaplo for main figure
 pdf(paste(out.prefix, "scores_vs_gnomAD-SV.pHaplo_raw.quintiled_large.pdf", sep="."),
-    height=2.75, width=2.1)
+    height=2.75, width=2.25)
 plot.oe.by.scorebin(oe.dat, scores, "pHaplo", "gnomad_sv_lof_del", metric="mean", n.bins=5,
                     x.label="All Autosomal Genes", cnv.label="LoF Dels.",
                     parse.x.label=F, x.label.line=1.1,
@@ -364,7 +364,7 @@ dev.off()
 
 # Plot large quintile-binned panel of pHaplo for main figure
 pdf(paste(out.prefix, "scores_vs_gnomAD-SV.pTriplo_raw.quintiled_large.pdf", sep="."),
-    height=2.75, width=2.1)
+    height=2.75, width=2.25)
 plot.oe.by.scorebin(oe.dat, scores, "pTriplo", "gnomad_sv_cg", metric="mean", n.bins=5,
                     x.label="All Autosomal Genes", cnv.label="CG Dups.",
                     parse.x.label=F, x.label.line=1.1,

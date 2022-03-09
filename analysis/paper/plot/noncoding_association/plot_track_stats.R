@@ -4,7 +4,7 @@
 #    rCNV Project    #
 ######################
 
-# Copyright (c) 2020 Ryan L. Collins and the Talkowski Laboratory
+# Copyright (c) 2020-Present Ryan L. Collins and the Talkowski Laboratory
 # Distributed under terms of the MIT License (see LICENSE)
 # Contact: Ryan L. Collins <rlcollins@g.harvard.edu>
 
@@ -22,12 +22,12 @@ family.barplot <- function(stats, parmar=c(0.5, 12, 2.25, 2)){
   # Get plot data
   pdat <- sort(table(stats$family[which(stats$cnv=="DEL")]), decreasing=TRUE)
   n.bars <- length(pdat)
-  
+
   # Prep plot area
   par(mar=parmar, bty="n")
   plot(NA, xlim=c(0, 1.1*max(pdat)), ylim=c(n.bars, 0),
        xaxt="n", yaxt="n", xlab="", ylab="", xaxs="i", yaxs="i")
-  
+
   # Add top axis & gridlines
   x.ax.at <- 1000*round(axTicks(1)/1000, 0)
   # abline(v=x.ax.at, col=bluewhite)
@@ -37,7 +37,7 @@ family.barplot <- function(stats, parmar=c(0.5, 12, 2.25, 2)){
     axis(3, at=x, tick=F, line=-0.8, labels=round(x/1000, 1))
   })
   mtext(3, text="Annotation Classes (x1,000)", line=1.25)
-  
+
   # Add rectangles & labels
   rect(xleft=rep(0, n.bars), xright=pdat,
        ybottom=(1:n.bars)-0.15, ytop=(1:n.bars)-0.85,
@@ -47,7 +47,7 @@ family.barplot <- function(stats, parmar=c(0.5, 12, 2.25, 2)){
        labels=prettyNum(pdat, big.mark=","))
   axis(2, at=(1:n.bars)-0.5, tick=F, line=-0.8, las=2, cex=5/6,
        labels=nc.anno.family.names[names(pdat)])
-  
+
   # Add cleanup line to left Y-axis
   axis(2, at=c(-10e10, 10e10), labels=NA, tck=0, col=blueblack)
 }
@@ -73,18 +73,18 @@ track.scatter <- function(stats, pt.cex=0.2, blue.bg=TRUE, parmar=c(2.25, 2.5, 0
     plot.bty <- "n"
     grid.col <- NA
   }
-  
+
   # Prep plot area
   par(bty="n", mar=parmar)
   plot(NA, xlim=xlims, ylim=ylims, xaxt="n", yaxt="n", xlab="", ylab="")
   ax.at <- -10:10
-  
+
   # Add background shading
-  rect(xleft=par("usr")[1], xright=par("usr")[2], 
+  rect(xleft=par("usr")[1], xright=par("usr")[2],
        ybottom=par("usr")[3], ytop=par("usr")[4],
        bty=plot.bty, border=plot.border, col=plot.bg)
   abline(h=ax.at, v=ax.at, col=grid.col)
-  
+
   # Add points
   points(plot.df[, 1:2], pch=19, cex=pt.cex, col=nc.anno.family.colors[plot.df$family])
 
@@ -93,7 +93,7 @@ track.scatter <- function(stats, pt.cex=0.2, blue.bg=TRUE, parmar=c(2.25, 2.5, 0
   axis(1, at=log10(logscale.minor[which(logscale.minor >= 1)]), tck=-0.015, col=blueblack, labels=NA, lwd=0.7)
   axis(1, at=ax.at, tck=-0.025, col=blueblack, labels=NA)
   sapply(1:length(logscale.major.bp), function(i){
-    axis(1, at=log10(logscale.major.bp[i]), tick=F, line=-0.8, cex.axis=5.5/6, 
+    axis(1, at=log10(logscale.major.bp[i]), tick=F, line=-0.8, cex.axis=5.5/6,
          labels=logscale.major.bp.labels[i])
   })
   mtext(1, line=1.2, text="Mean Element Size")
@@ -112,12 +112,10 @@ track.scatter <- function(stats, pt.cex=0.2, blue.bg=TRUE, parmar=c(2.25, 2.5, 0
 ### RSCRIPT BLOCK ###
 #####################
 require(optparse, quietly=T)
-require(funr, quietly=T)
+require(rCNV2, quietly=T)
 
 # List of command-line options
-option_list <- list(
-  make_option(c("--rcnv-config"), help="rCNV2 config file to be sourced.")
-)
+option_list <- list()
 
 # Get command-line arguments & options
 args <- parse_args(OptionParser(usage=paste("%prog stats.tsv out.prefix"),
@@ -133,22 +131,10 @@ if(length(args$args) != 2){
 # Writes args & opts to vars
 stats.in <- args$args[1]
 out.prefix <- args$args[2]
-rcnv.config <- opts$`rcnv-config`
 
 # # DEV PARAMETERS
 # stats.in <- "~/scratch/rCNV.burden_stats.tsv.gz"
 # out.prefix <- "~/scratch/track_stats_test"
-# rcnv.config <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/config/rCNV2_rscript_config.R"
-# script.dir <- "~/Desktop/Collins/Talkowski/CNV_DB/rCNV_map/rCNV2/analysis/paper/plot/noncoding_association/"
-
-# Source rCNV2 config, if optioned
-if(!is.null(rcnv.config)){
-  source(rcnv.config)
-}
-
-# Source common functions
-script.dir <- funr::get_script_path()
-source(paste(script.dir, "common_functions.R", sep="/"))
 
 # Load track stats & subset to single CNV type (no double counting)
 stats <- load.track.stats(stats.in)

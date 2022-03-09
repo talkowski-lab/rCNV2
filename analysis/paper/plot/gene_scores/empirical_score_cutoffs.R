@@ -251,8 +251,8 @@ ylims <- quantile(c(phi.lnor.full$margin_lnOR, pts.lnor.full$margin_lnOR),
                   probs=c(0.005, 0.995), na.rm=T)
 pt.cex <- 3/4
 avg.genes.per.bin <- mean(c(phi.lnor.full$margin_genes, pts.lnor.full$margin_genes), na.rm=T)
-pdf.height <- 2.25
-pdf.width <- 2.75
+pdf.height <- 2.4
+pdf.width <- 2.6
 pdf.parmar <- c(2.3, 2.3, 0.3, 0.3)
 
 # Plot full pHaplo vs lnOR

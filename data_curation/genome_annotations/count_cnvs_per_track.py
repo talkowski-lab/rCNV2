@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2020 Ryan L. Collins <rlcollins@g.harvard.edu> 
+# Copyright (c) 2020-Present Ryan L. Collins <rlcollins@g.harvard.edu> 
 # and the Talkowski Laboratory
 # Distributed under terms of the MIT license.
 
@@ -64,6 +64,42 @@ def load_cnvs(cohorts_in, case_hpos, control_hpos):
     return cnvs, cnv_counts, cohort_n
 
 
+def load_counts_by_context(c_by_c_in, cohorts, case_hpo='DEVELOPMENTAL', 
+                           control_hpo='HEALTHY_CONTROL'):
+    """
+    Load counts of CNVs per cohort, CNV type, and phenotype based on genic context
+    Returns dict
+    """
+
+    # Load & filter table
+    if c_by_c_in is not None:
+        c_by_c_df = pd.read_csv(c_by_c_in, sep='\t').\
+                       rename(columns={'#cohort' : 'cohort'})
+        keepers = (c_by_c_df.hpo.isin([case_hpo, control_hpo])) & \
+                  (c_by_c_df.gset == 'not_unconstrained')
+        c_by_c_df = c_by_c_df.loc[keepers, :]
+    else:
+        c_by_c_df = None
+
+    # Build nested dict of counts
+    counts_by_context = {cnv : {} for cnv in 'DEL DUP'.split()}
+    for cnv in counts_by_context.keys():
+        for ptype in phenotypes:
+            hpo = {'case' : case_hpo, 'control' : control_hpo}[ptype]
+            counts_by_context[cnv][ptype] = {}
+            for cohort in cohorts:
+                if c_by_c_df is None:
+                    counts_by_context[cnv][ptype][cohort] = 0
+                else:
+                    ridx = (c_by_c_df.cohort == cohort) & \
+                           (c_by_c_df.hpo == hpo) & \
+                           (c_by_c_df.cnv == cnv)
+                    counts_by_context[cnv][ptype][cohort] = \
+                        c_by_c_df.loc[ridx, 'cnvs'].values[0]
+
+    return counts_by_context
+
+
 def main():
     """
     Main block
@@ -88,6 +124,12 @@ def main():
     parser.add_argument('--norm-by-samplesize', action='store_true', help='Return ' +
                         'the number of samples with no CNVs as "_ref" category. ' +
                         '[default: returns number of CNVs not intersecting track]')
+    parser.add_argument('--conditional-exclusion', help='BED of cohorts to ' + 
+                        'exclude per 200kb window.')
+    parser.add_argument('--counts-by-gene-context', help='.tsv of counts of ' +
+                        'CNVs per phenotype by genic context. If provided, will ' +
+                        'subtract coding CNV carriers from denominators to ' +
+                        'better calibrate burden testing.')
     parser.add_argument('-o', '--outfile', help='Path to output BED file. ' +
                         '[default: stdout]', default='stdout')
     parser.add_argument('-z', '--gzip', action='store_true', help='Compress ' +
@@ -114,6 +156,18 @@ def main():
     # Load CNVs per cohort and split by CNV type and phenotype
     cnvs, cnv_counts, cohort_n = load_cnvs(args.cohorts, case_hpos, [args.control_hpo])
 
+    # Load conditional exclusion BED per cohort
+    if args.conditional_exclusion is not None:
+        xbt = pbt.BedTool(args.conditional_exclusion)
+        xlist = {c : xbt.filter(lambda x: c in x.name).cut(range(3)).merge() for c in cnvs.keys()}
+    else:
+        xlist = {c : pbt.BedTool('', from_string=True) for c in cnvs.keys()}
+
+    # Load samples to be subtracted from denominators
+    counts_by_context = load_counts_by_context(args.counts_by_gene_context,
+                                               cnvs.keys(), 'DEVELOPMENTAL',
+                                               args.control_hpo)
+
     # Iterate over tracks and count CNVs for each metacohort
     with open(args.track_stats) as tsin:
         for track_vals in [x.rstrip().split('\t') for x in tsin.readlines()]:
@@ -129,17 +183,20 @@ def main():
 
             # Process each track
             tname = str(track_vals[0])
-            tpath = str(track_vals[-1])
+            tbt = pbt.BedTool(str(track_vals[-1])).cut(range(3)).saveas()
             tvals_out_base = track_vals[:-1]
             for ctype in cnv_types:
                 tvals_out_sub = tvals_out_base + [ctype]
                 for cohort in cnvs.keys():
                     for ptype in phenotypes:
                         cbt = cnvs[cohort][ptype][ctype]
-                        hits = len(cbt.intersect(tpath, u=True, F=args.frac_overlap))
+                        xbt = xlist[cohort]
+                        tfilt = tbt.intersect(xbt, v=True)
+                        hits = len(cbt.intersect(tfilt, u=True, F=args.frac_overlap))
                         tvals_out_sub.append(str(hits))
                         if args.norm_by_samplesize:
-                            nohits = cohort_n[cohort][ptype] - hits
+                            n_sub = counts_by_context[ctype][ptype][cohort]
+                            nohits = cohort_n[cohort][ptype] - hits - n_sub
                             tvals_out_sub.append(str(nohits))
                         else:
                             nohits = cnv_counts[cohort][ptype][ctype] - hits

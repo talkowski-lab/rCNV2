@@ -87,6 +87,6 @@ out.pdf <- args$args[2]
 feats <- load.features(features.in, norm=T)
 
 # Plot feature matrix
-pdf(out.pdf, height=1.15, width=0.85)
+pdf(out.pdf, height=1, width=0.85)
 plot.mini.heat(feats, n.genes=60, n.feats=25)
 dev.off()

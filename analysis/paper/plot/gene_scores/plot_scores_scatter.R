@@ -385,6 +385,5 @@ plot.gradients(scores, ds.gradient.norm, ds.gradient.pal,
 hits.gradient <- scores$pTriplo - scores$pHaplo
 hits.gradient.norm <- round(((100*hits.gradient) + 100) / 2)
 plot.gradients(scores, hits.gradient.norm, hits.gradient.pal,
-               null.x=0.5, null.y=0.5,
                hist.x.ax.title="\"pTriplo\" - \"pHaplo\"",
                sub.out.prefix="hi_ts_gradient")

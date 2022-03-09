@@ -207,7 +207,7 @@ def parse_stats(stats_in, primary_p_cutoff, p_is_neg_log10=True,
                 secondary_for_fdr=False, sig_only=False, keep_genes=None, 
                 finemap_secondary=False):
     """
-    Input: csv.reader of meta-analysis association stats
+    Input: .bed file of meta-analysis association stats
     Output: dict of gene stats (either sig_only or all genes in reader)
     """
 

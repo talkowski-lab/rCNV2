@@ -708,6 +708,7 @@ make.meta.lookup.table <- function(stats.merged, cohorts, model, adjust.biobanks
 #' tail of distribution \[default: FALSE\]
 #' @param mirror mirror bottom 50% of Z-scores \[default: FALSE\]
 #' @param neglog10 boolean indicator of whether to -log10-scale adjusted P-values
+#' @param lower.tail boolean indicator of whether lower-tail P-values should be returned \[default: FALSE\]
 #'
 #' @return data.frame with two columns:
 #' * `$zscores` for corrected Z-scores
@@ -715,7 +716,7 @@ make.meta.lookup.table <- function(stats.merged, cohorts, model, adjust.biobanks
 #'
 #' @export
 saddlepoint.adj <- function(zscores, xidxs=NULL, winsorize=1, winsorize.left.tail=F,
-                            mirror=F, neglog10=T){
+                            mirror=F, neglog10=T, lower.tail=F){
   zscores.orig <- zscores
   if(!is.null(xidxs)){
     zscores <- zscores[-xidxs]
@@ -742,9 +743,9 @@ saddlepoint.adj <- function(zscores, xidxs=NULL, winsorize=1, winsorize.left.tai
   # Compute new Z-scores and P-values
   new.zscores <- (zscores.orig - mu.saddle) / sd.saddle
   if(neglog10==T){
-    new.pvals <- -pnorm(new.zscores, lower.tail=FALSE, log.p=TRUE)/log(10)
+    new.pvals <- -pnorm(new.zscores, lower.tail=lower.tail, log.p=TRUE)/log(10)
   }else{
-    new.pvals <- pnorm(new.zscores, lower.tail=FALSE)
+    new.pvals <- pnorm(new.zscores, lower.tail=lower.tail)
   }
   return(data.frame("zscores" = new.zscores, "pvalues" = new.pvals))
 }

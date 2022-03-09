@@ -152,8 +152,6 @@ prune.hpo.jaccard.matrix <- function(hpo.jac, sample.sizes, max.jac=0.5,
 }
 
 
-
-
 #' Inverse-variance weighted mean
 #'
 #' Compute inverse-variance weighted mean and 95% CI
@@ -176,3 +174,36 @@ inv.var.avg <- function(lnors, vars, conf=0.95){
   return(c(avg, lower.ci, upper.ci))
 }
 
+
+#' Get cytoband range
+#'
+#' Find & format the cytoband range overlapping a query interval
+#'
+#' @param chrom query chromosome
+#' @param start left-most coordinate of query interval
+#' @param end right-most coordinate of query interval
+#' @param cytobands.in path to UCSC-style cytobands BED file
+#' @param drop.subbands boolean indicator to round to the nearest whole band
+#' \[default: FALSE\]
+#'
+#' @return character of cytoband range
+#'
+#' @export
+get.cytoband.range <- function(chrom, start, end, cytobands.in, drop.subbands=FALSE){
+  cytos <- read.table(cytobands.in, sep="\t")
+  if(drop.subbands){
+    cytos[, 4] <- sapply(cytos[, 4], function(x){
+      unlist(strsplit(x, split=".", fixed=T))[1]
+    })
+  }
+  cytos <- cytos[which(cytos[, 1] == chrom
+                       & cytos[, 2] <= end
+                       & cytos[, 3] >= start), ]
+  cyto.range <- unique(c(head(cytos[, 4], 1), tail(cytos[, 4], 1)))
+  if(length(cyto.range) > 1){
+    if(substr(cyto.range[1], 1, 1) == substr(cyto.range[2], 1, 1)){
+      cyto.range[2] <- substring(cyto.range[2], 2)
+    }
+  }
+  return(paste(chrom, paste(cyto.range, collapse="-"), sep=""))
+}
