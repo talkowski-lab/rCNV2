@@ -118,8 +118,8 @@ for CNV in DEL DUP; do
   | awk -v OFS="\t" '{ print $4, $1, $2, $3 }' | sort -k1,1 \
   | join -j 1 -t $'\t' <( cat $CNV.all_sig_crbs.tsv | fgrep -v "#" | sort -k1,1 ) - \
   | awk -v OFS="\t" -v CNV=$CNV '{ print $3, $4, $5, $1, $2, CNV }' \
-  # | bedtools intersect -v -a - \
-  #   -b <( zcat rCNV.final_segments.loci.bed.gz | fgrep -w $CNV )
+  | bedtools intersect -v -a - \
+    -b <( zcat rCNV.final_segments.loci.bed.gz | fgrep -w $CNV )
 done
 
 # Copy all plots to final gs:// directory
