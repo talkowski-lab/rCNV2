@@ -275,16 +275,6 @@ for CNV in DEL DUP; do
 done | wc -l
 
 
-# Calculate number of genic associations not overlapping significant large segment
-for CNV in DEL DUP; do
-  zcat rCNV.final_genes.associations.bed.gz | fgrep -w $CNV \
-  | awk -v OFS="\t" '{ print $6"_"$1, $2, $3 }' \
-  | bedtools intersect -v -a - \
-    -b <( zcat rCNV.final_segments.associations.bed.gz | fgrep -w $CNV \
-          | awk -v OFS="\t" '{ print $6"_"$1, $2, $3 }' )
-done | wc -l
-
-
 # Count number of significant large segments with at least one confident fine-mapped gene
 for CNV in DEL DUP; do
   zcat rCNV.final_segments.loci.bed.gz \

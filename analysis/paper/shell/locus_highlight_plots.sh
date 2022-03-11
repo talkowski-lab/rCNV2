@@ -253,6 +253,83 @@ fdr_cutoff=$( /opt/rCNV2/analysis/other/estimate_p_for_fdr.R \
   main_highlights/IGF1R
 
 
+# Highlight panel for SHANK3 deletions
+if ! [ -e main_highlights ]; then
+  mkdir main_highlights
+fi
+/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_locus_highlight.R \
+  --case-hpos "HP:0000707" \
+  --highlight-hpo "HP:0012759" \
+  --highlights "22:50166930-51171641;22:51113069-51171641" \
+  --sumstats meta_stats/HP0012759.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz \
+  --genic-sumstats \
+  --cytobands refs/GRCh37.cytobands.bed.gz \
+  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
+  --label-genes "SHANK3" \
+  --genes-before-sumstats \
+  --constraint refs/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
+  --pips rCNV.DEL.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_no_variation_features.tsv \
+  --gw-sig-label "Exome-Wide Significance" \
+  --gw-sig-label-side "below" \
+  --standardize-frequencies \
+  --collapse-cohorts \
+  --idio-panel-space "$idio_space" \
+  --pval-panel-space "$pval_space" \
+  --or-panel-space "$or_space" \
+  --constraint-panel-space "$constraint_space" \
+  --pip-panel-space "$pip_space" \
+  --cnv-panel-space "$cnv_space" \
+  --cnv-panel-height "$cnv_height" \
+  --dx "$cnv_dx" \
+  --pdf-height "$pdf_height" \
+  22:49800000-51230000 \
+  cnvs.input.tsv \
+  DEL \
+  refs/HPOs_by_metacohort.table.tsv \
+  refs/GRCh37.genome \
+  main_highlights/SHANK3
+
+
+# Highlight panel for RAI1 deletions
+if ! [ -e main_highlights ]; then
+  mkdir main_highlights
+fi
+fdr_cutoff=$( /opt/rCNV2/analysis/other/estimate_p_for_fdr.R \
+                meta_stats/HP0012759.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz \
+                2>/dev/null )
+/opt/rCNV2/analysis/paper/plot/locus_highlights/plot_locus_highlight.R \
+  --case-hpos "HP:0000118" \
+  --highlight-hpo "HP:0012759" \
+  --highlights "17:16946073-19320589;17:17584786-17714767" \
+  --sumstats meta_stats/HP0012759.rCNV.DEL.gene_burden.meta_analysis.stats.bed.gz \
+  --genic-sumstats \
+  --cytobands refs/GRCh37.cytobands.bed.gz \
+  --gtf refs/gencode.v19.canonical.pext_filtered.gtf.gz \
+  --label-genes "RAI1" \
+  --genes-before-sumstats \
+  --constraint refs/gencode.v19.canonical.pext_filtered.constraint_features.bed.gz \
+  --pips rCNV.DEL.gene_fine_mapping.gene_stats.all_genes_from_blocks.merged_no_variation_features.tsv \
+  --gw-sig "$fdr_cutoff" \
+  --gw-sig-label "FDR < 1%" \
+  --standardize-frequencies \
+  --collapse-cohorts \
+  --idio-panel-space "$idio_space" \
+  --pval-panel-space "$pval_space" \
+  --or-panel-space "$or_space" \
+  --constraint-panel-space "$constraint_space" \
+  --pip-panel-space "$pip_space" \
+  --cnv-panel-space "$cnv_space" \
+  --cnv-panel-height "$cnv_height" \
+  --dx "$cnv_dx" \
+  --pdf-height "$pdf_height" \
+  17:15700000-20900000 \
+  cnvs.input.tsv \
+  DEL \
+  refs/HPOs_by_metacohort.table.tsv \
+  refs/GRCh37.genome \
+  main_highlights/RAI1
+
+
 # Copy all plots to final gs:// directory
 gsutil -m cp -r \
   all_large_segments \

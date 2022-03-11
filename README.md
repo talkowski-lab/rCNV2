@@ -29,10 +29,11 @@ If you use the code in this repository, please cite:
 
 ### Data access  
 
-All files pertaining to this project are stored in a protected Google Cloud bucket, here:  
-`gs://rcnv_project/`
-
-Note that permissions must be granted per user prior to data access.  
+The following datasets are hosted on [Zenodo]():  
+  * Association summary statistics from genome-wide sliding window meta-analyses for 54 phenotypes  
+  * Association summary statistics from exome-wide gene-based meta-analyses for 54 phenotypes  
+  * Feature matrix of 145 genomic annotations for all autosomal protein-coding genes
+  * Haploinsufficiency and triplosensitivity scores for all autosomal protein-coding genes  
 
 
 ### Docker  
