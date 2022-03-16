@@ -153,3 +153,4 @@ docs/
 po/*~
 
 # 
+.Rproj.user
