@@ -56,18 +56,3 @@ tabix -f GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz
 gsutil cp GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz* \
   gs://rcnv_project/cleaned_data/binned_genome/
 
-
-# # # Annotate bins with count of probes per array
-# for file in control_probesets/*bed.gz; do
-#   echo -e "$file\tcount\t$( basename $file | sed 's/\.bed\.gz//g' )"
-# done > probeset_tracks.athena.tsv
-# athena annotate-bins \
-#   --track-list probeset_tracks.athena.tsv \
-#   --bgzip \
-#   GRCh37.${binsize}kb_bins_${stepsize}kb_steps.raw.bed.gz \
-#   GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz
-# tabix -f GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz
-# gsutil cp GRCh37.${binsize}kb_bins_${stepsize}kb_steps.annotated.bed.gz* \
-#   gs://rcnv_project/cleaned_data/binned_genome/
-
-

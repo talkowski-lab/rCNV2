@@ -17,7 +17,7 @@ _Note: most subdirectories have their own documentation, which outlines specific
 | [`data_curation/`](https://github.com/talkowski-lab/rCNV2/tree/master/data_curation/) | Code for filtering & curation of CNV and annotation data |
 | [`docker/`](https://github.com/talkowski-lab/rCNV2/tree/master/docker/) | Dockerfile to build rCNV Docker image |
 | [`refs/`](https://github.com/talkowski-lab/rCNV2/tree/master/refs/) | Small reference files |
-| [`source/`](https://github.com/talkowski-lab/rCNV2/tree/master/source/) | Source code |  
+| [`source/`](https://github.com/talkowski-lab/rCNV2/tree/master/source/) | Source code for companion R package |  
 | [`utils/`](https://github.com/talkowski-lab/rCNV2/tree/master/utils/) | Miscellaneous small utilities and scripts |  
 
 
@@ -29,7 +29,7 @@ If you use the code in this repository, please cite:
 
 ### Data access  
 
-The following datasets are hosted on [Zenodo]():  
+The following datasets are hosted on [Zenodo](https://zenodo.org/record/6347673):  
   * Association summary statistics from genome-wide sliding window meta-analyses for 54 phenotypes  
   * Association summary statistics from exome-wide gene-based meta-analyses for 54 phenotypes  
   * Feature matrix of 145 genomic annotations for all autosomal protein-coding genes

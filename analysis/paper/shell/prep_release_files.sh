@@ -129,17 +129,17 @@ genes from Gencode v19. Each gene has the following 21 columns:
 14. meta_neg_log10_p: meta-analysis P-value scaled as -log10(P)
 15. meta_neg_log10_fdr_q: Benjamini-Hochberg corrected false discovery rate Q value
 16. meta_lnOR_secondary: same as column 10, but after excluding the cohort listed 
-    in column 5 from the meta-analysis
+    in column 6 from the meta-analysis
 17. meta_lnOR_lower_secondary: same as column 11, but after excluding the cohort 
-    listed in column 5 from the meta-analysis
+    listed in column 6 from the meta-analysis
 18. meta_lnOR_upper_secondary: same as column 12, but after excluding the cohort 
-    listed in column 5 from the meta-analysis
+    listed in column 6 from the meta-analysis
 19. meta_z_secondary: same as column 13, but after excluding the cohort listed 
-    in column 5 from the meta-analysis
+    in column 6 from the meta-analysis
 20. meta_neg_log10_p_secondary: same as column 14, but after excluding the cohort 
-    listed in column 5 from the meta-analysis
+    listed in column 6 from the meta-analysis
 21. meta_neg_log10_fdr_q_secondary: same as column 15, but after excluding the 
-    cohort listed in column 5 from the meta-analysis
+    cohort listed in column 6 from the meta-analysis
 EOF
 tar -czvf \
   ${prefix}_release_files/${prefix}.gene_association_sumstats.tar.gz \
