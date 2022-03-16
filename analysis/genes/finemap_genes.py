@@ -1559,13 +1559,6 @@ def main():
             rename(columns={'HPO' : '#HPO'}).\
             to_csv(args.genetic_outfile, sep='\t', index=False, na_rep='NA')
 
-    # # DEV: REMOVE THIS
-    # import pickle as pkl
-    # # pklfile = open('dev_data.pkl', 'wb')
-    # # pkl.dump([hpo_data, Wsq], pklfile)
-    # with open('dev_data.pkl', 'rb') as pklfile:
-    #     hpo_data, Wsq = pkl.load(pklfile)
-
     # Load & standardize gene features
     features = load_features(args.gene_features)
 
