@@ -816,7 +816,7 @@ plot.features.from.bedgraph <- function(bed, y0, col=blueblack, panel.height=0.2
 #' @param case.legend.topbottom vertical alignment for case legend \[default "top"]
 #' @param ctrl.legend.side side to plot control legend \[default: "left"\]
 #' @param cc.legend.colors vector of colors to apply to case & control legends \[default: blueblack\]
-#' @param cnv.lwd line width for each CNV \[default: 0.05\]
+#' @param cnv.lwd line width for each CNV \[default: 0\]
 #' @param add.cohort.label boolean indicator to print `cohort.label` on plot \[default: FALSE\]
 #' @param cohort.label text of cohort label \[default: no label\]
 #' @param panel.height relative height of panel \[default: 2\]
@@ -836,7 +836,7 @@ plot.cnv.panel.for.highlight <- function(cnvs, n.case, n.ctrl, y0, cnv.type,
                                          start=NULL, end=NULL, y.axis.title="CNV\nFreq.",
                                          expand.pheno.label=TRUE, case.legend.side="left",
                                          case.legend.topbottom="top", ctrl.legend.side="left",
-                                         cc.legend.colors=rep(blueblack, 2), cnv.lwd=0.05,
+                                         cc.legend.colors=rep(blueblack, 2), cnv.lwd=0,
                                          add.cohort.label=FALSE, cohort.label=NULL,
                                          panel.height=2, dx=100){
   # Standardize inputs
@@ -895,10 +895,16 @@ plot.cnv.panel.for.highlight <- function(cnvs, n.case, n.ctrl, y0, cnv.type,
   abline(h=c(y0, y0 + y.ax.tick.spacing, y0 - y.ax.tick.spacing), col="white")
 
   # Plot midline, pileups, and outlines
-  lapply(case.pileup$cnvs, function(l){polygon(l$x, y0 + l$y, border="white",
+  if(cnv.lwd == 0){
+    border <- NA
+    cnv.lwd <- 10e-9
+  }else{
+    border <- "white"
+  }
+  lapply(case.pileup$cnvs, function(l){polygon(l$x, y0 + l$y, border=border,
                                                col=l$color, lwd=cnv.lwd)})
   points(case.pileup$counts[, 1], case.pileup$counts[, 2] + y0, type="l", col=col.case.other)
-  lapply(ctrl.pileup$cnvs, function(l){polygon(l$x, y0 - l$y, border="white",
+  lapply(ctrl.pileup$cnvs, function(l){polygon(l$x, y0 - l$y, border=border,
                                                col=l$color, lwd=cnv.lwd)})
   points(ctrl.pileup$counts[, 1], -ctrl.pileup$counts[, 2] + y0, type="l", col=col.ctrl)
   abline(h=y0, col=col.midline)

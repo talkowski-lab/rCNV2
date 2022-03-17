@@ -20,7 +20,7 @@
   case.legend.topbottom = "top",
   ctrl.legend.side = "left",
   cc.legend.colors = rep(blueblack, 2),
-  cnv.lwd = 0.05,
+  cnv.lwd = 0,
   add.cohort.label = FALSE,
   cohort.label = NULL,
   panel.height = 2,
@@ -59,7 +59,7 @@
 
 \item{cc.legend.colors}{vector of colors to apply to case & control legends [default: blueblack]}
 
-\item{cnv.lwd}{line width for each CNV [default: 0.05]}
+\item{cnv.lwd}{line width for each CNV [default: 0]}
 
 \item{add.cohort.label}{boolean indicator to print \code{cohort.label} on plot [default: FALSE]}
 
