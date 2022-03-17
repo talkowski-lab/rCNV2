@@ -298,3 +298,28 @@ done < <( fgrep -v mega refs/rCNV_metacohort_list.txt )
 gsutil -m cp -r \
   gnomad_frequency_comparisons \
   ${rCNV_bucket}/analysis/paper/plots/misc/
+
+
+################################
+# UNKNOWN ASSOCIATION ANALYSIS #
+################################
+# Note: everything below this header is related to phenotype breakdowns of CNVs
+# in segments associated only with the UNKNOWN phenotype subgroup
+
+# Get list of segments associated only with the UNKNOWN subgroup
+zcat rCNV.final_segments.loci.bed.gz \
+| awk -v FS="\t" -v OFS="\t" '{ if ($16=="UNKNOWN") print $20, $5, $4 }' \
+> unknown_segs.tsv
+
+# Identify next-most significant HPO for these regions
+gsutil -m cp \
+  ${rCNV_bucket}/analysis/paper/data/large_segments/${prefix}.final_segments.loci.all_sumstats.tsv.gz \
+  ./
+while read ints cnv rid; do
+  zcat ${prefix}.final_segments.loci.all_sumstats.tsv.gz \
+  | awk -v rid="$rid" -v cnv=$cnv -v OFS="\t" \
+    '{ if ($1==rid && $3==cnv) print $2, $7 }' \
+  | sort -nrk2,2 | fgrep -v UNKNOWN | head -n1 | cut -f1 \
+  | fgrep -wf - refs/HPOs_by_metacohort.table.tsv | cut -f1-2
+done < unknown_segs.tsv | sort | uniq -c
+
