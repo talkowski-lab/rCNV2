@@ -663,6 +663,7 @@ sapply(names(dnms), function(cohort){
 
 # Collapsed distribution of excess DNMs across all NDD segments
 pct.cutoff <- 0
+width.buffer <- 0
 sapply(names(dnms), function(cohort){
   if(cohort == "DDD_plus_ASC"){
     min.excess.for.norm <- 1.9
@@ -670,9 +671,11 @@ sapply(names(dnms), function(cohort){
   }else if(cohort == "DDD"){
     min.excess.for.norm <- 0.9
     min.excess.ineq <- ">="
+    width.buffer <- 0.3
   }else{
     min.excess.for.norm <- 0.1
     min.excess.ineq <- ">"
+    width.buffer <- 0.3
   }
   sapply(csqs, function(csq){
     cnv.marker.wex <- 0
@@ -701,7 +704,7 @@ sapply(names(dnms), function(cohort){
                                round(min.excess.for.norm, 0), ")'", sep="")
     }
     pdf(paste(out.prefix,  cohort, csq, "excess_dnm_distrib_bygene.pdf", sep="."),
-        height=2, width=2.75)
+        height=2, width=2.75+width.buffer)
     dnm.excess.cdf.barplots(ndd.segs[which(ndd.segs$cnv %in% cnv.types), ],
                             dnms[[cohort]], cohort=cohort, csq=csq,
                             norm=F, legend=T, pct.cutoff=pct.cutoff,
@@ -710,7 +713,7 @@ sapply(names(dnms), function(cohort){
     dev.off()
     cat(paste(cohort, csq, "\n"))
     pdf(paste(out.prefix, cohort, csq, "excess_dnm_distrib_bygene.norm.pdf", sep="."),
-        height=2, width=2.5)
+        height=2, width=2.5+width.buffer)
     dnm.excess.cdf.barplots(ndd.segs[which(ndd.segs$cnv %in% cnv.types), ],
                             dnms[[cohort]], cohort=cohort, csq=csq,
                             min.excess=min.excess.for.norm, norm=T, legend=F,

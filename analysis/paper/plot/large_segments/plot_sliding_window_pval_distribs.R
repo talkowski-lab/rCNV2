@@ -319,6 +319,7 @@ primary.vs.secondary.scatter <- function(pvals.1, pvals.2, keep.idx=NULL,
 ### RSCRIPT BLOCK ###
 #####################
 require(rCNV2, quietly=T)
+require(rasterpdf, quietly=T)
 require(optparse, quietly=T)
 
 # List of command-line options
@@ -404,9 +405,14 @@ cat(paste("Median lambda, deletions & duplications only:", round(median(c(del.1$
 n.plots.wide <- 9
 n.plots.tall <- ceiling(length(hpos) / n.plots.wide)
 dim.scalar <- 7.5 / 10
-png(paste(out.prefix, "qq_grid_byHPO.png", sep="."),
-    height=dim.scalar*300*n.plots.tall, width=dim.scalar*300*n.plots.wide,
-    res=300)
+# png(paste(out.prefix, "qq_grid_byHPO.png", sep="."),
+#     height=dim.scalar*300*n.plots.tall, width=dim.scalar*300*n.plots.wide,
+#     res=300)
+raster_pdf(paste(out.prefix, "qq_grid_byHPO.pdf", sep="."),
+           height=dim.scalar*n.plots.tall, width=dim.scalar*n.plots.wide,
+           units="in", res=600)
+# pdf(paste(out.prefix, "qq_grid_byHPO.pdf", sep="."),
+#     height=dim.scalar*n.plots.tall, width=dim.scalar*n.plots.wide)
 par(mfrow=c(n.plots.tall, n.plots.wide))
 for(hpo in hpos){
   mini.qq(del.1, dup.1, hpo, title.cex=0.42, axis.cex=0.7, blue.bg=FALSE)
@@ -426,14 +432,22 @@ lambda.scatter(del.1, dup.1, hpo.n, blue.bg=FALSE)
 dev.off()
 
 # Scatterplots of primary vs. secondary P-values
-png(paste(out.prefix, "primary_vs_secondary_pvalue.DEL.png", sep="."),
-    height=prim.vs.sec.png.dim*300, width=prim.vs.sec.png.dim*300, res=300)
+# png(paste(out.prefix, "primary_vs_secondary_pvalue.DEL.png", sep="."),
+#     height=prim.vs.sec.png.dim*300, width=prim.vs.sec.png.dim*300, res=300)
+raster_pdf(paste(out.prefix, "primary_vs_secondary_pvalue.DEL.pdf", sep="."),
+           height=prim.vs.sec.png.dim, width=prim.vs.sec.png.dim, units="in", res=600)
+# pdf(paste(out.prefix, "primary_vs_secondary_pvalue.DEL.pdf", sep="."),
+#     height=prim.vs.sec.png.dim, width=prim.vs.sec.png.dim)
 primary.vs.secondary.scatter(del.1$pvals, del.2$pvals, cutoff.1=del.cutoff,
                              sig.color=cnv.colors[1], nonsig.color=control.cnv.colors[1],
                              pt.cex=0.175, blue.bg=FALSE, parmar=c(2.5, 2.5, 0.15, 0.15))
 dev.off()
-png(paste(out.prefix, "primary_vs_secondary_pvalue.DUP.png", sep="."),
-    height=prim.vs.sec.png.dim*300, width=prim.vs.sec.png.dim*300, res=300)
+# png(paste(out.prefix, "primary_vs_secondary_pvalue.DUP.png", sep="."),
+#     height=prim.vs.sec.png.dim*300, width=prim.vs.sec.png.dim*300, res=300)
+raster_pdf(paste(out.prefix, "primary_vs_secondary_pvalue.DUP.pdf", sep="."),
+           height=prim.vs.sec.png.dim, width=prim.vs.sec.png.dim, units="in", res=600)
+# pdf(paste(out.prefix, "primary_vs_secondary_pvalue.DUP.pdf", sep="."),
+#     height=prim.vs.sec.png.dim, width=prim.vs.sec.png.dim)
 primary.vs.secondary.scatter(dup.1$pvals, dup.2$pvals, cutoff.1=dup.cutoff,
                              sig.color=cnv.colors[2], nonsig.color=control.cnv.colors[2],
                              pt.cex=0.175, blue.bg=FALSE, parmar=c(2.5, 2.5, 0.15, 0.15))

@@ -178,6 +178,7 @@ mini.miami <- function(del, dup, max.p=10,
 ### RSCRIPT BLOCK ###
 #####################
 require(rCNV2, quietly=T)
+require(rasterpdf, quietly=T)
 require(optparse, quietly=T)
 
 # List of command-line options
@@ -231,4 +232,11 @@ png(out.png, height=dim.scalar*1.4*300, width=dim.scalar*1.95*300, res=300, fami
 mini.miami(del, dup, del.cutoff=del.cutoff, dup.cutoff=dup.cutoff, cutoff.label=cutoff.label,
            middle.axis.width=1.25, xaxis.label=xaxis.label, sig.col=graphabs.green, max.p=8)
 dev.off()
+out.pdf <- gsub(".png$", ".pdf", out.png)
+raster_pdf(out.pdf, height=dim.scalar*1.4, width=dim.scalar*1.95, units="in", res=600)
+# pdf(out.pdf, height=dim.scalar*1.4, width=dim.scalar*1.95)
+mini.miami(del, dup, del.cutoff=del.cutoff, dup.cutoff=dup.cutoff, cutoff.label=cutoff.label,
+           middle.axis.width=1.25, xaxis.label=xaxis.label, sig.col=graphabs.green, max.p=8)
+dev.off()
+
 

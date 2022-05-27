@@ -88,7 +88,7 @@ RUN apt-get -qqy clean && \
 # (Note that beeswarm _is_ available through conda but we need >=v0.4, and there 
 #  is a very complex dependency issue in conda that makes it easier to install 
 #  directly with R here)
-RUN Rscript -e "sapply(c('EQL', 'beeswarm'),\
+RUN Rscript -e "sapply(c('EQL', 'beeswarm', 'rasterpdf'),\
     function(pkg){install.packages(pkg,repos='https://cloud.r-project.org')})"
 ARG rCNV2_Rpkg_source="/opt/rCNV2/source/rCNV2_0.1.0.tar.gz"
 RUN Rscript -e "install.packages('$rCNV2_Rpkg_source', source=TRUE, repos=NULL)"
