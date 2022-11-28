@@ -1,13 +1,13 @@
 Package: rCNV2
 Type: Package
 Title: Built-in functions for rare copy number variation analyses (rCNV2 project)
-Version: 0.1.0
+Version: 1.0.0
 Author: Ryan L. Collins <rlcollins@g.harvard.edu>
 Maintainer: Ryan L. Collins <rlcollins@g.harvard.edu>
 Description: This package contains functions, constants, and other utilities used
   in the aggregation and analsyes of rare copy-number variants across disorder. 
     Please refer to the rCNV2 repository on GitHub for related code: https://github.com/talkowski-lab/rCNV2 
-    For more details on the study, please refer to Collins et al., medRxiv (2021)
+    For more details on the study, please refer to Collins et al., Cell (2022)
 License: M.I.T. License
 Encoding: UTF-8
 LazyData: true

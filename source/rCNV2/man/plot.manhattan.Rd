@@ -16,8 +16,10 @@
   lab.prefix = NULL,
   ymax = NULL,
   reflection = F,
+  chrom.label.spacing = 0.05,
   pt.cex = 0.2,
   label.cex = 1,
+  chrom.label.cex = 0.75,
   y.ax.cex = 0.75
 )
 }
@@ -44,9 +46,14 @@
 
 \item{reflection}{boolean indicator to invert plot (useful for Miami plots)}
 
+\item{chrom.label.spacing}{minimum spacing between X-axis chromsome labels,
+specified as a proportion of the total X axis length [default: 0.05]}
+
 \item{pt.cex}{scaling factor for points [default: 0.2]}
 
 \item{label.cex}{scaling factor for label text}
+
+\item{chrom.label.cex}{scaling factor for chromosome labels on X-axis [default: 0.75]}
 
 \item{y.ax.cex}{scaling factor for labels on Y-axis [default: 0.75]}
 }

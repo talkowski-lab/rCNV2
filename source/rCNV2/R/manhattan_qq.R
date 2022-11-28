@@ -72,8 +72,11 @@ load.manhattan.stats <- function(stats.in, p.col.name="p", p.is.neg.log10=F, min
 #' @param lab.prefix prefix to prepend to various labels
 #' @param ymax maximum Y-value to plot \[default: same as smallest P-value\]
 #' @param reflection boolean indicator to invert plot (useful for Miami plots)
+#' @param chrom.label.spacing minimum spacing between X-axis chromsome labels,
+#' specified as a proportion of the total X axis length \[default: 0.05\]
 #' @param pt.cex scaling factor for points \[default: 0.2\]
 #' @param label.cex scaling factor for label text
+#' @param chrom.label.cex scaling factor for chromosome labels on X-axis \[default: 0.75\]
 #' @param y.ax.cex scaling factor for labels on Y-axis \[default: 0.75\]
 #'
 #' @return None
@@ -88,7 +91,10 @@ plot.manhattan <- function(df, cutoff=1e-08, highlights=NULL,
                            cutoff.color="#D01C8B",
                            lab.prefix=NULL,
                            ymax=NULL, reflection=F,
-                           pt.cex=0.2, label.cex=1, y.ax.cex=0.75){
+                           chrom.label.spacing=0.05,
+                           pt.cex=0.2, label.cex=1,
+                           chrom.label.cex=0.75,
+                           y.ax.cex=0.75){
   contigs <- unique(df[, 1])
   contigs <- contigs[which(!(is.na(contigs)))]
 
@@ -200,17 +206,16 @@ plot.manhattan <- function(df, cutoff=1e-08, highlights=NULL,
   midpoints <- sapply(1:length(indexes[, 2]), function(i){
     return(mean(c(indexes[i, 4], indexes[i, 4] - indexes[i, 3])))
   })
-  xlab.frac <- 0.075
+  xlab.frac <- chrom.label.spacing
   xlab.bins <- seq(0, max(indexes$sum), xlab.frac * max(indexes$sum))
   xlab.contigs <- unique(sapply(xlab.bins, function(pos){
-    # which(pos<=indexes$sum & pos>=cumsum(c(0,indexes[-1, 3])))[1]
     which(abs(midpoints-pos)==min(abs(midpoints-pos)))
   }))
-  long.contigs <- which(indexes[, 3]/max(indexes$sum) > 0.0475)
+  long.contigs <- which(indexes[, 3]/max(indexes$sum) > chrom.label.spacing)
   xlab.contigs <- unique(c(xlab.contigs, long.contigs))
   sapply(xlab.contigs, function(k){
     axis(x.ax, at=midpoints[k], labels=indexes[k, 1],
-         tick=F, line=-1.1, cex.axis=0.75,
+         tick=F, line=-1.1, cex.axis=chrom.label.cex,
          col.axis=indexes$bg[k])
   })
   if(x.title == T){
