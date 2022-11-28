@@ -104,6 +104,7 @@ plot.manhattan <- function(df, cutoff=1e-08, highlights=NULL,
   indexes$sum <- cumsum(indexes[, 3])
   indexes$bg <- colors
   indexes[, 2:4] <- apply(indexes[, 2:4], 2, as.numeric)
+  indexes$sum_prev <- c(0, indexes$sum[-nrow(indexes)])
 
   df.plot <- as.data.frame(t(apply(df, 1, function(row){
     contig.idx <- which(indexes[, 1]==row[1])
@@ -203,16 +204,16 @@ plot.manhattan <- function(df, cutoff=1e-08, highlights=NULL,
   }
 
   axis(x.ax, at=c(0, max(indexes$sum)), tck=0, labels=NA)
-  midpoints <- sapply(1:length(indexes[, 2]), function(i){
-    return(mean(c(indexes[i, 4], indexes[i, 4] - indexes[i, 3])))
-  })
-  xlab.frac <- chrom.label.spacing
-  xlab.bins <- seq(0, max(indexes$sum), xlab.frac * max(indexes$sum))
-  xlab.contigs <- unique(sapply(xlab.bins, function(pos){
-    which(abs(midpoints-pos)==min(abs(midpoints-pos)))
+  chrom.label.gates <- max(indexes$sum) * seq(chrom.label.spacing/2,
+                                              1-(chrom.label.spacing/2),
+                                              chrom.label.spacing)
+  xlab.contigs <- unique(sapply(chrom.label.gates, function(x){
+    # Find chromosome encompassing gate x
+    which(indexes$sum >= x & indexes$sum_prev <= x)
   }))
-  long.contigs <- which(indexes[, 3]/max(indexes$sum) > chrom.label.spacing)
-  xlab.contigs <- unique(c(xlab.contigs, long.contigs))
+  midpoints <- sapply(1:length(indexes[, 2]), function(i){
+      return(mean(c(indexes[i, 4], indexes[i, 4] - indexes[i, 3])))
+    })
   sapply(xlab.contigs, function(k){
     axis(x.ax, at=midpoints[k], labels=indexes[k, 1],
          tick=F, line=-1.1, cex.axis=chrom.label.cex,
