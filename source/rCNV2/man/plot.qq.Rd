@@ -6,6 +6,7 @@
 \usage{
 \method{plot}{qq}(
   stats,
+  smallest.p = NULL,
   cutoff = NULL,
   highlights = NULL,
   highlight.color = "#4EE69A",
@@ -24,7 +25,9 @@
 \arguments{
 \item{stats}{data frame of association statistics as read by \code{\link[=read.manhattan.stats]{read.manhattan.stats()}}}
 
-\item{cutoff}{smallest P-value to render}
+\item{smallest.p}{smallest P-value to render}
+
+\item{cutoff}{P-value threshold for significance}
 
 \item{highlights}{data frame of regions to highlight}
 

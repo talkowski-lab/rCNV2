@@ -246,7 +246,8 @@ plot.manhattan <- function(df, cutoff=1e-08, highlights=NULL,
 #' Generate a Q-Q plot of association stats vs. uniform null
 #'
 #' @param stats data frame of association statistics as read by [read.manhattan.stats()]
-#' @param cutoff smallest P-value to render
+#' @param smallest.p smallest P-value to render
+#' @param cutoff P-value threshold for significance
 #' @param highlights data frame of regions to highlight
 #' @param highlight.color color to use for highlighted points
 #' @param highlight.name label for highlighted points
@@ -265,7 +266,7 @@ plot.manhattan <- function(df, cutoff=1e-08, highlights=NULL,
 #'
 #' @export plot.qq
 #' @export
-plot.qq <- function(stats, cutoff=NULL, highlights=NULL,
+plot.qq <- function(stats, smallest.p=NULL, cutoff=NULL, highlights=NULL,
                     highlight.color="#4EE69A",
                     highlight.name="Positive Controls",
                     print.stats=T, echo.lambdas=F,
@@ -346,16 +347,19 @@ plot.qq <- function(stats, cutoff=NULL, highlights=NULL,
       }
     }
 
+    if(is.null(smallest.p)){
+      smallest.p <- 0.05/length(p)
+    }
     if(is.null(cutoff)){
-      cutoff <- 0.05/length(p)
+      cutoff <- smallest.p
     }
 
     if(is.null(ymax)){
       maxp <- max(-log10(p[which(!(is.infinite(-log10(p))))]))
-      if(is.null(cutoff)){
+      if(is.null(smallest.p)){
         ymax <- maxp
       }else{
-        ymax <- max(maxp, -log10(cutoff) + 2)
+        ymax <- max(maxp, -log10(smallest.p) + 2)
       }
     }
 
