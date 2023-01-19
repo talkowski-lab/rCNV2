@@ -16,7 +16,9 @@
   xmax = NULL,
   ymax = NULL,
   reflection = F,
-  label.cex = 1
+  label.cex = 1,
+  pt.color = "grey15",
+  pt.cex = 0.2
 )
 }
 \arguments{
@@ -44,6 +46,10 @@ stdout (for logging purposes) [default: FALSE]}
 \item{reflection}{boolean indicator to invert plot (useful for Miami plots)}
 
 \item{label.cex}{scaling factor for label text}
+
+\item{pt.color}{color for all points [default: "grey15"]}
+
+\item{pt.cex}{scaling factor for all points [default: 0.2]}
 }
 \value{
 None

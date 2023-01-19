@@ -258,6 +258,8 @@ plot.manhattan <- function(df, cutoff=1e-08, highlights=NULL,
 #' @param ymax maximum Y-value to plot \[default: same as smallest P-value\]
 #' @param reflection boolean indicator to invert plot (useful for Miami plots)
 #' @param label.cex scaling factor for label text
+#' @param pt.color color for all points \[default: "grey15"\]
+#' @param pt.cex scaling factor for all points \[default: 0.2\]
 #'
 #' @return None
 #'
@@ -268,7 +270,7 @@ plot.qq <- function(stats, cutoff=NULL, highlights=NULL,
                     highlight.name="Positive Controls",
                     print.stats=T, echo.lambdas=F,
                     legend=T, xmax=NULL, ymax=NULL, reflection=F,
-                    label.cex=1){
+                    label.cex=1, pt.color="grey15", pt.cex=0.2){
 
   # Dummy function to plot N/A QQ for analyses with no cases
   empty.qq <- function(){
@@ -289,7 +291,7 @@ plot.qq <- function(stats, cutoff=NULL, highlights=NULL,
   if(all(p==1 | is.na(p) | is.nan(p) | is.infinite(p))){
     empty.qq()
   }else{
-    colors <- rep("grey15", times=length(p))
+    colors <- rep(pt.color, times=length(p))
     if(!is.null(highlights)){
       hits <- sort(unique(unlist(apply(highlights, 1, function(coords){
         which(stats$chr == as.character(coords[1])
@@ -416,14 +418,14 @@ plot.qq <- function(stats, cutoff=NULL, highlights=NULL,
       }
     }
 
-    points(x=expected, y=p, pch=19, col=colors, cex=0.2)
+    points(x=expected, y=p, pch=19, col=colors, cex=pt.cex)
 
     if(!is.null(highlights)){
       if(any(colors == highlight.color)){
         points(x=expected[which(colors == highlight.color)],
                y=p[which(colors == highlight.color)],
                col=colors[which(colors == highlight.color)],
-               pch=19, cex=0.2)
+               pch=19, cex=pt.cex)
       }
       if(legend==T){
         legend("left", pch=19, col=highlight.color, cex=0.5,
