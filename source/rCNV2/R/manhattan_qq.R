@@ -359,7 +359,7 @@ plot.qq <- function(stats, smallest.p=NULL, cutoff=NULL, highlights=NULL,
       if(is.null(smallest.p)){
         ymax <- maxp
       }else{
-        ymax <- max(maxp, -log10(smallest.p) + 2)
+        ymax <- min(maxp, -log10(smallest.p) + 2)
       }
     }
 

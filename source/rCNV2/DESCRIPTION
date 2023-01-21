@@ -1,7 +1,7 @@
 Package: rCNV2
 Type: Package
 Title: Built-in functions for rare copy number variation analyses (rCNV2 project)
-Version: 1.0.0
+Version: 1.0.1
 Author: Ryan L. Collins <rlcollins@g.harvard.edu>
 Maintainer: Ryan L. Collins <rlcollins@g.harvard.edu>
 Description: This package contains functions, constants, and other utilities used
