@@ -140,36 +140,47 @@ color.points.by.density <- function(x, y, palette=NULL){
 #'
 #' @param x independent variable vector
 #' @param y dependent variable vector
+#' @param palette function to generate a color palette \[default: Viridis\]
+#' @param add superimpose plot on existing device \[default: generate new device\]
 #' @param pt.cex scaling factor for points
+#' @param xpd `xpd` parameter passed to [points]
 #' @param parmar argument for option(parmar=...)
 #' @param add.cor boolean indicator to add correlation coefficient to plot \[default: TRUE\]
 #' @param plot.cor boolean indicator to plot linear best-fit line below plot \[default: TRUE\]
 #'
 #' @return None
 #'
-#' @seealso [color.points.by.density()]
+#' @seealso [color.points.by.density()], [colorRampPalette]
 #'
 #' @export dens.scatter
 #' @export
-dens.scatter <- function(x, y, pt.cex=1, parmar=rep(0.5, 4), add.cor=T, plot.cor=T){
+dens.scatter <- function(x, y, palette=NULL, add=FALSE, pt.cex=1, xpd=F,
+                         parmar=rep(0.5, 4), add.cor=T, plot.cor=T){
   # Based on heatscatter.R from Colby Chiang
   # (https://github.com/cc2qe/voir/blob/master/bin/heatscatter.R)
-  par(mar=parmar, bty="o")
   plot.df <- data.frame("x"=x, "y"=y)
   plot.df <- plot.df[which(!is.infinite(plot.df$x) & !is.infinite(plot.df$y)
                            & !is.na(plot.df$x) & !is.na(plot.df$y)), ]
   dens <- densCols(plot.df$x, plot.df$y, colramp=colorRampPalette(c("black", "white")))
   plot.df$dens <- col2rgb(dens)[1, ] + 1L
-  palette <- colorRampPalette(c("#440154", "#33638d", "#218f8d",
-                                "#56c667", "#fde725"))(256)
+  if(is.null(palette)){
+    palette <- colorRampPalette(c("#440154", "#33638d", "#218f8d",
+                                           "#56c667", "#fde725"))(256)
+  }else{
+    palette <- palette(256)
+  }
+
   plot.df$col <- palette[plot.df$dens]
   plot.df <- plot.df[order(plot.df$dens), ]
-  plot(plot.df$x, plot.df$y, type="n",
-       xlab="", xaxt="n", ylab="", yaxt="n")
+  if(!add){
+    par(mar=parmar, bty="o")
+    plot(plot.df$x, plot.df$y, type="n",
+         xlab="", xaxt="n", ylab="", yaxt="n")
+  }
   if(plot.cor){
     abline(lm(y ~ x, data=plot.df), lwd=2)
   }
-  points(plot.df$x, plot.df$y, col=plot.df$col, pch=19, cex=pt.cex)
+  points(plot.df$x, plot.df$y, col=plot.df$col, pch=19, cex=pt.cex, xpd=xpd)
   if(add.cor==T){
     r <- cor(plot.df$x, plot.df$y)
     text(x=par("usr")[2], y=par("usr")[3]+(0.075*(par("usr")[4]-par("usr")[3])),

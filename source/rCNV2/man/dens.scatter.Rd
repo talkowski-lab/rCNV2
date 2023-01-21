@@ -4,14 +4,30 @@
 \alias{dens.scatter}
 \title{Density-colored scatterplot}
 \usage{
-dens.scatter(x, y, pt.cex = 1, parmar = rep(0.5, 4), add.cor = T, plot.cor = T)
+dens.scatter(
+  x,
+  y,
+  palette = NULL,
+  add = FALSE,
+  pt.cex = 1,
+  xpd = F,
+  parmar = rep(0.5, 4),
+  add.cor = T,
+  plot.cor = T
+)
 }
 \arguments{
 \item{x}{independent variable vector}
 
 \item{y}{dependent variable vector}
 
+\item{palette}{function to generate a color palette [default: Viridis]}
+
+\item{add}{superimpose plot on existing device [default: generate new device]}
+
 \item{pt.cex}{scaling factor for points}
+
+\item{xpd}{\code{xpd} parameter passed to \link{points}}
 
 \item{parmar}{argument for option(parmar=...)}
 
@@ -26,5 +42,5 @@ None
 Generate a 2D scatterplot colored by local density
 }
 \seealso{
-\code{\link[=color.points.by.density]{color.points.by.density()}}
+\code{\link[=color.points.by.density]{color.points.by.density()}}, \link{colorRampPalette}
 }
