@@ -212,8 +212,8 @@ plot.manhattan <- function(df, cutoff=1e-08, highlights=NULL,
     which(indexes$sum >= x & indexes$sum_prev <= x)
   }))
   midpoints <- sapply(1:length(indexes[, 2]), function(i){
-      return(mean(c(indexes[i, 4], indexes[i, 4] - indexes[i, 3])))
-    })
+    return(mean(c(indexes[i, 4], indexes[i, 4] - indexes[i, 3])))
+  })
   sapply(xlab.contigs, function(k){
     axis(x.ax, at=midpoints[k], labels=indexes[k, 1],
          tick=F, line=-1.1, cex.axis=chrom.label.cex,
@@ -347,20 +347,22 @@ plot.qq <- function(stats, smallest.p=NULL, cutoff=NULL, highlights=NULL,
       }
     }
 
-    if(is.null(smallest.p)){
-      smallest.p <- 0.05/length(p)
-    }
     if(is.null(cutoff)){
-      cutoff <- smallest.p
+      cutoff <- 0.05/length(p)
+    }
+
+    if(!is.null(smallest.p)){
+      if(any(p < smallest.p)){
+        p[which(p < smallest.p)] <- smallest.p
+        p.rounded <- TRUE
+      }else{
+        p.rounded <- FALSE
+      }
     }
 
     if(is.null(ymax)){
       maxp <- max(-log10(p[which(!(is.infinite(-log10(p))))]))
-      if(is.null(smallest.p)){
-        ymax <- maxp
-      }else{
-        ymax <- max(c(maxp, -log10(cutoff))) + 2
-      }
+      ymax <- max(c(maxp, -log10(cutoff) + 2))
     }
 
     expected <- -log10(expected)
@@ -400,11 +402,11 @@ plot.qq <- function(stats, smallest.p=NULL, cutoff=NULL, highlights=NULL,
     if (print.stats == T){
       xpos.adjust <- 0.025
       stat.label.color <- "gray20"
-      if(reflection == T){
-        ypos.ref <- par("usr")[3]
-      }else{
-        ypos.ref <- par("usr")[4]
-      }
+        if(reflection == T){
+          ypos.ref <- par("usr")[3]
+        }else{
+          ypos.ref <- par("usr")[4]
+        }
       if(is.null(highlights)){
         text(par("usr")[1] - (xpos.adjust * (par("usr")[2] - par("usr")[1])),
              lambda.ypos[1] * ypos.ref, pos=4, font=2, cex=0.8, col=stat.label.color,
@@ -454,6 +456,10 @@ plot.qq <- function(stats, smallest.p=NULL, cutoff=NULL, highlights=NULL,
     axis(2, at=c(0, 10e10), labels=NA, tck=0)
     axis(2, at=y.at, labels=NA, tck=-0.02)
     axis(2, at=y.at, cex.axis=0.75, tick=F, line=-0.6, las=2, labels=abs(y.at))
+    if(p.rounded){
+      axis(2, at=-log10(smallest.p), tick=F, las=2, line=-0.9, cex.axis=0.75,
+           labels=bquote("" >= .(-log10(smallest.p))))
+    }
     mtext(2, text=expression(Observed ~ ~-log[10](italic(p))),
           line=1.5, cex=label.cex)
   }
