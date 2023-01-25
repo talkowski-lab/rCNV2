@@ -351,12 +351,11 @@ plot.qq <- function(stats, smallest.p=NULL, cutoff=NULL, highlights=NULL,
       cutoff <- 0.05/length(p)
     }
 
+    p.rounded <- FALSE
     if(!is.null(smallest.p)){
       if(any(p < smallest.p)){
         p[which(p < smallest.p)] <- smallest.p
         p.rounded <- TRUE
-      }else{
-        p.rounded <- FALSE
       }
     }
 
