@@ -453,13 +453,15 @@ plot.qq <- function(stats, smallest.p=NULL, cutoff=NULL, highlights=NULL,
     }else{
       y.at <- seq(0, ceiling(par("usr")[4]), by=ceiling(par("usr")[4]/6))
     }
+    if(p.rounded){
+      y.at <- y.at[-length(y.at)]
+      axis(2, at=-log10(smallest.p), labels=NA, tck=-0.02)
+      axis(2, at=-log10(smallest.p), tick=F, las=2, line=-0.6, cex.axis=0.75,
+           labels=bquote("" >= .(-log10(smallest.p))))
+    }
     axis(2, at=c(0, 10e10), labels=NA, tck=0)
     axis(2, at=y.at, labels=NA, tck=-0.02)
     axis(2, at=y.at, cex.axis=0.75, tick=F, line=-0.6, las=2, labels=abs(y.at))
-    if(p.rounded){
-      axis(2, at=-log10(smallest.p), tick=F, las=2, line=-0.9, cex.axis=0.75,
-           labels=bquote("" >= .(-log10(smallest.p))))
-    }
     mtext(2, text=expression(Observed ~ ~-log[10](italic(p))),
           line=1.5, cex=label.cex)
   }
